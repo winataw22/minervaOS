@@ -34,8 +34,8 @@
 - Different high level modules
  - flist
  - storage
-  - disks mangement
-  - 0-db
+   - disks mangement
+   - 0-db
  - network
    - CNI spec
    - port sharing management
@@ -44,15 +44,15 @@
    - service discovery (envoy)
    - wireguard
  - container
-  - OCI spec
-  - runc (is runc the implementation we want to use ?)
+   - OCI spec
+   - runc (is runc the implementation we want to use ?)
  - VM
-  - QEmu/KVM
+   - QEmu/KVM
  - metric/monitoring
-  - rtinfo
-  - prometheus node-exporter
-  - redis aggregation
-  - UI about system status Read Only
+   - rtinfo
+   - prometheus node-exporter
+   - redis aggregation
+   - UI about system status Read Only
 
 - @delandtj/azmy : define/desing public API/DSL
 
