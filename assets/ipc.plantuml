@@ -1,0 +1,20 @@
+@startuml
+
+== Initialization ==
+Module -> MsgBroker: Announce Module
+MsgBroker -> Module: create bi-directional channel
+
+== Utilisation ==
+loop
+    DSL -> MsgBroker: put RPC message
+    activate MsgBroker
+    Module <- MsgBroker: pull RPC message
+    activate Module
+    Module -> Module: execute method
+    Module -> MsgBroker: put reponse
+    deactivate Module
+    MsgBroker -> DSL : read reponse
+    deactivate MsgBroker
+end
+
+@enduml
