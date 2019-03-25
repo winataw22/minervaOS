@@ -8,10 +8,8 @@ A sort of secured, inter process communication is needed, where the api can reac
 also, handle different signals when an event that require attention. For example a `network` manager needs
 to free up a virtual network device when the VM that uses it exits.
 
-I did some research on the matter, and I found the [`DBus`](https://www.freedesktop.org/wiki/Software/dbus/) solution really powerful, and easy to use. A nice GO binding is available [here](https://github.com/godbus/dbus).
-
-I experimented with the `dbus` binding in go with good results. A server need to define an interface, then provide the implementation
-for that interface. Calling from other apps is easy once you know the bus-name, object, and method signature you want to call.
+We did some research for the best inter-process bus solution we can have, but unfortunately the available solution didn't
+fit precisely (for exampele DBus, and gRPC). Hence we built our own solution [zbus](zbus.md)
 
 ## Overview
 The API will receive a DSL that describes a certain service. For example a container. While the dsl is not specified yet, we can have this
@@ -27,7 +25,7 @@ pseudo dsl script
             # network specs
 ```
 
-The api, will use DBUS to find out who implements the `network` api, and doing the required calls on the network component (over dbus),
+The api, will use the bus to find out who implements the `network` api, and doing the required calls on the network component (over zbus),
 then just passing the results to the container component, to do it's part.
 
 In this scenario, the API is a DSL interpreter and a broker that can ask proper components for an object.

@@ -10,10 +10,12 @@
 - Disque
 - Rabbitmq
 
-> I think disque is a really nice option
 
 ## Overview
 ![ipc overview](../assets/ipc.png)
+
+## POC
+Please check [zbus](https://github.com/threefoldtech/zbus) for a proof of concept
 
 ## Example
 
