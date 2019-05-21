@@ -55,11 +55,6 @@ func main() {
 }
 
 func bootstrap() error {
-	z := zinit.New("")
-	if err := z.Connect(); err != nil {
-		return err
-	}
-
 	log.Info().Msg("Start network bootstrap")
 	if err := network.Bootstrap(); err != nil {
 		return err
@@ -76,5 +71,5 @@ func bootstrap() error {
 		return err
 	}
 
-	return z.Monitor("dhcp_zos")
+	return zinit.Monitor("dhcp_zos")
 }

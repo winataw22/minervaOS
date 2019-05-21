@@ -1,4 +1,0 @@
-exec: /bin/storaged
-oneshot: true
-after:
-  - udev-trigger

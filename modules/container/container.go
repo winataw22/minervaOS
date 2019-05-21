@@ -302,7 +302,7 @@ func (c *containerModule) Delete(ns string, id modules.ContainerID) error {
 			if trials <= 0 {
 				signal = syscall.SIGKILL
 			}
-			_ = task.Kill(ctx, signal)
+			task.Kill(ctx, signal)
 			trials--
 			select {
 			case <-exitC:

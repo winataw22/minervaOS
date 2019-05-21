@@ -51,7 +51,11 @@ func isPlugged(inf string) bool {
 		return false
 	}
 	data = bytes.TrimSpace(data)
-	return string(data) != "1"
+	if string(data) != "1" {
+		return false
+	}
+
+	return true
 }
 
 func isVirtEth(inf string) bool {

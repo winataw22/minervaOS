@@ -1,2 +1,0 @@
-exec: ash /etc/zinit/init/cgroup.sh
-oneshot: true
