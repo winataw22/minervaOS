@@ -1,0 +1,54 @@
+@startuml
+
+Title Container module flow
+
+actor tftech
+actor reservation
+control module
+control shim
+entity runc
+
+
+== Create container ==
+reservation -> module: reservation request\n to deploy a container
+activate module
+module -> shim: Start shim process
+activate shim
+module -> shim: Create container
+shim -> runc: Create container
+activate runc
+runc -> container: Create container
+activate container
+runc --> shim: container created
+deactivate runc
+shim --> module: container created
+
+== Start container ==
+module -> shim: Start container
+shim -> runc: Start container
+activate runc
+runc -> container: start container
+container -> runc: container started
+deactivate runc
+
+== Upgrade module ==
+tftech -> module: publish upgrade
+deactivate module
+module -> module: restart/upgrade
+note left: container module is restarted,\n but the container itself is untouched
+activate module
+
+== Stop container ==
+module -> shim: stop container
+shim -> runc: stop container
+runc -> container: stop container
+deactivate container
+container --> runc: container stopped
+runc --> shim: container stopped
+shim --> module: container stopped
+
+module -> shim: kill shim
+deactivate shim
+deactivate module
+
+@enduml

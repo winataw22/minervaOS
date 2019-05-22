@@ -1,0 +1,35 @@
+@startuml
+title Provisioning a workload on the TFGrid
+
+autonumber
+actor "User 3Bot" as user
+actor "Farmer 3Bot" as farmer
+database "TF Directory" as directory
+database TFChain as tfchain
+database "Notary Chain" as notarychain
+boundary Node as node
+
+== Resource research ==
+user -> directory: User look where to deploy the workload
+activate directory
+user <- directory: Gives detail about the farmer owning the node selected
+deactivate directory
+== Resource negotiation ==
+user -> farmer: Start negotiation
+activate farmer
+farmer <-> user: negotiate prices
+deactivate farmer
+== Resource reservation  ==
+user -> tfchain: lock some TFT
+user -> notarychain: write description of the workload
+user -> node: notify some provisioning is waiting
+activate node
+== Resource provisioning  ==
+node -> notarychain: read description of the workload
+node -> node: provision workload
+node -> user: notify workload is ready
+deactivate node
+tfchain -> farmer: TFT are unlock progresively to the farmer
+== Resource monitoring ==
+user <-> node: monitor workload
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+actor User as user 
+box "To Be Defined" #LightBlue
+    participant Market
+end box
+entity Farmer as farmer
+boundary Node as node
+
+user -> farmer: Request space
+activate farmer
+farmer -> node: reserve space
+activate node
+farmer -> user: confirmation
+deactivate farmer
+...
+note over user, node: communication allows only owner of space
+user -> node: deploy services
+...
+user -> farmer: destroy space
+farmer -> node: delete space
+deactivate node
+@enduml

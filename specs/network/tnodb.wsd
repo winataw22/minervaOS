@@ -1,0 +1,23 @@
+@startuml
+title Tenant Network Object db
+start
+:Incoming request for\nNR in Network Transaction;
+if (Network Transaction in\nBCDB/Blockchain?) then (yes)
+    if (TNo exists?) then (yes)
+        :request prefix from Farmer;
+    else (no)
+        :create TNo;
+        :request prefix from Farmer;
+        if (NoFree or\nUnreachable) then (Error)
+            stop
+        else (Ok)
+        endif
+    endif 
+    :reply TNo;
+    :save TNo;
+else (no)
+    :Error, no network transaction;
+    stop
+endif
+end
+@enduml

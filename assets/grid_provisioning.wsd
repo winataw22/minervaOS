@@ -1,0 +1,37 @@
+@startuml
+title Provisioning of a resource space
+
+autonumber
+actor User as user
+' entity Farmer as farmer
+entity Network as network
+database Blockchain as bc
+boundary Node as node
+collections "Resource space" as rs
+
+== Resource research ==
+user -> network: Send resource request
+activate network
+network -> node: broadcast resource request
+activate node
+deactivate network
+...broadcast to all nodes...
+node -> user: Send offer
+user -> user: inspect offer
+
+== Resource space negotiation  ==
+user -> node: accept offer
+user <-> node: key exchange
+user -> bc: money is locked on blockchain
+...
+node -> rs: create resrouce space
+activate rs
+node -> user: notify space is created
+node -> bc: notify he created the space
+user -> rs: make sure it can access the space
+user -> bc: validate can access the space
+bc -> node: money is released to the node
+deactivate node
+== Usage of the space ==
+user -> rs: deploy workload
+@enduml
