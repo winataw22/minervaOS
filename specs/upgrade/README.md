@@ -28,7 +28,7 @@ The only way to get code onto a 0-OS is using flist. An upgrade flist will be co
 
 The content of the upgrade flist will be cached on disk, so in the event of a power failure, the node can just restart and restart all the workloads without downloading all the new modules again.
 
-## Flist upgrade layout
+### Flist upgrade layout
 
 The files in the upgrade flist needs to be located in the filesystem tree at the same destination they would need to be in 0-OS. This allow the upgrade code to stays simple and only does a copy from the flist to the cache disk of 0-OS.
 
@@ -40,7 +40,7 @@ Example:
 root
 ├── bin
     ├── containerd
-
+    └── runc
 ```
 
 upgrade flist:
@@ -68,7 +68,7 @@ root
         └── config.toml
 ```
 
-## Upgrade watcher
+### Upgrade watcher
 
 This component is going to be responsible to watch new upgrade being publish on the blockchain. He's also going to be the one driving the upgrade. Its responsibilities will be:
 
