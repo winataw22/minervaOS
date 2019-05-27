@@ -35,7 +35,6 @@ func (s *FlisterStub) Mount(arg0 string, arg1 string) (ret0 string, ret1 error) 
 	return
 }
 
-
 func (s *FlisterStub) Umount(arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "Umount", args...)

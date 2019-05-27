@@ -7,11 +7,10 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zosv2/modules/flist"
 )
 
 var (
-	moduleRoot   = flag.String("root", "/var/modules/flist", "root working directory of the module")
+	moduleRoot   = flag.String("root", defaultRoot, "root working directory of the module")
 	msgBrokerCon = flag.String("broker", "tcp://localhost:6379", "connection string to the message broker")
 	workerNr     = flag.Uint("workers", 1, "number of workers")
 )
@@ -26,7 +25,7 @@ func main() {
 		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)
 	}
 
-	flist := flist.New(*moduleRoot)
+	flist := New(*moduleRoot)
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, flist)
 
 	log.Info().
