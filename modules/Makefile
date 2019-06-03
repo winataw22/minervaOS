@@ -60,7 +60,7 @@ coverage: build
 
 generate:
 	@echo "Generating modules client stubs"
-	go generate
+	go generate github.com/threefoldtech/zosv2/modules
 
 build:
 	@CGO_ENABLED=0 go build -v ./...

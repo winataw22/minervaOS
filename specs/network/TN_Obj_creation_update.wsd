@@ -1,0 +1,42 @@
+@startuml
+title TN Object Creation
+' fpa : Farmer Prefix Allocator
+database fpa
+' TNoDB: TN Object TNoDB
+database TNoDB
+' NRRH : Network Resource Request
+box Network Module
+participant NRRH
+' node : 0-OS
+entity node
+' 
+control watcher
+endbox
+
+== Request network Resource ==
+alt NR doesn't exist
+NRRH -> TNoDB : request network\nresource
+TNoDB -> fpa : request prefix allocation
+fpa --> TNoDB : here you go
+TNoDB->TNoDB :update TN object\n(TNo+1)
+TNoDB --> NRRH : TN object
+== Applying TN == 
+NRRH -> node : TNo
+node <- node : apply NR of TNo
+end
+== TN updates ==
+watcher -> TNoDB : TN new version?
+watcher <-- TNoDB : TNo
+watcher -> node : apply NR of TNo
+
+
+legend
+|=abbrev  | definition   |
+|TN:      | Tenant Network|
+|TNo:     | Tenant Network Object |
+|fpa:     | Farmer Prefix allocator|
+|TNoDB:   | distributed TNoDB space to keep Tenant Network Objects|
+|NRRH:     | Network Resource Request Handler (incoming request)|
+|watcher: | request new versions of Tenant Network Objects|
+endlegend
+@enduml

@@ -1,4 +1,4 @@
-package main
+package flist
 
 import (
 	"bufio"
@@ -43,6 +43,10 @@ type flistModule struct {
 func New(root string) modules.Flister {
 	if root == "" {
 		root = defaultRoot
+	}
+
+	if err := os.MkdirAll(root, 0750); err != nil {
+		panic(err)
 	}
 
 	// prepare directory layout for the module

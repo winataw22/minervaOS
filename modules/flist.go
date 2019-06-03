@@ -1,7 +1,6 @@
 package modules
 
-//go:generate rm -rf stubs
-//go:generate mkdir stubs
+//go:generate mkdir -p stubs
 
 //go:generate zbusc -module flist -version 0.0.1 -name flist -package stubs github.com/threefoldtech/zosv2/modules+Flister stubs/flist_stub.go
 

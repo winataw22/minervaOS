@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zosv2/modules/flist"
 	"github.com/threefoldtech/zosv2/modules/stubs"
 )
 
@@ -24,6 +25,16 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	os.Exit(m.Run())
+}
+
+func testFlistModule(t *testing.T) (modules.Flister, func()) {
+	root, err := ioutil.TempDir("", "flist_root")
+	require.NoError(t, err)
+
+	cleanup := func() {
+		os.RemoveAll(root)
+	}
+	return flist.New(root), cleanup
 }
 
 func testPrepareRPC(t *testing.T) (modules.Flister, func()) {

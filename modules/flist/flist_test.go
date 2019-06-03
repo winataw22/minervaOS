@@ -1,4 +1,4 @@
-package main
+package flist
 
 import (
 	"io/ioutil"
