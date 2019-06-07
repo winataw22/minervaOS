@@ -144,6 +144,7 @@ func isNewVersionAvailable(current semver.Version, p Publisher) (bool, semver.Ve
 }
 
 func versionsToApply(current, latest semver.Version, p Publisher) ([]semver.Version, error) {
+
 	versions, err := p.List()
 	if err != nil {
 		log.Error().
@@ -151,16 +152,19 @@ func versionsToApply(current, latest semver.Version, p Publisher) ([]semver.Vers
 			Msg("fail to list available version from publisher")
 		return nil, err
 	}
+	semver.Sort(semver.Versions(versions))
 
 	latestFound := false
 	toApply := []semver.Version{}
 	for _, v := range versions {
-		if v.Equals(latest) {
-			latestFound = true
-		}
 		// if the v is a higher version as the current version
 		if current.Compare(v) < 0 {
 			toApply = append(toApply, v)
+		}
+
+		if v.Equals(latest) {
+			latestFound = true
+			break
 		}
 	}
 	if !latestFound {
@@ -174,50 +178,58 @@ func (u *UpgradeModule) applyUpgrade(upgrade Upgrade) error {
 
 	log.Info().Str("flist", upgrade.Flist).Msg(("start applying upgrade"))
 
-	path, err := u.flister.Mount(upgrade.Flist, upgrade.Storage)
+	flistRoot, err := u.flister.Mount(upgrade.Flist, upgrade.Storage)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := u.flister.Umount(path); err != nil {
-			log.Error().Err(err).Msgf("fail to umount flist at %s: %v", path, err)
+		if err := u.flister.Umount(flistRoot); err != nil {
+			log.Error().Err(err).Msgf("fail to umount flist at %s: %v", flistRoot, err)
 		}
 	}()
 
-	// tx := beginTransaction()
-
-	if err := executeHook(filepath.Join(path, string(hookPreCopy))); err != nil {
+	if err := executeHook(filepath.Join(flistRoot, string(hookPreCopy))); err != nil {
 		log.Error().Err(err).Msg("fail to execute pre-copy script")
-		// u.rollback()
 	}
 
-	// copy file from path to /
-	// TODO: what upgrade that fails mid way ?
-	if err := mergeFs(path, "/"); err != nil {
+	// copy file from upgrade flist to root filesystem
+	files, err := listDir(flistRoot)
+	if err != nil {
+		return err
+	}
+	if err := mergeFs(files, "/"); err != nil {
 		return err
 	}
 	log.Info().Str("flist", upgrade.Flist).Msg(("upgrade applied"))
 
-	if err := executeHook(filepath.Join(path, string(hookPostCopy))); err != nil {
+	if err := executeHook(filepath.Join(flistRoot, string(hookPostCopy))); err != nil {
 		log.Error().Err(err).Msg("fail to execute post-copy script")
-		// u.rollback()
 	}
 
-	// zinit.Stop() stop services
+	for i, path := range files {
+		files[i] = trimMounpoint(flistRoot, path)
+	}
+	services := servicesToRestart(files)
 
-	if err := executeHook(filepath.Join(path, string(hookMigrate))); err != nil {
+	for _, service := range services {
+		log.Info().Str("service", service).Msg("stop service")
+		// zinit.Stop(service)
+	}
+
+	if err := executeHook(filepath.Join(flistRoot, string(hookMigrate))); err != nil {
 		log.Error().Err(err).Msg("fail to execute migrate script")
 		// u.rollback()
 	}
 
-	// zinit.Start() restart stopped/new services
-
-	if err := executeHook(filepath.Join(path, string(hookPostStart))); err != nil {
-		log.Error().Err(err).Msg("fail to execute post-start script")
-		// u.rollback()
+	for _, service := range services {
+		log.Info().Str("service", service).Msg("restart service")
+		// zinit.Stop(service)
 	}
 
-	// tx.Commit()
+	if err := executeHook(filepath.Join(flistRoot, string(hookPostStart))); err != nil {
+		log.Error().Err(err).Msg("fail to execute post-start script")
+	}
+
 	return nil
 	// TODO:
 	// identify which module has been updated
@@ -251,7 +263,33 @@ func executeHook(path string) error {
 	return nil
 }
 
-func mergeFs(upgradeRoot, fsRoot string) error {
+// servicesToRestart look into the files of an upgrade flist
+// and check if the file located in the /bin directory have a matching init service
+// it retruns the name of all the init services that matches
+func servicesToRestart(files []string) []string {
+	services := []string{}
+	for _, file := range files {
+		if file[:4] != "/bin" {
+			continue
+		}
+		name := filepath.Base(file)
+		if exists(fmt.Sprintf("/etc/zinit/%s.yaml", name)) || exists(fmt.Sprintf("/etc/zinit/%sd.yaml", name)) {
+			services = append(services, name)
+		} else {
+
+		}
+	}
+	return services
+}
+
+func trimMounpoint(mountpoint, path string) string {
+	if mountpoint[len(mountpoint)-1] == filepath.Separator {
+		mountpoint = mountpoint[:len(mountpoint)-1]
+	}
+	return path[len(mountpoint):]
+}
+
+func mergeFs(files []string, destination string) error {
 
 	skippingFiles := []string{
 		fmt.Sprintf("/%s", string(hookPreCopy)),
@@ -260,45 +298,39 @@ func mergeFs(upgradeRoot, fsRoot string) error {
 		fmt.Sprintf("/%s", string(hookPostStart)),
 	}
 
-	return filepath.Walk(upgradeRoot, func(path string, info os.FileInfo, err error) error {
-		// trim flist mountpoint from flist path
-		destPath := ""
-		if path == upgradeRoot {
-			destPath = "/"
-		} else {
-			destPath = path[len(upgradeRoot):]
-			if destPath[0] != filepath.Separator {
-				destPath = fmt.Sprintf("/%s", path)
-			}
-		}
-
-		// don't copy hook scripts
-		if isIn(destPath, skippingFiles) {
-			return nil
-		}
-
-		// change root
-		p, err := changeRoot(fsRoot, destPath)
+	for _, path := range files {
+		dest, err := changeRoot(destination, path)
 		if err != nil {
 			return err
 		}
-		// create directories
-		if info.IsDir() {
-			if err := os.MkdirAll(p, info.Mode().Perm()); err != nil {
-				return err
-			}
-			return nil
+
+		// don't copy hook scripts
+		if isIn(dest, skippingFiles) {
+			continue
+		}
+
+		// make sure the directory of the file exists
+		if err := os.MkdirAll(filepath.Dir(dest), 770); err != nil {
+			return err
+		}
+
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
 		}
 
 		// upgrade flist should only container directory and regular files
 		if !info.Mode().IsRegular() {
-			log.Printf("skip %s: not a regular file", path)
-			return nil
+			log.Info().Msgf("skip %s: not a regular file", path)
+			continue
 		}
 
 		// copy the file to final destination
-		return copyFile(p, path, info.Mode().Perm())
-	})
+		if err := copyFile(dest, path); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func isIn(target string, list []string) bool {
@@ -310,14 +342,19 @@ func isIn(target string, list []string) bool {
 	return false
 }
 
-func copyFile(dst, src string, perm os.FileMode) error {
+func copyFile(dst, src string) error {
 	fSrc, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer fSrc.Close()
 
-	fDst, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_SYNC, perm)
+	stat, err := fSrc.Stat()
+	if err != nil {
+		return err
+	}
+
+	fDst, err := os.OpenFile(dst, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|os.O_SYNC, stat.Mode().Perm())
 	if err != nil {
 		return err
 	}

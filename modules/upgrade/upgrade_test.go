@@ -150,6 +150,21 @@ func TestVersionsToApply(t *testing.T) {
 			},
 			versions: []semver.Version{},
 		},
+		{
+			name:    "lastest is not highest available",
+			current: semver.MustParse("0.0.1"),
+			latest:  semver.MustParse("0.1.0"),
+			upgrades: map[string]Upgrade{
+				"0.0.1": Upgrade{},
+				"0.0.2": Upgrade{},
+				"0.1.0": Upgrade{},
+				"0.1.1": Upgrade{},
+			},
+			versions: []semver.Version{
+				semver.MustParse("0.0.2"),
+				semver.MustParse("0.1.0"),
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &testPublisher{

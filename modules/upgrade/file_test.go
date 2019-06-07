@@ -1,7 +1,6 @@
 package upgrade
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -33,8 +32,24 @@ func TestIsExecutable(t *testing.T) {
 	assert.False(t, IsExecutable(stat.Mode().Perm()))
 }
 
-func TestListDir(t *testing.T) {
-	files, err := listDir("/etc")
-	require.NoError(t, err)
-	fmt.Println(files)
+func TestTrimMounpoint(t *testing.T) {
+	for _, tc := range []struct {
+		path       string
+		mountpoint string
+		result     string
+	}{
+		{
+			path:       "/mnt/foo/bin/bar",
+			mountpoint: "/mnt/foo",
+			result:     "/bin/bar",
+		},
+		{
+			path:       "/mnt/foo/bin/bar",
+			mountpoint: "/mnt/foo/",
+			result:     "/bin/bar",
+		},
+	} {
+		result := trimMounpoint(tc.mountpoint, tc.path)
+		assert.Equal(t, tc.result, result)
+	}
 }
