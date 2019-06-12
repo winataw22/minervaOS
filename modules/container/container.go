@@ -58,11 +58,17 @@ func New(root string, containerd string) modules.ContainerModule {
 	}
 }
 
-func WithNetworkNamespace(name string) oci.SpecOpts {
+func getNetworkSpec(network modules.NetworkInfo) oci.SpecOpts {
+	ns := network.Namespace
+	if !path.IsAbs(ns) {
+		// just name
+		ns = path.Join("/var/run/netns", ns)
+	}
+
 	return oci.WithLinuxNamespace(
 		specs.LinuxNamespace{
 			Type: specs.NetworkNamespace,
-			Path: path.Join("/var/run/netns", name),
+			Path: ns,
 		},
 	)
 }
@@ -70,6 +76,19 @@ func WithNetworkNamespace(name string) oci.SpecOpts {
 func withHooks(hooks specs.Hooks) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, spec *oci.Spec) error {
 		spec.Hooks = &hooks
+		return nil
+	}
+}
+
+func withNoNetworkNamespace() oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+		namespaces := []specs.LinuxNamespace{}
+		for _, ns := range s.Linux.Namespaces {
+			if ns.Type != specs.NetworkNamespace {
+				namespaces = append(namespaces, ns)
+			}
+		}
+		s.Linux.Namespaces = namespaces
 		return nil
 	}
 }
@@ -105,7 +124,6 @@ func withAddedCapabilities(caps []string) oci.SpecOpts {
 // NOTE:
 // THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data modules.Container) (id modules.ContainerID, err error) {
-	log.Info().Msgf("create new container %v", data)
 	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -128,7 +146,7 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 			Options: []string{"rbind"}, // mount options
 		})
 		data.RootFS = "/usr/lib/corex"
-		data.Entrypoint = "/bin/corex --chroot /sandbox -d 7"
+		data.Entrypoint = "/bin/corex --chroot /sandbox"
 	}
 
 	args, err := shlex.Split(data.Entrypoint)
@@ -141,26 +159,39 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 		oci.WithRootFSPath(data.RootFS),
 		oci.WithProcessArgs(args...),
 		oci.WithEnv(data.Env),
+
+		// NOTE: the hooks run inside runc namespace
+		// it means that we can't do the unmount of the
+		// root fs from here.
+
+		// withHooks(specs.Hooks{
+		// 	Poststop: []specs.Hook{
+		// 		{
+		// 			Path: "umount",
+		// 			Args: []string{path},
+		// 		},
+		// 	},
+		// }),
 	}
 	if data.Interactive {
+		// FIXME
+		fmt.Println("Interactive mode enabled")
 		opts = append(
 			opts,
+			withNoNetworkNamespace(),
 			withAddedCapabilities([]string{
 				"CAP_SYS_ADMIN",
 			}),
-			// in interactive mode, since we start the container
-			// from /usr/lib/corex
-			// we make it read-only
-			oci.WithReadonlyPaths([]string{"/"}),
 		)
 	}
 
-	if data.Network.Namespace != "" {
-		opts = append(
-			opts,
-			WithNetworkNamespace(data.Network.Namespace),
-		)
-	}
+	// uncomment once we have network support
+	// if len(data.Network.Namespace) != 0 {
+	// 	opts = append(
+	// 		opts,
+	// 		getNetworkSpec(data.Network),
+	// 	)
+	// }
 
 	for _, mount := range data.Mounts {
 		opts = append(

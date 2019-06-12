@@ -3,65 +3,52 @@ package zinit
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
-
-	"gopkg.in/yaml.v2"
 )
 
 // ServiceState is a type representing the state of a service managed by zinit
-type ServiceState string
+type ServiceState int
 
 const (
 	// ServiceStatusUnknown is return when we cannot determine the status of a service
-	ServiceStatusUnknown ServiceState = "unknown"
+	ServiceStatusUnknown ServiceState = iota
 	// ServiceStatusRunning is return when we a service process is running and healthy
-	ServiceStatusRunning = "running"
+	ServiceStatusRunning
 	// ServiceStatusHalted is return when we a service is not running because stopped explicitly
-	ServiceStatusHalted = "halted"
+	ServiceStatusHalted
 	// ServiceStatusSuccess is return when a one shot service exited without errors
-	ServiceStatusSuccess = "success"
+	ServiceStatusSuccess
 	// ServiceStatusError is return when we a service is not running while it should
 	// this means something has made the service crash
-	ServiceStatusError = "error"
+	ServiceStatusError
 )
 
-func (s *ServiceState) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var buf string
-	if err := unmarshal(&buf); err != nil {
-		return err
-	}
-	*s = ServiceState(strings.ToLower(buf))
-	return nil
+var strToServiceState = map[string]ServiceState{
+	"unknown": ServiceStatusUnknown,
+	"running": ServiceStatusRunning,
+	"success": ServiceStatusSuccess,
+	"halted":  ServiceStatusHalted,
+	"error":   ServiceStatusError,
 }
 
-type ServiceTarget string
-
-func (s *ServiceTarget) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var buf string
-	if err := unmarshal(&buf); err != nil {
-		return err
-	}
-	*s = ServiceTarget(strings.ToLower(buf))
-	return nil
-}
+type ServiceTarget int
 
 const (
-	// ServiceTargetUp means the service has been asked to start
-	ServiceTargetUp ServiceTarget = "up"
-	// ServiceTargetDown means the service has been asked to stop
-	ServiceTargetDown = "down"
+	ServiceTargetUp ServiceTarget = iota
+	ServiceTargetDown
 )
 
-// ServiceStatus represent the status of a service
+var strToServiceTarget = map[string]ServiceTarget{
+	"up":   ServiceTargetUp,
+	"down": ServiceTargetDown,
+}
+
 type ServiceStatus struct {
 	Name   string
 	Pid    int
 	State  ServiceState
 	Target ServiceTarget
-	// Deps is the list of dependent services
-	// all dependencies needs to be running before a service
-	// can starts
-	Deps map[string]string
 }
 
 // List returns all the service monitored and their status
@@ -75,10 +62,23 @@ func (c *ZinitClient) List() (map[string]ServiceState, error) {
 }
 
 func parseList(s string) (map[string]ServiceState, error) {
-	l := make(map[string]ServiceState)
-	if err := yaml.Unmarshal([]byte(s), &l); err != nil {
-		return nil, err
+	lines := strings.Split(s, "\n")
+	l := make(map[string]ServiceState, len(lines))
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, ":")
+		service := strings.TrimSpace(parts[0])
+		status := strings.TrimSpace(parts[1])
+		s, ok := strToServiceState[strings.ToLower(status)]
+		if !ok {
+			return nil, fmt.Errorf("unsupported service status: %v", status)
+		}
+		l[service] = s
 	}
+
 	return l, nil
 }
 
@@ -94,9 +94,51 @@ func (c *ZinitClient) Status(service string) (ServiceStatus, error) {
 
 func parseStatus(s string) (ServiceStatus, error) {
 	status := ServiceStatus{}
-	if err := yaml.Unmarshal([]byte(s), &status); err != nil {
+	lines := strings.Split(s, "\n")
+
+	entries := map[string]string{}
+	for _, line := range lines {
+		parts := strings.SplitN(line, ":", 2)
+		entries[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+
+	var (
+		ok  bool
+		err error
+	)
+
+	status.Name, ok = entries["name"]
+	if !ok {
+		return status, fmt.Errorf("name field not found in response")
+	}
+
+	spid, ok := entries["pid"]
+	if !ok {
+		return status, fmt.Errorf("pid field not found in response")
+	}
+	status.Pid, err = strconv.Atoi(spid)
+	if err != nil {
 		return status, err
 	}
+
+	state, ok := entries["state"]
+	if !ok {
+		return status, fmt.Errorf("state field not found in response")
+	}
+	status.State, ok = strToServiceState[strings.ToLower(state)]
+	if !ok {
+		return status, fmt.Errorf("state value not supported: %v", state)
+	}
+
+	target, ok := entries["target"]
+	if !ok {
+		return status, fmt.Errorf("target field not found in response")
+	}
+	status.Target, ok = strToServiceTarget[strings.ToLower(target)]
+	if !ok {
+		return status, fmt.Errorf("target value not supported: %v", target)
+	}
+
 	return status, nil
 }
 
