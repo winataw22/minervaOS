@@ -126,9 +126,7 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 		IP:   net.ParseIP(host),
 		Port: port,
 	}
-	if err != nil {
-		return peer, err
-	}
+
 	for _, allowedIP := range allowedIPs {
 		_, ip, err := net.ParseCIDR(allowedIP)
 		if err != nil {

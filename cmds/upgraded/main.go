@@ -40,7 +40,12 @@ func main() {
 
 	log.Info().Msg("start upgrade daemon")
 
-	if err := u.Run(time.Second*10, publisher); err != nil {
-		log.Error().Err(err).Msg("fail to apply upgrade")
+	ticker := time.NewTicker(time.Second * 10)
+
+	for range ticker.C {
+		if err := u.Upgrade(publisher); err != nil {
+			log.Error().Err(err).Msg("fail to apply upgrade")
+		}
 	}
+
 }

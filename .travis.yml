@@ -1,0 +1,23 @@
+language: go
+
+os:
+- linux
+
+env:
+- GO111MODULE=on
+
+
+install:
+- echo $(pwd); ls *
+- cd modules
+- make getdeps
+
+script:
+- make verifiers
+- make build
+
+# after_success:
+# - bash <(curl -s https://codecov.io/bash)
+
+go:
+- '1.12.5'

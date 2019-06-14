@@ -112,5 +112,6 @@ func TestDownloadFlist(t *testing.T) {
 	// mod time should be the same, this proof the second download
 	// didn't actually re-wrote the file a second time
 	info2, err := os.Stat(path2)
+	require.NoError(err)
 	assert.Equal(info1.ModTime(), info2.ModTime())
 }

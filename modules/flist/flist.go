@@ -234,7 +234,7 @@ func (f *flistModule) saveFlist(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	if os.Rename(tmp.Name(), path); err != nil {
+	if err := os.Rename(tmp.Name(), path); err != nil {
 		return "", err
 	}
 
@@ -315,7 +315,7 @@ func waitMountedLog(timeout time.Duration, logfile string) error {
 					continue
 				}
 
-				if strings.Index(line, target) == -1 {
+				if !strings.Contains(line, target) {
 					time.Sleep(delay)
 					continue
 				}

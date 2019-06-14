@@ -1,0 +1,4 @@
+exec: /bin/flistd -broker unix:///var/run/redis.sock -root /var/cache/modules/flist
+after:
+  - storage
+  - redis

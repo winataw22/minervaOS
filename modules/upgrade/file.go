@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-var ModeExecutable os.FileMode = 0111
+var ModeExecutable os.FileMode = 0100
 
 func IsExecutable(perm os.FileMode) bool {
 	return (perm & ModeExecutable) != 0

@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/threefoldtech/zosv2/modules/zinit"
 
@@ -39,21 +38,9 @@ func New(root string, flister modules.Flister) (*UpgradeModule, error) {
 		return nil, err
 	}
 
-	var version semver.Version
-	versionPath := filepath.Join(root, "version")
-	version, err := readVersion(versionPath)
+	version, err := ensureVersionFile(root)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Error().Err(err).Msg("read version")
-			return nil, err
-		}
-		log.Info().Msg("no version found, assuming fresh install")
-		// the file doesn't exist yet. So we are on a fresh system
-		version = semver.MustParse("0.0.1")
-		if err := writeVersion(versionPath, version); err != nil {
-			log.Error().Err(err).Msg("fail to write version")
-			return nil, err
-		}
+		return nil, err
 	}
 
 	zinit := zinit.New("/var/run/unix.sock")
@@ -70,52 +57,70 @@ func New(root string, flister modules.Flister) (*UpgradeModule, error) {
 	}, nil
 }
 
-// FIXME: not sure about the public interface of this package yet
-// most probably will need to run as a daemon too
-func (u *UpgradeModule) Run(period time.Duration, p Publisher) error {
-	ticker := time.NewTicker(period)
-
-	for range ticker.C {
-		ok, latest, err := isNewVersionAvailable(u.version, p)
-		if err != nil || !ok {
-			continue
+func ensureVersionFile(root string) (version semver.Version, err error) {
+	versionPath := filepath.Join(root, "version")
+	version, err = readVersion(versionPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Error().Err(err).Msg("read version")
+			return version, err
 		}
+		log.Info().Msg("no version found, assuming fresh install")
+		// the file doesn't exist yet. So we are on a fresh system
+		version = semver.MustParse("0.0.1")
+		if err := writeVersion(versionPath, version); err != nil {
+			log.Error().Err(err).Msg("fail to write version")
+			return version, err
+		}
+	}
+	return version, nil
+}
 
-		toApply, err := versionsToApply(u.version, latest, p)
+func (u *UpgradeModule) Upgrade(p Publisher) error {
+
+	ok, latest, err := isNewVersionAvailable(u.version, p)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		// no new version available
+		return nil
+	}
+
+	toApply, err := versionsToApply(u.version, latest, p)
+	if err != nil {
+		return err
+	}
+
+	for _, version := range toApply {
+		upgrade, err := p.Get(version)
 		if err != nil {
-			continue
+			log.Error().
+				Err(err).
+				Str("version", version.String()).
+				Msg("fail to retrieve upgrade from publisher")
+			break
 		}
 
-		for _, version := range toApply {
-			upgrade, err := p.Get(version)
-			if err != nil {
-				log.Error().
-					Err(err).
-					Str("version", version.String()).
-					Msg("fail to retrieve upgrade from publisher")
-				break
-			}
+		log.Info().
+			Str("curent version", u.version.String()).
+			Str("new version", version.String()).
+			Msg("start upgrade")
 
-			log.Info().
-				Str("curent version", u.version.String()).
-				Str("new version", version.String()).
-				Msg("start upgrade")
+		if err := u.applyUpgrade(upgrade); err != nil {
+			log.Error().
+				Err(err).
+				Str("version", version.String()).
+				Msg("fail to apply upgrade")
+			break
+		}
 
-			if err := u.applyUpgrade(upgrade); err != nil {
-				log.Error().
-					Err(err).
-					Str("version", version.String()).
-					Msg("fail to apply upgrade")
-				break
-			}
-
-			u.version = version
-			if err := writeVersion(filepath.Join(u.root, "version"), version); err != nil {
-				log.Error().
-					Err(err).
-					Str("version", version.String()).
-					Msg("fail to write version to disks")
-			}
+		u.version = version
+		if err := writeVersion(filepath.Join(u.root, "version"), version); err != nil {
+			log.Error().
+				Err(err).
+				Str("version", version.String()).
+				Msg("fail to write version to disks")
 		}
 	}
 
@@ -287,8 +292,6 @@ func servicesToRestart(files []string) []string {
 		name := filepath.Base(file)
 		if exists(fmt.Sprintf("/etc/zinit/%s.yaml", name)) || exists(fmt.Sprintf("/etc/zinit/%sd.yaml", name)) {
 			services = append(services, name)
-		} else {
-
 		}
 	}
 	return services
@@ -322,7 +325,7 @@ func mergeFs(files []string, destination string) error {
 		}
 
 		// make sure the directory of the file exists
-		if err := os.MkdirAll(filepath.Dir(dest), 770); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), 0770); err != nil {
 			return err
 		}
 

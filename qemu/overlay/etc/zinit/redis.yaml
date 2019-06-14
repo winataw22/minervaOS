@@ -1,0 +1,1 @@
+exec: /usr/bin/redis-server --unixsocket /var/run/redis.sock

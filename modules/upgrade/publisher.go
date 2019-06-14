@@ -126,7 +126,7 @@ func (p *httpPublisher) Get(version semver.Version) (Upgrade, error) {
 func joinURL(base, path string) (string, error) {
 	u, err := url.Parse(base)
 	if err != nil {
-		return "nil", err
+		return "", err
 	}
 	u.Path = filepath.Join(u.Path, path)
 	return u.String(), nil

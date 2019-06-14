@@ -189,16 +189,16 @@ func TestLoadVersion(t *testing.T) {
 	defer os.RemoveAll(root)
 
 	t.Run("fresh start", func(t *testing.T) {
-		u, err := New(root, nil)
+		version, err := ensureVersionFile(root)
 		require.NoError(t, err)
-		assert.Equal(t, semver.MustParse("0.0.1"), u.version)
+		assert.Equal(t, semver.MustParse("0.0.1"), version)
 	})
 
 	t.Run("load existing", func(t *testing.T) {
 		writeVersion(filepath.Join(root, "version"), semver.MustParse("0.1.0"))
-		u, err := New(root, nil)
+		version, err := ensureVersionFile(root)
 		require.NoError(t, err)
-		assert.Equal(t, semver.MustParse("0.1.0"), u.version)
+		assert.Equal(t, semver.MustParse("0.1.0"), version)
 	})
 }
 

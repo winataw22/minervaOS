@@ -9,12 +9,17 @@ import (
 	"strings"
 )
 
+const defaultSocketPath = "/var/run/zinit.sock"
+
 type ZinitClient struct {
 	socket string //path to the unix socket
 	conn   net.Conn
 }
 
 func New(socket string) *ZinitClient {
+	if socket == "" {
+		socket = defaultSocketPath
+	}
 	return &ZinitClient{socket: socket}
 }
 

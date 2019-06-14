@@ -36,7 +36,7 @@ func dhcpProbe(inf string) (bool, error) {
 			log.Error().Err(err).Msg("")
 		}
 
-		cmd.Wait()
+		_ = cmd.Wait()
 	}()
 
 	timeout := time.After(time.Second * 10)
@@ -45,7 +45,7 @@ func dhcpProbe(inf string) (bool, error) {
 		stay  = true
 	)
 
-	for hasGW == false && stay == true {
+	for !hasGW && stay {
 		time.Sleep(time.Second)
 		select {
 		case <-timeout:
