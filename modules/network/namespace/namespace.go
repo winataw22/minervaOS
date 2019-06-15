@@ -16,7 +16,9 @@ const (
 	netNSPath = "/var/run/netns"
 )
 
-func CreateNetNS(name string) (netns.NsHandle, error) {
+// Create creates a new named network namespace and bind mount
+// it file descriptor to /var/run/netns/{name}
+func Create(name string) (netns.NsHandle, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -58,7 +60,8 @@ func CreateNetNS(name string) (netns.NsHandle, error) {
 	return ns, nil
 }
 
-func DeleteNetNS(name string) error {
+// Delete deletes a network namespace
+func Delete(name string) error {
 	path := filepath.Join(netNSPath, name)
 	ns, err := netns.GetFromPath(path)
 	if err != nil {
@@ -113,7 +116,8 @@ func touch(path string) error {
 	return f.Close()
 }
 
-func SetLinkNS(link netlink.Link, name string) error {
+// SetLink move a link to the named network namespace
+func SetLink(link netlink.Link, name string) error {
 	log.Info().Msg("get ns")
 	ns, err := netns.GetFromName(name)
 	if err != nil {
@@ -125,7 +129,7 @@ func SetLinkNS(link netlink.Link, name string) error {
 	return netlink.LinkSetNsFd(link, int(ns))
 }
 
-// RouteAddNS adds a route into a named network namespace
+// RouteAdd adds a route into a named network namespace
 func RouteAdd(name string, route *netlink.Route) error {
 	ns, err := netns.GetFromName(name)
 	if err != nil {
@@ -147,6 +151,8 @@ type NSContext struct {
 	working netns.NsHandle
 }
 
+// Enter enters a network namespace
+// don't forger to call Exit to move back to the host namespace
 func (c *NSContext) Enter(nsName string) error {
 	log.Info().Str("name", nsName).Msg("enter network namespace")
 	// Lock thread to prevent switching of namespaces
@@ -169,6 +175,7 @@ func (c *NSContext) Enter(nsName string) error {
 	return netns.Set(c.working)
 }
 
+// Exit exits the network namespace
 func (c *NSContext) Exit() error {
 	log.Info().Msg("exit network namespace")
 	// always unlock thread

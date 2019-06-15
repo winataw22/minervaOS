@@ -5,6 +5,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// CreateBridge create a bridge and set it up
 func CreateBridge(name string) (*netlink.Bridge, error) {
 	attrs := netlink.NewLinkAttrs()
 	attrs.Name = name
@@ -28,6 +29,7 @@ func CreateBridge(name string) (*netlink.Bridge, error) {
 	return bridge, err
 }
 
+// ListBridges list all the bridge interfaces
 func ListBridges() ([]*netlink.Bridge, error) {
 	links, err := interfaces()
 	if err != nil {
@@ -36,10 +38,12 @@ func ListBridges() ([]*netlink.Bridge, error) {
 	return filterBridge(links), nil
 }
 
+// BridgeAttachNic attaches an interface to a bridge
 func BridgeAttachNic(device *netlink.Device, bridge *netlink.Bridge) error {
 	return netlink.LinkSetMaster(device, bridge)
 }
 
+// BridgeDetachNic detaches an interface to a bridge
 func BridgeDetachNic(bridge *netlink.Bridge) error {
 	return netlink.LinkSetNoMaster(bridge)
 }

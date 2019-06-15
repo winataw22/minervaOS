@@ -53,6 +53,6 @@ func TestAttachBridge(t *testing.T) {
 		netlink.LinkDel(bridge)
 	}()
 
-	err = BridgeAttachNic(&netlink.Device{netlink.LinkAttrs{Name: "dummy0"}}, bridge)
+	err = BridgeAttachNic(&netlink.Device{LinkAttrs: netlink.LinkAttrs{Name: "dummy0"}}, bridge)
 	assert.NoError(t, err)
 }

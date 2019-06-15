@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ServiceState is a type representing the state of a service managed by zinit
+// ServiceState represents the state of a service managed by zinit
 type ServiceState string
 
 const (
@@ -25,6 +25,7 @@ const (
 	ServiceStatusError = "error"
 )
 
+// UnmarshalYAML implements the  yaml.Unmarshaler interface
 func (s *ServiceState) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var buf string
 	if err := unmarshal(&buf); err != nil {
@@ -34,8 +35,10 @@ func (s *ServiceState) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
+// ServiceTarget represents the desired state of a service
 type ServiceTarget string
 
+// UnmarshalYAML implements the  yaml.Unmarshaler interface
 func (s *ServiceTarget) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var buf string
 	if err := unmarshal(&buf); err != nil {
@@ -65,7 +68,7 @@ type ServiceStatus struct {
 }
 
 // List returns all the service monitored and their status
-func (c *ZinitClient) List() (map[string]ServiceState, error) {
+func (c *Client) List() (map[string]ServiceState, error) {
 	resp, err := c.cmd("list")
 	if err != nil {
 		return nil, err
@@ -83,7 +86,7 @@ func parseList(s string) (map[string]ServiceState, error) {
 }
 
 // Status returns the status of a service
-func (c *ZinitClient) Status(service string) (ServiceStatus, error) {
+func (c *Client) Status(service string) (ServiceStatus, error) {
 	resp, err := c.cmd(fmt.Sprintf("status %s", service))
 	if err != nil {
 		return ServiceStatus{}, err
@@ -101,31 +104,31 @@ func parseStatus(s string) (ServiceStatus, error) {
 }
 
 // Start start service. has no effect if the service is already running
-func (c *ZinitClient) Start(service string) error {
+func (c *Client) Start(service string) error {
 	_, err := c.cmd(fmt.Sprintf("start %s", service))
 	return err
 }
 
 // Stop stops a service
-func (c *ZinitClient) Stop(service string) error {
+func (c *Client) Stop(service string) error {
 	_, err := c.cmd(fmt.Sprintf("stop %s", service))
 	return err
 }
 
 // Monitor starts monitoring a service
-func (c *ZinitClient) Monitor(service string) error {
+func (c *Client) Monitor(service string) error {
 	_, err := c.cmd(fmt.Sprintf("monitor %s", service))
 	return err
 }
 
 // Fortget forget a service. you can only forget a stopped service
-func (c *ZinitClient) forget(service string) error {
+func (c *Client) forget(service string) error {
 	_, err := c.cmd(fmt.Sprintf("forget %s", service))
 	return err
 }
 
 // Kill sends a signal to a running service.
-func (c *ZinitClient) Kill(service string, sig os.Signal) error {
+func (c *Client) Kill(service string, sig os.Signal) error {
 	_, err := c.cmd(fmt.Sprintf("kill %s %s", service, sig.String()))
 	return err
 }

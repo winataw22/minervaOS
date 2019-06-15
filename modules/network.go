@@ -16,7 +16,10 @@ type Networker interface {
 	ApplyNetResource(resource NetResource) error
 }
 
+// NetID is a type defining the ID of a network
 type NetID string
+
+// NodeID is a type defining a node ID
 type NodeID string
 
 type network struct {
@@ -35,6 +38,7 @@ type network struct {
 	exit ExitPoint
 }
 
+// NetResource represent a part of a network configuration
 type NetResource struct {
 	// where does it live
 	NodeID NodeID
@@ -51,7 +55,7 @@ type NetResource struct {
 	// IPv6Allow []net.IPNet
 }
 
-// the exit container(ns) hold as well a prefix as netresource as well
+// ExitPoint represents the exit container(ns) hold as well a prefix as netresource as well
 // an IPv6 address that is going to hold the routes for all prefixes of the
 // network. That IPv6 address will thus be the gateway for all prefixes that
 // are part of that network. That also means that an upstream router needs to
@@ -69,8 +73,7 @@ type ExitPoint struct {
 	ipv6Allow []net.IP
 }
 
-// TBD ipv4/6 portforwarding/firewalling
-
+// DNAT represents an ipv4/6 portforwarding/firewalling
 type DNAT struct {
 	InternalIP   net.IP
 	InternalPort int16
@@ -99,7 +102,7 @@ type ipv6Conf struct {
 	Iface   netlink.Link
 }
 
-// connected are the peers for which we have a tunnel established, and the
+// Connected are the peers for which we have a tunnel established, and the
 // prefix it routes to. The connection, as it is a peer to peer connection,
 // can be of type wireguard, but also any other type that can bring
 // a packet to a node containing a netresource.
@@ -112,15 +115,16 @@ type Connected struct {
 	Connection Wireguard
 }
 
-// see above
+// ConnType is an enum
 type ConnType int
 
 const (
+	// ConnTypeWireguard is an ConnType enum value for wireguard
 	ConnTypeWireguard ConnType = iota
 	// ConnTypeLocalVxlan
 )
 
-// see above for the type definition.
+// Wireguard represent a wireguard interface configuration
 // the key would be a public key, with the private key only available
 // locally and stored locally.
 type Wireguard struct {

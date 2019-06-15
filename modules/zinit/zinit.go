@@ -9,16 +9,26 @@ import (
 	"strings"
 )
 
-type ZinitClient struct {
+const defaultSocketPath = "/var/run/zinit.sock"
+
+// Client is a client for zinit action
+// it talks to zinit directly over its unis socket
+type Client struct {
 	socket string //path to the unix socket
 	conn   net.Conn
 }
 
-func New(socket string) *ZinitClient {
-	return &ZinitClient{socket: socket}
+// New create a new Zinit client
+func New(socket string) *Client {
+	if socket == "" {
+		socket = defaultSocketPath
+	}
+	return &Client{socket: socket}
 }
 
-func (c *ZinitClient) Connect() error {
+// Connect dials zinit over a unix socket
+// You must call Connect before any other action
+func (c *Client) Connect() error {
 	if c.conn != nil {
 		return fmt.Errorf("already connected")
 	}
@@ -31,7 +41,8 @@ func (c *ZinitClient) Connect() error {
 	return nil
 }
 
-func (c *ZinitClient) Close() error {
+// Close closes the socket connection
+func (c *Client) Close() error {
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
 			return err
@@ -42,7 +53,7 @@ func (c *ZinitClient) Close() error {
 	return nil
 }
 
-func (c *ZinitClient) cmd(cmd string) (string, error) {
+func (c *Client) cmd(cmd string) (string, error) {
 	if c.conn == nil {
 		return "", fmt.Errorf("not connected, call Connect() before executing command ")
 	}
@@ -55,7 +66,7 @@ func (c *ZinitClient) cmd(cmd string) (string, error) {
 	return c.readResponse()
 }
 
-func (c *ZinitClient) readResponse() (string, error) {
+func (c *Client) readResponse() (string, error) {
 	var (
 		count  uint64
 		status string

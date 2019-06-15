@@ -12,6 +12,10 @@ const (
 	defaultBridge = "zos"
 )
 
+// Bootstrap creates the default bridge of 0-OS
+// it then walk over all pluggued network interfaces and attaches them to the bridge
+// one by one and try to get an IP. Bootstrap stops as soon as one of the interface receives and ip with a
+// default route
 func Bootstrap() error {
 
 	log.Info().Msg("Create default bridge")
@@ -30,7 +34,7 @@ func Bootstrap() error {
 	var defaultGW *netlink.Device
 
 	for _, device := range filterDevices(links) {
-		log.Info().Str("interace", device.Name).Msg("probe interface")
+		log.Info().Str("interface", device.Name).Msg("probe interface")
 		// TODO: support noautonic kernel params
 		if device.Name == "lo" {
 			continue
@@ -81,6 +85,8 @@ func Bootstrap() error {
 	return nil
 }
 
+// DefaultBridgeName return the name of the default bridge
+// created by the network bootstrap
 func DefaultBridgeName() string {
 	return defaultBridge
 }

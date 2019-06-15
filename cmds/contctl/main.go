@@ -94,13 +94,13 @@ func main() {
 				}()
 
 				log.Info().Msg("create new net ns")
-				_, err = namespace.CreateNetNS(name)
+				_, err = namespace.Create(name)
 				if err != nil {
 					return err
 				}
 
 				log.Info().Msg("move wg iface into container netns")
-				if err := namespace.SetLinkNS(wg, name); err != nil {
+				if err := namespace.SetLink(wg, name); err != nil {
 					log.Error().
 						Err(err).
 						Str("namespce", name).

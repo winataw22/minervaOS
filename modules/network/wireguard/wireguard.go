@@ -17,6 +17,7 @@ type Wireguard struct {
 	attrs *netlink.LinkAttrs
 }
 
+// New create a new wireguard interface
 func New(name string) (*Wireguard, error) {
 	attrs := netlink.NewLinkAttrs()
 	attrs.Name = name
@@ -39,6 +40,7 @@ func (w *Wireguard) Attrs() *netlink.LinkAttrs {
 	return w.attrs
 }
 
+// SetAddr sets an IP address on the interface
 func (w *Wireguard) SetAddr(cidr string) error {
 	addr, err := netlink.ParseAddr(cidr)
 	if err != nil {
@@ -51,12 +53,14 @@ func (w *Wireguard) SetAddr(cidr string) error {
 	return nil
 }
 
+// Peer represent a peer in a wireguard configuration
 type Peer struct {
 	PublicKey  string
 	Endpoint   string
 	AllowedIPs []string
 }
 
+// Configure configures the wiregard configuration
 func (w *Wireguard) Configure(addr, privateKey string, peers []Peer) error {
 
 	if err := netlink.LinkSetDown(w); err != nil {
@@ -126,9 +130,7 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 		IP:   net.ParseIP(host),
 		Port: port,
 	}
-	if err != nil {
-		return peer, err
-	}
+
 	for _, allowedIP := range allowedIPs {
 		_, ip, err := net.ParseCIDR(allowedIP)
 		if err != nil {

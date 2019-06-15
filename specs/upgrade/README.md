@@ -24,13 +24,22 @@ The upgrade transaction should container a description and signature of all the 
 
 0-OS is design to provide maximum uptime for its workload, so rebooting a node should never be required to upgrade any of its component (except when we will push a kernel upgrade).
 
-The only way to get code onto a 0-OS is using flist. An upgrade flist will be composed of the new binary to install and in some case a migration binary that needs to be run before the start of the new module.
+The only way to get code onto a 0-OS is using flist. An upgrade flist will be composed of the new binary to install and in some case a migration scripts.
 
 The content of the upgrade flist will be cached on disk, so in the event of a power failure, the node can just restart and restart all the workloads without downloading all the new modules again.
+
+![upgrade flow](../../assets/0-OS_upgrade_flow.png)
 
 ### Flist upgrade layout
 
 The files in the upgrade flist needs to be located in the filesystem tree at the same destination they would need to be in 0-OS. This allow the upgrade code to stays simple and only does a copy from the flist to the cache disk of 0-OS.
+
+Some hooks scripts will be executed during the upgrade flow if there are present in the flist. These files needs to be executable, be located at the root of the flist and named:
+
+- pre-copy
+- post-copy
+- migrate
+- post-start
 
 Example:
 
@@ -50,9 +59,13 @@ root
 ├── bin
 │   ├── flist_module_0.2.0
 │   └── containerd
-└── etc
-    └── containerd
-        └── config.toml
+├── etc
+|   └── containerd
+|       └── config.toml
+├── migrate
+├── post-copy
+├── post-start
+└── pre-copy
 ```
 
 After upgrade:
@@ -76,4 +89,4 @@ This component is going to be responsible to watch new upgrade being publish on 
 - schedule upgrade
   - it always needs to aim for a minimal to no downtime if possible.
   - if some downtime is required, arrange to make it during a low traffic hour to impact as less as possible the users.
-- in the event of the cache being corrupted, it will need to re-downloads all the component requires to run the workload present on the node. Some workload might still required previous version of some component, so during re-population of the cache it needs to make sure to grab all the version required.
+- in the event of the cache being corrupted, it will need to re-downloads all the component requires to run the workload present on the node. Some workload might still required previous version of some component, so during re-population of the cache it needs to make sure to grab all the versions required.

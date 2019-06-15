@@ -39,6 +39,7 @@ var (
 )
 
 var (
+	// ErrEmptyRootFS is returned when RootFS field is empty when trying to create a container
 	ErrEmptyRootFS = errors.New("RootFS of the container creation data cannot be empty")
 )
 
@@ -47,6 +48,7 @@ type containerModule struct {
 	root       string
 }
 
+// New return an new modules.ContainerModule
 func New(root string, containerd string) modules.ContainerModule {
 	if len(containerd) == 0 {
 		containerd = containerdSock
@@ -58,7 +60,8 @@ func New(root string, containerd string) modules.ContainerModule {
 	}
 }
 
-func WithNetworkNamespace(name string) oci.SpecOpts {
+// withNetworkNamespace set the named network namespace to use for the container
+func withNetworkNamespace(name string) oci.SpecOpts {
 	return oci.WithLinuxNamespace(
 		specs.LinuxNamespace{
 			Type: specs.NetworkNamespace,
@@ -102,7 +105,7 @@ func withAddedCapabilities(caps []string) oci.SpecOpts {
 	}
 }
 
-// NOTE:
+// Run creates and starts a container
 // THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data modules.Container) (id modules.ContainerID, err error) {
 	log.Info().Msgf("create new container %v", data)
@@ -158,7 +161,7 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 	if data.Network.Namespace != "" {
 		opts = append(
 			opts,
-			WithNetworkNamespace(data.Network.Namespace),
+			withNetworkNamespace(data.Network.Namespace),
 		)
 	}
 
@@ -225,6 +228,7 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 	return modules.ContainerID(container.ID()), nil
 }
 
+// Inspect returns the detail about a running container
 func (c *containerModule) Inspect(ns string, id modules.ContainerID) (result modules.Container, err error) {
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -274,6 +278,7 @@ func (c *containerModule) Inspect(ns string, id modules.ContainerID) (result mod
 	return
 }
 
+// Deletes stops and remove a container
 func (c *containerModule) Delete(ns string, id modules.ContainerID) error {
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -302,7 +307,7 @@ func (c *containerModule) Delete(ns string, id modules.ContainerID) error {
 			if trials <= 0 {
 				signal = syscall.SIGKILL
 			}
-			task.Kill(ctx, signal)
+			_ = task.Kill(ctx, signal)
 			trials--
 			select {
 			case <-exitC:

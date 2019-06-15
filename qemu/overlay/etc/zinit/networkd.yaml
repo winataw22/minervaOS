@@ -1,0 +1,4 @@
+exec: /bin/networkd
+oneshot: true
+after:
+ - udev-trigger
