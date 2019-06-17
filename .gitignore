@@ -1,13 +1,8 @@
 # editors
 .vscode/
 out/
+bin/
 
 qemu/node*
 qemu/*.efi
 
-cmds/networkd/networkd
-cmds/contctl/contctl
-cmds/contd/contd
-cmds/flistd/flistd
-cmds/storaged/storaged
-cmds/upgraded/upgraded
