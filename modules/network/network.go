@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zosv2/modules/network/bridge"
 
 	"github.com/vishvananda/netlink"
 )
@@ -19,7 +20,7 @@ const (
 func Bootstrap() error {
 
 	log.Info().Msg("Create default bridge")
-	bridge, err := CreateBridge(defaultBridge)
+	br, err := bridge.New(defaultBridge)
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to create bridge %s", defaultBridge)
 		return err
@@ -54,16 +55,16 @@ func Bootstrap() error {
 		}
 
 		log.Info().Str("interface", device.Name).Msg("attach interface to default bridge")
-		if err := BridgeAttachNic(device, bridge); err != nil {
+		if err := bridge.AttachNic(device, br); err != nil {
 			log.Warn().Err(err).
 				Str("device", device.Name).
-				Str("bridge", bridge.Name).
+				Str("bridge", br.Name).
 				Msg("fail to attach device to bridge")
 			continue
 		}
 
 		log.Info().Str("interface", device.Name).Msg("start dhcp probing")
-		valid, err := dhcpProbe(bridge.Name)
+		valid, err := dhcpProbe(br.Name)
 		if err != nil {
 			log.Warn().Err(err).Str("device", device.Name).Msg("dhcp probing unexpected error")
 			continue

@@ -1,7 +1,11 @@
 package wireguard
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -26,6 +30,21 @@ func New(name string) (*Wireguard, error) {
 	wg := &Wireguard{attrs: &attrs}
 	if err := netlink.LinkAdd(wg); err != nil {
 		return nil, err
+	}
+	return wg, nil
+}
+
+func GetByName(name string) (*Wireguard, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if link.Type() != "wireguard" {
+		return nil, fmt.Errorf("link %s is not of type wireguard", name)
+	}
+	wg := &Wireguard{
+		attrs: link.Attrs(),
 	}
 	return wg, nil
 }
@@ -92,8 +111,9 @@ func (w *Wireguard) Configure(addr, privateKey string, peers []Peer) error {
 	}
 
 	config := wgtypes.Config{
-		PrivateKey: &key,
-		Peers:      peersConfig,
+		PrivateKey:   &key,
+		Peers:        peersConfig,
+		ReplacePeers: true,
 	}
 	log.Info().Msg("configure wg device")
 
@@ -105,7 +125,9 @@ func (w *Wireguard) Configure(addr, privateKey string, peers []Peer) error {
 }
 
 func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, error) {
-	peer := wgtypes.PeerConfig{}
+	peer := wgtypes.PeerConfig{
+		ReplaceAllowedIPs: true,
+	}
 	var err error
 
 	duration := time.Second * 10
@@ -140,4 +162,29 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 	}
 
 	return peer, nil
+}
+
+func GenerateKey(dir string) (wgtypes.Key, error) {
+	key, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return wgtypes.Key{}, err
+	}
+	if err := os.MkdirAll(dir, 700); err != nil {
+		return wgtypes.Key{}, err
+	}
+
+	path := filepath.Join(dir, "key.priv")
+	if err := ioutil.WriteFile(path, []byte(key.String()), 400); err != nil {
+		return wgtypes.Key{}, err
+	}
+	return key, nil
+}
+
+func LoadKey(dir string) (wgtypes.Key, error) {
+	path := filepath.Join(dir, "key.priv")
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return wgtypes.Key{}, err
+	}
+	return wgtypes.ParseKey(string(b))
 }

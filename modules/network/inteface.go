@@ -43,20 +43,6 @@ func filterDevices(links []netlink.Link) []*netlink.Device {
 	return devices
 }
 
-func filterBridge(links []netlink.Link) []*netlink.Bridge {
-	bridges := []*netlink.Bridge{}
-
-	for _, link := range links {
-		if link.Type() == "bridge" {
-			bridge, ok := link.(*netlink.Bridge)
-			if ok {
-				bridges = append(bridges, bridge)
-			}
-		}
-	}
-	return bridges
-}
-
 func isPlugged(inf string) bool {
 	data, err := ioutil.ReadFile(fmt.Sprintf(carrierFile, inf))
 	if err != nil {

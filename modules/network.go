@@ -22,7 +22,7 @@ type NetID string
 // NodeID is a type defining a node ID
 type NodeID string
 
-type network struct {
+type Network struct {
 	// some type of identification... an uuid ?
 	// that netid is bound to a user and an allowed (bought) creation of a
 	// node-local prefix for a bridge/container/vm
@@ -35,7 +35,7 @@ type network struct {
 	// as well the prefix as the local config needs to be queried.
 	// - the prefix from the grid
 	// - the exit prefix and default gw from the local allocation
-	exit ExitPoint
+	Exit ExitPoint
 }
 
 // NetResource represent a part of a network configuration
@@ -128,12 +128,15 @@ const (
 // the key would be a public key, with the private key only available
 // locally and stored locally.
 type Wireguard struct {
-	// deterministic, based on the public key
+	// deterministic, based on the prefix
 	NICName string
 	// TBD, a peer can be IPv6, IPv6-ll or IPv4
 	Peer net.IP
-	// public key
-	Key []byte
+	// Listen port of wireguard
+	PeerPort uint16
+	// base64 encoded public key
+	// Key []byte
+	Key string
 	// Gateways in IPv6 are link-local. To be able to use IPv6 in any way,
 	// an interface needs an IPv6 link-local address. As wireguard interfaces
 	// are l3-only, the kernel doesn't assign one, so we need to assign one

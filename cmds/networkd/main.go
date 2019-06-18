@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/zinit"
 )
@@ -32,28 +34,9 @@ func main() {
 		return
 	}
 
-	// if err := os.MkdirAll(*root, 0750); err != nil {
-	// 	log.Fatal().Msgf("fail to create module root: %s", err)
-	// }
-
-	// netAlloc := network.NewTestNetResourceAllocator()
-	// networker := network.NewNetworker(netAlloc)
-
-	// server, err := zbus.NewRedisServer(module, *broker, 1)
-	// if err != nil {
-	// 	log.Fatal().Msgf("fail to connect to message broker server: %v", err)
-	// }
-
-	// server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, networker)
-
-	// log.Info().
-	// 	Str("broker", *broker).
-	// 	Uint("worker nr", 1).
-	// 	Msg("starting networkd module")
-
-	// if err := server.Run(context.Background()); err != nil {
-	// 	log.Error().Err(err).Msg("unexpected error")
-	// }
+	if err := startServer(*root, *broker); err != nil {
+		log.Error().Err(err).Msg("unexpected error")
+	}
 }
 
 func bootstrap() error {
@@ -79,4 +62,27 @@ func bootstrap() error {
 	}
 
 	return z.Monitor("dhcp_zos")
+}
+
+func startServer(root, broker string) error {
+	if err := os.MkdirAll(root, 0750); err != nil {
+		log.Error().Err(err).Msgf("fail to create module root")
+	}
+
+	netAlloc := network.NewTestNetResourceAllocator()
+	networker := network.NewNetworker(root, netAlloc)
+
+	server, err := zbus.NewRedisServer(module, broker, 1)
+	if err != nil {
+		log.Error().Err(err).Msgf("fail to connect to message broker server")
+	}
+
+	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, networker)
+
+	log.Info().
+		Str("broker", broker).
+		Uint("worker nr", 1).
+		Msg("starting networkd module")
+
+	return server.Run(context.Background())
 }

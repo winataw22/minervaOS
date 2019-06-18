@@ -72,7 +72,7 @@ func Delete(name string) error {
 		return err
 	}
 
-	if err := syscall.Unmount(path, syscall.MNT_FORCE); err != nil {
+	if err := syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		return err
 	}
 
@@ -81,6 +81,12 @@ func Delete(name string) error {
 	}
 
 	return nil
+}
+
+// Exists checks if a network namespace exists or not
+func Exists(name string) bool {
+	_, err := netns.GetFromName(name)
+	return err == nil
 }
 
 func mountBindNetNS(name string) error {
