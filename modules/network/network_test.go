@@ -10,7 +10,6 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
-	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
 	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
@@ -39,7 +38,7 @@ var networks = []modules.Network{
 		NetID: "net1",
 		Resources: []modules.NetResource{
 			{
-				NodeID:    modules.NodeID{ID: "node1"},
+				NodeID:    modules.NodeID("node1"),
 				Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
 				LinkLocal: mustParseCIDR("fe80::ff02/64"),
 				Connected: []modules.Connected{
@@ -71,17 +70,16 @@ func TestCreateNetwork(t *testing.T) {
 	var (
 		network    = networks[0]
 		resource   = network.Resources[0]
-		nibble     = zosip.NewNibble(resource.Prefix, network.AllocationNR)
-		netName    = nibble.NetworkName()
-		bridgeName = nibble.BridgeName()
-		vethName   = nibble.VethName()
+		netName    = netnsName(resource.Prefix)
+		vethName   = vethName(resource.Prefix)
+		bridgeName = bridgeName(resource.Prefix)
 	)
 
 	defer func() {
-		_ = deleteNetResource(&resource, network.AllocationNR)
+		_ = deleteNetworkResource(resource)
 	}()
 
-	err := createNetworkResource(network.NetID, &resource, network.AllocationNR)
+	err := createNetworkResource(network.NetID, resource)
 	require.NoError(t, err)
 
 	assert.True(t, bridge.Exists(bridgeName))
@@ -113,9 +111,8 @@ func TestConfigureWG(t *testing.T) {
 	var (
 		network  = networks[0]
 		resource = network.Resources[0]
-		nibble   = zosip.NewNibble(resource.Prefix, network.AllocationNR)
-		netName  = nibble.NetworkName()
-		wgName   = nibble.WiregardName()
+		netName  = netnsName(resource.Prefix)
+		wgName   = wgName(resource.Prefix)
 	)
 
 	dir, err := ioutil.TempDir("", netName)
@@ -124,14 +121,14 @@ func TestConfigureWG(t *testing.T) {
 	storage := filepath.Join(dir, netName)
 
 	defer func() {
-		_ = deleteNetResource(&resource, network.AllocationNR)
+		_ = deleteNetworkResource(resource)
 		_ = os.RemoveAll(dir)
 	}()
 
-	err = createNetworkResource(network.NetID, &resource, network.AllocationNR)
+	err = createNetworkResource(network.NetID, resource)
 	require.NoError(t, err)
 
-	key, err := configureWG(storage, &resource, network.AllocationNR)
+	key, err := configureWG(storage, network.Resources[0])
 	assert.NoError(t, err)
 
 	netns, err := namespace.GetByName(netName)
@@ -156,10 +153,9 @@ func TestConfigureWG(t *testing.T) {
 			assert.Equal(t, endpoint(resource.Connected[i]), peer.Endpoint.String())
 
 			// asserts allowedIPs
-			a, b, err := nibble.ToV4()
-			require.NoError(t, err)
+			a, b := ipv4Nibble(resource.Connected[i].Prefix)
 			expected := []string{
-				fmt.Sprintf("fe80::%s/128", nibble.Hex()),
+				fmt.Sprintf("fe80::%s/128", prefixStr(resource.Connected[i].Prefix)),
 				fmt.Sprintf("172.16.%d.%d/32", a, b),
 			}
 			actual := make([]string, len(peer.AllowedIPs))

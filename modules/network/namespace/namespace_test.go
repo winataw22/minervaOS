@@ -9,9 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containernetworking/plugins/pkg/ns"
-
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,27 +66,30 @@ func TestNamespace(t *testing.T) {
 	assert.True(t, ifacesNr > 0)
 
 	nsName := "testns"
-	netns, err := Create(nsName)
+	_, err = Create(nsName)
 	require.NoError(t, err)
 	defer Delete(nsName)
 
-	err = netns.Do(func(_ ns.NetNS) error {
-		ifaces, err = netlink.LinkList()
-		require.NoError(t, err)
-		assert.True(t, len(ifaces) == 1)
+	nsCtx := NSContext{}
+	err = nsCtx.Enter(nsName)
+	require.NoError(t, err)
 
-		err = netlink.LinkAdd(&netlink.Dummy{
-			LinkAttrs: netlink.LinkAttrs{
-				Name: "dummy1",
-			},
-		})
-		require.NoError(t, err)
+	ifaces, err = netlink.LinkList()
+	require.NoError(t, err)
+	assert.True(t, len(ifaces) == 1)
 
-		ifaces, err = netlink.LinkList()
-		require.NoError(t, err)
-		assert.True(t, len(ifaces) == 2)
-		return nil
+	err = netlink.LinkAdd(&netlink.Dummy{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: "dummy1",
+		},
 	})
+	require.NoError(t, err)
+
+	ifaces, err = netlink.LinkList()
+	require.NoError(t, err)
+	assert.True(t, len(ifaces) == 2)
+
+	err = nsCtx.Exit()
 	require.NoError(t, err)
 
 	ifaces, err = netlink.LinkList()
@@ -103,16 +105,63 @@ func TestNamespace(t *testing.T) {
 	assert.False(t, found)
 }
 
+func TestNSContext(t *testing.T) {
+	nsName := "testns"
+
+	origin, err := netns.Get()
+	require.NoError(t, err)
+
+	_, err = Create(nsName)
+	require.NoError(t, err)
+	defer Delete(nsName)
+
+	nsCtx := NSContext{}
+	err = nsCtx.Enter(nsName)
+	require.NoError(t, err)
+
+	current, err := netns.Get()
+	require.NoError(t, err)
+
+	assert.True(t, nsCtx.origins.Equal(origin))
+	assert.True(t, nsCtx.working.Equal(current))
+
+	err = nsCtx.Exit()
+	require.NoError(t, err)
+
+	current, _ = netns.Get()
+	assert.True(t, origin.Equal(current))
+}
+
 func TestAddRoute(t *testing.T) {
-	t.SkipNow()
 	nsName := "testns"
 	_, err := Create(nsName)
 	require.NoError(t, err)
 	defer Delete(nsName)
 
-	err = RouteAdd(nsName, &netlink.Route{
+	ns, err := netns.GetFromName(nsName)
+	require.NoError(t, err)
+
+	h, err := netlink.NewHandleAt(ns)
+	require.NoError(t, err)
+	err = h.RouteAdd(&netlink.Route{
 		Src: net.ParseIP("172.21.0.10"),
 		Gw:  net.ParseIP("172.21.0.1"),
 	})
 	require.NoError(t, err)
 }
+
+// func TestCreateNetNSMultiple(t *testing.T) {
+// 	name := "testns"
+// 	_, err := CreateNetNS(name)
+// 	require.NoError(t, err)
+
+// 	name2 := "testns2"
+// 	_, err = CreateNetNS(name2)
+// 	require.NoError(t, err)
+
+// 	err = DeleteNetNS(name)
+// 	require.NoError(t, err)
+
+// 	err = DeleteNetNS(name2)
+// 	require.NoError(t, err)
+// }
