@@ -35,9 +35,9 @@ func (s *NetworkerStub) ApplyNetResource(arg0 modules.NetResource) (ret0 error) 
 	return
 }
 
-func (s *NetworkerStub) GetNetResource(arg0 string) (ret0 modules.NetResource, ret1 error) {
+func (s *NetworkerStub) GetNetwork(arg0 string) (ret0 modules.NetResource, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GetNetResource", args...)
+	result, err := s.client.Request(s.module, s.object, "GetNetwork", args...)
 	if err != nil {
 		panic(err)
 	}

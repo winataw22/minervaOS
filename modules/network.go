@@ -12,16 +12,49 @@ import (
 
 //Networker is the interface for the network module
 type Networker interface {
-	GetNetResource(id string) (NetResource, error)
-	ApplyNetResource(resource NetResource) error
+	GetNetwork(id string) (*Network, error)
+	ApplyNetResource(*Network) error
+	DeleteNetResource(*Network) error
 }
 
 // NetID is a type defining the ID of a network
 type NetID string
 
-// NodeID is a type defining a node ID
-type NodeID string
+// ReachabilityV4 is the Node's IPv4 reachability:
+type ReachabilityV4 int
 
+const (
+	// ReachabilityV4Hidden The Node lives in an RFC1918 space, can't listen publically
+	ReachabilityV4Hidden ReachabilityV4 = iota
+	// ReachabilityV4Public The Node's Wireguard interfaces listen address is reachable publicly
+	ReachabilityV4Public
+)
+
+// ReachabilityV6 is the Node's IPv6 reachability
+type ReachabilityV6 int
+
+const (
+	// ReachabilityV6ULA The Node lives in an ULA prefix (IPv6 private space)
+	ReachabilityV6ULA ReachabilityV6 = iota
+	// ReachabilityV6Public The Node's Wireguard interfaces listen address is reachable publicly
+	ReachabilityV6Public
+)
+
+// NodeID is a type defining a node ID
+type NodeID struct {
+	ID string
+	// FarmeerID is needed for when a Node is HIDDEN, but lives in the same farm.
+	// that way if a network resource is started on a HIDDEN Node, and the peer
+	// is also HIDDEN, but part of the same farm, we can surmise that that peer
+	// can be included for that network resource
+	// https://www.wireguard.com/protocol/ -> we could send a handshake request
+	// to a HIDDEN peer and in case we receive a reply, include the peer in the list
+	FarmerID       string
+	ReachabilityV4 ReachabilityV4
+	ReachabilityV6 ReachabilityV6
+}
+
+// Network represent a full network owned by a user
 type Network struct {
 	// some type of identification... an uuid ?
 	// that netid is bound to a user and an allowed (bought) creation of a
@@ -36,6 +69,11 @@ type Network struct {
 	// - the prefix from the grid
 	// - the exit prefix and default gw from the local allocation
 	Exit ExitPoint
+	// AllocationNr is for when a new allocation has been necessary and needs to
+	// be added to the pool for Prefix allocations.
+	// this is needed as we set up deterministic interface names, that could conflict with
+	// the already existing allocation-derived names
+	AllocationNR int8
 }
 
 // NetResource represent a part of a network configuration
@@ -45,6 +83,12 @@ type NetResource struct {
 	// prefix is the IPv6 allocation that will be connected to the
 	// bridge/container/vm
 	Prefix net.IPNet
+	// Gateways in IPv6 are link-local. To be able to use IPv6 in any way,
+	// an interface needs an IPv6 link-local address. As wireguard interfaces
+	// are l3-only, the kernel doesn't assign one, so we need to assign one
+	// ourselves. (we need to come up with a deterministic way, so we can be
+	// sure we now which/where)
+	LinkLocal net.IPNet
 	// what are the peers:
 	// each netresource needs to know what prefixes are reachable through
 	// what endpoint. Basically this `connected` array will be used to build
@@ -128,21 +172,13 @@ const (
 // the key would be a public key, with the private key only available
 // locally and stored locally.
 type Wireguard struct {
-	// deterministic, based on the prefix
-	NICName string
 	// TBD, a peer can be IPv6, IPv6-ll or IPv4
-	Peer net.IP
+	IP net.IP
 	// Listen port of wireguard
-	PeerPort uint16
+	Port uint16
 	// base64 encoded public key
 	// Key []byte
 	Key string
-	// Gateways in IPv6 are link-local. To be able to use IPv6 in any way,
-	// an interface needs an IPv6 link-local address. As wireguard interfaces
-	// are l3-only, the kernel doesn't assign one, so we need to assign one
-	// ourselves. (we need to come up with a deterministic way, so we can be
-	// sure we now which/where)
-	LinkLocal net.IP
 }
 
 // definition for later usage

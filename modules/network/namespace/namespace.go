@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/containernetworking/plugins/pkg/ns"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/vishvananda/netlink"
@@ -17,47 +19,37 @@ const (
 )
 
 // Create creates a new named network namespace and bind mount
-// it file descriptor to /var/run/netns/{name}
-func Create(name string) (netns.NsHandle, error) {
+// its file descriptor to /var/run/netns/{name}
+func Create(name string) (ns.NetNS, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	if Exists(name) {
+		nsPath := filepath.Join(netNSPath, name)
+		return ns.GetNS(nsPath)
+	}
+
 	origin, err := netns.Get()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer func() {
 		netns.Set(origin)
 	}()
 
 	// create a network namespace
-	ns, err := netns.New()
+	nsHandle, err := netns.New()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer ns.Close()
+	defer nsHandle.Close()
 
-	// // set its ID
-	// // In an attempt to avoid namespace id collisions, set this to something
-	// // insanely high. When the kernel assigns IDs, it does so starting from 0
-	// // So, just use our pid shifted up 16 bits
-	// wantID := os.Getpid() << 16
-
-	// h, err := netlink.NewHandle()
-	// if err != nil {
-	// 	return 0, err
-	// }
-
-	// err = h.SetNetNsIdByFd(int(ns), wantID)
-	// if err != nil {
-	// 	return 0, err
-	// }
-
-	if err := mountBindNetNS(name); err != nil {
-		return 0, err
+	nsPath, err := mountBindNetNS(name)
+	if err != nil {
+		return nil, err
 	}
 
-	return ns, nil
+	return ns.GetNS(nsPath)
 }
 
 // Delete deletes a network namespace
@@ -89,16 +81,22 @@ func Exists(name string) bool {
 	return err == nil
 }
 
-func mountBindNetNS(name string) error {
+// GetByName return a namespace by its name
+func GetByName(name string) (ns.NetNS, error) {
+	nsPath := filepath.Join(netNSPath, name)
+	return ns.GetNS(nsPath)
+}
+
+func mountBindNetNS(name string) (string, error) {
 	log.Info().Msg("create netnsPath")
 	if err := os.MkdirAll(netNSPath, 0660); err != nil {
-		return err
+		return "", err
 	}
 
 	nsPath := filepath.Join(netNSPath, name)
 	log.Info().Msg("create file")
 	if err := touch(nsPath); err != nil {
-		return err
+		return "", err
 	}
 
 	src := "/proc/self/ns/net"
@@ -109,9 +107,9 @@ func mountBindNetNS(name string) error {
 
 	if err := syscall.Mount(src, nsPath, "bind", syscall.MS_BIND, ""); err != nil {
 		os.Remove(nsPath)
-		return err
+		return "", err
 	}
-	return nil
+	return nsPath, nil
 }
 
 func touch(path string) error {
@@ -148,56 +146,4 @@ func RouteAdd(name string, route *netlink.Route) error {
 		return err
 	}
 	return h.RouteAdd(route)
-}
-
-// NSContext allows the caller to define a portion of the code
-// where the network namespace is switched
-type NSContext struct {
-	origins netns.NsHandle
-	working netns.NsHandle
-}
-
-// Enter enters a network namespace
-// don't forger to call Exit to move back to the host namespace
-func (c *NSContext) Enter(nsName string) error {
-	log.Info().Str("name", nsName).Msg("enter network namespace")
-	// Lock thread to prevent switching of namespaces
-	runtime.LockOSThread()
-
-	var err error
-	// save handle to host namespace
-	c.origins, err = netns.Get()
-	if err != nil {
-		return err
-	}
-
-	// get handle to target namespace
-	c.working, err = netns.GetFromName(nsName)
-	if err != nil {
-		return err
-	}
-
-	// set working namespace to target namespace
-	return netns.Set(c.working)
-}
-
-// Exit exits the network namespace
-func (c *NSContext) Exit() error {
-	log.Info().Msg("exit network namespace")
-	// always unlock thread
-	defer runtime.UnlockOSThread()
-
-	// Switch back to the original namespace
-	if err := netns.Set(c.origins); err != nil {
-		return err
-	}
-	// close working namespace
-	if err := c.working.Close(); err != nil {
-		return err
-	}
-	// close origin namespace
-	// if err := c.origin.Close(); err != nil {
-	// 	return err
-	// }
-	return nil
 }

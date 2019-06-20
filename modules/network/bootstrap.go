@@ -67,12 +67,19 @@ func Bootstrap() error {
 		valid, err := dhcpProbe(br.Name)
 		if err != nil {
 			log.Warn().Err(err).Str("device", device.Name).Msg("dhcp probing unexpected error")
+			if err := bridge.DetachNic(br); err != nil {
+				log.Warn().Err(err).Str("device", device.Name).Msg("error detaching device from default bridge")
+			}
 			continue
 		}
 
 		if valid {
 			defaultGW = device
 			break
+		} else {
+			if err := bridge.DetachNic(br); err != nil {
+				log.Warn().Err(err).Str("device", device.Name).Msg("error detaching device from default bridge")
+			}
 		}
 	}
 

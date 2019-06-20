@@ -3,52 +3,66 @@ package wireguard
 import (
 	"testing"
 
+	"github.com/vishvananda/netlink"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// func TestConfigCmd(t *testing.T) {
-// 	cmd := configCmd("wg0", "/etc/wg/key.priv", []Peer{
-// 		{
-// 			PublicKey:  "KF6yeDYqnVquTHiLjUvNDylqCzXpBNSBnFCnC0TBm1M=",
-// 			Endpoint:   "37.187.124.71:51820",
-// 			AllowedIPs: []string{"0.0.0.0/0"},
-// 		},
-// 	})
-
-// 	expected := "set wg0 private-key /etc/wg/key.priv peer KF6yeDYqnVquTHiLjUvNDylqCzXpBNSBnFCnC0TBm1M= endpoint 37.187.124.71:51820 allowed-ips 0.0.0.0/0"
-// 	assert.Equal(t, expected, cmd)
-// }
 func TestNewPeer(t *testing.T) {
-	_, err := newPeer("mR5fBXohKe2MZ6v+GLwlKwrvkFxo1VvV3bPNHDBhOAI=", "37.187.124.71:51820", []string{"172.21.0.0/24"})
+	endpoint := "37.187.124.71:51820"
+	publicKey := "mR5fBXohKe2MZ6v+GLwlKwrvkFxo1VvV3bPNHDBhOAI="
+	allowedIps := []string{"172.21.0.0/24", "fe80::f002/64"}
+	peer, err := newPeer(publicKey, endpoint, allowedIps)
 	require.NoError(t, err)
 
+	require.Equal(t, endpoint, peer.Endpoint.String())
+	require.Equal(t, publicKey, peer.PublicKey.String())
+	tmp := make([]string, len(peer.AllowedIPs))
+	for i, ip := range peer.AllowedIPs {
+		tmp[i] = ip.String()
+	}
+	require.Equal(t, allowedIps, tmp)
 }
 
-// func TestNamespaceWireguard(t *testing.T) {
+func TestConfigure(t *testing.T) {
+	wg, err := New("test")
+	require.NoError(t, err)
 
-// 	_, err := namespace.CreateNetNS("testns")
-// 	require.NoError(t, err)
+	defer func() {
+		_ = netlink.LinkDel(wg)
+	}()
 
-// 	hostIfaces, err := netlink.LinkList()
-// 	require.NoError(t, err)
+	addr := "192.168.0.1/24"
+	privateKey := "4DwTbGRWECH8oqcTXdoWXGOaWWC952QKbFE1fMzBNmA="
+	publicKey := "kDd5mB6L4gkd3U5W287JeQu7urFzBYH51JQZUrJd8Hg="
+	endpoint := "37.187.124.71:51820"
+	peerPublicKey := "mR5fBXohKe2MZ6v+GLwlKwrvkFxo1VvV3bPNHDBhOAI="
+	allowedIps := []string{"172.21.0.0/24", "192.168.1.10/32", "fe80::f002/128"}
 
-// 	nsCtx := namespace.NSContext{}
-// 	nsCtx.Enter("testns")
-// 	defer nsCtx.Exit()
+	err = wg.Configure(addr, privateKey, []Peer{
+		{
+			PublicKey:  peerPublicKey,
+			AllowedIPs: allowedIps,
+			Endpoint:   endpoint,
+		},
+	})
+	require.NoError(t, err)
 
-// 	wg, err := New("wgtest")
-// 	require.NoError(t, err)
+	device, err := wg.Device()
+	require.NoError(t, err)
 
-// 	nsIfaces, err := netlink.LinkList()
-// 	require.NoError(t, err)
-// 	assert.NotEqual(t, len(hostIfaces), len(nsIfaces))
+	assert.Equal(t, privateKey, device.PrivateKey.String())
+	assert.Equal(t, publicKey, device.PrivateKey.PublicKey().String())
+	assert.Equal(t, publicKey, device.PrivateKey.PublicKey().String())
 
-// 	found := false
-// 	for _, iface := range nsIfaces {
-// 		if iface.Attrs().Name == wg.Attrs().Name {
-// 			found = true
-// 			break
-// 		}
-// 	}
-// 	assert.True(t, found)
-// }
+	for _, peer := range device.Peers {
+		assert.Equal(t, endpoint, peer.Endpoint.String())
+
+		actual := make([]string, len(peer.AllowedIPs))
+		for y, ip := range peer.AllowedIPs {
+			actual[y] = ip.String()
+		}
+		assert.Equal(t, allowedIps, actual)
+	}
+}

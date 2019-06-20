@@ -1,7 +1,9 @@
 package bridge
 
 import (
-	"github.com/rs/zerolog/log"
+	"fmt"
+	"syscall"
+
 	"github.com/vishvananda/netlink"
 )
 
@@ -9,31 +11,36 @@ import (
 func New(name string) (*netlink.Bridge, error) {
 	attrs := netlink.NewLinkAttrs()
 	attrs.Name = name
-	bridge := &netlink.Bridge{
-		LinkAttrs: attrs,
-	}
+	attrs.MTU = 1500
+	bridge := &netlink.Bridge{LinkAttrs: attrs}
 
-	if err := netlink.LinkAdd(bridge); err != nil {
+	if err := netlink.LinkAdd(bridge); err != nil && err != syscall.EEXIST {
 		return bridge, err
 	}
 
-	var err error
-	defer func() {
-		if err != nil {
-			if err := netlink.LinkDel(bridge); err != nil {
-				log.Error().Err(err).Msgf("failed to delete bridge %s", bridge.Name)
-			}
-		}
-	}()
-	err = netlink.LinkSetUp(bridge)
-	return bridge, nil
+	if err := netlink.LinkSetUp(bridge); err != nil {
+		return nil, err
+	}
+
+	// get the bridge object from the kernel now
+	l, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup %q: %v", name, err)
+	}
+
+	newBr, ok := l.(*netlink.Bridge)
+	if !ok {
+		return nil, fmt.Errorf("%q already exists but is not a bridge", name)
+	}
+
+	return newBr, nil
 }
 
 // Delete remove a bridge
 func Delete(name string) error {
 	link, err := netlink.LinkByName(name)
 	if err != nil {
-		if err == (netlink.LinkNotFoundError{}) {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return nil
 		}
 		return err
@@ -52,18 +59,12 @@ func List() ([]*netlink.Bridge, error) {
 
 // Exists check if a bridge named name already exists
 func Exists(name string) bool {
-	briges, err := List()
+	link, err := netlink.LinkByName(name)
 	if err != nil {
 		return false
 	}
-	found := false
-	for _, bridge := range briges {
-		if bridge.Attrs().Name == name {
-			found = true
-			break
-		}
-	}
-	return found
+	_, ok := link.(*netlink.Bridge)
+	return ok
 }
 
 // AttachNic attaches an interface to a bridge
@@ -71,7 +72,7 @@ func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
 	return netlink.LinkSetMaster(link, bridge)
 }
 
-// DetachNic detaches an interface to a bridge
+// DetachNic detaches an interface from a bridge
 func DetachNic(bridge *netlink.Bridge) error {
 	return netlink.LinkSetNoMaster(bridge)
 }
