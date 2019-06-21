@@ -93,13 +93,9 @@ type Peer struct {
 }
 
 // Configure configures the wiregard configuration
-func (w *Wireguard) Configure(addr, privateKey string, peers []Peer) error {
+func (w *Wireguard) Configure(privateKey string, peers []Peer) error {
 
 	if err := netlink.LinkSetDown(w); err != nil {
-		return err
-	}
-
-	if err := w.SetAddr(addr); err != nil {
 		return err
 	}
 
@@ -151,19 +147,21 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 		return peer, err
 	}
 
-	host, p, err := net.SplitHostPort(endpoint)
-	if err != nil {
-		return peer, err
-	}
+	if endpoint != "" {
+		host, p, err := net.SplitHostPort(endpoint)
+		if err != nil {
+			return peer, err
+		}
 
-	port, err := strconv.Atoi(p)
-	if err != nil {
-		return peer, err
-	}
+		port, err := strconv.Atoi(p)
+		if err != nil {
+			return peer, err
+		}
 
-	peer.Endpoint = &net.UDPAddr{
-		IP:   net.ParseIP(host),
-		Port: port,
+		peer.Endpoint = &net.UDPAddr{
+			IP:   net.ParseIP(host),
+			Port: port,
+		}
 	}
 
 	for _, allowedIP := range allowedIPs {

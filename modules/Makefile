@@ -21,7 +21,7 @@ vet:
 
 fmt:
 	@echo "Running $@"
-	@gofmt -d flist
+	@gofmt -d .
 
 lint:
 	@echo "Running $@"
@@ -33,14 +33,14 @@ ineffassign:
 
 cyclo:
 	@echo "Running $@"
-	@${GOPATH}/bin/gocyclo -over 100 flist
+	@${GOPATH}/bin/gocyclo -over 100 .
 
 deadcode:
 	@echo "Running $@"
 	@${GOPATH}/bin/deadcode -test $(shell go list ./...) || true
 
 spelling:
-	@${GOPATH}/bin/misspell -error `find flist/`
+	@${GOPATH}/bin/misspell -error `find .`
 
 # Builds minio, runs the verifiers then runs the tests.
 check: test

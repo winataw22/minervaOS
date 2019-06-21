@@ -4,7 +4,7 @@
 # i.e. every namespace has an encrypted tunnel to the other, with the
 # associated route
 
-NUM=50
+NUM=5
 # setup 2 network namespaces, generate keys for 2 wg's
 
 function genkeys() {
@@ -66,19 +66,36 @@ function ns() {
 		ip link add wg${i} type wireguard
 		ip link set wg${i} netns wg${i}
 
-		ip link add int${i} type dummy
-		ip link set int${i} netns wg${i}
-
 		ip -n wg${i} link set lo up
 		ip -n wg${i} link set wg${i} up
-		ip -n wg${i} link set int${i} up
 
 		ip netns exec wg${i} wg setconf wg${i} wg${i}.conf
+		# enable forwarding in the NS (not on by default)
+		ip netns exec wg${i} sysctl -w net.ipv6.conf.all.forwarding=1
+
 
 		ip -n wg${i} addr add fe80::${h}/64 dev wg${i}
 		ip -n wg${i} addr add 192.168.255.${i}/24 dev wg${i}
 
-		ip -n wg${i} addr add 2001:1:1:${h}::1/64 dev int${i}
+		# create an ethernet pair and send it int another NS so we can test all allowed
+		ip netns add cont${i}
+		ip -n cont${i} link set lo up
+		ip link add br-${i} type bridge
+		ip link set br-${i} up
+		ip link add wg2br${i} type veth peer name br2wg${i}
+		ip link add cont2br${i} type veth peer name br2cont${i}
+		ip link set br2wg${i} master br-${i}
+		ip link set br2cont${i} master br-${i}
+		ip link set br2wg${i} up
+		ip link set br2cont${i} up
+		ip link set wg2br${i} netns wg${i}
+		ip link set cont2br${i} netns cont${i}
+		ip -n wg${i} link set wg2br${i} up
+		ip -n cont${i} link set cont2br${i} up
+		ip -n wg${i} addr add 2001:1:1:${h}::1/64 dev wg2br${i}
+		ip -n cont${i} addr add 2001:1:1:${h}::200/64 dev cont2br${i}
+		ip -n cont${i} route add default via 2001:1:1:${h}::1
+
 
 	done
 	echo
@@ -94,7 +111,7 @@ function addroutes() {
 				ip -n wg${i} route add 2001:1:1:${h}::/64 via fe80::${h} dev wg${i}
 			fi
 		done
-		# default route is via wg1
+		# default route is via wg1 for all except wg1 itself
 		[ "$i" -ne "1" ] && ip -n wg${i} route add default via fe80::1 dev wg${i}
 	done
 }
@@ -109,7 +126,11 @@ function exitNR() {
 }
 function deleteall() {
 	for i in $(seq 1 $NUM); do
+	    ip -n wg${i} link del wg2br${i}
+		ip -n cont${i} link del cont2br${i}
+		ip link del br-${i}
 		ip netns del wg${i}
+		ip netns del cont${i}
 	done
 	rm -f wg*
 
