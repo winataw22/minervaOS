@@ -1,0 +1,15 @@
+# ready is a pseudo boot stage to mark that all
+# zinit unit files provided by the base image
+# have been booted correctly
+
+exec: sh /etc/zinit/init/node-ready.sh
+oneshot: true
+after:
+  # list of all services that must be running before moving on
+  # note, these services are defined by the 0-initramfs repo
+  - local-modprobe
+  - udev-trigger
+  - redis
+  - haveged
+  - cgroup
+  - redis

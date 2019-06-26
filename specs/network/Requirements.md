@@ -40,7 +40,7 @@ Tunnels 6in4 then do not apply, and IPv4 proxies can be handled locally.
 
 IPv6 allocations are simple to come by, it's just a matter of requesting an
 allocation from the LIR (Local Internet Registrar). Mostly they will give a /48
-to start with, that gives ample space already. (65536 subnets).  As the smallest Router advertisement prefix from an allocation is a/48, when explaining to the network admin from the DC what your IPv6 Requirements are, they'll gladly give you a /40. And if that doesn't suffice, you can just ask a /32 from the RIR, the IPv6 space is so vast that it's only an administrative entry. (a /32 gives you 2^32 /64 prefixes, that is as many as the full IPv4 Internet space).  
+to start with, that gives ample space already. (65536 subnets).  As the smallest Router advertisement prefix from an allocation is a /48, when explaining to the network admin from the DC what your IPv6 Requirements are, they'll gladly give you a /40. And if that doesn't suffice, you can just ask a /32 from the RIR, the IPv6 space is so vast that it's only an administrative entry. (a /32 gives you 2^32 /64 prefixes, that is as many as the full IPv4 Address space).  
 
 We then need to be able to hand out an allocation from that range for a tenant
 service/network and announce a route, e.g. upstream
@@ -49,7 +49,7 @@ subnet `xxxx/64` is reachable via node `yyyy` (note the placement of the '`::`')
 
 But that kind of administration for aquiring IPv6 allocations need to be done and will require both good documentation of how to obtain them and how to register these resources on the grid to be usable.
 
-Routing:  
+**Routing:  
 In the node's main table that route points to the IP addr of the bridge of that
 tenant network (here `2001:fe80:aaaa:1234::`, note: `::` is an ip address, as
 there are no 'network numbers' in IPv6).

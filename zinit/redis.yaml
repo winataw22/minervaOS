@@ -1,0 +1,1 @@
+exec: redis-server --port 0 --unixsocket /var/run/redis.sock

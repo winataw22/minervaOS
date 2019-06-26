@@ -25,7 +25,7 @@ func main() {
 	)
 
 	flag.StringVar(&moduleRoot, "root", "/var/modules/containerd", "root working directory of the module")
-	flag.StringVar(&msgBrokerCon, "broker", "tcp://localhost:6379", "connection string to the message broker")
+	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.StringVar(&containerdCon, "containerd", "/run/containerd/containerd.sock", "connection string to containerd")
 	flag.UintVar(&workerNr, "workers", 1, "number of workers")
 

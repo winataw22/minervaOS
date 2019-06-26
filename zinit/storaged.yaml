@@ -1,0 +1,5 @@
+exec: storaged
+# we only consider the storaged is running only if the /var/cache is mounted
+test: mountpoint /var/cache
+after:
+  - node-ready

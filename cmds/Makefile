@@ -4,6 +4,9 @@ MODULES = $(shell find $(MK_DIR) -maxdepth 1 -type d -not -name .)
 
 all: $(MODULES)
 
+# _base is a hack to only build modules that we know are building atm
+_base: contd flistd storaged upgraded
+
 .PHONY: output clean
 
 output:

@@ -12,7 +12,7 @@ import (
 
 var (
 	moduleRoot   = flag.String("root", "/var/modules/flist", "root working directory of the module")
-	msgBrokerCon = flag.String("broker", "tcp://localhost:6379", "connection string to the message broker")
+	msgBrokerCon = flag.String("broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	workerNr     = flag.Uint("workers", 1, "number of workers")
 )
 

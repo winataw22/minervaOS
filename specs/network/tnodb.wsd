@@ -4,7 +4,7 @@ start
 :Incoming request for\nNR in Network Transaction;
 if (Network Transaction in\nBCDB/Blockchain?) then (yes)
     if (TNo exists?) then (yes)
-        :request prefix from Farmer;
+        :request prefix from Farmer Allocation;
     else (no)
         :create TNo;
         :request prefix from Farmer;
@@ -13,8 +13,9 @@ if (Network Transaction in\nBCDB/Blockchain?) then (yes)
         else (Ok)
         endif
     endif 
-    :reply TNo;
+    :Update TNo;
     :save TNo;
+    :reply TNo;
 else (no)
     :Error, no network transaction;
     stop

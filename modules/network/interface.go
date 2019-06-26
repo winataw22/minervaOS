@@ -8,26 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
 )
 
 const carrierFile = "/sys/class/net/%s/carrier"
-
-// LinkUp set a device up
-func LinkUp(name string) error {
-	log.Info().Msgf("bring interface %s up", name)
-
-	return netlink.LinkSetUp(&netlink.Device{
-		LinkAttrs: netlink.LinkAttrs{
-			Name: name,
-		},
-	})
-}
-
-func interfaces() ([]netlink.Link, error) {
-	return netlink.LinkList()
-}
 
 func filterDevices(links []netlink.Link) []*netlink.Device {
 	devices := []*netlink.Device{}

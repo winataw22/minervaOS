@@ -1,0 +1,3 @@
+exec: upgraded -broker unix:///var/run/redis.sock
+after:
+  - boot

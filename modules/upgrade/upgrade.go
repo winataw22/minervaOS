@@ -46,7 +46,7 @@ func New(root string, flister modules.Flister) (*Upgrader, error) {
 		return nil, err
 	}
 
-	zinit := zinit.New("/var/run/unix.sock")
+	zinit := zinit.New("/var/run/zinit.sock")
 	if err := zinit.Connect(); err != nil {
 		return nil, err
 	}

@@ -26,7 +26,7 @@ func Bootstrap() error {
 		return err
 	}
 
-	links, err := interfaces()
+	links, err := netlink.LinkList()
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to list interfaces")
 		return err

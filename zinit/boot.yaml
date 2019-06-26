@@ -1,0 +1,13 @@
+# boot is a pseudo boot stage to make sure that
+# storaged and networkd are running before any 
+# of the other modules
+
+exec: "true"
+oneshot: true
+after:
+  # list of all services that must be running before moving on
+  - storaged
+  # we removed networkd from the dep tree for now 
+  # since the binary is still not working on master branch
+  # later this can be added back.
+  # - networkd

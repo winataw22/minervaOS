@@ -15,6 +15,7 @@ List of sub-modules:
 - [disks](#disk-sub-module)
 - [storage pools](#storage-pool-sub-module)
 - [0-db](#0-db-sub-module)
+- [booting](#booting)
 
 
 ## Disk sub-module
@@ -53,6 +54,8 @@ type DiskModule interface {
 
 ### Interface
 Responsible to do the capacity planning of the storage pools on top of the disk prepare by the disk sub-module
+
+> This interface is just for clarification, please check the actual exposed interface under the module code
 
 ```go
 type Space struct {
@@ -97,4 +100,21 @@ type ZDBModule interface {
     // ReleaseNamespace delete a 0-db namespace acquired by ReserveNamespace
     ReleaseNamespace(nsID string) (error)
 }
+```
+
+## Booting
+When the module boots:
+- Make sure to mount all available pools
+- Make sure to mount the cache subvolume under the /var/cache
+- If no pools exist, it find the first available SSD disk (or hdd if no ssd exists) and create a pool
+  with a single disk
+  - a cache sub-volume is created and mounted under /var/cache
+
+### Zinit config
+The zinit unit file of the module must make sure to provide a test command, that only pass
+after the cache volume is mounted 
+
+```yaml
+exec: module binary
+test: mountpoint /var/cache
 ```
