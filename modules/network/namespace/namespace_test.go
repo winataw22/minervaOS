@@ -1,6 +1,8 @@
 package namespace
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +19,7 @@ import (
 
 func TestCreateNetNS(t *testing.T) {
 	name := "testns"
-	testNS, err := Create(name)
+	_, err := Create(name)
 	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(netNSPath, name))
@@ -27,7 +29,7 @@ func TestCreateNetNS(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, strings.Contains(string(out), name))
 
-	err = Delete(testNS)
+	err = Delete(name)
 	require.NoError(t, err)
 
 	out, err = exec.Command("ip", "netns").CombinedOutput()
@@ -35,7 +37,30 @@ func TestCreateNetNS(t *testing.T) {
 	assert.False(t, strings.Contains(string(out), name))
 }
 
-func TestNamespaceIsolation(t *testing.T) {
+func TestSetLinkNS(t *testing.T) {
+	link := &netlink.Dummy{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: "dummy0",
+		},
+	}
+	err := netlink.LinkAdd(link)
+	require.NoError(t, err)
+	defer netlink.LinkDel(link)
+
+	_, err = Create("testns")
+	require.NoError(t, err)
+	defer Delete("testns")
+
+	err = SetLink(link, "testns")
+	assert.NoError(t, err)
+}
+
+func printIfaces(ifaces []netlink.Link) {
+	for _, iface := range ifaces {
+		fmt.Println(iface.Attrs().Name)
+	}
+}
+func TestNamespace(t *testing.T) {
 	ifaces, err := netlink.LinkList()
 	require.NoError(t, err)
 	ifacesNr := len(ifaces)
@@ -44,7 +69,7 @@ func TestNamespaceIsolation(t *testing.T) {
 	nsName := "testns"
 	netns, err := Create(nsName)
 	require.NoError(t, err)
-	defer Delete(netns)
+	defer Delete(nsName)
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		ifaces, err = netlink.LinkList()
@@ -76,4 +101,18 @@ func TestNamespaceIsolation(t *testing.T) {
 	}
 	assert.Equal(t, ifacesNr, len(ifaces))
 	assert.False(t, found)
+}
+
+func TestAddRoute(t *testing.T) {
+	t.SkipNow()
+	nsName := "testns"
+	_, err := Create(nsName)
+	require.NoError(t, err)
+	defer Delete(nsName)
+
+	err = RouteAdd(nsName, &netlink.Route{
+		Src: net.ParseIP("172.21.0.10"),
+		Gw:  net.ParseIP("172.21.0.1"),
+	})
+	require.NoError(t, err)
 }

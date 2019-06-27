@@ -7,7 +7,4 @@ oneshot: true
 after:
   # list of all services that must be running before moving on
   - storaged
-  # we removed networkd from the dep tree for now 
-  # since the binary is still not working on master branch
-  # later this can be added back.
-  # - networkd
+  - networkd
