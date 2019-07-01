@@ -119,6 +119,10 @@ func (w *Wireguard) Configure(privateKey string, peers []Peer) error {
 		return err
 	}
 
+	for _, peer := range peersConfig {
+		fmt.Printf("%+v\n", peer)
+	}
+
 	config := wgtypes.Config{
 		PrivateKey:   &key,
 		Peers:        peersConfig,
@@ -170,7 +174,6 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 			return peer, err
 		}
 		ipNet.IP = ip
-		fmt.Printf("allowed ips %+v\n", ipNet)
 		peer.AllowedIPs = append(peer.AllowedIPs, *ipNet)
 	}
 

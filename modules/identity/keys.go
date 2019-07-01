@@ -6,11 +6,13 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+// KeyPair holds a public and private side of an ed25519 key pair
 type KeyPair struct {
 	PrivateKey ed25519.PrivateKey
 	PublicKey  ed25519.PublicKey
 }
 
+// GenerateKeyPair creates a new KeyPair from a random seed
 func GenerateKeyPair() (*KeyPair, error) {
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
@@ -23,12 +25,15 @@ func GenerateKeyPair() (*KeyPair, error) {
 	return &keypair, nil
 }
 
+// SerializeSeed saves the seed of a key pair in a file located at path
 func SerializeSeed(keypair *KeyPair, path string) error {
 	seed := keypair.PrivateKey.Seed()
 
 	return ioutil.WriteFile(path, seed, 0400)
 }
 
+// LoadSeed reads a seed from a file located at path and re-create a
+// KeyPair using the seed
 func LoadSeed(path string) (*KeyPair, error) {
 	seed, err := ioutil.ReadFile(path)
 	if err != nil {

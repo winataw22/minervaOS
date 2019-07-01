@@ -2,8 +2,6 @@ package modules
 
 import (
 	"net"
-
-	"github.com/vishvananda/netlink"
 )
 
 //go:generate mkdir -p stubs
@@ -13,6 +11,8 @@ import (
 //Networker is the interface for the network module
 type Networker interface {
 	GetNetwork(id string) (*Network, error)
+	GenerateWireguarKeyPair(NetID) (string, error)
+	PublishWireguarKeyPair(string, NodeID, NetID) error
 	ApplyNetResource(*Network) error
 	DeleteNetResource(*Network) error
 }
@@ -60,20 +60,20 @@ type Network struct {
 	// that netid is bound to a user and an allowed (bought) creation of a
 	// node-local prefix for a bridge/container/vm
 	// needs to be queried from somewhere(TBD) to be filled in
-	NetID NetID
+	NetID NetID `json":"network_id"`
 	// a netresource is a group of interconnected prefixes for a netid
 	// needs to be queried and updated when the netresource is created
-	Resources []*NetResource
+	Resources []*NetResource `json":"resources"`
 	// the exit is the ultimate default gateway container
 	// as well the prefix as the local config needs to be queried.
 	// - the prefix from the grid
 	// - the exit prefix and default gw from the local allocation
-	Exit *ExitPoint
+	Exit *ExitPoint `json":"exit_point"`
 	// AllocationNr is for when a new allocation has been necessary and needs to
 	// be added to the pool for Prefix allocations.
 	// this is needed as we set up deterministic interface names, that could conflict with
 	// the already existing allocation-derived names
-	AllocationNR int8
+	AllocationNR int8 `json:"allocation_nr"`
 }
 
 // NetResource represent a part of a network configuration
@@ -110,40 +110,43 @@ type ExitPoint struct {
 	// netresource is the same as on all other netresources of a tenant network
 	*NetResource
 	// the ultimate IPv{4,6} config of the exit container.
-	ipv4Conf ipv4Conf
-	ipv4DNAT []DNAT
+	Ipv4Conf Ipv4Conf
+	Ipv4DNAT []DNAT
 
-	ipv6Conf  ipv6Conf
-	ipv6Allow []net.IP
+	Ipv6Conf  Ipv6Conf
+	Ipv6Allow []net.IP
 }
 
 // DNAT represents an ipv4/6 portforwarding/firewalling
 type DNAT struct {
 	InternalIP   net.IP
-	InternalPort int16
+	InternalPort uint16
 
 	ExternalIP   net.IP
-	ExternalPort int16
+	ExternalPort uint16
+
+	Protocol string
 }
 
-type ipv4Conf struct {
+//Ipv4Conf represents the the IPv4 configuration of an exit container
+type Ipv4Conf struct {
 	// cidr
-	CIDR    net.IPNet
+	CIDR    *net.IPNet
 	Gateway net.IP
 	Metric  uint32
 	// deterministic name in function of the prefix and it's allocation
-	Iface netlink.Link
+	Iface string
 	// TBD, we need to establish if we want fc00/7 (ULA) or rfc1918 networks
 	// to be NATed (6to4 and/or 66)
 	EnableNAT bool
 }
 
-// comments: see above
-type ipv6Conf struct {
-	Adder   net.IP
+//Ipv6Conf represents the the IPv6 configuration of an exit container
+type Ipv6Conf struct {
+	Addr    net.IP
 	Gateway net.IP
-	metric  uint32
-	Iface   netlink.Link
+	Metric  uint32
+	Iface   string
 }
 
 // Peer is a peer for which we have a tunnel established and the

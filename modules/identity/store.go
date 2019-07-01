@@ -18,18 +18,20 @@ type httpIDStore struct {
 	baseURL string
 }
 
+// NewHTTPIDStore returns a HTTP IDStore client
 func NewHTTPIDStore(url string) IDStore {
 	return &httpIDStore{baseURL: url}
 }
 
-type NodeRegisterReq struct {
+type nodeRegisterReq struct {
 	NodeID string `json:"node_id"`
 	FarmID string `json:"farm_id"`
 }
 
+// RegisterNode implements the IDStore interface
 func (s *httpIDStore) RegisterNode(node Identifier, farm Identifier) error {
 	buf := bytes.Buffer{}
-	err := json.NewEncoder(&buf).Encode(NodeRegisterReq{
+	err := json.NewEncoder(&buf).Encode(nodeRegisterReq{
 		NodeID: node.Identity(),
 		FarmID: farm.Identity(),
 	})
@@ -48,14 +50,15 @@ func (s *httpIDStore) RegisterNode(node Identifier, farm Identifier) error {
 	return nil
 }
 
-type FarmRegisterReq struct {
+type farmRegisterReq struct {
 	ID   string `json:"farm_id"`
 	Name string `json:"name"`
 }
 
+// RegisterFarm implements the IDStore interface
 func (s *httpIDStore) RegisterFarm(farm Identifier, name string) error {
 	buf := bytes.Buffer{}
-	err := json.NewEncoder(&buf).Encode(FarmRegisterReq{
+	err := json.NewEncoder(&buf).Encode(farmRegisterReq{
 		ID:   farm.Identity(),
 		Name: name,
 	})

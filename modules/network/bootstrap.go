@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 
 	"github.com/vishvananda/netlink"
 )
@@ -14,7 +15,7 @@ const (
 )
 
 // Bootstrap creates the default bridge of 0-OS
-// it then walk over all pluggued network interfaces and attaches them to the bridge
+// it then walk over all plugged network interfaces and attaches them to the bridge
 // one by one and try to get an IP. Bootstrap stops as soon as one of the interface receives and ip with a
 // default route
 func Bootstrap() error {
@@ -26,7 +27,7 @@ func Bootstrap() error {
 		return err
 	}
 
-	links, err := interfaces()
+	links, err := netlink.LinkList()
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to list interfaces")
 		return err
@@ -34,15 +35,19 @@ func Bootstrap() error {
 
 	var defaultGW *netlink.Device
 
-	for _, device := range filterDevices(links) {
+	for _, link := range ifaceutil.LinkFilter(links, []string{"device"}) {
+		device, ok := link.(*netlink.Device)
+		if !ok {
+			continue
+		}
 		log.Info().Str("interface", device.Name).Msg("probe interface")
 		// TODO: support noautonic kernel params
 		if device.Name == "lo" {
 			continue
 		}
 
-		if !isVirtEth(device.Name) {
-			if !isPlugged(device.Name) {
+		if !ifaceutil.IsVirtEth(device.Name) {
+			if !ifaceutil.IsPlugged(device.Name) {
 				log.Info().Str("interface", device.Name).Msg("interface is not plugged in, skipping")
 				continue
 			}

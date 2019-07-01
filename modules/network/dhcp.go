@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/vishvananda/netlink"
 )
 
@@ -51,55 +52,16 @@ func dhcpProbe(inf string) (bool, error) {
 		case <-timeout:
 			stay = false
 		default:
-			for _, family := range []int{netlink.FAMILY_V6, netlink.FAMILY_V4} {
-				hasGW, err = hasDefaultGW(link, family)
-				if err != nil {
-					return false, err
-				}
-				if hasGW {
-					break
-				}
+			hasGW, _, err = ifaceutil.HasDefaultGW(link)
+			if err != nil {
+				return false, err
 			}
+			if hasGW {
+				break
+			}
+
 		}
 	}
 
 	return hasGW, nil
-}
-
-func hasDefaultGW(link netlink.Link, family int) (bool, error) {
-
-	addrs, err := netlink.AddrList(link, family)
-	if err != nil {
-		return false, err
-	}
-
-	if len(addrs) <= 0 {
-		return false, nil
-	}
-
-	log.Info().Msg("IP addresses found")
-	for i, addr := range addrs {
-		log.Info().
-			Str("interface", link.Attrs().Name).
-			IPAddr(string(i), addr.IP).Msg("")
-	}
-
-	routes, err := netlink.RouteList(link, family)
-	if err != nil {
-		return false, err
-	}
-	log.Info().Msg("routes found")
-	for i, route := range routes {
-		log.Info().
-			Str("interface", link.Attrs().Name).
-			Str(string(i), route.String())
-	}
-
-	for _, route := range routes {
-		if route.Gw != nil {
-			return true, err
-		}
-	}
-
-	return false, nil
 }

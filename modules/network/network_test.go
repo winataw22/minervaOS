@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -21,18 +20,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func TestInterfaces(t *testing.T) {
-	link, err := netlink.LinkByName("wlan0")
-	require.NoError(t, err)
-
-	routes, err := netlink.RouteList(link, netlink.FAMILY_V4)
-	require.NoError(t, err)
-
-	for _, route := range routes {
-		fmt.Printf("%v\n", route)
-	}
-}
-
 var peers = []*modules.Peer{
 	{
 		Type:   modules.ConnTypeWireguard,
@@ -49,7 +36,7 @@ var peers = []*modules.Peer{
 		Connection: modules.Wireguard{
 			IP:   net.ParseIP("2001:1:1:2::1"),
 			Port: 1602,
-			Key:  "4w4woC+AuDUAaRipT49M8SmTkzERps3xA5i0BW4hPiw=",
+			Key:  "HXnTmizQdGlAuE9PpVPw1Drg2WygUsxwGnJY+A5xgVo=",
 		},
 	},
 	{
@@ -95,7 +82,7 @@ var node3 = &modules.NetResource{
 	Peers:     peers,
 }
 
-var networks = []modules.Network{
+var networks = []*modules.Network{
 	{
 		NetID: "net1",
 		Resources: []*modules.NetResource{
@@ -110,7 +97,7 @@ var networks = []modules.Network{
 func TestCreateNetwork(t *testing.T) {
 	var (
 		network    = networks[0]
-		resource   = network.Resources[1]
+		resource   = network.Resources[0]
 		nibble     = zosip.NewNibble(resource.Prefix, network.AllocationNR)
 		netName    = nibble.NetworkName()
 		bridgeName = nibble.BridgeName()
@@ -122,47 +109,82 @@ func TestCreateNetwork(t *testing.T) {
 
 	storage := filepath.Join(dir, netName)
 	networker := &networker{
-		nodeID:      node2.NodeID,
+		nodeID:      node1.NodeID,
 		storageDir:  storage,
 		netResAlloc: nil,
 	}
 
-	defer func() {
-		_ = networker.DeleteNetResource(&network)
-	}()
+	for _, tc := range []struct {
+		exitIface *ExitIface
+	}{
+		{
+			exitIface: nil,
+		},
+		{
+			exitIface: &ExitIface{
+				Master: "zos0",
+				Type:   MacVlanIface,
+				IPv6:   mustParseCIDR("2a02:1802:5e:ff02::100/64"),
+				GW6:    net.ParseIP("fe80::1"),
+			},
+		},
+	} {
+		name := "withPublicNamespace"
+		if tc.exitIface == nil {
+			name = "NoPubNamespace"
+		}
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				err := networker.DeleteNetResource(network)
+				require.NoError(t, err)
+				if tc.exitIface != nil {
+					pubNs, _ := namespace.GetByName(PublicNamespace)
+					err = namespace.Delete(pubNs)
+					require.NoError(t, err)
+				}
+			}()
 
-	err = networker.createNetworkResource(&network)
-	require.NoError(t, err)
+			if tc.exitIface != nil {
+				err := CreatePublicNS(tc.exitIface)
+				require.NoError(t, err)
+			}
 
-	assert.True(t, bridge.Exists(bridgeName))
-	assert.True(t, namespace.Exists(netName))
+			err := createNetworkResource(resource, network)
+			require.NoError(t, err)
 
-	netns, err := namespace.GetByName(netName)
-	var handler = func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(vethName)
-		require.NoError(t, err)
+			assert.True(t, bridge.Exists(bridgeName))
+			assert.True(t, namespace.Exists(netName))
 
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
-		require.NoError(t, err)
-		assert.Equal(t, 1, len(addrs))
-		assert.Equal(t, "10.255.2.1/24", addrs[0].IPNet.String())
+			netns, err := namespace.GetByName(netName)
+			require.NoError(t, err)
+			defer netns.Close()
+			var handler = func(_ ns.NetNS) error {
+				link, err := netlink.LinkByName(vethName)
+				require.NoError(t, err)
 
-		addrs, err = netlink.AddrList(link, netlink.FAMILY_V6)
-		require.NoError(t, err)
-		assert.Equal(t, 2, len(addrs))
-		assert.Equal(t, "2a02:1802:5e:ff02::/64", addrs[0].IPNet.String())
+				addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+				require.NoError(t, err)
+				assert.Equal(t, 1, len(addrs))
+				assert.Equal(t, "10.255.2.1/24", addrs[0].IPNet.String())
 
-		return nil
+				addrs, err = netlink.AddrList(link, netlink.FAMILY_V6)
+				require.NoError(t, err)
+				assert.Equal(t, 2, len(addrs))
+				assert.Equal(t, "2a02:1802:5e:ff02::/64", addrs[0].IPNet.String())
+
+				return nil
+			}
+			err = netns.Do(handler)
+			assert.NoError(t, err)
+		})
 	}
-	err = netns.Do(handler)
-	assert.NoError(t, err)
 
 }
 
 func TestConfigureWG(t *testing.T) {
 	var (
 		network = networks[0]
-		// resource = network.Resources[1]
+		// resource = network.Resources[0]
 		// nibble   = zosip.NewNibble(resource.Prefix, network.AllocationNR)
 		// netName  = nibble.NetworkName()
 		// wgName   = nibble.WiregardName()
@@ -172,17 +194,17 @@ func TestConfigureWG(t *testing.T) {
 	require.NoError(t, err)
 
 	networker := &networker{
-		nodeID:      node2.NodeID,
+		nodeID:      node3.NodeID,
 		storageDir:  dir,
 		netResAlloc: nil,
 	}
 
 	defer func() {
-		_ = networker.DeleteNetResource(&network)
+		_ = networker.DeleteNetResource(network)
 		_ = os.RemoveAll(dir)
 	}()
 
-	err = networker.ApplyNetResource(&network)
+	err = networker.ApplyNetResource(network)
 	require.NoError(t, err)
 
 	// netns, err := namespace.GetByName(netName)

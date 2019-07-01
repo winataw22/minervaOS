@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 
+	"github.com/cenkalti/backoff"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/identity"
 )
@@ -10,6 +12,8 @@ import (
 const seedPath = "/var/cache/seed.txt"
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	nodeID, err := loadIdentify()
 	if err != nil {
 		os.Exit(1)
@@ -22,11 +26,20 @@ func main() {
 	}
 
 	store := identity.NewHTTPIDStore("http://172.20.0.1:8080")
-	log.Info().Msg("start registration of the node")
-	if err := store.RegisterNode(nodeID, farmID); err != nil {
-		log.Error().Err(err).Msg("fail to register node identity")
-		os.Exit(1)
+	f := func() error {
+		log.Info().Msg("start registration of the node")
+		if err := store.RegisterNode(nodeID, farmID); err != nil {
+			log.Error().Err(err).Msg("fail to register node identity")
+			return err
+		}
+		return nil
 	}
+
+	err = backoff.Retry(f, backoff.NewExponentialBackOff())
+	if err != nil {
+		return
+	}
+
 	log.Info().Msg("node registered successfully")
 }
 

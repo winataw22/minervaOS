@@ -55,6 +55,11 @@ func (n *Nibble) VethName() string {
 	return fmt.Sprintf("veth-%s-%d", n.Hex(), n.allocNr)
 }
 
+// PubName return the deterministic public interface name
+func (n *Nibble) PubName() string {
+	return fmt.Sprintf("pub-%s-%d", n.Hex(), n.allocNr)
+}
+
 // ToV4 returns 2 uint8 that can be used as the last 2 bytes of an IPv4 address
 func (n *Nibble) ToV4() (uint8, uint8, error) {
 	if len(n.nibble) > 2 {
