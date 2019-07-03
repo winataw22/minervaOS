@@ -1,1 +1,13 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/7b837b72fa613429c2c5d5c3f1ca1cc0
+module github.com/threefoldtech/zosv2/cmds/tnodb_mock
+
+go 1.12
+
+replace github.com/threefoldtech/zosv2/modules => ../../modules/
+
+require (
+	github.com/dspinhirne/netaddr-go v0.0.0-20180510133009-a6cfb692cb10
+	github.com/google/uuid v1.1.1
+	github.com/gorilla/mux v1.7.2
+	github.com/stretchr/testify v1.3.0
+	github.com/threefoldtech/zosv2/modules v0.0.0-00010101000000-000000000000
+)

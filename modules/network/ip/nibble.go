@@ -32,32 +32,48 @@ func NewNibble(prefix *net.IPNet, allocNr int8) *Nibble {
 
 // Hex return the hexadecimal version of the meaningfull nibble
 func (n *Nibble) Hex() string {
-	return fmt.Sprintf("%x", n.nibble)
+	if len(n.nibble) == 2 {
+		return fmt.Sprintf("%x", n.nibble)
+	}
+	if len(n.nibble) == 4 {
+		return fmt.Sprintf("%x:%x", n.nibble[:2], n.nibble[2:])
+	}
+	panic("wrong nibble size")
+}
+
+func (n *Nibble) nocolonhex() string {
+	if len(n.nibble) == 2 {
+		return fmt.Sprintf("%x", n.nibble)
+	}
+	if len(n.nibble) == 4 {
+		return fmt.Sprintf("%x%x", n.nibble[:2], n.nibble[2:])
+	}
+	panic("wrong nibble size")
 }
 
 // WiregardName return the deterministic wireguard name
 func (n *Nibble) WiregardName() string {
-	return fmt.Sprintf("wg-%s-%d", n.Hex(), n.allocNr)
+	return fmt.Sprintf("wg-%s-%d", n.nocolonhex(), n.allocNr)
 }
 
 // BridgeName return the deterministic bridge name
 func (n *Nibble) BridgeName() string {
-	return fmt.Sprintf("br-%s-%d", n.Hex(), n.allocNr)
+	return fmt.Sprintf("br-%s-%d", n.nocolonhex(), n.allocNr)
 }
 
 // NetworkName return the deterministic network name
 func (n *Nibble) NetworkName() string {
-	return fmt.Sprintf("net-%s-%d", n.Hex(), n.allocNr)
+	return fmt.Sprintf("net-%s-%d", n.nocolonhex(), n.allocNr)
 }
 
 // VethName return the deterministic veth interface name
 func (n *Nibble) VethName() string {
-	return fmt.Sprintf("veth-%s-%d", n.Hex(), n.allocNr)
+	return fmt.Sprintf("veth-%s-%d", n.nocolonhex(), n.allocNr)
 }
 
 // PubName return the deterministic public interface name
 func (n *Nibble) PubName() string {
-	return fmt.Sprintf("pub-%s-%d", n.Hex(), n.allocNr)
+	return fmt.Sprintf("pub-%s-%d", n.nocolonhex(), n.allocNr)
 }
 
 // ToV4 returns 2 uint8 that can be used as the last 2 bytes of an IPv4 address

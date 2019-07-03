@@ -2,6 +2,7 @@ package modules
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -79,7 +80,16 @@ func TestNetworkUnmarshal(t *testing.T) {
 	require.NoError(t, err)
 	assert := assert.New(t)
 	assert.Equal(NetID("netid"), network.NetID)
-	assert.Equal(len(network.Resources), 1)
-	assert.Equal(network.Resources[0].NodeID.ID, "kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=")
-	assert.Equal(network.Resources[0].NodeID.FarmerID, "ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E=")
+	assert.Equal(1, len(network.Resources))
+	assert.Equal("kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=", network.Resources[0].NodeID.ID)
+	assert.Equal("ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E=", network.Resources[0].NodeID.FarmerID)
+}
+
+func TestMarshlNetwork(t *testing.T) {
+	network := &Network{
+		NetID: NetID("test"),
+	}
+	b, err := json.Marshal(network)
+	require.NoError(t, err)
+	fmt.Println(string(b))
 }

@@ -24,17 +24,37 @@ func requestAllocation(farm string, store *allocationStore) (*net.IPNet, error) 
 	return allocate(farmAlloc)
 }
 
+func getNetworkZero(farm string, store *allocationStore) (*net.IPNet, int, error) {
+	store.Lock()
+	defer store.Unlock()
+	farmAlloc, ok := store.Allocations[farm]
+	if !ok {
+		return nil, 0, fmt.Errorf("farm %s does not have a prefix registered", farm)
+	}
+
+	ipv6net, err := netaddr.ParseIPv6Net(farmAlloc.Allocation.String())
+	if err != nil {
+		return nil, 0, err
+	}
+	subnet := ipv6net.NthSubnet(64, 0)
+	allocSize, _ := farmAlloc.Allocation.Mask.Size()
+	return convert(subnet), allocSize, nil
+}
+
 func allocate(allocation *Allocation) (*net.IPNet, error) {
 	ipv6net, err := netaddr.ParseIPv6Net(allocation.Allocation.String())
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	subnetCount := ipv6net.SubnetCount(64)
 	if uint64(len(allocation.SubNetUsed)) >= subnetCount {
 		return nil, fmt.Errorf("all subnets already allocated")
 	}
-	nth := rand.Int63n(int64(subnetCount))
+
+	// random from 1 to subnetCount-1
+	// we never hand out the network 0 cause we keep it for the routing segment of the farm
+	nth := rand.Int63n(int64(subnetCount)-1) + 1
 	for {
 		if !isIn(nth, allocation.SubNetUsed) {
 			allocation.SubNetUsed = append(allocation.SubNetUsed, uint64(nth))

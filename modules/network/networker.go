@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/threefoldtech/zosv2/modules/identity"
+
 	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 
 	"github.com/rs/zerolog/log"
@@ -16,35 +18,49 @@ import (
 )
 
 type networker struct {
-	nodeID      modules.NodeID
-	storageDir  string
-	netResAlloc NetResourceAllocator
-	tnodb       TNoDB
+	nodeID     identity.Identifier
+	storageDir string
+	tnodb      TNoDB
 }
 
 // NewNetworker create a new modules.Networker that can be used over zbus
-func NewNetworker(storageDir string, allocator NetResourceAllocator, nodeID modules.NodeID) modules.Networker {
+func NewNetworker(nodeID identity.Identifier, tnodb TNoDB, storageDir string) modules.Networker {
 	return &networker{
-		nodeID:      nodeID,
-		storageDir:  storageDir,
-		netResAlloc: allocator,
+		nodeID:     nodeID,
+		storageDir: storageDir,
+		tnodb:      tnodb,
 	}
 }
 
 var _ modules.Networker = (*networker)(nil)
 
 // GetNetwork implements modules.Networker interface
-func (n *networker) GetNetwork(id string) (*modules.Network, error) {
-	// TODO check signature
-	return n.netResAlloc.Get(id)
+func (n *networker) GetNetwork(id modules.NetID) (*modules.Network, error) {
+	return n.tnodb.GetNetwork(id)
 }
 
 // ApplyNetResource implements modules.Networker interface
 func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 	log.Info().Msg("apply netresource")
+
+	path := filepath.Join(n.storageDir, string(network.NetID))
+	wgKey, err := wireguard.LoadKey(path)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("network", string(network.NetID)).
+			Str("directory", path).
+			Msg("failed to load wireguard keys. Generate the keys before trying to configure the network")
+		return err
+	}
+
 	localResource := n.localResource(network.Resources)
 	if localResource == nil {
-		return fmt.Errorf("not network resource for this node: %s", n.nodeID.ID)
+		return fmt.Errorf("not network resource for this node: %s", n.nodeID.Identity())
+	}
+	exitNetRes, err := exitResource(network.Resources)
+	if err != nil {
+		return err
 	}
 
 	defer func() {
@@ -68,7 +84,7 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 	}
 
 	// if we are not the exit node, then add the default route to the exit node
-	if localResource.Prefix.String() != network.Exit.Prefix.String() {
+	if localResource.Prefix.String() != exitNetRes.Prefix.String() {
 		log.Info().Msg("Generate wireguard config to the exit node")
 		exitPeers, exitRoutes, err := genWireguardExitPeers(localResource, network)
 		if err != nil {
@@ -76,12 +92,18 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 		}
 		peers = append(peers, exitPeers...)
 		routes = append(routes, exitRoutes...)
+	} else { // we are the exit node
+		log.Info().Msg("Configure network resource as exit point")
+		err := configNetResAsExitPoint(exitNetRes, network.Exit, network.PrefixZero)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Info().
 		Int("number of peers", len(peers)).
 		Msg("configure wg")
-	err = configWG(localResource, network, peers, routes, n.storageDir)
+	err = configWG(localResource, network, peers, routes, wgKey)
 	if err != nil {
 		return err
 	}
@@ -132,6 +154,6 @@ func (n *networker) GenerateWireguarKeyPair(netID modules.NetID) (string, error)
 	}
 	return key.PublicKey().String(), nil
 }
-func (n *networker) PublishWireguarKeyPair(key string, nodeID modules.NodeID, netID modules.NetID) error {
-	return n.tnodb.PublishWireguarKey(key, nodeID, netID)
+func (n *networker) PublishWGPubKey(key string, netID modules.NetID) error {
+	return n.tnodb.PublishWireguarKey(key, n.nodeID.Identity(), netID)
 }

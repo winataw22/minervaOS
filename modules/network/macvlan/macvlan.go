@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
@@ -84,14 +86,20 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 }
 
 // Install configures a macvlan intefaces created with Create method
-func Install(link *netlink.Macvlan, ip *net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
+func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
 	return netns.Do(func(_ ns.NetNS) error {
 		name := link.Attrs().Name
 
-		if err := netlink.AddrAdd(link, &netlink.Addr{
-			IPNet: ip,
-		}); err != nil {
-			return err
+		for _, ip := range ips {
+			if err := netlink.AddrAdd(link, &netlink.Addr{
+				IPNet: ip,
+			}); err != nil {
+				log.Error().
+					Str("addr", ip.String()).
+					Str("link", link.Attrs().Name).
+					Err(err).Msg("failed to set address on link")
+				return err
+			}
 		}
 
 		if err := netlink.LinkSetUp(link); err != nil {
@@ -100,6 +108,10 @@ func Install(link *netlink.Macvlan, ip *net.IPNet, routes []*netlink.Route, netn
 
 		for _, route := range routes {
 			if err := netlink.RouteAdd(route); err != nil {
+				log.Error().
+					Str("route", route.String()).
+					Str("link", link.Attrs().Name).
+					Err(err).Msg("failed to set route on link")
 				return err
 			}
 		}

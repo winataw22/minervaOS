@@ -1,6 +1,0 @@
-exec: /bin/upgraded -broker unix:///var/run/redis.sock -root /var/cache/modules/upgrade
-after:
-  - network-dhcp
-  - storage
-  - redis
-  - zos_flist

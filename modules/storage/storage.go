@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,22 +33,27 @@ type storageModule struct {
 }
 
 // New create a new storage module service
-func New() modules.StorageModule {
+func New() (modules.StorageModule, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	m, err := filesystem.DefaultDeviceManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &storageModule{
 		volumes: []filesystem.Pool{},
-		devices: filesystem.DefaultDeviceManager(),
+		devices: m,
 	}
 
 	// go for a simple linear setup right now
-	if err := s.initialize(modules.StoragePolicy{
+	err = s.initialize(modules.StoragePolicy{
 		Raid:     modules.Single,
 		Disks:    1,
 		MaxPools: 0,
-	}); err != nil {
-		panic(err)
-	}
-
-	return s
+	})
+	return s, err
 }
 
 /**
@@ -64,10 +70,6 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 	// Make sure we finish in 1 minute
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 	defer cancel()
-
-	if err := s.devices.Scan(context.Background()); err != nil {
-		return (err)
-	}
 
 	fs := filesystem.NewBtrfs(s.devices)
 
@@ -102,11 +104,11 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 
 	// collect free disks, sort by read time so faster disks are first
 	sort.Sort(filesystem.ByReadTime(disks))
-	freeDisks := []filesystem.Device{}
-	for _, device := range disks {
-		if !device.Used() {
-			log.Debug().Msgf("Found free device %s", device.Path)
-			freeDisks = append(freeDisks, device)
+	freeDisks := filesystem.DeviceCache{}
+	for idx := range disks {
+		if !disks[idx].Used() {
+			log.Debug().Msgf("Found free device %s", disks[idx].Path)
+			freeDisks = append(freeDisks, disks[idx])
 		}
 	}
 
@@ -126,20 +128,21 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 	newPools := []filesystem.Pool{}
 
 	// also make sure pools are homogenous, only 1 type of device per pool
-	ssds := []filesystem.Device{}
-	hdds := []filesystem.Device{}
+	ssds := filesystem.DeviceCache{}
+	hdds := filesystem.DeviceCache{}
 
-	for _, d := range freeDisks {
-		if d.DiskType == filesystem.SSDDevice {
-			ssds = append(ssds, d)
+	for idx := range freeDisks {
+		if freeDisks[idx].DiskType == modules.SSDDevice {
+			ssds = append(ssds, freeDisks[idx])
 		} else {
-			hdds = append(hdds, d)
+			hdds = append(hdds, freeDisks[idx])
 		}
 	}
 
 	createdPools := 0
-	for _, fdisks := range [][]filesystem.Device{ssds, hdds} {
-		possiblePools := len(fdisks) / int(policy.Disks)
+	fdisks := []filesystem.DeviceCache{ssds, hdds}
+	for idx := range fdisks {
+		possiblePools := len(fdisks[idx]) / int(policy.Disks)
 		// only create up to the specified amount of pools
 		if policy.MaxPools != 0 && int(policy.MaxPools) < possiblePools-createdPools {
 			possiblePools = int(policy.MaxPools)
@@ -148,11 +151,11 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 
 		for i := 0; i < possiblePools; i++ {
 			log.Debug().Msgf("Creating new volume %d", i)
-			poolDevices := []filesystem.Device{}
+			poolDevices := filesystem.DeviceCache{}
 
 			for j := 0; j < int(policy.Disks); j++ {
-				log.Debug().Msgf("Grabbing device %d: %s for new volume", i*int(policy.Disks)+j, fdisks[i*int(policy.Disks)+j].Path)
-				poolDevices = append(poolDevices, fdisks[i*int(policy.Disks)+j])
+				log.Debug().Msgf("Grabbing device %d: %s for new volume", i*int(policy.Disks)+j, fdisks[idx][i*int(policy.Disks)+j].Path)
+				poolDevices = append(poolDevices, fdisks[idx][i*int(policy.Disks)+j])
 			}
 
 			pool, err := fs.Create(ctx, uuid.New().String(), poolDevices, policy.Raid)
@@ -167,10 +170,10 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 
 	// make sure new pools are mounted
 	log.Info().Msgf("Making sure new volumes are mounted")
-	for _, pool := range newPools {
-		if _, mounted := pool.Mounted(); !mounted {
-			log.Debug().Msgf("Mounting volume %s", pool.Name())
-			if _, err = pool.Mount(); err != nil {
+	for idx := range newPools {
+		if _, mounted := newPools[idx].Mounted(); !mounted {
+			log.Debug().Msgf("Mounting volume %s", newPools[idx].Name())
+			if _, err = newPools[idx].Mount(); err != nil {
 				return err
 			}
 		}
@@ -178,19 +181,14 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 
 	s.volumes = append(s.volumes, newPools...)
 
-	// rescan disks
-	if err = s.devices.Scan(ctx); err != nil {
-		return err
-	}
-
 	return s.ensureCache()
 }
 
 // CreateFilesystem with the given size in a storage pool.
-func (s *storageModule) CreateFilesystem(size uint64) (string, error) {
+func (s *storageModule) CreateFilesystem(size uint64, poolType modules.DeviceType) (string, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
 
-	fs, err := s.createSubvol(size, uuid.New().String(), false)
+	fs, err := s.createSubvol(size, uuid.New().String(), poolType)
 	if err != nil {
 		return "", err
 	}
@@ -203,15 +201,18 @@ func (s *storageModule) CreateFilesystem(size uint64) (string, error) {
 func (s *storageModule) ReleaseFilesystem(path string) error {
 	log.Info().Msgf("Deleting volume at %v", path)
 
-	for _, volume := range s.volumes {
-		filesystems, err := volume.Volumes()
+	for idx := range s.volumes {
+		if !strings.HasPrefix(path, s.volumes[idx].Path()) {
+			continue
+		}
+		filesystems, err := s.volumes[idx].Volumes()
 		if err != nil {
 			return err
 		}
-		for _, fs := range filesystems {
-			if fs.Path() == path {
-				log.Debug().Msgf("Removing filesystem %v in volume %v", fs.Name(), volume.Name())
-				return volume.RemoveVolume(fs.Name())
+		for jdx := range filesystems {
+			if filesystems[jdx].Path() == path {
+				log.Debug().Msgf("Removing filesystem %v in volume %v", filesystems[jdx].Name(), s.volumes[idx].Name())
+				return s.volumes[idx].RemoveVolume(filesystems[jdx].Name())
 			}
 		}
 	}
@@ -229,15 +230,15 @@ func (s *storageModule) ensureCache() error {
 	var cacheFs filesystem.Volume
 
 	// check if we already have a cache
-	for _, volume := range s.volumes {
-		filesystems, err := volume.Volumes()
+	for idx := range s.volumes {
+		filesystems, err := s.volumes[idx].Volumes()
 		if err != nil {
 			return err
 		}
-		for _, fs := range filesystems {
-			if fs.Name() == cacheLabel {
-				log.Debug().Msgf("Found existing cache at %v", fs.Path())
-				cacheFs = fs
+		for jdx := range filesystems {
+			if filesystems[jdx].Name() == cacheLabel {
+				log.Debug().Msgf("Found existing cache at %v", filesystems[jdx].Path())
+				cacheFs = filesystems[jdx]
 				break
 			}
 		}
@@ -249,7 +250,12 @@ func (s *storageModule) ensureCache() error {
 	if cacheFs == nil {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
-		fs, err := s.createSubvol(cacheSize, cacheLabel, true)
+		fs, err := s.createSubvol(cacheSize, cacheLabel, modules.SSDDevice)
+		if err == modules.ErrNotEnoughSpace {
+			// No space on SSD (probably no SSD in the node at all), try HDD
+			err = nil
+			fs, err = s.createSubvol(cacheSize, cacheLabel, modules.HDDDevice)
+		}
 		if err != nil {
 			return err
 		}
@@ -263,30 +269,18 @@ func (s *storageModule) ensureCache() error {
 // createSubvol creates a subvolume with the given name and limits it to the given size
 // if the requested disk type does not have a storage pool available, an error is
 // returned
-func (s *storageModule) createSubvol(size uint64, name string, preferSSD bool) (filesystem.Volume, error) {
+func (s *storageModule) createSubvol(size uint64, name string, poolType modules.DeviceType) (filesystem.Volume, error) {
 	var fs filesystem.Volume
 	var err error
 
-	// sort possible types
-	possiblePools := s.volumes
-	if preferSSD {
-		ssdPools := []filesystem.Pool{}
-		hddPools := []filesystem.Pool{}
-		for _, pool := range s.volumes {
-
-			if pool.Type() == filesystem.SSDDevice {
-				ssdPools = append(ssdPools, pool)
-			} else {
-				hddPools = append(hddPools, pool)
-			}
+	// pick an appropriate pool
+	for idx := range s.volumes {
+		// ignore pools which don't have the right device type
+		if s.volumes[idx].Type() != poolType {
+			continue
 		}
-		possiblePools = append(ssdPools, hddPools...)
-	}
 
-	// for now take the first volume, if an ssd is preferred ssds will be sorted
-	// first
-	for _, volume := range possiblePools {
-		usage, err := volume.Usage()
+		usage, err := s.volumes[idx].Usage()
 		if err != nil {
 			log.Error().Msgf("Failed to get current volume usage: %v", err)
 			continue
@@ -298,7 +292,7 @@ func (s *storageModule) createSubvol(size uint64, name string, preferSSD bool) (
 			continue
 		}
 
-		fsn, err := volume.AddVolume(name)
+		fsn, err := s.volumes[idx].AddVolume(name)
 		if err != nil {
 			log.Error().Msgf("Failed to create new filesystem: %v", err)
 			continue
@@ -311,5 +305,10 @@ func (s *storageModule) createSubvol(size uint64, name string, preferSSD bool) (
 		break
 	}
 
-	return fs, err
+	if err != nil || fs != nil {
+		return fs, err
+	}
+
+	// no error but also no volume, so we didn't manage to create one
+	return nil, modules.ErrNotEnoughSpace
 }

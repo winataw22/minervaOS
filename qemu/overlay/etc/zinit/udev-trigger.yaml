@@ -1,4 +1,0 @@
-exec: sh /etc/zinit/init/udev.sh
-oneshot: true
-after:
-  - udevd

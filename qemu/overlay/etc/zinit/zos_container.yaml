@@ -1,6 +1,0 @@
-exec: /bin/contd -broker unix:///var/run/redis.sock -containerd /run/containerd/containerd.sock -root /var/cache/modules/container
-after:
-  - storage
-  - redis
-  - containerd
-  - zos_flist

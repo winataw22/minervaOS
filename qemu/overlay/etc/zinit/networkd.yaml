@@ -1,4 +1,1 @@
-exec: /bin/networkd
-oneshot: true
-after:
- - udev-trigger
+../../../../zinit/networkd.yaml

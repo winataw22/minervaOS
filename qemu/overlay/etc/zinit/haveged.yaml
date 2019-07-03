@@ -1,2 +1,0 @@
-exec: haveged -w 1024 -d 32 -i 32 -v 1
-oneshot: true

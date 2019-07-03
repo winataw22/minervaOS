@@ -3,7 +3,6 @@ package network
 import (
 	"fmt"
 	"net"
-	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
 	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 	"github.com/vishvananda/netlink"
@@ -53,6 +53,10 @@ func createNetworkResource(localResource *modules.NetResource, network *modules.
 	hostIface := &current.Interface{}
 	var handler = func(hostNS ns.NetNS) error {
 		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
+			return err
+		}
+
+		if err := ifaceutil.SetLoUp(); err != nil {
 			return err
 		}
 
@@ -172,6 +176,10 @@ func createNetworkResource(localResource *modules.NetResource, network *modules.
 
 func genWireguardPeers(localResource *modules.NetResource, network *modules.Network) ([]wireguard.Peer, []*netlink.Route, error) {
 	publicPrefixes := publicPrefixes(network.Resources)
+	exitNetRes, err := exitResource(network.Resources)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	peers := make([]wireguard.Peer, 0, len(publicPrefixes)+1)
 	routes := make([]*netlink.Route, 0, len(publicPrefixes))
@@ -186,7 +194,7 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 		}
 
 		// skip exit peer cause we add it in genWireguardExitPeers
-		if peer.Prefix.String() == network.Exit.Prefix.String() {
+		if peer.Prefix.String() == exitNetRes.Prefix.String() {
 			continue
 		}
 
@@ -212,7 +220,7 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 		log.Info().Str("peer prefix", peer.Prefix.String()).Msg("generate wireguard configuration for peer")
 		peers = append(peers, wgPeer)
 
-		if peer.Prefix.String() == network.Exit.Prefix.String() {
+		if peer.Prefix.String() == exitNetRes.Prefix.String() {
 			// we don't add the route to the exit node here cause it's
 			// done in the prepareNonExitNode method
 			continue
@@ -230,9 +238,13 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 func genWireguardExitPeers(localResource *modules.NetResource, network *modules.Network) ([]wireguard.Peer, []*netlink.Route, error) {
 	peers := make([]wireguard.Peer, 0)
 	routes := make([]*netlink.Route, 0)
+	exitNetRes, err := exitResource(network.Resources)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// add exit node to the list of peers
-	exitPeer, err := getPeer(network.Exit.Prefix.String(), localResource.Peers)
+	exitPeer, err := getPeer(exitNetRes.Prefix.String(), localResource.Peers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -283,27 +295,13 @@ func genWireguardExitPeers(localResource *modules.NetResource, network *modules.
 	return peers, routes, nil
 }
 
-func configWG(localResource *modules.NetResource, network *modules.Network, wgPeers []wireguard.Peer, routes []*netlink.Route, storageDir string) error {
+func configWG(localResource *modules.NetResource, network *modules.Network, wgPeers []wireguard.Peer, routes []*netlink.Route, wgKey wgtypes.Key) error {
 	localNibble := zosip.NewNibble(localResource.Prefix, network.AllocationNR)
 	netns, err := namespace.GetByName(localNibble.NetworkName())
 	if err != nil {
 		return err
 	}
 	defer netns.Close()
-
-	storagePath := filepath.Join(storageDir, localNibble.Hex())
-	var key wgtypes.Key
-	key, err = wireguard.LoadKey(storagePath)
-	if err != nil {
-		key, err = wireguard.GenerateKey(storagePath)
-		if err != nil {
-			return err
-		}
-	}
-	// key, err := wgtypes.ParseKey("oKGf7plalsxRjsNxN/G/S2bfBlyGlGJxY3t45VOvHVY=")
-	// if err != nil {
-	// 	return err
-	// }
 
 	var handler = func(_ ns.NetNS) error {
 
@@ -324,7 +322,7 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 		}
 
 		log.Info().Msg("configure wireguard interface")
-		if err = wg.Configure(key.String(), wgPeers); err != nil {
+		if err = wg.Configure(wgKey.String(), wgPeers); err != nil {
 			return err
 		}
 
@@ -348,7 +346,7 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 func (n *networker) localResource(resources []*modules.NetResource) *modules.NetResource {
 	for _, resource := range resources {
 		log.Info().Msgf("try to find local net resource %+v", resource)
-		if resource.NodeID.ID == n.nodeID.ID {
+		if resource.NodeID.ID == n.nodeID.Identity() {
 			return resource
 		}
 	}
@@ -362,6 +360,15 @@ func isIn(target string, l []string) bool {
 		}
 	}
 	return false
+}
+
+func exitResource(r []*modules.NetResource) (*modules.NetResource, error) {
+	for _, res := range r {
+		if res.ExitPoint {
+			return res, nil
+		}
+	}
+	return nil, fmt.Errorf("not net resource with exit flag enabled found")
 }
 
 func getPeer(prefix string, peers []*modules.Peer) (*modules.Peer, error) {
@@ -393,12 +400,12 @@ func hiddenPrefixes(resources []*modules.NetResource) []string {
 	return output
 }
 
-func isPublic(nodeID modules.NodeID) bool {
+func isPublic(nodeID *modules.NodeID) bool {
 	return nodeID.ReachabilityV6 == modules.ReachabilityV6Public ||
 		nodeID.ReachabilityV4 == modules.ReachabilityV4Public
 }
 
-func isHidden(nodeID modules.NodeID) bool {
+func isHidden(nodeID *modules.NodeID) bool {
 	return nodeID.ReachabilityV6 == modules.ReachabilityV6ULA ||
 		nodeID.ReachabilityV4 == modules.ReachabilityV4Hidden
 }

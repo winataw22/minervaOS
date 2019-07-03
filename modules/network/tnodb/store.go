@@ -234,8 +234,8 @@ func (s *httpTNoDB) ReadExitNode(node identity.Identifier) (*network.ExitIface, 
 	return exitIface, nil
 }
 
-func (s *httpTNoDB) PublishWireguarKey(key string, nodeID modules.NodeID, netID modules.NetID) error {
-	url := fmt.Sprintf("%s/networks/%s/%s/wgkeys", s.baseURL, nodeID.ID, netID)
+func (s *httpTNoDB) PublishWireguarKey(key string, nodeID string, netID modules.NetID) error {
+	url := fmt.Sprintf("%s/networks/%s/%s/wgkeys", s.baseURL, nodeID, netID)
 	buf := &bytes.Buffer{}
 
 	output := struct {
@@ -257,13 +257,52 @@ func (s *httpTNoDB) PublishWireguarKey(key string, nodeID modules.NodeID, netID 
 	return nil
 }
 
-// func (s *httpTNoDB) ReadNetworkObj(node identity.Identifier) ([]*modules.Network, error) {
-// 	url := fmt.Sprintf("%s/nodes/%s/network", s.baseURL, node.Identity())
-// 	resp, err := http.Get(url)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// }
+func (s *httpTNoDB) GetNetwork(netid modules.NetID) (*modules.Network, error) {
+	url := fmt.Sprintf("%s/networks/%s", s.baseURL, string(netid))
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	network := &modules.Network{}
+	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
+		return nil, err
+	}
+	return network, nil
+}
+
+func (s *httpTNoDB) CreateNetwork(farmID string) (*modules.Network, error) {
+	networkReq := struct {
+		ExitFarm string `json:"exit_farm"`
+	}{ExitFarm: farmID}
+
+	buf := &bytes.Buffer{}
+
+	if err := json.NewEncoder(buf).Encode(networkReq); err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/networks", s.baseURL)
+	resp, err := http.Post(url, "application/json", buf)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("wrong response status received: %s", resp.Status)
+	}
+
+	defer resp.Body.Close()
+
+	network := &modules.Network{}
+	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
+		log.Error().Err(err).Msg("failed to decode network json")
+		return nil, err
+	}
+
+	return network, nil
+}
 
 func linkAddrs(l netlink.Link) ([]string, error) {
 	addrs, err := netlink.AddrList(l, netlink.FAMILY_ALL)

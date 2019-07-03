@@ -1,4 +1,1 @@
-exec: /bin/containerd --config /etc/containerd/config.toml
-after:
-  - network-dhcp
-  - storage
+../../../../zinit/containerd.yaml

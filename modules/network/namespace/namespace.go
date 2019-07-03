@@ -3,7 +3,6 @@ package namespace
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -128,13 +127,6 @@ func Delete(ns ns.NetNS) error {
 	// Only unmount if it's been bind-mounted (don't touch namespaces in /proc...)
 	if strings.HasPrefix(nsPath, netNSPath) {
 		if err := unix.Unmount(nsPath, 0); err != nil {
-
-			out, cmdErr := exec.Command("bash", "-c", "lsof | grep net-ff02").CombinedOutput()
-			if cmdErr != nil {
-				panic(cmdErr)
-			}
-			fmt.Println(string(out))
-
 			return fmt.Errorf("failed to unmount NS: at %s: %v", nsPath, err)
 		}
 

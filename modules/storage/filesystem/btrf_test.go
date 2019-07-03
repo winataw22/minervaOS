@@ -93,27 +93,27 @@ type TestDeviceManager struct {
 	devices TestDevices
 }
 
-func (m TestDeviceManager) Device(ctx context.Context, device string) (Device, error) {
+func (m TestDeviceManager) Device(ctx context.Context, device string) (*Device, error) {
 	for _, loop := range m.devices {
 		if loop == device {
-			return Device{
+			return &Device{
 				Path: loop,
 				Type: "loop",
 			}, nil
 		}
 	}
 
-	return Device{}, fmt.Errorf("device not found")
+	return nil, fmt.Errorf("device not found")
 }
 
-func (m TestDeviceManager) ByLabel(ctx context.Context, label string) ([]Device, error) {
+func (m TestDeviceManager) ByLabel(ctx context.Context, label string) (DeviceCache, error) {
 	return nil, nil
 }
 
-func (m TestDeviceManager) Devices(ctx context.Context) ([]Device, error) {
-	var devices []Device
+func (m TestDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
+	var devices DeviceCache
 	for _, loop := range m.devices {
-		devices = append(devices, Device{
+		devices = append(devices, &Device{
 			Path: loop,
 			Type: "loop",
 		})
@@ -262,7 +262,11 @@ func TestBtrfsSingle(t *testing.T) {
 	defer devices.Destroy()
 
 	fs := NewBtrfs(TestDeviceManager{devices})
-	pool, err := fs.Create(context.Background(), "test-single", devices.Loops(), modules.Single)
+	devs := DeviceCache{}
+	for idx := range devices.Loops() {
+		devs = append(devs, &devices.Loops()[idx])
+	}
+	pool, err := fs.Create(context.Background(), "test-single", devs, modules.Single)
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -281,7 +285,11 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	loops := devices.Loops()
 	fs := NewBtrfs(TestDeviceManager{devices})
-	pool, err := fs.Create(context.Background(), "test-raid1", loops[:2], modules.Raid1) //use the first 2 disks
+	devs := DeviceCache{}
+	for idx := range devices.Loops()[:2] {
+		devs = append(devs, &devices.Loops()[idx])
+	}
+	pool, err := fs.Create(context.Background(), "test-raid1", devs, modules.Raid1) //use the first 2 disks
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -301,7 +309,7 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	t.Run("add device", func(t *testing.T) {
 		// add a device to array
-		err = pool.AddDevice(loops[2])
+		err = pool.AddDevice(&loops[2])
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()
 		}
@@ -309,7 +317,7 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	t.Run("remove device", func(t *testing.T) {
 		// remove device from array
-		err = pool.RemoveDevice(loops[0])
+		err = pool.RemoveDevice(&loops[0])
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()
 		}
@@ -318,7 +326,7 @@ func TestBtrfsRaid1(t *testing.T) {
 	t.Run("remove second device", func(t *testing.T) {
 		// remove a 2nd device should fail because raid1 should
 		// have at least 2 devices
-		err = pool.RemoveDevice(loops[1])
+		err = pool.RemoveDevice(&loops[1])
 		if ok := assert.Error(t, err); !ok {
 			t.Fatal()
 		}
@@ -340,7 +348,7 @@ func TestBtrfsList(t *testing.T) {
 	for i, loop := range loops {
 		name := fmt.Sprintf("test-list-%d", i)
 		names[name] = struct{}{}
-		_, err := fs.Create(context.Background(), name, []Device{loop}, modules.Single)
+		_, err := fs.Create(context.Background(), name, DeviceCache{&loop}, modules.Single)
 
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()

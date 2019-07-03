@@ -26,7 +26,10 @@ func main() {
 
 	flag.Parse()
 
-	storage := storage.New()
+	storage, err := storage.New()
+	if err != nil {
+		log.Fatal().Msgf("Error initializing storage module: %s", err)
+	}
 
 	server, err := zbus.NewRedisServer(module, msgBrokerCon, workerNr)
 	if err != nil {

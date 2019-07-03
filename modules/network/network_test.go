@@ -51,7 +51,7 @@ var peers = []*modules.Peer{
 }
 
 var node1 = &modules.NetResource{
-	NodeID: modules.NodeID{
+	NodeID: &modules.NodeID{
 		ID:             "node1",
 		ReachabilityV4: modules.ReachabilityV4Public,
 		ReachabilityV6: modules.ReachabilityV6Public,
@@ -59,9 +59,10 @@ var node1 = &modules.NetResource{
 	Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
 	LinkLocal: mustParseCIDR("fe80::ff02/64"),
 	Peers:     peers,
+	ExitPoint: true,
 }
 var node2 = &modules.NetResource{
-	NodeID: modules.NodeID{
+	NodeID: &modules.NodeID{
 		ID:             "node2",
 		ReachabilityV4: modules.ReachabilityV4Hidden,
 		ReachabilityV6: modules.ReachabilityV6ULA,
@@ -72,7 +73,7 @@ var node2 = &modules.NetResource{
 }
 
 var node3 = &modules.NetResource{
-	NodeID: modules.NodeID{
+	NodeID: &modules.NodeID{
 		ID:             "node3",
 		ReachabilityV4: modules.ReachabilityV4Public,
 		ReachabilityV6: modules.ReachabilityV6Public,
@@ -88,9 +89,8 @@ var networks = []*modules.Network{
 		Resources: []*modules.NetResource{
 			node1, node2, node3,
 		},
-		Exit: &modules.ExitPoint{
-			NetResource: node1,
-		},
+		PrefixZero: mustParseCIDR("2a02:1802:5e:0000::/64"),
+		Exit:       &modules.ExitPoint{},
 	},
 }
 
@@ -109,9 +109,8 @@ func TestCreateNetwork(t *testing.T) {
 
 	storage := filepath.Join(dir, netName)
 	networker := &networker{
-		nodeID:      node1.NodeID,
-		storageDir:  storage,
-		netResAlloc: nil,
+		nodeID:     node1.NodeID,
+		storageDir: storage,
 	}
 
 	for _, tc := range []struct {
@@ -184,20 +183,18 @@ func TestCreateNetwork(t *testing.T) {
 func TestConfigureWG(t *testing.T) {
 	var (
 		network = networks[0]
-		// resource = network.Resources[0]
-		// nibble   = zosip.NewNibble(resource.Prefix, network.AllocationNR)
-		// netName  = nibble.NetworkName()
-		// wgName   = nibble.WiregardName()
 	)
 
 	dir, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 
 	networker := &networker{
-		nodeID:      node3.NodeID,
-		storageDir:  dir,
-		netResAlloc: nil,
+		nodeID:     node1.NodeID,
+		storageDir: dir,
 	}
+
+	_, err = networker.GenerateWireguarKeyPair(network.NetID)
+	require.NoError(t, err)
 
 	defer func() {
 		_ = networker.DeleteNetResource(network)
@@ -206,46 +203,6 @@ func TestConfigureWG(t *testing.T) {
 
 	err = networker.ApplyNetResource(network)
 	require.NoError(t, err)
-
-	// netns, err := namespace.GetByName(netName)
-	// require.NoError(t, err)
-
-	// verifty the configfuration of the wg interface
-	// for this we need to swtich into the network namespace created for
-	// this network resource
-	// var handler = func(_ ns.NetNS) error {
-	// 	wg, err := wireguard.GetByName(wgName)
-	// 	require.NoError(t, err)
-
-	// 	device, err := wg.Device()
-	// 	require.NoError(t, err)
-
-	// 	assert.Equal(t, wgName, device.Name)
-	// 	assert.Equal(t, key, device.PrivateKey)
-	// 	assert.Equal(t, key.PublicKey(), device.PublicKey)
-
-	// 	for i, peer := range device.Peers {
-	// 		// asserts endpoint
-	// 		assert.Equal(t, endpoint(resource.Peers[i]), peer.Endpoint.String())
-
-	// 		// asserts allowedIPs
-	// 		a, b, err := nibble.ToV4()
-	// 		require.NoError(t, err)
-	// 		expected := []string{
-	// 			fmt.Sprintf("fe80::%s/128", nibble.Hex()),
-	// 			fmt.Sprintf("172.16.%d.%d/32", a, b),
-	// 		}
-	// 		actual := make([]string, len(peer.AllowedIPs))
-	// 		for y, ip := range peer.AllowedIPs {
-	// 			actual[y] = ip.String()
-	// 		}
-	// 		assert.Equal(t, expected, actual)
-	// 	}
-	// 	return nil
-	// }
-	// err = netns.Do(handler)
-	// require.NoError(t, err)
-
 }
 
 func mustParseCIDR(cidr string) *net.IPNet {
