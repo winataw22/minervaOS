@@ -132,7 +132,7 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 	hdds := filesystem.DeviceCache{}
 
 	for idx := range freeDisks {
-		if freeDisks[idx].DiskType == modules.SSDDevice {
+		if freeDisks[idx].DiskType == filesystem.SSDDevice {
 			ssds = append(ssds, freeDisks[idx])
 		} else {
 			hdds = append(hdds, freeDisks[idx])
@@ -185,10 +185,10 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 }
 
 // CreateFilesystem with the given size in a storage pool.
-func (s *storageModule) CreateFilesystem(size uint64, poolType modules.DeviceType) (string, error) {
+func (s *storageModule) CreateFilesystem(size uint64) (string, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
 
-	fs, err := s.createSubvol(size, uuid.New().String(), poolType)
+	fs, err := s.createSubvol(size, uuid.New().String(), false)
 	if err != nil {
 		return "", err
 	}
@@ -250,12 +250,7 @@ func (s *storageModule) ensureCache() error {
 	if cacheFs == nil {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
-		fs, err := s.createSubvol(cacheSize, cacheLabel, modules.SSDDevice)
-		if err == modules.ErrNotEnoughSpace {
-			// No space on SSD (probably no SSD in the node at all), try HDD
-			err = nil
-			fs, err = s.createSubvol(cacheSize, cacheLabel, modules.HDDDevice)
-		}
+		fs, err := s.createSubvol(cacheSize, cacheLabel, true)
 		if err != nil {
 			return err
 		}
@@ -269,18 +264,29 @@ func (s *storageModule) ensureCache() error {
 // createSubvol creates a subvolume with the given name and limits it to the given size
 // if the requested disk type does not have a storage pool available, an error is
 // returned
-func (s *storageModule) createSubvol(size uint64, name string, poolType modules.DeviceType) (filesystem.Volume, error) {
+func (s *storageModule) createSubvol(size uint64, name string, preferSSD bool) (filesystem.Volume, error) {
 	var fs filesystem.Volume
 	var err error
 
-	// pick an appropriate pool
-	for idx := range s.volumes {
-		// ignore pools which don't have the right device type
-		if s.volumes[idx].Type() != poolType {
-			continue
+	// sort possible types
+	possiblePools := s.volumes
+	if preferSSD {
+		ssdPools := []filesystem.Pool{}
+		hddPools := []filesystem.Pool{}
+		for idx := range s.volumes {
+			if s.volumes[idx].Type() == filesystem.SSDDevice {
+				ssdPools = append(ssdPools, s.volumes[idx])
+			} else {
+				hddPools = append(hddPools, s.volumes[idx])
+			}
 		}
+		possiblePools = append(ssdPools, hddPools...)
+	}
 
-		usage, err := s.volumes[idx].Usage()
+	// for now take the first volume, if an ssd is preferred ssds will be sorted
+	// first
+	for idx := range possiblePools {
+		usage, err := possiblePools[idx].Usage()
 		if err != nil {
 			log.Error().Msgf("Failed to get current volume usage: %v", err)
 			continue
@@ -292,7 +298,7 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType modules.
 			continue
 		}
 
-		fsn, err := s.volumes[idx].AddVolume(name)
+		fsn, err := possiblePools[idx].AddVolume(name)
 		if err != nil {
 			log.Error().Msgf("Failed to create new filesystem: %v", err)
 			continue
@@ -305,10 +311,5 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType modules.
 		break
 	}
 
-	if err != nil || fs != nil {
-		return fs, err
-	}
-
-	// no error but also no volume, so we didn't manage to create one
-	return nil, modules.ErrNotEnoughSpace
+	return fs, err
 }
