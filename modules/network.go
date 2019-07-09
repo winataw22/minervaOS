@@ -54,6 +54,11 @@ type NodeID struct {
 	ReachabilityV6 ReachabilityV6 `json:"reachability_v6"`
 }
 
+// Identity implements the identity.Identifier interface
+func (n *NodeID) Identity() string {
+	return n.ID
+}
+
 // Network represent a full network owned by a user
 type Network struct {
 	// some type of identification... an uuid ?

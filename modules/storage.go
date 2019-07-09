@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -19,6 +20,22 @@ const (
 	Raid1 RaidProfile = "raid1"
 	// Raid10 profile
 	Raid10 RaidProfile = "raid10"
+)
+
+var (
+	// ErrNotEnoughSpace indicates that there is not enough space in a pool
+	// of the requested type to create the filesystem
+	ErrNotEnoughSpace = errors.New("Not enough space left in pools of this type")
+)
+
+// DeviceType is the actual type of hardware that the storage device runs on,
+// i.e. SSD or HDD
+type DeviceType string
+
+// Known device types
+const (
+	SSDDevice = "SSD"
+	HDDDevice = "HDD"
 )
 
 // Validate make sure profile is correct
@@ -64,8 +81,12 @@ type StoragePolicy struct {
 // StorageModule defines the api for storage
 type StorageModule interface {
 	// CreateFilesystem creates a filesystem with a given size. The filesystem
-	// is mounted, and the path to the mountpoint is returned.
-	CreateFilesystem(size uint64) (string, error)
+	// is mounted, and the path to the mountpoint is returned. The filesystem
+	// is only attempted to be created in a pool of the given type. If no
+	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
+	// It is up to the caller to handle such a situation and decide if he wants
+	// to try again on a different devicetype
+	CreateFilesystem(size uint64, poolType DeviceType) (string, error)
 
 	// ReleaseFilesystem signals that the filesystem at the given mountpoint
 	// is no longer needed. The filesystem will be unmounted and subsequently

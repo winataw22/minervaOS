@@ -47,7 +47,7 @@ type Pool interface {
 	// RemoveDevice from the pool
 	RemoveDevice(device *Device) error
 	// Type of the physical storage in this pool
-	Type() DeviceType
+	Type() modules.DeviceType
 
 	// Health() ?
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zosv2/modules"
 )
 
 // DeviceManager is able to list all/specific devices on a system
@@ -30,25 +31,15 @@ const (
 	BtrfsFSType FSType = "btrfs"
 )
 
-// DeviceType is the actual type of hardware that the storage device runs on,
-// i.e. SSD or HDD
-type DeviceType string
-
-// Known device types
-const (
-	SSDDevice = "SSD"
-	HDDDevice = "HDD"
-)
-
 // Device represents a physical device
 type Device struct {
-	Type       string     `json:"type"`
-	Path       string     `json:"name"`
-	Label      string     `json:"label"`
-	Filesystem FSType     `json:"fstype"`
-	Children   []Device   `json:"children"`
-	DiskType   DeviceType `json:"-"`
-	ReadTime   uint64     `json:"-"`
+	Type       string             `json:"type"`
+	Path       string             `json:"name"`
+	Label      string             `json:"label"`
+	Filesystem FSType             `json:"fstype"`
+	Children   []Device           `json:"children"`
+	DiskType   modules.DeviceType `json:"-"`
+	ReadTime   uint64             `json:"-"`
 }
 
 // Used assumes that the device is used if it has custom label or fstype or children
@@ -171,7 +162,7 @@ func setDeviceTypes(devices []Device) ([]Device, error) {
 
 // setDeviceType recursively sets a device type and read time on a device and
 // all of its children
-func setDeviceType(device *Device, typ DeviceType, readTime uint64) {
+func setDeviceType(device *Device, typ modules.DeviceType, readTime uint64) {
 	device.DiskType = typ
 	device.ReadTime = readTime
 
@@ -180,15 +171,15 @@ func setDeviceType(device *Device, typ DeviceType, readTime uint64) {
 	}
 }
 
-func deviceTypeFromString(typ string) DeviceType {
+func deviceTypeFromString(typ string) modules.DeviceType {
 	switch typ {
-	case string(SSDDevice):
-		return SSDDevice
-	case string(HDDDevice):
-		return HDDDevice
+	case string(modules.SSDDevice):
+		return modules.SSDDevice
+	case string(modules.HDDDevice):
+		return modules.HDDDevice
 	default:
 		// if we have an error or unrecognized type, set type to HDD
-		return HDDDevice
+		return modules.HDDDevice
 	}
 }
 

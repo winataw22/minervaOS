@@ -57,13 +57,15 @@ func main() {
 				}
 				name := c.Args().First()
 				if name == "" {
-
+					return fmt.Errorf("A farm name needs to be specified")
 				}
 				farm := identity.NewFarm(name, keyPair)
 				if err := idStore.RegisterFarm(farm, name); err != nil {
 					return err
 				}
-				fmt.Println("farm registered successfully")
+				fmt.Println("Farm registered successfully")
+				fmt.Printf("Name: %s\n", name)
+				fmt.Printf("Identity: %s\n", farm.Identity())
 				return nil
 			},
 		},

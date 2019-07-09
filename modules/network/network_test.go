@@ -109,9 +109,8 @@ func TestCreateNetwork(t *testing.T) {
 
 	storage := filepath.Join(dir, netName)
 	networker := &networker{
-		nodeID:      *node1.NodeID,
-		storageDir:  storage,
-		netResAlloc: nil,
+		nodeID:     node1.NodeID,
+		storageDir: storage,
 	}
 
 	for _, tc := range []struct {
@@ -190,9 +189,8 @@ func TestConfigureWG(t *testing.T) {
 	require.NoError(t, err)
 
 	networker := &networker{
-		nodeID:      *node1.NodeID,
-		storageDir:  dir,
-		netResAlloc: nil,
+		nodeID:     node1.NodeID,
+		storageDir: dir,
 	}
 
 	_, err = networker.GenerateWireguarKeyPair(network.NetID)
