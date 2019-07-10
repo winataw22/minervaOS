@@ -14,9 +14,8 @@ func LocalNodeID() (Identifier, error) {
 		return nil, err
 	}
 
-	nodeID := NewNodeID(keypair)
 	log.Info().
-		Str("identify", nodeID.Identity()).
+		Str("identify", keypair.Identity()).
 		Msg("node identity loaded")
-	return nodeID, nil
+	return keypair, nil
 }

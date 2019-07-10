@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"encoding/base64"
 	"io/ioutil"
 
 	"golang.org/x/crypto/ed25519"
@@ -12,21 +13,26 @@ type KeyPair struct {
 	PublicKey  ed25519.PublicKey
 }
 
+// Identity implements the Identifier interface
+func (k KeyPair) Identity() string {
+	return base64.StdEncoding.EncodeToString(k.PublicKey)
+}
+
 // GenerateKeyPair creates a new KeyPair from a random seed
-func GenerateKeyPair() (*KeyPair, error) {
+func GenerateKeyPair() (k KeyPair, err error) {
 	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		return nil, err
+		return k, err
 	}
-	keypair := KeyPair{
+	k = KeyPair{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 	}
-	return &keypair, nil
+	return k, nil
 }
 
 // SerializeSeed saves the seed of a key pair in a file located at path
-func SerializeSeed(keypair *KeyPair, path string) error {
+func SerializeSeed(keypair KeyPair, path string) error {
 	seed := keypair.PrivateKey.Seed()
 
 	return ioutil.WriteFile(path, seed, 0400)
@@ -34,17 +40,17 @@ func SerializeSeed(keypair *KeyPair, path string) error {
 
 // LoadSeed reads a seed from a file located at path and re-create a
 // KeyPair using the seed
-func LoadSeed(path string) (*KeyPair, error) {
+func LoadSeed(path string) (k KeyPair, err error) {
 	seed, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return k, err
 	}
 	privateKey := ed25519.NewKeyFromSeed(seed)
 	publicKey := make([]byte, ed25519.PublicKeySize)
 	copy(publicKey, privateKey[32:])
-	keypair := KeyPair{
+	k = KeyPair{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 	}
-	return &keypair, nil
+	return k, nil
 }

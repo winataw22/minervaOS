@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -46,22 +45,21 @@ type NetworkInfo struct {
 
 var (
 	nodeStore    map[string]*NodeInfo
-	exitNodes    map[string]*network.ExitIface
+	exitIfaces   map[string]*network.ExitIface
 	farmStore    map[string]*FarmInfo
 	networkStore map[string]*NetworkInfo
+	allocStore   *allocationStore
 )
 
 type allocationStore struct {
 	sync.Mutex
-	Allocations map[string]*Allocation
+	Allocations map[string]*Allocation `json:"allocations"`
 }
 
 type Allocation struct {
 	Allocation *net.IPNet
 	SubNetUsed []uint64
 }
-
-var allocStore *allocationStore
 
 func registerNode(w http.ResponseWriter, r *http.Request) {
 	log.Println("node register request received")
@@ -125,13 +123,40 @@ func chooseExit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type input struct {
-		Iface string `json:"iface"`
-		IP    string `json:"ip"`
-		GW    string `json:"gateway"`
-		// Type todo allow to chose type of connection
+	// add the node id to the list of possible exit node of the farm
+	var found = false
+	for _, nodeID := range farm.ExitNodes {
+		if nodeID == node.NodeID {
+			found = true
+			break
+		}
 	}
-	i := input{}
+	if !found {
+		farm.ExitNodes = append(farm.ExitNodes, node.NodeID)
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func configurePublic(w http.ResponseWriter, r *http.Request) {
+	nodeID := mux.Vars(r)["node_id"]
+	node, ok := nodeStore[nodeID]
+	if !ok {
+		http.Error(w, fmt.Sprintf("node id %s not found", nodeID), http.StatusNotFound)
+		return
+	}
+
+	if _, ok = farmStore[node.FarmID]; !ok {
+		http.Error(w, fmt.Sprintf("farm id %s not found", node.FarmID), http.StatusNotFound)
+		return
+	}
+
+	i := struct {
+		Iface string `json:"iface,omitempty"`
+		IP    string `json:"ip,omitempty"`
+		GW    string `json:"gateway,omitempty"`
+		// Type todo allow to chose type of connection
+	}{}
 
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
@@ -139,12 +164,12 @@ func chooseExit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO verifiy the iface sent by user actually exists
+	// TODO verify the iface sent by user actually exists
 	var exitIface *network.ExitIface
-	exitIface, ok = exitNodes[nodeID]
+	exitIface, ok = exitIfaces[nodeID]
 	if !ok {
 		exitIface = &network.ExitIface{}
-		exitNodes[nodeID] = exitIface
+		exitIfaces[nodeID] = exitIface
 	}
 
 	exitIface.Version++
@@ -169,24 +194,12 @@ func chooseExit(w http.ResponseWriter, r *http.Request) {
 		exitIface.GW6 = gw
 	}
 
-	// add the node id to the list of possible exit node of the farm
-	var found = false
-	for _, nodeID := range farm.ExitNodes {
-		if nodeID == node.NodeID {
-			found = true
-			break
-		}
-	}
-	if !found {
-		farm.ExitNodes = append(farm.ExitNodes, node.NodeID)
-	}
-
 	w.WriteHeader(http.StatusCreated)
 }
 
 func nodeDetail(w http.ResponseWriter, r *http.Request) {
 	nodeID := mux.Vars(r)["node_id"]
-	exitIface, ok := exitNodes[nodeID]
+	exitIface, ok := exitIfaces[nodeID]
 	if !ok {
 		http.Error(w, fmt.Sprintf("node id %s not found", nodeID), http.StatusNotFound)
 		return
@@ -530,26 +543,27 @@ func main() {
 	flag.Parse()
 
 	nodeStore = make(map[string]*NodeInfo)
-	exitNodes = make(map[string]*network.ExitIface)
+	exitIfaces = make(map[string]*network.ExitIface)
 	farmStore = make(map[string]*FarmInfo)
 	networkStore = make(map[string]*NetworkInfo)
 	allocStore = &allocationStore{Allocations: make(map[string]*Allocation)}
 
-	// if err := load(); err != nil {
-	// 	log.Fatalf("failed to load data: %v\n", err)
-	// }
-	// defer func() {
-	// 	if err := save(); err != nil {
-	// 		log.Printf("failed to save data: %v\n", err)
-	// 	}
-	// }()
+	if err := load(); err != nil {
+		log.Fatalf("failed to load data: %v\n", err)
+	}
+	defer func() {
+		if err := save(); err != nil {
+			log.Printf("failed to save data: %v\n", err)
+		}
+	}()
 
 	router := mux.NewRouter()
 
 	router.HandleFunc("/nodes", registerNode).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}", nodeDetail).Methods("GET")
 	router.HandleFunc("/nodes/{node_id}/interfaces", registerIfaces).Methods("POST")
-	router.HandleFunc("/nodes/{node_id}/enable_exit", chooseExit).Methods("POST")
+	router.HandleFunc("/nodes/{node_id}/configure_public", configurePublic).Methods("POST")
+	router.HandleFunc("/nodes/{node_id}/select_exit", chooseExit).Methods("POST")
 	router.HandleFunc("/nodes", listNodes).Methods("GET")
 	router.HandleFunc("/farms", registerFarm).Methods("POST")
 	router.HandleFunc("/farms", listFarm).Methods("GET")
@@ -583,18 +597,19 @@ func main() {
 
 func save() error {
 	stores := map[string]interface{}{
-		"nodes":   nodeStore,
-		"exits":   exitNodes,
-		"farms":   farmStore,
-		"network": networkStore,
+		"nodes":       nodeStore,
+		"exits":       exitIfaces,
+		"farms":       farmStore,
+		"network":     networkStore,
+		"allocations": allocStore,
 	}
 	for name, store := range stores {
-		f, err := os.OpenFile(name+".gob", os.O_CREATE|os.O_WRONLY, 0660)
+		f, err := os.OpenFile(name+".json", os.O_CREATE|os.O_WRONLY, 0660)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		if err := gob.NewEncoder(f).Encode(store); err != nil {
+		if err := json.NewEncoder(f).Encode(store); err != nil {
 			return err
 		}
 	}
@@ -603,13 +618,14 @@ func save() error {
 
 func load() error {
 	stores := map[string]interface{}{
-		"nodes":   nodeStore,
-		"exits":   exitNodes,
-		"farms":   farmStore,
-		"network": networkStore,
+		"nodes":       &nodeStore,
+		"exits":       &exitIfaces,
+		"farms":       &farmStore,
+		"network":     &networkStore,
+		"allocations": &allocStore,
 	}
 	for name, store := range stores {
-		f, err := os.OpenFile(name+".gob", os.O_RDONLY, 0660)
+		f, err := os.OpenFile(name+".json", os.O_RDONLY, 0660)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -617,7 +633,7 @@ func load() error {
 			return err
 		}
 		defer f.Close()
-		if err := gob.NewDecoder(f).Decode(&store); err != nil {
+		if err := json.NewDecoder(f).Decode(store); err != nil {
 			return err
 		}
 	}
