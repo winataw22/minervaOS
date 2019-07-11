@@ -180,8 +180,19 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 	return peer, nil
 }
 
-// GenerateKey generates a new private key
+// GenerateKey generates a new private key. If key already exists
+// in that location, that key is returned instead.
 func GenerateKey(dir string) (wgtypes.Key, error) {
+	path := filepath.Join(dir, "key.priv")
+	data, err := ioutil.ReadFile(path)
+	if err == nil {
+		//key already exists
+		return wgtypes.ParseKey(string(data))
+	} else if !os.IsNotExist(err) {
+		//another error than not exist
+		return wgtypes.Key{}, err
+	}
+
 	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
 		return wgtypes.Key{}, err
@@ -190,7 +201,6 @@ func GenerateKey(dir string) (wgtypes.Key, error) {
 		return wgtypes.Key{}, err
 	}
 
-	path := filepath.Join(dir, "key.priv")
 	if err := ioutil.WriteFile(path, []byte(key.String()), 400); err != nil {
 		return wgtypes.Key{}, err
 	}

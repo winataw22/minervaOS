@@ -85,11 +85,16 @@ func TestNetworkUnmarshal(t *testing.T) {
 	assert.Equal("ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E=", network.Resources[0].NodeID.FarmerID)
 }
 
-func TestMarshlNetwork(t *testing.T) {
+func TestEncodeDecode(t *testing.T) {
 	network := &Network{
 		NetID: NetID("test"),
 	}
 	b, err := json.Marshal(network)
 	require.NoError(t, err)
 	fmt.Println(string(b))
+
+	decoded := Network{}
+	err = json.Unmarshal(b, &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, network, decoded)
 }

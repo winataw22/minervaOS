@@ -256,7 +256,7 @@ func (s *httpTNoDB) ReadPubIface(node identity.Identifier) (*network.ExitIface, 
 }
 
 func (s *httpTNoDB) PublishWireguarKey(key string, nodeID string, netID modules.NetID) error {
-	url := fmt.Sprintf("%s/networks/%s/%s/wgkeys", s.baseURL, nodeID, netID)
+	url := fmt.Sprintf("%s/networks/%s/%s/wgkeys", s.baseURL, netID, nodeID)
 	buf := &bytes.Buffer{}
 
 	output := struct {

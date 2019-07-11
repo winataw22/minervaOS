@@ -97,9 +97,11 @@ func (p *Peer) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("unsupported peer connection type %s", tmp.Type)
 	}
 	p.Type = ConnTypeWireguard
-	_, p.Prefix, err = net.ParseCIDR(tmp.Prefix)
-	if err != nil {
-		return err
+	if tmp.Prefix != "" {
+		_, p.Prefix, err = net.ParseCIDR(tmp.Prefix)
+		if err != nil {
+			return err
+		}
 	}
 	p.Connection.IP = net.ParseIP(tmp.Connection.IP)
 	p.Connection.Port = tmp.Connection.Port
@@ -156,16 +158,20 @@ func (r *NetResource) UnmarshalJSON(b []byte) error {
 
 	r.NodeID = tmp.NodeID
 	r.Peers = tmp.Peers
-	_, r.Prefix, err = net.ParseCIDR(tmp.Prefix)
-	if err != nil {
-		return err
+	if tmp.Prefix != "" {
+		_, r.Prefix, err = net.ParseCIDR(tmp.Prefix)
+		if err != nil {
+			return err
+		}
 	}
-	var ip net.IP
-	ip, r.LinkLocal, err = net.ParseCIDR(tmp.LinkLocal)
-	if err != nil {
-		return err
+	if tmp.LinkLocal != "" {
+		var ip net.IP
+		ip, r.LinkLocal, err = net.ParseCIDR(tmp.LinkLocal)
+		if err != nil {
+			return err
+		}
+		r.LinkLocal.IP = ip
 	}
-	r.LinkLocal.IP = ip
 	r.ExitPoint = tmp.ExitPoint
 
 	return nil
@@ -252,12 +258,14 @@ func (i *Ipv6Conf) UnmarshalJSON(b []byte) error {
 	}
 
 	*i = Ipv6Conf{}
-	ip, ipnet, err := net.ParseCIDR(tmp.Addr)
-	if err != nil {
-		return err
+	if tmp.Addr != "" {
+		ip, ipnet, err := net.ParseCIDR(tmp.Addr)
+		if err != nil {
+			return err
+		}
+		ipnet.IP = ip
+		i.Addr = ipnet
 	}
-	ipnet.IP = ip
-	i.Addr = ipnet
 	i.Gateway = net.ParseIP(tmp.Gateway)
 	i.Metric = tmp.Metric
 	i.Iface = tmp.Iface
@@ -385,9 +393,11 @@ func (d *Network) UnmarshalJSON(b []byte) (err error) {
 	d.Resources = tmp.Resources
 	d.Exit = tmp.ExitPoint
 	d.AllocationNR = tmp.AllocationNR
-	_, d.PrefixZero, err = net.ParseCIDR(tmp.PrefixZero)
-	if err != nil {
-		return err
+	if tmp.PrefixZero != "" {
+		_, d.PrefixZero, err = net.ParseCIDR(tmp.PrefixZero)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -405,8 +415,10 @@ func (d *Network) MarshalJSON() ([]byte, error) {
 		NetworkID:    string(d.NetID),
 		Resources:    d.Resources,
 		ExitPoint:    d.Exit,
-		PrefixZero:   d.PrefixZero.String(),
 		AllocationNR: d.AllocationNR,
+	}
+	if d.PrefixZero != nil {
+		tmp.PrefixZero = d.PrefixZero.String()
 	}
 	return json.Marshal(tmp)
 }

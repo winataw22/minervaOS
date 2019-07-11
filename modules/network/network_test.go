@@ -134,7 +134,7 @@ func TestCreateNetwork(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			defer func() {
-				err := networker.DeleteNetResource(network)
+				err := networker.DeleteNetResource(*network)
 				require.NoError(t, err)
 				if tc.exitIface != nil {
 					pubNs, _ := namespace.GetByName(PublicNamespace)
@@ -197,11 +197,11 @@ func TestConfigureWG(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		_ = networker.DeleteNetResource(network)
+		_ = networker.DeleteNetResource(*network)
 		_ = os.RemoveAll(dir)
 	}()
 
-	err = networker.ApplyNetResource(network)
+	err = networker.ApplyNetResource(*network)
 	require.NoError(t, err)
 }
 

@@ -1,6 +1,5 @@
 exec: /bin/identityd
 oneshot: true
 after:
-  - storaged
-  - networkd
+  - boot
   - dhcp_zos

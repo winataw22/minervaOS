@@ -105,6 +105,22 @@ func withAddedCapabilities(caps []string) oci.SpecOpts {
 	}
 }
 
+func (c *containerModule) ensureNamespace(ctx context.Context, client *containerd.Client, namespace string) error {
+	service := client.NamespaceService()
+	namespaces, err := service.List(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, ns := range namespaces {
+		if ns == namespace {
+			return nil
+		}
+	}
+
+	return service.Create(ctx, namespace, nil)
+}
+
 // Run creates and starts a container
 // THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data modules.Container) (id modules.ContainerID, err error) {
@@ -115,6 +131,12 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 		return id, err
 	}
 	defer client.Close()
+
+	ctx := namespaces.WithNamespace(context.Background(), ns)
+
+	if err := c.ensureNamespace(ctx, client, ns); err != nil {
+		return id, err
+	}
 
 	if data.RootFS == "" {
 		return id, ErrEmptyRootFS
@@ -178,8 +200,6 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 			}),
 		)
 	}
-
-	ctx := namespaces.WithNamespace(context.Background(), ns)
 
 	container, err := client.NewContainer(
 		ctx,
