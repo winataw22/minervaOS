@@ -43,7 +43,7 @@ type NetworkInfo struct {
 
 var (
 	nodeStore    map[string]*NodeInfo
-	exitIfaces   map[string]*network.ExitIface
+	exitIfaces   map[string]*network.PubIface
 	farmStore    map[string]*FarmInfo
 	networkStore map[string]*NetworkInfo
 	allocStore   *allocationStore
@@ -67,7 +67,7 @@ func main() {
 	flag.Parse()
 
 	nodeStore = make(map[string]*NodeInfo)
-	exitIfaces = make(map[string]*network.ExitIface)
+	exitIfaces = make(map[string]*network.PubIface)
 	farmStore = make(map[string]*FarmInfo)
 	networkStore = make(map[string]*NetworkInfo)
 	allocStore = &allocationStore{Allocations: make(map[string]*Allocation)}

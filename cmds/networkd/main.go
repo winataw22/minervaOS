@@ -67,7 +67,7 @@ func main() {
 	defer cancel()
 
 	ch := watchPubIface(ctx, db)
-	go func(ctx context.Context, ch <-chan *network.ExitIface) {
+	go func(ctx context.Context, ch <-chan *network.PubIface) {
 		for {
 			select {
 			case iface := <-ch:

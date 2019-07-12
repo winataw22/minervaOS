@@ -66,11 +66,13 @@ func networkGetNamespace(network *modules.Network, nodeID identity.Identifier) (
 
 // NetworkProvision is entry point to provision a network
 func NetworkProvision(ctx context.Context, reservation Reservation) (interface{}, error) {
-	var netID modules.NetID
-	if err := json.Unmarshal(reservation.Data, &netID); err != nil {
+	x := struct {
+		NetID modules.NetID `json:"network_id"`
+	}{}
+	if err := json.Unmarshal(reservation.Data, &x); err != nil {
 		return nil, err
 	}
 
-	_, err := networkProvision(ctx, netID)
+	_, err := networkProvision(ctx, x.NetID)
 	return nil, err
 }

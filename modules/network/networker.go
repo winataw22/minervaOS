@@ -6,6 +6,7 @@ import (
 
 	"github.com/threefoldtech/zosv2/modules/identity"
 
+	"github.com/threefoldtech/zosv2/modules/network/ip"
 	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 
 	"github.com/rs/zerolog/log"
@@ -70,24 +71,10 @@ func (n *networker) GetNetwork(id modules.NetID) (net modules.Network, err error
 }
 
 // ApplyNetResource implements modules.Networker interface
-func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
+func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 
-	if err := validateNetwork(network); err != nil {
+	if err := validateNetwork(&network); err != nil {
 		log.Error().Err(err).Msg("network object format invalid")
-		return err
-	}
-
-
-	log.Info().Msg("apply netresource")
-
-	path := filepath.Join(n.storageDir, string(network.NetID))
-	wgKey, err := wireguard.LoadKey(path)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("network", string(network.NetID)).
-			Str("directory", path).
-			Msg("failed to load wireguard keys. Generate the keys before trying to configure the network")
 		return err
 	}
 
@@ -100,6 +87,31 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 		return err
 	}
 
+	nibble := ip.NewNibble(localResource.Prefix, network.AllocationNR)
+
+	// the flow is a bit different is the network namespace already exist or not
+	// if it already exists, we skip the all network resource creation
+	// and only do the wireguard configuration
+	// so any new updated wireguard peer will be updated
+	creation := !namespace.Exists(nibble.NetworkName())
+
+	if creation {
+		log.Info().Msg("create new network resource")
+	} else {
+		log.Info().Msg("update existing network resource")
+	}
+
+	path := filepath.Join(n.storageDir, string(network.NetID))
+	wgKey, err := wireguard.LoadKey(path)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("network", string(network.NetID)).
+			Str("directory", path).
+			Msg("failed to load wireguard keys. Generate the keys before trying to configure the network")
+		return err
+	}
+
 	defer func() {
 		if err != nil {
 			if err := n.DeleteNetResource(network); err != nil {
@@ -108,10 +120,12 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 		}
 	}()
 
-	log.Info().Msg("create net resource namespace")
-	err = createNetworkResource(localResource, &network)
-	if err != nil {
-		return err
+	if creation {
+		log.Info().Msg("create network resource namespace")
+		err = createNetworkResource(localResource, &network)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Info().Msg("Generate wireguard config for all peers")
@@ -121,7 +135,7 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 	}
 
 	// if we are not the exit node, then add the default route to the exit node
-	if localResource.Prefix.String() != exitNetRes.Prefix.String() {
+	if creation && localResource.Prefix.String() == exitNetRes.Prefix.String() {
 		log.Info().Msg("Generate wireguard config to the exit node")
 		exitPeers, exitRoutes, err := genWireguardExitPeers(localResource, &network)
 		if err != nil {
@@ -129,7 +143,7 @@ func (n *networker) ApplyNetResource(network *modules.Network) (err error) {
 		}
 		peers = append(peers, exitPeers...)
 		routes = append(routes, exitRoutes...)
-	} else { // we are the exit node
+	} else if creation { // we are the exit node and this network resource is being creating
 		log.Info().Msg("Configure network resource as exit point")
 		err := configNetResAsExitPoint(exitNetRes, network.Exit, network.PrefixZero)
 		if err != nil {

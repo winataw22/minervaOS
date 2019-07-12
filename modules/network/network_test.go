@@ -114,13 +114,13 @@ func TestCreateNetwork(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		exitIface *ExitIface
+		exitIface *PubIface
 	}{
 		{
 			exitIface: nil,
 		},
 		{
-			exitIface: &ExitIface{
+			exitIface: &PubIface{
 				Master: "zos0",
 				Type:   MacVlanIface,
 				IPv6:   mustParseCIDR("2a02:1802:5e:ff02::100/64"),

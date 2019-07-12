@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -79,7 +80,7 @@ func (w *Wireguard) SetAddr(cidr string) error {
 		return err
 	}
 
-	if err := netlink.AddrAdd(w, addr); err != nil {
+	if err := netlink.AddrAdd(w, addr); err != nil && err != syscall.EEXIST {
 		return err
 	}
 	return nil

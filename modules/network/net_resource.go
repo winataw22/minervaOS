@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
+	"github.com/pkg/errors"
 
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ip"
@@ -307,23 +308,26 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 
 		wg, err := wireguard.GetByName(localNibble.WiregardName())
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "fail to get wireguard interface %s", localNibble.WiregardName())
 		}
 
 		if err := wg.SetAddr(localResource.LinkLocal.String()); err != nil {
-			return err
+			return errors.Wrapf(err, "fail to set address %s on wireguard interface %s",
+				localResource.LinkLocal.String(), localNibble.WiregardName())
 		}
 		a, b, err := localNibble.ToV4()
 		if err != nil {
 			return err
 		}
-		if err := wg.SetAddr(fmt.Sprintf("172.16.%d.%d/16", a, b)); err != nil {
-			return err
+		addr := fmt.Sprintf("172.16.%d.%d/16", a, b)
+		if err := wg.SetAddr(addr); err != nil {
+			return errors.Wrapf(err, "fail to set address %s on wireguard interface %s",
+				addr, localNibble.WiregardName())
 		}
 
 		log.Info().Msg("configure wireguard interface")
 		if err = wg.Configure(wgKey.String(), wgPeers); err != nil {
-			return err
+			return errors.Wrap(err, "fail to configure wireguard interface")
 		}
 
 		for _, route := range routes {
@@ -333,7 +337,7 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 					Err(err).
 					Str("route", route.String()).
 					Msg("fail to set route")
-				return err
+				return errors.Wrapf(err, "fail to add route %s", route.String())
 			}
 		}
 
@@ -345,7 +349,6 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 // localResource return the net resource of the local node from a list of net resources
 func (n *networker) localResource(resources []*modules.NetResource) *modules.NetResource {
 	for _, resource := range resources {
-		log.Info().Msgf("try to find local net resource %+v", resource)
 		if resource.NodeID.ID == n.nodeID.Identity() {
 			return resource
 		}
