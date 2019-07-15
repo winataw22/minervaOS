@@ -78,7 +78,7 @@ func main() {
 		}
 	}(ctx, ch)
 
-	startServer(root, broker, db)
+	startServer(ctx, root, broker, db)
 }
 
 func bootstrap() error {
@@ -106,7 +106,7 @@ func bootstrap() error {
 	return z.Monitor("dhcp_zos")
 }
 
-func startServer(root, broker string, db network.TNoDB) error {
+func startServer(ctx context.Context, root, broker string, db network.TNoDB) error {
 	if err := os.MkdirAll(root, 0750); err != nil {
 		log.Error().Err(err).Msgf("fail to create module root")
 	}
@@ -116,7 +116,7 @@ func startServer(root, broker string, db network.TNoDB) error {
 		return err
 	}
 
-	networker := network.NewNetworker(nodeID, db, root)
+	networker := network.NewNetworker(ctx, nodeID, db, root)
 
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {

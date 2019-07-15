@@ -13,8 +13,12 @@ type Networker interface {
 	GetNetwork(id NetID) (Network, error)
 	GenerateWireguarKeyPair(NetID) (string, error)
 	PublishWGPubKey(string, NetID) error
+
 	ApplyNetResource(Network) error
 	DeleteNetResource(Network) error
+
+	WatchNetwork(NetID) error
+	UnwatchNetwork(NetID)
 }
 
 // NetID is a type defining the ID of a network
@@ -82,6 +86,10 @@ type Network struct {
 	// this is needed as we set up deterministic interface names, that could conflict with
 	// the already existing allocation-derived names
 	AllocationNR int8 `json:"allocation_nr"`
+
+	// Version is an incremental number updated each time the network object
+	// is changed. This allow node to know when a network object needs to re-applied
+	Version uint32 `json:"version"`
 }
 
 // NetResource represent a part of a network configuration

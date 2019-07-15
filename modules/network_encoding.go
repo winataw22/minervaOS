@@ -382,6 +382,7 @@ func (d *Network) UnmarshalJSON(b []byte) (err error) {
 		PrefixZero   string         `json:"prefix_zero"`
 		ExitPoint    *ExitPoint     `json:"exit_point"`
 		AllocationNR int8           `json:"allocation_nr"`
+		Version      uint32         `json:"version"`
 	}{}
 
 	if err := json.Unmarshal(b, &tmp); err != nil {
@@ -399,6 +400,7 @@ func (d *Network) UnmarshalJSON(b []byte) (err error) {
 			return err
 		}
 	}
+	d.Version = tmp.Version
 
 	return nil
 }
@@ -411,11 +413,13 @@ func (d *Network) MarshalJSON() ([]byte, error) {
 		PrefixZero   string         `json:"prefix_zero"`
 		ExitPoint    *ExitPoint     `json:"exit_point"`
 		AllocationNR int8           `json:"allocation_nr"`
+		Version      uint32         `json:"version"`
 	}{
 		NetworkID:    string(d.NetID),
 		Resources:    d.Resources,
 		ExitPoint:    d.Exit,
 		AllocationNR: d.AllocationNR,
+		Version:      d.Version,
 	}
 	if d.PrefixZero != nil {
 		tmp.PrefixZero = d.PrefixZero.String()
