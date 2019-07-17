@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/threefoldtech/zosv2/modules/identity"
+	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/tnodb"
 	"github.com/urfave/cli"
 )
@@ -20,12 +21,19 @@ func main() {
 
 	app := cli.NewApp()
 
-	idStore := identity.NewHTTPIDStore("http://localhost:8080")
-	db := tnodb.NewHTTPHTTPTNoDB("http://localhost:8080")
+	var (
+		idStore identity.IDStore
+		db      network.TNoDB
+	)
+
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug, d",
 			Usage: "enable debug logging",
+		},
+		cli.StringFlag{
+			Name:  "tnodb, u",
+			Usage: "URL of the TNODB",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
@@ -34,6 +42,11 @@ func main() {
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+		url := c.String("tnodb")
+		idStore = identity.NewHTTPIDStore(url)
+		db = tnodb.NewHTTPHTTPTNoDB(url)
+
 		return nil
 	}
 	app.Commands = []cli.Command{
@@ -49,16 +62,28 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				seedPath := c.String("seed")
 
-				farmID, err := generateKeyPair(seedPath)
-				if err != nil {
-					return err
-				}
 				name := c.Args().First()
 				if name == "" {
 					return fmt.Errorf("A farm name needs to be specified")
 				}
+
+				var farmID identity.Identifier
+				var err error
+				seedPath := c.String("seed")
+				if seedPath != "" {
+					farmID, err = loadFarmID(seedPath)
+					if err != nil {
+						return err
+					}
+				}
+				if farmID == nil {
+					farmID, err = generateKeyPair(seedPath)
+					if err != nil {
+						return err
+					}
+				}
+
 				if err := idStore.RegisterFarm(farmID, name); err != nil {
 					return err
 				}
@@ -227,15 +252,6 @@ func loadFarmID(seedPath string) (identity.Identifier, error) {
 
 func generateKeyPair(seedPath string) (identity.Identifier, error) {
 
-	if seedPath != "" {
-		log.Debug().Msgf("loading seed from %s", seedPath)
-		keypair, err := identity.LoadSeed(seedPath)
-		if err != nil {
-			return nil, err
-		}
-		return keypair, nil
-	}
-
 	log.Debug().Msg("generating new key pair")
 	keypair, err := identity.GenerateKeyPair()
 	if err != nil {
@@ -243,13 +259,15 @@ func generateKeyPair(seedPath string) (identity.Identifier, error) {
 		return nil, err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	if seedPath == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		seedPath = filepath.Join(cwd, "farm.seed")
 	}
-	path := filepath.Join(cwd, "farm.seed")
 
-	if err := identity.SerializeSeed(keypair, path); err != nil {
+	if err := identity.SerializeSeed(keypair, seedPath); err != nil {
 		log.Error().Err(err).Msg("fail to save identity seed on disk")
 		return nil, err
 	}

@@ -1,10 +1,10 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules/identity"
 
 	"github.com/threefoldtech/zosv2/modules/network/ip"
@@ -23,24 +23,16 @@ type networker struct {
 	nodeID     identity.Identifier
 	storageDir string
 	tnodb      TNoDB
-
-	workerCtx      context.Context
-	cWorker        chan *modules.Network
-	watchedNetwork map[modules.NetID]context.CancelFunc
 }
 
 // NewNetworker create a new modules.Networker that can be used over zbus
-func NewNetworker(ctx context.Context, nodeID identity.Identifier, tnodb TNoDB, storageDir string) modules.Networker {
+func NewNetworker(nodeID identity.Identifier, tnodb TNoDB, storageDir string) modules.Networker {
 	nw := &networker{
 		nodeID:     nodeID,
 		storageDir: storageDir,
 		tnodb:      tnodb,
-
-		workerCtx:      ctx,
-		cWorker:        make(chan *modules.Network),
-		watchedNetwork: make(map[modules.NetID]context.CancelFunc),
 	}
-	go nw.watchWorker()
+
 	return nw
 }
 
@@ -77,8 +69,17 @@ func (n *networker) GetNetwork(id modules.NetID) (net modules.Network, err error
 	if err != nil {
 		return net, err
 	}
-
+	log.Debug().Msgf("networker get network %+v", no)
 	return *no, nil
+}
+
+func (n *networker) JoinNetwork(id modules.NetID, WGPort uint16, WGPubKey string) (modules.Network, error) {
+	network, err := n.tnodb.JoinNetwork(n.nodeID, id, WGPort, WGPubKey)
+	if err != nil {
+		return modules.Network{}, errors.Wrapf(err, "fail to join network %s", id)
+	}
+	log.Debug().Msgf("networker join network %+v", network)
+	return *network, nil
 }
 
 // ApplyNetResource implements modules.Networker interface
@@ -145,8 +146,13 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 		return err
 	}
 
+	log.Debug().
+		Str("local prefix", localResource.Prefix.String()).
+		Str("exit prefix", exitNetRes.Prefix.String()).
+		Msg("configure wireguard exit node")
+
 	// if we are not the exit node, then add the default route to the exit node
-	if creation && localResource.Prefix.String() == exitNetRes.Prefix.String() {
+	if localResource.Prefix.String() != exitNetRes.Prefix.String() {
 		log.Info().Msg("Generate wireguard config to the exit node")
 		exitPeers, exitRoutes, err := genWireguardExitPeers(localResource, &network)
 		if err != nil {
@@ -165,6 +171,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 	log.Info().
 		Int("number of peers", len(peers)).
 		Msg("configure wg")
+
 	err = configWG(localResource, &network, peers, routes, wgKey)
 	if err != nil {
 		return err
@@ -218,50 +225,4 @@ func (n *networker) GenerateWireguarKeyPair(netID modules.NetID) (string, error)
 }
 func (n *networker) PublishWGPubKey(key string, netID modules.NetID) error {
 	return n.tnodb.PublishWireguarKey(key, n.nodeID.Identity(), netID)
-}
-
-func (n *networker) WatchNetwork(netID modules.NetID) error {
-	_, ok := n.watchedNetwork[netID]
-	if ok {
-		return nil
-	}
-
-	w := NewWatcher(netID, n.tnodb)
-
-	ctx, cancel := context.WithCancel(n.workerCtx)
-	n.watchedNetwork[netID] = cancel
-
-	ch, err := w.Watch(ctx)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for nw := range ch {
-			n.cWorker <- nw
-		}
-	}()
-	return nil
-}
-func (n *networker) UnwatchNetwork(netID modules.NetID) {
-	cancel, ok := n.watchedNetwork[netID]
-	if !ok {
-		return
-	}
-
-	cancel()
-}
-
-func (n *networker) watchWorker() {
-	for nw := range n.cWorker {
-		select {
-		case <-n.workerCtx.Done():
-			return
-		default:
-			if err := n.ApplyNetResource(*nw); err != nil {
-				log.Error().Err(err).Msgf("failed to apply updated network %s", nw.NetID)
-				continue
-			}
-		}
-	}
 }

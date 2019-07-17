@@ -94,7 +94,7 @@ type Peer struct {
 }
 
 // Configure configures the wiregard configuration
-func (w *Wireguard) Configure(privateKey string, peers []Peer) error {
+func (w *Wireguard) Configure(privateKey string, listentPort int, peers []Peer) error {
 
 	if err := netlink.LinkSetDown(w); err != nil {
 		return err
@@ -127,6 +127,7 @@ func (w *Wireguard) Configure(privateKey string, peers []Peer) error {
 	config := wgtypes.Config{
 		PrivateKey:   &key,
 		Peers:        peersConfig,
+		ListenPort:   &listentPort,
 		ReplacePeers: true,
 	}
 	log.Info().Msg("configure wg device")

@@ -80,6 +80,22 @@ func (s *NetworkerStub) GetNetwork(arg0 modules.NetID) (ret0 modules.Network, re
 	return
 }
 
+func (s *NetworkerStub) JoinNetwork(arg0 modules.NetID, arg1 uint16, arg2 string) (ret0 modules.Network, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
+	result, err := s.client.Request(s.module, s.object, "JoinNetwork", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) PublishWGPubKey(arg0 string, arg1 modules.NetID) (ret0 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.Request(s.module, s.object, "PublishWGPubKey", args...)

@@ -10,12 +10,8 @@ import (
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
 )
 
-func watchPubIface(ctx context.Context, db network.TNoDB) <-chan *network.PubIface {
-	var (
-		currentVersion = -1
-		err            error
-		nodeID         identity.Identifier
-	)
+func watchPubIface(ctx context.Context, nodeID identity.Identifier, db network.TNoDB, ifaceVersion int) <-chan *network.PubIface {
+	var currentVersion = ifaceVersion
 
 	ch := make(chan *network.PubIface)
 	go func() {
@@ -24,16 +20,10 @@ func watchPubIface(ctx context.Context, db network.TNoDB) <-chan *network.PubIfa
 		}()
 
 		for {
-			<-time.After(10 * time.Second)
-
-			log.Info().Msg("check if a public interface if configured for us")
-
-			if nodeID == nil {
-				nodeID, err = identity.LocalNodeID()
-				if err != nil {
-					log.Error().Err(err).Msg("failed to get local node ID")
-					continue
-				}
+			select {
+			case <-time.After(time.Second * 10):
+			case <-ctx.Done():
+				break
 			}
 
 			exitIface, err := db.ReadPubIface(nodeID)
@@ -46,12 +36,12 @@ func watchPubIface(ctx context.Context, db network.TNoDB) <-chan *network.PubIfa
 			}
 
 			if exitIface.Version <= currentVersion {
-				log.Info().
-					Int("current version", currentVersion).
-					Int("received version", exitIface.Version).
-					Msg("public interface already configured")
 				continue
 			}
+			log.Info().
+				Int("current version", currentVersion).
+				Int("received version", exitIface.Version).
+				Msg("new version of the public interface configuration")
 			currentVersion = exitIface.Version
 
 			select {

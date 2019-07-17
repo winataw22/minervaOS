@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"net"
+	"syscall"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
@@ -209,7 +210,7 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 			PublicKey: peer.Connection.Key,
 			AllowedIPs: []string{
 				fmt.Sprintf("fe80::%s/128", nibble.Hex()),
-				fmt.Sprintf("172.16.%d.%d/32", a, b),
+				fmt.Sprintf("10.255.%d.%d/32", a, b),
 				peer.Prefix.String(),
 			},
 		}
@@ -281,7 +282,7 @@ func genWireguardExitPeers(localResource *modules.NetResource, network *modules.
 			IP:   net.ParseIP(fmt.Sprintf("10.%d.%d.0", a, b)),
 			Mask: net.CIDRMask(24, 32),
 		},
-		Gw: net.ParseIP(fmt.Sprintf("172.16.%d.%d", a, b)),
+		Gw: net.ParseIP(fmt.Sprintf("10.255.%d.%d", a, b)),
 	})
 
 	// add default ipv4 route to the exit node
@@ -290,7 +291,7 @@ func genWireguardExitPeers(localResource *modules.NetResource, network *modules.
 			IP:   net.ParseIP("0.0.0.0"),
 			Mask: net.CIDRMask(0, 32),
 		},
-		Gw: net.ParseIP(fmt.Sprintf("172.16.%d.%d", a, b)),
+		Gw: net.ParseIP(fmt.Sprintf("10.255.%d.%d", a, b)),
 	})
 
 	return peers, routes, nil
@@ -319,20 +320,26 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 		if err != nil {
 			return err
 		}
-		addr := fmt.Sprintf("172.16.%d.%d/16", a, b)
+
+		addr := fmt.Sprintf("10.255.%d.%d/16", a, b)
 		if err := wg.SetAddr(addr); err != nil {
 			return errors.Wrapf(err, "fail to set address %s on wireguard interface %s",
 				addr, localNibble.WiregardName())
 		}
 
+		localPeer, err := getPeer(localResource.Prefix.String(), localResource.Peers)
+		if err != nil {
+			return fmt.Errorf("not peer found for local network resource: %s", err)
+		}
+
 		log.Info().Msg("configure wireguard interface")
-		if err = wg.Configure(wgKey.String(), wgPeers); err != nil {
+		if err = wg.Configure(wgKey.String(), int(localPeer.Connection.Port), wgPeers); err != nil {
 			return errors.Wrap(err, "fail to configure wireguard interface")
 		}
 
 		for _, route := range routes {
 			route.LinkIndex = wg.Attrs().Index
-			if err := netlink.RouteAdd(route); err != nil {
+			if err := netlink.RouteAdd(route); err != nil && err != syscall.EEXIST {
 				log.Error().
 					Err(err).
 					Str("route", route.String()).

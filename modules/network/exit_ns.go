@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types/current"
+	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/ip"
@@ -159,30 +160,40 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 	pubNS, err := namespace.GetByName("public")
 
 	if err == nil { // there is a public namespace on the node
+		var ifaceIndex int
+
 		defer pubNS.Close()
 		// get the name of the public interface in the public namespace
 		if err := pubNS.Do(func(_ ns.NetNS) error {
-			master, err := getPublicMasterIface()
+			// get the name of the interface connected to the public segment
+			public, err := netlink.LinkByName("public")
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to get public link")
 			}
-			pubIface.Name = master.Attrs().Name
+
+			ifaceIndex = public.Attrs().ParentIndex
 
 			return nil
 		}); err != nil {
 			return err
 		}
+
+		master, err := netlink.LinkByIndex(ifaceIndex)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get link by index %d", ifaceIndex)
+		}
+		pubIface.Name = master.Attrs().Name
 	} else {
 		// since we are a fully public node
 		// get the name of the interface that has the default gateway
 		links, err := netlink.LinkList()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to list interfaces")
 		}
 		for _, link := range links {
 			has, _, err := ifaceutil.HasDefaultGW(link)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "fail to inspect default gateway of iface %s", link.Attrs().Name)
 			}
 			if !has {
 				continue
@@ -194,14 +205,14 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 
 	nrNS, err := namespace.GetByName(nibble.NetworkName())
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "fail to get network namespace for network %s", nibble.NetworkName())
 	}
 	defer nrNS.Close()
 
 	pubMacVlan, err := macvlan.Create("public", pubIface.Name, nrNS)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create public mac vlan interface")
-		return err
+		return errors.Wrap(err, "failed to create public mac vlan interface")
 	}
 
 	var (
@@ -229,15 +240,16 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 		})
 	}
 
-	ip, ipnet, err := net.ParseCIDR(fmt.Sprintf("%s%s/64", prefixZero.IP.String(), nibble.Hex()))
+	cidr := fmt.Sprintf("%s%s/64", prefixZero.IP.String(), nibble.Hex())
+	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "fail to parse CIDR: %v", cidr)
 	}
 	ipnet.IP = ip
 	ips = append(ips, ipnet)
 
 	if err := macvlan.Install(pubMacVlan, ips, routes, nrNS); err != nil {
-		return err
+		return errors.Wrap(err, "fail to install mac vlan")
 	}
 
 	return nil
@@ -247,11 +259,13 @@ func getPublicMasterIface() (netlink.Link, error) {
 	// get the name of the interface connected to the public segment
 	public, err := netlink.LinkByName("public")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get public link")
 	}
-	master, err := netlink.LinkByIndex(public.Attrs().MasterIndex)
+
+	index := public.Attrs().MasterIndex
+	master, err := netlink.LinkByIndex(index)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get link by index %d", index)
 	}
 	return master, nil
 }

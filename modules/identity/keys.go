@@ -1,8 +1,10 @@
 package identity
 
 import (
-	"encoding/base64"
+	"fmt"
 	"io/ioutil"
+
+	"github.com/jbenet/go-base58"
 
 	"golang.org/x/crypto/ed25519"
 )
@@ -15,7 +17,7 @@ type KeyPair struct {
 
 // Identity implements the Identifier interface
 func (k KeyPair) Identity() string {
-	return base64.StdEncoding.EncodeToString(k.PublicKey)
+	return base58.Encode(k.PublicKey)
 }
 
 // GenerateKeyPair creates a new KeyPair from a random seed
@@ -45,6 +47,11 @@ func LoadSeed(path string) (k KeyPair, err error) {
 	if err != nil {
 		return k, err
 	}
+
+	if len(seed) != ed25519.SeedSize {
+		return k, fmt.Errorf("seed has the wrong size %d", len(seed))
+	}
+
 	privateKey := ed25519.NewKeyFromSeed(seed)
 	publicKey := make([]byte, ed25519.PublicKeySize)
 	copy(publicKey, privateKey[32:])

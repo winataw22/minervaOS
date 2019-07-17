@@ -11,14 +11,13 @@ import (
 //Networker is the interface for the network module
 type Networker interface {
 	GetNetwork(id NetID) (Network, error)
+	JoinNetwork(id NetID, WGPort uint16, WGPubKey string) (Network, error)
+
 	GenerateWireguarKeyPair(NetID) (string, error)
 	PublishWGPubKey(string, NetID) error
 
 	ApplyNetResource(Network) error
 	DeleteNetResource(Network) error
-
-	WatchNetwork(NetID) error
-	UnwatchNetwork(NetID)
 }
 
 // NetID is a type defining the ID of a network

@@ -214,6 +214,31 @@ func getNetwork(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(network.Network)
 }
 
+func getNetworksVersion(w http.ResponseWriter, r *http.Request) {
+	nodeID := mux.Vars(r)["node_id"]
+
+	if !nodeExist(nodeID) {
+		http.Error(w, fmt.Sprintf("node %s not found", nodeID), http.StatusNotFound)
+		return
+	}
+
+	output := make(map[string]uint32)
+
+	for nwID, nw := range networkStore {
+		for _, nr := range nw.Network.Resources {
+			if nr.NodeID.ID == nodeID {
+				output[nwID] = nw.Network.Version
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(output); err != nil {
+		log.Printf("error encoding network versions: %v\n", err)
+	}
+}
+
 func createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	networkReq := struct {
@@ -251,14 +276,13 @@ func createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	exitNodeID := farm.ExitNodes[0]
 	exitNibble := meaningfullNibble(alloc, allocSize)
+	ipZero := netZeroIP(allocZero, exitNibble)
 
 	netid, err := uuid.NewRandom()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	ipZero := netZeroIP(allocZero, alloc, allocSize)
 
 	exitPeer := &modules.Peer{
 		Type:   modules.ConnTypeWireguard,
@@ -311,6 +335,109 @@ func createNetwork(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(network); err != nil {
 		log.Println("error while marshalling network into json")
+	}
+}
+
+func addMember(w http.ResponseWriter, r *http.Request) {
+	netID := mux.Vars(r)["netid"]
+	networkReq := struct {
+		WGPort   uint16 `json:"wg_port"`
+		WGPubKey string `json:"wg_public_key"`
+		NodeID   string `json:"node_id"`
+	}{}
+
+	network, ok := networkStore[netID]
+	if !ok {
+		http.Error(w, fmt.Sprintf("network %s not found", netID), http.StatusNotFound)
+		return
+	}
+
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&networkReq); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	node, ok := nodeStore[networkReq.NodeID]
+	if !ok {
+		http.Error(w, fmt.Sprintf("node %s not found", networkReq.NodeID), http.StatusNotFound)
+		return
+	}
+
+	var err error
+	var wgIP net.IP
+	for _, iface := range node.Ifaces {
+		wgIP, err = iface.DefaultIP()
+		if err != nil {
+			continue
+		}
+		break
+	}
+
+	exitFarm := network.Network.Resources[0].NodeID.FarmerID
+	alloc, err := requestAllocation(exitFarm, allocStore)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// make a copy of all the existing peers
+	peers := make([]*modules.Peer, 0, len(network.Network.Resources[0].Peers)+1)
+	for _, p := range network.Network.Resources[0].Peers {
+		peers = append(peers, p)
+	}
+	// add the new peer to the existing list of peers
+	newPeer := &modules.Peer{
+		Type:   modules.ConnTypeWireguard,
+		Prefix: alloc,
+		Connection: modules.Wireguard{
+			Port: networkReq.WGPort,
+			Key:  networkReq.WGPubKey,
+		},
+	}
+	if wgIP != nil {
+		newPeer.Connection.IP = wgIP
+	}
+	peers = append(peers, newPeer)
+
+	//set the updated list of peers in all the network resources
+	for _, res := range network.Network.Resources {
+		res.Peers = peers
+	}
+
+	allocSize, _ := network.Network.PrefixZero.Mask.Size()
+	exitNibble := meaningfullNibble(alloc, allocSize)
+
+	linkLocal := &net.IPNet{
+		IP:   net.ParseIP(fmt.Sprintf("fe80::%s", exitNibble.Hex())),
+		Mask: net.CIDRMask(64, 128),
+	}
+
+	v6Reach := modules.ReachabilityV6Public
+	if wgIP == nil {
+		v6Reach = modules.ReachabilityV6ULA
+	}
+
+	resource := &modules.NetResource{
+		NodeID: &modules.NodeID{
+			ID:             networkReq.NodeID,
+			FarmerID:       exitFarm,
+			ReachabilityV6: v6Reach,
+			ReachabilityV4: modules.ReachabilityV4Hidden, //TODO change once we support ipv4 public nodes
+		},
+		Prefix:    alloc,
+		LinkLocal: linkLocal,
+		Peers:     peers,
+		ExitPoint: false,
+	}
+
+	network.Network.Resources = append(network.Network.Resources, resource)
+	network.Network.Version++
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-type", "application/json")
+	if err := json.NewEncoder(w).Encode(network.Network); err != nil {
+		log.Printf("fail to write network: %v\n", err)
 	}
 }
 
@@ -388,9 +515,7 @@ func meaningfullNibble(prefix *net.IPNet, size int) nibble {
 	return nibble(n)
 }
 
-func netZeroIP(netZero *net.IPNet, alloc *net.IPNet, allocSize int) net.IP {
-	nibble := meaningfullNibble(alloc, allocSize)
-
+func netZeroIP(netZero *net.IPNet, nibble []byte) net.IP {
 	ipZero := make([]byte, net.IPv6len)
 	copy(ipZero[:], netZero.IP)
 	copy(ipZero[net.IPv6len-len(nibble):], nibble)

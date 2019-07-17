@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules/identity"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
@@ -16,12 +19,14 @@ import (
 func networkProvision(ctx context.Context, netID modules.NetID) (namespace string, err error) {
 
 	mgr := stubs.NewNetworkerStub(GetZBus(ctx))
+
 	wgK, err := mgr.GenerateWireguarKeyPair(netID)
 	if err != nil {
 		return "", err
 	}
 
-	if err := mgr.PublishWGPubKey(wgK, netID); err != nil {
+	nodeID, err := identity.LocalNodeID()
+	if err != nil {
 		return "", err
 	}
 
@@ -31,12 +36,21 @@ func networkProvision(ctx context.Context, netID modules.NetID) (namespace strin
 		return "", err
 	}
 
-	if err := mgr.ApplyNetResource(*network); err != nil {
-		return "", err
+	if !isInNetwork(network, nodeID) {
+		nw, err := mgr.JoinNetwork(network.NetID, 1610, wgK)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to join network %s", network.NetID)
+		}
+		network = &nw
+	} else {
+		// TODO check if we really need to publish it
+		if err := mgr.PublishWGPubKey(wgK, netID); err != nil {
+			return "", errors.Wrap(err, "failed to publish wireguard key")
+		}
 	}
+	log.Debug().Msgf("network %+v", network)
 
-	nodeID, err := identity.LocalNodeID()
-	if err != nil {
+	if err := mgr.ApplyNetResource(*network); err != nil {
 		return "", err
 	}
 
@@ -46,6 +60,18 @@ func networkProvision(ctx context.Context, netID modules.NetID) (namespace strin
 	}
 
 	return namespace, err
+}
+
+// isInNetwork checks if nodeID already has a network resource in the
+// network object
+func isInNetwork(network *modules.Network, nodeID identity.Identifier) bool {
+	id := nodeID.Identity()
+	for _, nr := range network.Resources {
+		if nr.NodeID.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func networkGetNamespace(network *modules.Network, nodeID identity.Identifier) (string, error) {

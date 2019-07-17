@@ -23,6 +23,9 @@ type TNoDB interface {
 
 	CreateNetwork(farmID string) (*modules.Network, error)
 	GetNetwork(netID modules.NetID) (*modules.Network, error)
+	JoinNetwork(node identity.Identifier, id modules.NetID, WGPort uint16, WGPubKey string) (*modules.Network, error)
+
+	GetNetworksVersion(nodeID identity.Identifier) (versions map[modules.NetID]uint32, err error)
 
 	PublishWireguarKey(key string, nodeID string, netID modules.NetID) error
 }

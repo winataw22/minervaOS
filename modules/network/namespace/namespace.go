@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,7 +27,7 @@ func Create(name string) (ns.NetNS, error) {
 	// other namespaces (containers)
 	err := os.MkdirAll(netNSPath, 0755)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to create network namespace directory %s", netNSPath)
 	}
 
 	// Remount the namespace directory shared. This will fail if it is not
@@ -57,7 +58,7 @@ func Create(name string) (ns.NetNS, error) {
 	nsPath := path.Join(netNSPath, name)
 	mountPointFd, err := os.Create(nsPath)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to create file %s", nsPath)
 	}
 	mountPointFd.Close()
 

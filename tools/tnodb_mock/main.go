@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -24,10 +25,34 @@ type NodeInfo struct {
 
 	Ifaces []ifaceInfo
 }
+
 type ifaceInfo struct {
 	Name    string   `json:"name"`
 	Addrs   []string `json:"addrs"`
 	Gateway []string `json:"gateway"`
+}
+
+func (i ifaceInfo) DefaultIP() (net.IP, error) {
+	if len(i.Gateway) <= 0 {
+		return nil, fmt.Errorf("iterface has not gateway")
+	}
+
+	for _, addr := range i.Addrs {
+		ip, _, err := net.ParseCIDR(addr)
+		if err != nil {
+			continue
+		}
+		if ip.IsLinkLocalUnicast() ||
+			ip.IsLinkLocalMulticast() ||
+			ip.To4() != nil {
+			continue
+		}
+
+		if ip.To16() != nil {
+			return ip, nil
+		}
+	}
+	return nil, fmt.Errorf("no ipv6 address with default gateway")
 }
 
 type FarmInfo struct {
@@ -96,8 +121,10 @@ func main() {
 	router.HandleFunc("/allocations", registerAlloc).Methods("POST")
 	router.HandleFunc("/allocations", listAlloc).Methods("GET")
 	router.HandleFunc("/allocations/{farm_id}", getAlloc).Methods("GET")
-	router.HandleFunc("/networks/{netid}", getNetwork).Methods("GET")
 	router.HandleFunc("/networks", createNetwork).Methods("POST")
+	router.HandleFunc("/networks/{netid}", getNetwork).Methods("GET")
+	router.HandleFunc("/networks/{netid}", addMember).Methods("POST")
+	router.HandleFunc("/networks/{node_id}/versions", getNetworksVersion).Methods("GET")
 	router.HandleFunc("/networks/{netid}/{nodeid}/wgkeys", publishWGKey).Methods("POST")
 
 	router.HandleFunc("/reserve/{node_id}", reserve).Methods("POST")
@@ -135,7 +162,7 @@ func save() error {
 		"reservations": reservationStore,
 	}
 	for name, store := range stores {
-		f, err := os.OpenFile(name+".json", os.O_CREATE|os.O_WRONLY, 0660)
+		f, err := os.OpenFile(name+".json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0660)
 		if err != nil {
 			return err
 		}

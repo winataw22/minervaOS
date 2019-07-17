@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-
 	"github.com/threefoldtech/zosv2/modules/provision"
 )
 
@@ -48,7 +47,7 @@ func getReservations(w http.ResponseWriter, r *http.Request) {
 
 	_, ok := nodeStore[nodeID]
 	if !ok {
-		http.Error(w, fmt.Sprintf("node %s not found", nodeID), http.StatusNotModified)
+		http.Error(w, fmt.Sprintf("node %s not found", nodeID), http.StatusNotFound)
 		return
 	}
 
