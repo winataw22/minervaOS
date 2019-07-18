@@ -87,44 +87,39 @@ func CreatePublicNS(iface *PubIface) error {
 		return fmt.Errorf("unsupported iface type %s", iface.Type)
 	}
 	var (
-		ips    []*net.IPNet
-		routes []*netlink.Route
+		ips    = make([]*net.IPNet, 0)
+		routes = make([]*netlink.Route, 0)
 	)
 
 	if iface.IPv6 != nil && iface.GW6 != nil {
-		routes = []*netlink.Route{
-			{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("::"),
-					Mask: net.CIDRMask(0, 128),
-				},
-				Gw:        iface.GW6,
-				LinkIndex: pubIface.Attrs().Index,
+		routes = append(routes, &netlink.Route{
+			Dst: &net.IPNet{
+				IP:   net.ParseIP("::"),
+				Mask: net.CIDRMask(0, 128),
 			},
-		}
-		ips = []*net.IPNet{
-			iface.IPv6,
-		}
+			Gw:        iface.GW6,
+			LinkIndex: pubIface.Attrs().Index,
+		})
+		ips = append(ips, iface.IPv6)
+	}
+	if iface.IPv4 != nil && iface.GW4 != nil {
+		routes = append(routes, &netlink.Route{
+			Dst: &net.IPNet{
+				IP:   net.ParseIP("0.0.0.0"),
+				Mask: net.CIDRMask(0, 32),
+			},
+			Gw:        iface.GW4,
+			LinkIndex: pubIface.Attrs().Index,
+		})
+		ips = append(ips, iface.IPv4)
+	}
 
-	} else if iface.IPv4 != nil && iface.GW4 != nil {
-		routes = []*netlink.Route{
-			{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("0.0.0.0"),
-					Mask: net.CIDRMask(0, 32),
-				},
-				Gw:        iface.GW4,
-				LinkIndex: pubIface.Attrs().Index,
-			},
-		}
-		ips = []*net.IPNet{
-			iface.IPv4,
-		}
-	} else {
+	if len(ips) <= 0 || len(routes) <= 0 {
 		err = fmt.Errorf("missing some information in the exit iface object")
 		log.Error().Err(err).Msg("failed to configure public interface")
 		return err
 	}
+
 	if err := macvlan.Install(pubIface, ips, routes, pubNS); err != nil {
 		return err
 	}

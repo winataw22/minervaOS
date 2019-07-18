@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/vishvananda/netlink"
@@ -80,7 +80,7 @@ func (w *Wireguard) SetAddr(cidr string) error {
 		return err
 	}
 
-	if err := netlink.AddrAdd(w, addr); err != nil && err != syscall.EEXIST {
+	if err := netlink.AddrAdd(w, addr); err != nil {
 		return err
 	}
 	return nil
@@ -133,10 +133,13 @@ func (w *Wireguard) Configure(privateKey string, listentPort int, peers []Peer) 
 	log.Info().Msg("configure wg device")
 
 	if err := wc.ConfigureDevice(w.attrs.Name, config); err != nil {
-		return err
+		return errors.Wrap(err, "failed to configure wireguard interface")
 	}
 
-	return netlink.LinkSetUp(w)
+	if err := netlink.LinkSetUp(w); err != nil {
+		return errors.Wrapf(err, "failed to bring wireguard interface %s up", w.Attrs().Name)
+	}
+	return nil
 }
 
 func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, error) {

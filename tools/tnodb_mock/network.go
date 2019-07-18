@@ -81,15 +81,15 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	i := struct {
-		Iface string `json:"iface,omitempty"`
-		IP    string `json:"ip,omitempty"`
-		GW    string `json:"gateway,omitempty"`
+	input := struct {
+		Iface string   `json:"iface"`
+		IPs   []string `json:"ips"`
+		GWs   []string `json:"gateways"`
 		// Type todo allow to chose type of connection
 	}{}
 
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&i); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -103,25 +103,27 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exitIface.Version++
-	exitIface.Master = i.Iface
-	ip, ipnet, err := net.ParseCIDR(i.IP)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ipnet.IP = ip
+	exitIface.Master = input.Iface
+	for i := range input.IPs {
+		ip, ipnet, err := net.ParseCIDR(input.IPs[i])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ipnet.IP = ip
 
-	if ip.To4() != nil {
-		exitIface.IPv4 = ipnet
-	} else if ip.To16() != nil {
-		exitIface.IPv6 = ipnet
-	}
+		if ip.To4() != nil {
+			exitIface.IPv4 = ipnet
+		} else if ip.To16() != nil {
+			exitIface.IPv6 = ipnet
+		}
 
-	gw := net.ParseIP(i.GW)
-	if gw.To4() != nil {
-		exitIface.GW4 = gw
-	} else if gw.To16() != nil {
-		exitIface.GW6 = gw
+		gw := net.ParseIP(input.GWs[i])
+		if gw.To4() != nil {
+			exitIface.GW4 = gw
+		} else if gw.To16() != nil {
+			exitIface.GW6 = gw
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -338,7 +340,7 @@ func createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func addMember(w http.ResponseWriter, r *http.Request) {
+func addNode(w http.ResponseWriter, r *http.Request) {
 	netID := mux.Vars(r)["netid"]
 	networkReq := struct {
 		WGPort   uint16 `json:"wg_port"`
@@ -423,6 +425,87 @@ func addMember(w http.ResponseWriter, r *http.Request) {
 			ID:             networkReq.NodeID,
 			FarmerID:       exitFarm,
 			ReachabilityV6: v6Reach,
+			ReachabilityV4: modules.ReachabilityV4Hidden, //TODO change once we support ipv4 public nodes
+		},
+		Prefix:    alloc,
+		LinkLocal: linkLocal,
+		Peers:     peers,
+		ExitPoint: false,
+	}
+
+	network.Network.Resources = append(network.Network.Resources, resource)
+	network.Network.Version++
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-type", "application/json")
+	if err := json.NewEncoder(w).Encode(network.Network); err != nil {
+		log.Printf("fail to write network: %v\n", err)
+	}
+}
+
+// addUser add an extra wiregard peer to the tno
+// so a user can connect to its network form its own computer
+func addUser(w http.ResponseWriter, r *http.Request) {
+	netID := mux.Vars(r)["netid"]
+	networkReq := struct {
+		UserID   string `json:"user_id"`
+		WGPubKey string `json:"wg_public_key"`
+	}{}
+
+	network, ok := networkStore[netID]
+	if !ok {
+		http.Error(w, fmt.Sprintf("network %s not found", netID), http.StatusNotFound)
+		return
+	}
+
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&networkReq); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	exitFarm := network.Network.Resources[0].NodeID.FarmerID
+	alloc, err := requestAllocation(exitFarm, allocStore)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// make a copy of all the existing peers
+	peers := make([]*modules.Peer, 0, len(network.Network.Resources[0].Peers)+1)
+	for _, p := range network.Network.Resources[0].Peers {
+		peers = append(peers, p)
+	}
+	// add the new peer to the existing list of peers
+	newPeer := &modules.Peer{
+		Type:   modules.ConnTypeWireguard,
+		Prefix: alloc,
+		Connection: modules.Wireguard{
+			// Port: networkReq.WGPort,
+			Key: networkReq.WGPubKey,
+		},
+	}
+
+	peers = append(peers, newPeer)
+
+	//set the updated list of peers in all the network resources
+	for _, res := range network.Network.Resources {
+		res.Peers = peers
+	}
+
+	allocSize, _ := network.Network.PrefixZero.Mask.Size()
+	exitNibble := meaningfullNibble(alloc, allocSize)
+
+	linkLocal := &net.IPNet{
+		IP:   net.ParseIP(fmt.Sprintf("fe80::%s", exitNibble.Hex())),
+		Mask: net.CIDRMask(64, 128),
+	}
+
+	resource := &modules.NetResource{
+		NodeID: &modules.NodeID{
+			ID:             networkReq.UserID,
+			FarmerID:       exitFarm,
+			ReachabilityV6: modules.ReachabilityV6ULA,
 			ReachabilityV4: modules.ReachabilityV4Hidden, //TODO change once we support ipv4 public nodes
 		},
 		Prefix:    alloc,

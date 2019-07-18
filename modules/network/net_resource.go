@@ -5,6 +5,8 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/minio/minio-go/pkg/set"
+
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 
@@ -307,24 +309,14 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 
 	var handler = func(_ ns.NetNS) error {
 
-		wg, err := wireguard.GetByName(localNibble.WiregardName())
-		if err != nil {
-			return errors.Wrapf(err, "fail to get wireguard interface %s", localNibble.WiregardName())
-		}
-
-		if err := wg.SetAddr(localResource.LinkLocal.String()); err != nil {
-			return errors.Wrapf(err, "fail to set address %s on wireguard interface %s",
-				localResource.LinkLocal.String(), localNibble.WiregardName())
-		}
 		a, b, err := localNibble.ToV4()
 		if err != nil {
 			return err
 		}
 
-		addr := fmt.Sprintf("10.255.%d.%d/16", a, b)
-		if err := wg.SetAddr(addr); err != nil {
-			return errors.Wrapf(err, "fail to set address %s on wireguard interface %s",
-				addr, localNibble.WiregardName())
+		wg, err := wireguard.GetByName(localNibble.WiregardName())
+		if err != nil {
+			return errors.Wrapf(err, "failed to get wireguard interface %s", localNibble.WiregardName())
 		}
 
 		localPeer, err := getPeer(localResource.Prefix.String(), localResource.Peers)
@@ -332,9 +324,31 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 			return fmt.Errorf("not peer found for local network resource: %s", err)
 		}
 
-		log.Info().Msg("configure wireguard interface")
 		if err = wg.Configure(wgKey.String(), int(localPeer.Connection.Port), wgPeers); err != nil {
-			return errors.Wrap(err, "fail to configure wireguard interface")
+			return errors.Wrap(err, "failed to configure wireguard interface")
+		}
+
+		addrs, err := netlink.AddrList(wg, netlink.FAMILY_ALL)
+		if err != nil {
+			return err
+		}
+		curAddrs := set.NewStringSet()
+		for _, addr := range addrs {
+			curAddrs.Add(addr.IPNet.String())
+		}
+
+		newAddrs := set.NewStringSet()
+		newAddrs.Add(localResource.LinkLocal.String())
+		newAddrs.Add(fmt.Sprintf("10.255.%d.%d/16", a, b))
+
+		fmt.Println("current", curAddrs.String())
+		fmt.Println("new", newAddrs.String())
+
+		for _, addr := range newAddrs.Difference(curAddrs).ToSlice() {
+			log.Debug().Str("ip", addr).Msg("set addr on wireguard interface")
+			if err := wg.SetAddr(addr); err != nil {
+				return errors.Wrapf(err, "failed to set address %s on wireguard interface %s", addr, wg.Attrs().Name)
+			}
 		}
 
 		for _, route := range routes {
@@ -344,7 +358,7 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 					Err(err).
 					Str("route", route.String()).
 					Msg("fail to set route")
-				return errors.Wrapf(err, "fail to add route %s", route.String())
+				return errors.Wrapf(err, "failed to add route %s", route.String())
 			}
 		}
 

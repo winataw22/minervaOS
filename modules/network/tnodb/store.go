@@ -157,16 +157,21 @@ func (s *httpTNoDB) PublishInterfaces() error {
 	return nil
 }
 
-func (s *httpTNoDB) ConfigurePublicIface(node identity.Identifier, ip *net.IPNet, gw net.IP, iface string) error {
+func (s *httpTNoDB) ConfigurePublicIface(node identity.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error {
 	output := struct {
-		Iface string `json:"iface"`
-		IP    string `json:"ip"`
-		GW    string `json:"gateway"`
+		Iface string   `json:"iface"`
+		IPs   []string `json:"ips"`
+		GWs   []string `json:"gateways"`
 		// Type todo allow to chose type of connection
 	}{
 		Iface: iface,
-		IP:    ip.String(),
-		GW:    gw.String(),
+		IPs:   make([]string, len(ips)),
+		GWs:   make([]string, len(gws)),
+	}
+
+	for i := range ips {
+		output.IPs[i] = ips[i].String()
+		output.GWs[i] = gws[i].String()
 	}
 
 	url := fmt.Sprintf("%s/nodes/%s/configure_public", s.baseURL, node.Identity())
@@ -338,6 +343,7 @@ func (s *httpTNoDB) CreateNetwork(farmID string) (*modules.Network, error) {
 
 	return network, nil
 }
+
 func (s *httpTNoDB) JoinNetwork(nodeID identity.Identifier, id modules.NetID, WGPort uint16, WGPubKey string) (*modules.Network, error) {
 
 	req := struct {
@@ -371,19 +377,51 @@ func (s *httpTNoDB) JoinNetwork(nodeID identity.Identifier, id modules.NetID, WG
 		return nil, fmt.Errorf("wrong response status received: %s %s", resp.Status, string(body))
 	}
 
-	b, err := httputil.DumpResponse(resp, true)
-	if err != nil {
-		panic(err)
-	}
-	log.Debug().Msgf("%s", string(b))
-
 	network := &modules.Network{}
 	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
 		log.Error().Err(err).Msg("failed to decode network json")
 		return nil, err
 	}
 
-	log.Debug().Msgf("tnodb client join network %+v", network)
+	return network, nil
+}
+
+func (s *httpTNoDB) AddUser(user identity.Identifier, id modules.NetID, WGPubKey string) (*modules.Network, error) {
+
+	req := struct {
+		WGPubKey string `json:"wg_public_key"`
+		UserID   string `json:"user_id"`
+	}{
+		WGPubKey: WGPubKey,
+		UserID:   user.Identity(),
+	}
+
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(req); err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/networks/%s/user", s.baseURL, id)
+	resp, err := http.Post(url, "application/json", buf)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("wrong response status received: %s %s", resp.Status, string(body))
+	}
+
+	network := &modules.Network{}
+	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
+		log.Error().Err(err).Msg("failed to decode network json")
+		return nil, err
+	}
 
 	return network, nil
 }

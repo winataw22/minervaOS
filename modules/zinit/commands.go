@@ -118,6 +118,9 @@ func (c *Client) Stop(service string) error {
 // Monitor starts monitoring a service
 func (c *Client) Monitor(service string) error {
 	_, err := c.cmd(fmt.Sprintf("monitor %s", service))
+	if err != nil && strings.Contains(err.Error(), "already monitored") {
+		return nil
+	}
 	return err
 }
 

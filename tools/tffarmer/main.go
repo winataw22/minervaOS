@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net"
 	"path/filepath"
 
 	"github.com/rs/zerolog"
@@ -17,14 +14,16 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	idStore identity.IDStore
+	db      network.TNoDB
+)
+
 func main() {
 
 	app := cli.NewApp()
-
-	var (
-		idStore identity.IDStore
-		db      network.TNoDB
-	)
+	app.Usage = "Create and manage a Threefold farm"
+	app.Version = "0.0.1"
 
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
@@ -34,6 +33,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "tnodb, u",
 			Usage: "URL of the TNODB",
+			Value: "https://tnodb.dev.grid.tf",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
@@ -51,170 +51,77 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		{
-			Name:      "register",
-			Usage:     "register a new farm",
-			Category:  "identity",
-			ArgsUsage: "farm_name",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "seed",
-					Usage: "path to the farmer seed. Specify this if you already have a seed generated for your farm",
+			Name:  "farm",
+			Usage: "Manage and create farms",
+			Subcommands: []cli.Command{
+				{
+					Name:      "register",
+					Usage:     "register a new farm",
+					Category:  "identity",
+					ArgsUsage: "farm_name",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "seed",
+							Usage: "path to the farmer seed. Specify this if you already have a seed generated for your farm",
+						},
+					},
+					Action: registerFarm,
 				},
-			},
-			Action: func(c *cli.Context) error {
-
-				name := c.Args().First()
-				if name == "" {
-					return fmt.Errorf("A farm name needs to be specified")
-				}
-
-				var farmID identity.Identifier
-				var err error
-				seedPath := c.String("seed")
-				if seedPath != "" {
-					farmID, err = loadFarmID(seedPath)
-					if err != nil {
-						return err
-					}
-				}
-				if farmID == nil {
-					farmID, err = generateKeyPair(seedPath)
-					if err != nil {
-						return err
-					}
-				}
-
-				if err := idStore.RegisterFarm(farmID, name); err != nil {
-					return err
-				}
-				fmt.Println("Farm registered successfully")
-				fmt.Printf("Name: %s\n", name)
-				fmt.Printf("Identity: %s\n", farmID.Identity())
-				return nil
 			},
 		},
 		{
-			Name:      "give-alloc",
-			Category:  "network",
-			Usage:     "register an allocation to the TNoDB",
-			ArgsUsage: "allocation prefix (ip/mask)",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "seed",
-					Usage: "path to the farmer seed. Specify this if you already have a seed generated for your farm",
+			Name:  "network",
+			Usage: "Manage network of a farm and hand out allocation to the grid",
+			Subcommands: []cli.Command{
+				{
+					Name:      "give-alloc",
+					Category:  "network",
+					Usage:     "register an allocation to the TNoDB",
+					ArgsUsage: "allocation prefix (ip/mask)",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "seed",
+							Usage: "path to the farmer seed. Specify this if you already have a seed generated for your farm",
+						},
+					},
+					Action: giveAlloc,
 				},
-			},
-			Action: func(c *cli.Context) error {
-
-				farmID, err := loadFarmID(c.String("seed"))
-				if err != nil {
-					log.Error().Err(err).Msg("impossible to load farm id, user register command first")
-					return err
-				}
-
-				alloc := c.Args().First()
-				_, allocation, err := net.ParseCIDR(alloc)
-				if err != nil {
-					log.Error().Err(err).Msg("prefix format not valid, use ip/mask")
-					return err
-				}
-
-				if err := db.RegisterAllocation(farmID, allocation); err != nil {
-					log.Error().Err(err).Msg("failed to register prefix")
-					return err
-				}
-
-				fmt.Println("prefix registered successfully")
-				return nil
-			},
-		},
-		{
-			Name:      "get-alloc",
-			Category:  "network",
-			Usage:     "get an allocation for a tenant network",
-			ArgsUsage: "farm_id",
-			Action: func(c *cli.Context) error {
-
-				farm := c.Args().First()
-				alloc, err := db.RequestAllocation(strID(farm))
-				if err != nil {
-					log.Error().Err(err).Msg("failed to get an allocation")
-					return err
-				}
-
-				fmt.Printf("allocation received: %s\n", alloc.String())
-				return nil
-			},
-		},
-		{
-			Name:      "configure-public",
-			Category:  "network",
-			Usage:     "configure the public interface of a node",
-			ArgsUsage: "node ID",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "ip",
-					Usage: "ip address to set to the exit interface",
+				{
+					Name:      "get-alloc",
+					Category:  "network",
+					Usage:     "get an allocation for a tenant network",
+					ArgsUsage: "farm_id",
+					Action:    getAlloc,
 				},
-				cli.StringFlag{
-					Name:  "gw",
-					Usage: "gw address to set to the exit interface",
+				{
+					Name:     "configure-public",
+					Category: "network",
+					Usage: `configure the public interface of a node.
+You can specify multime time the ip and gw flag to configure multiple IP on the public interface`,
+					ArgsUsage: "node ID",
+					Flags: []cli.Flag{
+						cli.StringSliceFlag{
+							Name:  "ip",
+							Usage: "ip address to set to the exit interface",
+						},
+						cli.StringSliceFlag{
+							Name:  "gw",
+							Usage: "gw address to set to the exit interface",
+						},
+						cli.StringFlag{
+							Name:  "iface",
+							Usage: "name of the interface to use as public interface",
+						},
+					},
+					Action: configPublic,
 				},
-				cli.StringFlag{
-					Name:  "iface",
-					Usage: "name of the interface to use as public interface",
+				{
+					Name:      "select-exit",
+					Category:  "network",
+					Usage:     "mark a node as being an exit",
+					ArgsUsage: "node ID",
+					Action:    selectExit,
 				},
-			},
-			Action: func(c *cli.Context) error {
-				ip, ipnet, err := net.ParseCIDR(c.String("ip"))
-				if err != nil {
-					return err
-				}
-				ipnet.IP = ip
-				gw := net.ParseIP(c.String("gw"))
-				iface := c.String("iface")
-				node := c.Args().First()
-
-				if err := db.ConfigurePublicIface(strID(node), ipnet, gw, iface); err != nil {
-					return err
-				}
-				fmt.Printf("public interface configured on node %s\n", node)
-				return nil
-			},
-		},
-		{
-			Name:      "select-exit",
-			Category:  "network",
-			Usage:     "mark a node as being an exit",
-			ArgsUsage: "node ID",
-			Action: func(c *cli.Context) error {
-				node := c.Args().First()
-
-				if err := db.SelectExitNode(strID(node)); err != nil {
-					return err
-				}
-				fmt.Printf("Node %s marked as exit node\n", node)
-				return nil
-			},
-		},
-		{
-			Name:      "create-network",
-			Category:  "network",
-			Usage:     "create a new user network",
-			ArgsUsage: "ID of the exit farm",
-			Action: func(c *cli.Context) error {
-				farmID := c.Args().First()
-				network, err := db.CreateNetwork(farmID)
-				if err != nil {
-					log.Error().Err(err).Msg("failed to create network")
-					return err
-				}
-				b, err := json.Marshal(network)
-				if err != nil {
-					return err
-				}
-				fmt.Println(string(b))
-				return nil
 			},
 		},
 	}

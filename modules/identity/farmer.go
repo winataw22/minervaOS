@@ -16,5 +16,5 @@ func GetFarmID() (Identifier, error) {
 		return nil, fmt.Errorf("farmer id not found in kernel parameters")
 	}
 
-	return strIdentifier(farmerID[0]), nil
+	return StrIdentifier(farmerID[0]), nil
 }

@@ -31,6 +31,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mdlayher/genetlink v0.0.0-20190605184957-3071ac0624c8 // indirect
 	github.com/mdlayher/netlink v0.0.0-20190607185106-0051450635a6 // indirect
+	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect

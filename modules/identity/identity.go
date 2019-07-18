@@ -6,11 +6,11 @@ type Identifier interface {
 	Identity() string
 }
 
-// strIdentifier is a helper type that implement the Identifier interface
+// StrIdentifier is a helper type that implement the Identifier interface
 // on top of simple string
-type strIdentifier string
+type StrIdentifier string
 
 // Identity implements the Identifier interface
-func (s strIdentifier) Identity() string {
+func (s StrIdentifier) Identity() string {
 	return string(s)
 }

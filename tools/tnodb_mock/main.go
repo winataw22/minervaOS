@@ -123,7 +123,8 @@ func main() {
 	router.HandleFunc("/allocations/{farm_id}", getAlloc).Methods("GET")
 	router.HandleFunc("/networks", createNetwork).Methods("POST")
 	router.HandleFunc("/networks/{netid}", getNetwork).Methods("GET")
-	router.HandleFunc("/networks/{netid}", addMember).Methods("POST")
+	router.HandleFunc("/networks/{netid}", addNode).Methods("POST")
+	router.HandleFunc("/networks/{netid}/user", addUser).Methods("POST")
 	router.HandleFunc("/networks/{node_id}/versions", getNetworksVersion).Methods("GET")
 	router.HandleFunc("/networks/{netid}/{nodeid}/wgkeys", publishWGKey).Methods("POST")
 

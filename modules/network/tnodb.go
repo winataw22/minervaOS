@@ -16,7 +16,7 @@ type TNoDB interface {
 
 	PublishInterfaces() error
 
-	ConfigurePublicIface(node identity.Identifier, ip *net.IPNet, gw net.IP, iface string) error
+	ConfigurePublicIface(node identity.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error
 	ReadPubIface(node identity.Identifier) (*PubIface, error)
 
 	SelectExitNode(node identity.Identifier) error
@@ -24,6 +24,7 @@ type TNoDB interface {
 	CreateNetwork(farmID string) (*modules.Network, error)
 	GetNetwork(netID modules.NetID) (*modules.Network, error)
 	JoinNetwork(node identity.Identifier, id modules.NetID, WGPort uint16, WGPubKey string) (*modules.Network, error)
+	AddUser(user identity.Identifier, id modules.NetID, WGPubKey string) (*modules.Network, error)
 
 	GetNetworksVersion(nodeID identity.Identifier) (versions map[modules.NetID]uint32, err error)
 
