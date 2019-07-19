@@ -173,6 +173,8 @@ func listAlloc(w http.ResponseWriter, r *http.Request) {
 	for _, prefix := range allocStore.Allocations {
 		allocs = append(allocs, prefix.Allocation.String())
 	}
+
+	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(allocs)
 }
@@ -199,6 +201,7 @@ func getAlloc(w http.ResponseWriter, r *http.Request) {
 		Alloc string `json:"allocation"`
 	}{alloc.String()}
 
+	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(&data)
 }
@@ -212,6 +215,7 @@ func getNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(network.Network)
 }
@@ -234,7 +238,7 @@ func getNetworksVersion(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(output); err != nil {
 		log.Printf("error encoding network versions: %v\n", err)
@@ -334,6 +338,7 @@ func createNetwork(w http.ResponseWriter, r *http.Request) {
 		ExitPoint: exitPoint,
 	}
 
+	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(network); err != nil {
 		log.Println("error while marshalling network into json")

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+
+	"github.com/rs/zerolog"
 
 	"github.com/rs/zerolog/log"
 
@@ -25,6 +28,8 @@ func main() {
 	flag.UintVar(&workerNr, "workers", 1, "Number of workers")
 
 	flag.Parse()
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	storage, err := storage.New()
 	if err != nil {

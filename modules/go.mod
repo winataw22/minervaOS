@@ -17,6 +17,7 @@ require (
 	github.com/containernetworking/plugins v0.8.1
 	github.com/coreos/go-iptables v0.4.1 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190612170431-362f06ec6bc1 // indirect
+	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/docker/go-events v0.0.0-20170721190031-9461782956ad // indirect
@@ -31,7 +32,6 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mdlayher/genetlink v0.0.0-20190605184957-3071ac0624c8 // indirect
 	github.com/mdlayher/netlink v0.0.0-20190607185106-0051450635a6 // indirect
-	github.com/minio/minio-go v6.0.14+incompatible
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect

@@ -8,7 +8,6 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/mdlayher/genetlink v0.0.0-20190617154021-985b2115c31a // indirect
 	github.com/mdlayher/netlink v0.0.0-20190617153422-f82a9b10b2bc // indirect
-	github.com/minio/minio-go v6.0.14+incompatible // indirect
 	github.com/rs/zerolog v1.14.3
 	github.com/threefoldtech/zbus v0.0.0-20190711124326-09379d5f12e0
 	github.com/threefoldtech/zosv2/modules v0.0.0-20190711080824-231c81c6ccb4

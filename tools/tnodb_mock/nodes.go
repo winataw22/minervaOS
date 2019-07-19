@@ -63,6 +63,7 @@ func nodeDetail(w http.ResponseWriter, r *http.Request) {
 		output.GW6 = exitIface.GW6.String()
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(&output)
 }
@@ -73,6 +74,7 @@ func listNodes(w http.ResponseWriter, r *http.Request) {
 		identities = append(identities, info)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(identities)
 }
@@ -98,6 +100,7 @@ func listFarm(w http.ResponseWriter, r *http.Request) {
 		farms = append(farms, info)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(farms)
 }

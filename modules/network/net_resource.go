@@ -5,7 +5,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/minio/minio-go/pkg/set"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
@@ -190,15 +190,9 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 
 	// we are a public node
 	for _, peer := range localResource.Peers {
-		if peer.Type != modules.ConnTypeWireguard {
-			continue
-		}
-		if peer.Prefix.String() == localResource.Prefix.String() {
-			continue
-		}
-
-		// skip exit peer cause we add it in genWireguardExitPeers
-		if peer.Prefix.String() == exitNetRes.Prefix.String() {
+		if peer.Type != modules.ConnTypeWireguard || // wireguard is the only supported connection type at the moment
+			peer.Prefix.String() == localResource.Prefix.String() || // skip ourself
+			peer.Prefix.String() == exitNetRes.Prefix.String() { // skip exit peer cause we add it in genWireguardExitPeers
 			continue
 		}
 
@@ -240,15 +234,21 @@ func genWireguardPeers(localResource *modules.NetResource, network *modules.Netw
 }
 
 func genWireguardExitPeers(localResource *modules.NetResource, network *modules.Network) ([]wireguard.Peer, []*netlink.Route, error) {
-	peers := make([]wireguard.Peer, 0)
-	routes := make([]*netlink.Route, 0)
-	exitNetRes, err := exitResource(network.Resources)
+	var (
+		peers      = make([]wireguard.Peer, 0)
+		routes     = make([]*netlink.Route, 0)
+		exitNetRes *modules.NetResource
+		exitPeer   *modules.Peer
+		err        error
+	)
+
+	exitNetRes, err = exitResource(network.Resources)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// add exit node to the list of peers
-	exitPeer, err := getPeer(exitNetRes.Prefix.String(), localResource.Peers)
+	exitPeer, err = getPeer(exitNetRes.Prefix.String(), localResource.Peers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -262,9 +262,9 @@ func genWireguardExitPeers(localResource *modules.NetResource, network *modules.
 			"::/0",
 		},
 	})
-	nibble := zosip.NewNibble(exitPeer.Prefix, network.AllocationNR)
 
 	// add default ipv6 route to the exit node
+	nibble := zosip.NewNibble(exitPeer.Prefix, network.AllocationNR)
 	routes = append(routes, &netlink.Route{
 		Dst: &net.IPNet{
 			IP:   net.ParseIP("::"),
@@ -332,23 +332,36 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 		if err != nil {
 			return err
 		}
-		curAddrs := set.NewStringSet()
+		curAddrs := mapset.NewSet()
 		for _, addr := range addrs {
 			curAddrs.Add(addr.IPNet.String())
 		}
 
-		newAddrs := set.NewStringSet()
+		newAddrs := mapset.NewSet()
 		newAddrs.Add(localResource.LinkLocal.String())
 		newAddrs.Add(fmt.Sprintf("10.255.%d.%d/16", a, b))
 
-		fmt.Println("current", curAddrs.String())
-		fmt.Println("new", newAddrs.String())
+		toRemove := curAddrs.Difference(newAddrs)
+		toAdd := newAddrs.Difference(curAddrs)
 
-		for _, addr := range newAddrs.Difference(curAddrs).ToSlice() {
-			log.Debug().Str("ip", addr).Msg("set addr on wireguard interface")
+		log.Info().Msgf("current %s/n", curAddrs.String())
+		log.Info().Msgf("to add %s/n", toAdd.String())
+		log.Info().Msgf("to remove %s/n", toRemove.String())
+
+		for addr := range toAdd.Iter() {
+			addr, _ := addr.(string)
+			log.Debug().Str("ip", addr).Msg("set ip on wireguard interface")
 			if err := wg.SetAddr(addr); err != nil {
 				return errors.Wrapf(err, "failed to set address %s on wireguard interface %s", addr, wg.Attrs().Name)
 			}
+		}
+
+		for addr := range toRemove.Iter() {
+			addr, _ := addr.(string)
+			log.Debug().Str("ip", addr).Msg("unset ip on wireguard interface")
+			// if err := wg.UsetAddr(addr); err != nil {
+			// 	return errors.Wrapf(err, "failed to set address %s on wireguard interface %s", addr, wg.Attrs().Name)
+			// }
 		}
 
 		for _, route := range routes {
