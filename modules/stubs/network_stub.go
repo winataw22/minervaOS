@@ -22,14 +22,17 @@ func NewNetworkerStub(client zbus.Client) *NetworkerStub {
 	}
 }
 
-func (s *NetworkerStub) ApplyNetResource(arg0 modules.Network) (ret0 error) {
+func (s *NetworkerStub) ApplyNetResource(arg0 modules.Network) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "ApplyNetResource", args...)
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return
@@ -48,9 +51,9 @@ func (s *NetworkerStub) DeleteNetResource(arg0 modules.Network) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) GenerateWireguarKeyPair(arg0 modules.NetID) (ret0 string, ret1 error) {
+func (s *NetworkerStub) Namespace(arg0 modules.NetID) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GenerateWireguarKeyPair", args...)
+	result, err := s.client.Request(s.module, s.object, "Namespace", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -59,51 +62,6 @@ func (s *NetworkerStub) GenerateWireguarKeyPair(arg0 modules.NetID) (ret0 string
 	}
 	ret1 = new(zbus.RemoteError)
 	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *NetworkerStub) GetNetwork(arg0 modules.NetID) (ret0 modules.Network, ret1 error) {
-	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GetNetwork", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *NetworkerStub) JoinNetwork(arg0 modules.NetID, arg1 uint16, arg2 string) (ret0 modules.Network, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2}
-	result, err := s.client.Request(s.module, s.object, "JoinNetwork", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *NetworkerStub) PublishWGPubKey(arg0 string, arg1 modules.NetID) (ret0 error) {
-	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "PublishWGPubKey", args...)
-	if err != nil {
-		panic(err)
-	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
 		panic(err)
 	}
 	return

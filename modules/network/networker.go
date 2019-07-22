@@ -2,13 +2,17 @@ package network
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zosv2/modules/crypto"
 	"github.com/threefoldtech/zosv2/modules/identity"
 
 	"github.com/threefoldtech/zosv2/modules/network/ip"
-	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
@@ -63,43 +67,37 @@ func validateNetwork(n *modules.Network) error {
 	return nil
 }
 
-// GetNetwork implements modules.Networker interface
-func (n *networker) GetNetwork(id modules.NetID) (net modules.Network, err error) {
-	no, err := n.tnodb.GetNetwork(id)
+func (n networker) Namespace(id modules.NetID) (string, error) {
+	b, err := ioutil.ReadFile(filepath.Join(n.storageDir, string(id)))
 	if err != nil {
-		return net, err
+		return "", err
 	}
-	log.Debug().Msgf("networker get network %+v", no)
-	return *no, nil
-}
-
-func (n *networker) JoinNetwork(id modules.NetID, WGPort uint16, WGPubKey string) (modules.Network, error) {
-	network, err := n.tnodb.JoinNetwork(n.nodeID, id, WGPort, WGPubKey)
-	if err != nil {
-		return modules.Network{}, errors.Wrapf(err, "fail to join network %s", id)
-	}
-	log.Debug().Msgf("networker join network %+v", network)
-	return *network, nil
+	return string(b), err
 }
 
 // ApplyNetResource implements modules.Networker interface
-func (n *networker) ApplyNetResource(network modules.Network) (err error) {
+func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
+	var err error
 
 	if err := validateNetwork(&network); err != nil {
 		log.Error().Err(err).Msg("network object format invalid")
-		return err
+		return "", err
 	}
 
 	localResource := n.localResource(network.Resources)
 	if localResource == nil {
-		return fmt.Errorf("not network resource for this node: %s", n.nodeID.Identity())
+		return "", fmt.Errorf("not network resource for this node: %s", n.nodeID.Identity())
 	}
 	exitNetRes, err := exitResource(network.Resources)
 	if err != nil {
-		return err
+		return "", err
 	}
-
 	nibble := ip.NewNibble(localResource.Prefix, network.AllocationNR)
+
+	wgKey, err := extractPrivateKey(localResource)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to extract private key from network object")
+	}
 
 	// the flow is a bit different is the network namespace already exist or not
 	// if it already exists, we skip the all network resource creation
@@ -111,17 +109,6 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 		log.Info().Msg("create new network resource")
 	} else {
 		log.Info().Msg("update existing network resource")
-	}
-
-	path := filepath.Join(n.storageDir, string(network.NetID))
-	wgKey, err := wireguard.LoadKey(path)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("network", string(network.NetID)).
-			Str("directory", path).
-			Msg("failed to load wireguard keys. Generate the keys before trying to configure the network")
-		return err
 	}
 
 	defer func() {
@@ -136,14 +123,14 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 		log.Info().Msg("create network resource namespace")
 		err = createNetworkResource(localResource, &network)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	log.Info().Msg("Generate wireguard config for all peers")
 	peers, routes, err := genWireguardPeers(localResource, &network)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	log.Debug().
@@ -156,7 +143,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 		log.Info().Msg("Generate wireguard config to the exit node")
 		exitPeers, exitRoutes, err := genWireguardExitPeers(localResource, &network)
 		if err != nil {
-			return err
+			return "", err
 		}
 		peers = append(peers, exitPeers...)
 		routes = append(routes, exitRoutes...)
@@ -164,7 +151,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 		log.Info().Msg("Configure network resource as exit point")
 		err := configNetResAsExitPoint(exitNetRes, network.Exit, network.PrefixZero)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -174,10 +161,16 @@ func (n *networker) ApplyNetResource(network modules.Network) (err error) {
 
 	err = configWG(localResource, &network, peers, routes, wgKey)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	// map the network ID to the network namespace
+	path := filepath.Join(n.storageDir, string(network.NetID))
+	if err := ioutil.WriteFile(path, []byte(nibble.NetworkName()), 0660); err != nil {
+		return "", err
+	}
+
+	return nibble.NetworkName(), nil
 }
 
 // ApplyNetResource implements modules.Networker interface
@@ -210,19 +203,43 @@ func (n *networker) DeleteNetResource(network modules.Network) error {
 			Str("namespace", netnsName).
 			Msg("failed to delete network resource namespace")
 	}
+
+	// map the network ID to the network namespace
+	path := filepath.Join(n.storageDir, string(network.NetID))
+	if err := os.Remove(path); err != nil {
+		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
+	}
+
 	return nil
 }
 
-// GenerateWireguarKeyPair generate a pair of keys for a specific network
-// and return the base64 encode version of the public key
-func (n *networker) GenerateWireguarKeyPair(netID modules.NetID) (string, error) {
-	path := filepath.Join(n.storageDir, string(netID))
-	key, err := wireguard.GenerateKey(path)
+func extractPrivateKey(r *modules.NetResource) (wgtypes.Key, error) {
+	key := wgtypes.Key{}
+
+	peer, err := getPeer(r.Prefix.String(), r.Peers)
 	if err != nil {
-		return "", err
+		return key, err
 	}
-	return key.PublicKey().String(), nil
-}
-func (n *networker) PublishWGPubKey(key string, netID modules.NetID) error {
-	return n.tnodb.PublishWireguarKey(key, n.nodeID.Identity(), netID)
+	if peer.Connection.PrivateKey == "" {
+		return key, fmt.Errorf("wireguard private key is empty")
+	}
+
+	// private key is hex encoded in the network object
+	sk := ""
+	_, err = fmt.Sscanf(peer.Connection.PrivateKey, "%x", &sk)
+	if err != nil {
+		return key, err
+	}
+
+	// TODO: change me once identity is available over zbus
+	keyPair, err := identity.LoadSeed("/var/cache/seed.txt")
+	if err != nil {
+		return key, err
+	}
+	decoded, err := crypto.Decrypt([]byte(sk), keyPair.PrivateKey)
+	if err != nil {
+		return key, err
+	}
+
+	return wgtypes.ParseKey(string(decoded))
 }

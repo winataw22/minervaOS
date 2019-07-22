@@ -56,65 +56,76 @@ func main() {
 	}
 	app.Commands = []cli.Command{
 		{
-			Name:  "network",
-			Usage: "Manage private networks",
-			Subcommands: []cli.Command{
-				{
-					Name:  "create",
-					Usage: "create a new user network",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "farm",
-							Usage: "ID of the exit farm to use for this network",
-						},
-						cli.StringSliceFlag{
-							Name:  "node",
-							Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
-						},
-					},
-					Action: createNetwork,
-				},
-				{
-					Name:  "add",
-					Usage: "add a node to a existing network",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "network",
-							Usage: "ID of the network",
-						},
-						cli.StringSliceFlag{
-							Name:  "node",
-							Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
-						},
-					},
-					Action: addMember,
-				},
-				{
-					Name:  "local",
-					Usage: "add a user to a private network. Use this command if you want to be able to connect to a network from your own computer",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "network",
-							Usage: "ID of the network",
-						},
-						cli.StringFlag{
-							Name:  "user",
-							Usage: "user ID",
-						},
-					},
-					Action: addLocal,
+			Name:    "generate",
+			Aliases: []string{"gen"},
+			Usage:   "Group of command to generate provisioning schemas",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "output,o",
+					Usage: "file name where to write the result of the command",
 				},
 			},
-		},
-		{
-			Name:  "container",
-			Usage: "Provision containers",
 			Subcommands: []cli.Command{
 				{
-
-					Name:      "create",
-					Usage:     "create a container",
-					ArgsUsage: "node ID where to deploy the container",
+					Name:  "network",
+					Usage: "Manage private networks",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "input,i",
+							Usage: "file name to a json encoded network definition",
+						},
+					},
+					Subcommands: []cli.Command{
+						{
+							Name:  "create",
+							Usage: "create a new user network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "farm",
+									Usage: "ID of the exit farm to use for this network",
+								},
+								cli.StringSliceFlag{
+									Name:  "node",
+									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
+								},
+							},
+							Action: cmdCreateNetwork,
+						},
+						{
+							Name:  "add",
+							Usage: "add a node to a existing network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "network",
+									Usage: "ID of the network",
+								},
+								cli.StringSliceFlag{
+									Name:  "node",
+									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
+								},
+							},
+							Action: cmdsAddNode,
+						},
+						{
+							Name:  "user",
+							Usage: "add a user to a private network. Use this command if you want to be able to connect to a network from your own computer",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "network",
+									Usage: "ID of the network",
+								},
+								cli.StringFlag{
+									Name:  "user",
+									Usage: "user ID, if not specified, a user ID will be generated automatically",
+								},
+							},
+							Action: cmdsAddUser,
+						},
+					},
+				},
+				{
+					Name:  "container",
+					Usage: "Generate container provisioning schema",
 					Flags: []cli.Flag{
 						cli.StringFlag{
 							Name:  "flist",
@@ -141,32 +152,47 @@ func main() {
 							Usage: "environment variable to set into the container",
 						},
 					},
-					Action: createContainer,
+					Action: generateContainer,
+				},
+				{
+					Name:  "storage",
+					Usage: "Generate volumes and 0-db provisioning schema",
+					Subcommands: []cli.Command{
+						{
+							Name:    "volume",
+							Aliases: []string{"vol"},
+							Flags: []cli.Flag{
+								cli.Uint64Flag{
+									Name:  "size, s",
+									Usage: "Size of the volume in GiB",
+									Value: 1,
+								},
+								cli.StringFlag{
+									Name:  "type, t",
+									Usage: "Type of disk to use, HHD or SSD",
+								},
+							},
+							Action: generateVolume,
+						},
+					},
 				},
 			},
 		},
 		{
-			Name:  "storage",
-			Usage: "Provision volumes and 0-db",
-			Subcommands: []cli.Command{
-				{
-
-					Name:      "create",
-					Usage:     "create a storage volume",
-					ArgsUsage: "node ID where to create the volume",
-					Flags: []cli.Flag{
-						cli.Uint64Flag{
-							Name:  "size",
-							Usage: "Size of the volume in GiB",
-						},
-						cli.StringFlag{
-							Name:  "type",
-							Usage: "Type of disk to use, HHD or SSD",
-						},
-					},
-					Action: createVolume,
+			Name:  "provision",
+			Usage: "Provision a workload",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "schema",
+					Usage: "path to the provisioning schema, use - to read from stdin",
+					Value: "provision.json",
+				},
+				cli.StringFlag{
+					Name:  "node",
+					Usage: "Node ID where to deploy the workload",
 				},
 			},
+			Action: cmdsProvision,
 		},
 	}
 

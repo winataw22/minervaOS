@@ -57,7 +57,8 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 		Str("config", fmt.Sprintf("%+v", config)).
 		Msg("deploying network")
 
-	ns, err := networkProvision(ctx, modules.NetID(config.Network.NetwokID))
+	networkMgr := stubs.NewNetworkerStub(GetZBus(ctx))
+	ns, err := networkMgr.Namespace(modules.NetID(config.Network.NetwokID))
 	if err != nil {
 		return nil, err
 	}

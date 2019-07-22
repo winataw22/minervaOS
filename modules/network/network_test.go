@@ -1,13 +1,19 @@
 package network
 
 import (
+	"crypto/rand"
+	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"golang.org/x/crypto/ed25519"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/threefoldtech/zosv2/modules/crypto"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
 	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
 
@@ -180,31 +186,6 @@ func TestCreateNetwork(t *testing.T) {
 
 }
 
-func TestConfigureWG(t *testing.T) {
-	var (
-		network = networks[0]
-	)
-
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-
-	networker := &networker{
-		nodeID:     node1.NodeID,
-		storageDir: dir,
-	}
-
-	_, err = networker.GenerateWireguarKeyPair(network.NetID)
-	require.NoError(t, err)
-
-	defer func() {
-		_ = networker.DeleteNetResource(*network)
-		_ = os.RemoveAll(dir)
-	}()
-
-	err = networker.ApplyNetResource(*network)
-	require.NoError(t, err)
-}
-
 func mustParseCIDR(cidr string) *net.IPNet {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
@@ -212,4 +193,32 @@ func mustParseCIDR(cidr string) *net.IPNet {
 	}
 	ipnet.IP = ip
 	return ipnet
+}
+
+func TestKeys(t *testing.T) {
+	wgKey, err := wgtypes.GenerateKey()
+	require.NoError(t, err)
+
+	pk, sk, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	fmt.Println(wgKey.String())
+
+	encrypted, err := crypto.Encrypt([]byte(wgKey.String()), pk)
+	require.NoError(t, err)
+
+	strEncrypted := fmt.Sprintf("%x", encrypted)
+
+	strDecrypted := ""
+	fmt.Sscanf(strEncrypted, "%x", &strDecrypted)
+
+	decrypted, err := crypto.Decrypt([]byte(strDecrypted), sk)
+	require.NoError(t, err)
+
+	fmt.Println(string(decrypted))
+
+	wgKey2, err := wgtypes.ParseKey(string(decrypted))
+	require.NoError(t, err)
+
+	assert.Equal(t, wgKey, wgKey2)
 }

@@ -6,6 +6,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.12 // indirect
 	github.com/Microsoft/hcsshim v0.8.6 // indirect
 	github.com/NebulousLabs/entropy-mnemonics v0.0.0-20181203154559-bc7e13c5ccd8
+	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/cgroups v0.0.0-20190603164311-51b62d303d38 // indirect
 	github.com/containerd/containerd v1.2.3
@@ -22,6 +23,7 @@ require (
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/docker/go-events v0.0.0-20170721190031-9461782956ad // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/dspinhirne/netaddr-go v0.0.0-20180510133009-a6cfb692cb10
 	github.com/garyburd/redigo v1.6.0
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gogo/googleapis v1.2.0 // indirect
@@ -48,6 +50,7 @@ require (
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
+	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980 // indirect
 	golang.org/x/sys v0.0.0-20190614084037-d442b75600c5

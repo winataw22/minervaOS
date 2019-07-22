@@ -12,7 +12,8 @@ import (
 // to talk to a Tenant Network object database
 type TNoDB interface {
 	RegisterAllocation(farm identity.Identifier, allocation *net.IPNet) error
-	RequestAllocation(farm identity.Identifier) (*net.IPNet, error)
+	RequestAllocation(farm identity.Identifier) (*net.IPNet, *net.IPNet, error)
+	GetFarm(farm identity.Identifier) (Farm, error)
 
 	PublishInterfaces() error
 
@@ -21,14 +22,15 @@ type TNoDB interface {
 
 	SelectExitNode(node identity.Identifier) error
 
-	CreateNetwork(farmID string) (*modules.Network, error)
 	GetNetwork(netID modules.NetID) (*modules.Network, error)
-	JoinNetwork(node identity.Identifier, id modules.NetID, WGPort uint16, WGPubKey string) (*modules.Network, error)
-	AddUser(user identity.Identifier, id modules.NetID, WGPubKey string) (*modules.Network, error)
-
 	GetNetworksVersion(nodeID identity.Identifier) (versions map[modules.NetID]uint32, err error)
+}
 
-	PublishWireguarKey(key string, nodeID string, netID modules.NetID) error
+// Farm hold the ID, name and list of possible exit node of a farm
+type Farm struct {
+	ID        string   `json:"farm_id"`
+	Name      string   `json:"name"`
+	ExitNodes []string `json:"exit_nodes"`
 }
 
 // ErrNoPubIface is the error returns by ReadPubIface when no public

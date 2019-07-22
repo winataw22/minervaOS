@@ -10,14 +10,9 @@ import (
 
 //Networker is the interface for the network module
 type Networker interface {
-	GetNetwork(id NetID) (Network, error)
-	JoinNetwork(id NetID, WGPort uint16, WGPubKey string) (Network, error)
-
-	GenerateWireguarKeyPair(NetID) (string, error)
-	PublishWGPubKey(string, NetID) error
-
-	ApplyNetResource(Network) error
+	ApplyNetResource(Network) (string, error)
 	DeleteNetResource(Network) error
+	Namespace(NetID) (string, error)
 }
 
 // NetID is a type defining the ID of a network
@@ -149,7 +144,8 @@ type Wireguard struct {
 	Port uint16 `json:"port"`
 	// base64 encoded public key
 	// Key []byte
-	Key string `json:"key"`
+	Key        string `json:"key"`
+	PrivateKey string `json:"private_key"`
 }
 
 // ExitPoint represents the exit container(ns) hold as well a prefix as netresource as well

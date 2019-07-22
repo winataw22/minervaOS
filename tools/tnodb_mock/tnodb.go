@@ -13,15 +13,20 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func requestAllocation(farm string, store *allocationStore) (*net.IPNet, error) {
+func requestAllocation(farm string, store *allocationStore) (*net.IPNet, *net.IPNet, error) {
 	store.Lock()
 	defer store.Unlock()
 	farmAlloc, ok := store.Allocations[farm]
 	if !ok {
-		return nil, fmt.Errorf("farm %s does not have a prefix registered", farm)
+		return nil, nil, fmt.Errorf("farm %s does not have a prefix registered", farm)
 	}
 
-	return allocate(farmAlloc)
+	newAlloc, err := allocate(farmAlloc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return newAlloc, farmAlloc.Allocation, nil
 }
 
 func getNetworkZero(farm string, store *allocationStore) (*net.IPNet, int, error) {
@@ -53,7 +58,7 @@ func allocate(allocation *Allocation) (*net.IPNet, error) {
 	}
 
 	// random from 000f to subnetCount
-	// we never hand out the network 0 to f cause we keep it for 
+	// we never hand out the network 0 to f cause we keep it for
 	// adminstrative purposes (routing segment, mgmt, tunnel sources... )
 	nth := rand.Int63n(int64(subnetCount)-16) + 16
 	for {

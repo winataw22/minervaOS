@@ -1,17 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/provision"
 	"github.com/urfave/cli"
 )
 
-func createContainer(c *cli.Context) error {
+func generateContainer(c *cli.Context) error {
 
 	envs, err := splitEnvs(c.StringSlice("envs"))
 	if err != nil {
@@ -34,40 +31,22 @@ func createContainer(c *cli.Context) error {
 		},
 	}
 
-	fmt.Printf("reservation:\n%+v\n", container)
-	asn, err := confirm("do you want to reserve this container? [Y/n]")
-	if err != nil {
+	if err := validateContainer(container); err != nil {
 		return err
 	}
-	if asn != "y" {
-		return nil
-	}
 
-	raw, err := json.Marshal(container)
+	p, err := embed(container, provision.ContainerReservation)
 	if err != nil {
 		return err
 	}
 
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return err
-	}
-	r := provision.Reservation{
-		ID:   id.String(),
-		Type: provision.ContainerReservation,
-		Data: raw,
-	}
+	return output(c.GlobalString("output"), p)
+}
 
-	nodeID := c.Args().First()
-	if nodeID == "" {
-		return fmt.Errorf("missing argument, node ID must be specified")
+func validateContainer(c provision.Container) error {
+	if c.FList == "" {
+		return fmt.Errorf("flist cannot be empty")
 	}
-
-	if err := store.Reserve(r, identity.StrIdentifier(nodeID)); err != nil {
-		return err
-	}
-
-	fmt.Printf("container reservation sent\n")
 	return nil
 }
 

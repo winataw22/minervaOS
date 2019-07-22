@@ -104,3 +104,16 @@ func listFarm(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(farms)
 }
+
+func getFarm(w http.ResponseWriter, r *http.Request) {
+	farmID := mux.Vars(r)["farm_id"]
+	farm, ok := farmStore[farmID]
+	if !ok {
+		http.Error(w, fmt.Sprintf("farm %s not found", farmID), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(farm)
+}

@@ -81,9 +81,10 @@ func (p *Peer) UnmarshalJSON(b []byte) error {
 		Type       string `json:"type"`
 		Prefix     string `json:"prefix"`
 		Connection struct {
-			IP   string `json:"ip"`
-			Port uint16 `json:"port"`
-			Key  string `json:"key"`
+			IP         string `json:"ip"`
+			Port       uint16 `json:"port"`
+			Key        string `json:"key"`
+			PrivateKey string `json:"private_key"`
 		}
 	}{}
 
@@ -106,6 +107,7 @@ func (p *Peer) UnmarshalJSON(b []byte) error {
 	p.Connection.IP = net.ParseIP(tmp.Connection.IP)
 	p.Connection.Port = tmp.Connection.Port
 	p.Connection.Key = tmp.Connection.Key
+	p.Connection.PrivateKey = tmp.Connection.PrivateKey
 
 	return nil
 }
@@ -118,9 +120,10 @@ func (p *Peer) MarshalJSON() ([]byte, error) {
 	}
 
 	type Connection struct {
-		IP   string `json:"ip"`
-		Port uint16 `json:"port"`
-		Key  string `json:"key"`
+		IP         string `json:"ip"`
+		Port       uint16 `json:"port"`
+		Key        string `json:"key"`
+		PrivateKey string `json:"private_key"`
 	}
 	tmp := struct {
 		Type       string `json:"type"`
@@ -130,9 +133,10 @@ func (p *Peer) MarshalJSON() ([]byte, error) {
 		Type:   "wireguard",
 		Prefix: p.Prefix.String(),
 		Connection: Connection{
-			IP:   p.Connection.IP.String(),
-			Port: p.Connection.Port,
-			Key:  p.Connection.Key,
+			IP:         p.Connection.IP.String(),
+			Port:       p.Connection.Port,
+			Key:        p.Connection.Key,
+			PrivateKey: p.Connection.PrivateKey,
 		},
 	}
 

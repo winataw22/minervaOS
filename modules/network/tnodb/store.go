@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httputil"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network"
 
@@ -60,11 +60,11 @@ func (s *httpTNoDB) RegisterAllocation(farm identity.Identifier, allocation *net
 	return nil
 }
 
-func (s *httpTNoDB) RequestAllocation(farm identity.Identifier) (*net.IPNet, error) {
+func (s *httpTNoDB) RequestAllocation(farm identity.Identifier) (*net.IPNet, *net.IPNet, error) {
 	url := fmt.Sprintf("%s/%s/%s", s.baseURL, "allocations", farm.Identity())
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
@@ -74,22 +74,42 @@ func (s *httpTNoDB) RequestAllocation(farm identity.Identifier) (*net.IPNet, err
 			panic(err)
 		}
 		fmt.Printf("%+v", string(b))
-		return nil, fmt.Errorf("wrong response status code received: %v", resp.Status)
+		return nil, nil, fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}
 
 	data := struct {
-		Alloc string `json:"allocation"`
+		Alloc     string `json:"allocation"`
+		FarmAlloc string `json:"farm_allocation"`
 	}{}
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, alloc, err := net.ParseCIDR(data.Alloc)
 	if err != nil {
-		return nil, err
+		return nil, nil, errors.Wrap(err, "failed to parse network allocation")
+	}
+	_, farmAlloc, err := net.ParseCIDR(data.FarmAlloc)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to parse farm allocation")
 	}
 
-	return alloc, nil
+	return alloc, farmAlloc, nil
+}
+
+func (s *httpTNoDB) GetFarm(farm identity.Identifier) (network.Farm, error) {
+	f := network.Farm{}
+
+	url := fmt.Sprintf("%s/farms/%s", s.baseURL, farm.Identity())
+	resp, err := http.Get(url)
+	if err != nil {
+		return f, err
+	}
+	defer resp.Body.Close()
+
+	err = json.NewDecoder(resp.Body).Decode(&f)
+
+	return f, err
 }
 
 func (s *httpTNoDB) PublishInterfaces() error {
@@ -269,30 +289,6 @@ func (s *httpTNoDB) ReadPubIface(node identity.Identifier) (*network.PubIface, e
 	return exitIface, nil
 }
 
-func (s *httpTNoDB) PublishWireguarKey(key string, nodeID string, netID modules.NetID) error {
-	url := fmt.Sprintf("%s/networks/%s/%s/wgkeys", s.baseURL, netID, nodeID)
-	buf := &bytes.Buffer{}
-
-	output := struct {
-		Key string `json:"key"`
-	}{Key: key}
-
-	if err := json.NewEncoder(buf).Encode(output); err != nil {
-		return err
-	}
-
-	resp, err := http.Post(url, "application/json", buf)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("wrong response status received: %s", resp.Status)
-	}
-
-	return nil
-}
-
 func (s *httpTNoDB) GetNetwork(netid modules.NetID) (*modules.Network, error) {
 	url := fmt.Sprintf("%s/networks/%s", s.baseURL, string(netid))
 	resp, err := http.Get(url)
@@ -302,127 +298,17 @@ func (s *httpTNoDB) GetNetwork(netid modules.NetID) (*modules.Network, error) {
 
 	defer resp.Body.Close()
 
-	network := &modules.Network{}
-	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
-		return nil, err
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("network not found")
 	}
-	return network, nil
-}
-
-func (s *httpTNoDB) CreateNetwork(farmID string) (*modules.Network, error) {
-	networkReq := struct {
-		ExitFarm string `json:"exit_farm"`
-	}{ExitFarm: farmID}
-
-	buf := &bytes.Buffer{}
-
-	if err := json.NewEncoder(buf).Encode(networkReq); err != nil {
-		return nil, err
-	}
-
-	url := fmt.Sprintf("%s/networks", s.baseURL)
-	resp, err := http.Post(url, "application/json", buf)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("wrong response status received: %s %s", resp.Status, string(body))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("wrong response status code %s", resp.Status)
 	}
 
 	network := &modules.Network{}
 	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
-		log.Error().Err(err).Msg("failed to decode network json")
 		return nil, err
 	}
-
-	return network, nil
-}
-
-func (s *httpTNoDB) JoinNetwork(nodeID identity.Identifier, id modules.NetID, WGPort uint16, WGPubKey string) (*modules.Network, error) {
-
-	req := struct {
-		WGPort   uint16 `json:"wg_port"`
-		WGPubKey string `json:"wg_public_key"`
-		NodeID   string `json:"node_id"`
-	}{
-		WGPort:   WGPort,
-		WGPubKey: WGPubKey,
-		NodeID:   nodeID.Identity(),
-	}
-
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(req); err != nil {
-		return nil, err
-	}
-
-	url := fmt.Sprintf("%s/networks/%s", s.baseURL, id)
-	resp, err := http.Post(url, "application/json", buf)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("wrong response status received: %s %s", resp.Status, string(body))
-	}
-
-	network := &modules.Network{}
-	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
-		log.Error().Err(err).Msg("failed to decode network json")
-		return nil, err
-	}
-
-	return network, nil
-}
-
-func (s *httpTNoDB) AddUser(user identity.Identifier, id modules.NetID, WGPubKey string) (*modules.Network, error) {
-
-	req := struct {
-		WGPubKey string `json:"wg_public_key"`
-		UserID   string `json:"user_id"`
-	}{
-		WGPubKey: WGPubKey,
-		UserID:   user.Identity(),
-	}
-
-	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(req); err != nil {
-		return nil, err
-	}
-
-	url := fmt.Sprintf("%s/networks/%s/user", s.baseURL, id)
-	resp, err := http.Post(url, "application/json", buf)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("wrong response status received: %s %s", resp.Status, string(body))
-	}
-
-	network := &modules.Network{}
-	if err := json.NewDecoder(resp.Body).Decode(network); err != nil {
-		log.Error().Err(err).Msg("failed to decode network json")
-		return nil, err
-	}
-
 	return network, nil
 }
 
