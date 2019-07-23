@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
@@ -127,8 +128,15 @@ func (s *httpTNoDB) PublishInterfaces() error {
 	}
 
 	for _, link := range ifaceutil.LinkFilter(links, []string{"device", "bridge"}) {
-		if !ifaceutil.IsPlugged(link.Attrs().Name) {
-			log.Info().Msgf("not plugged %s", link.Attrs().Name)
+
+		// TODO: see if we need to set the if down
+		if err := netlink.LinkSetUp(link); err != nil {
+			log.Info().Str("interface", link.Attrs().Name).Msg("failed to bring interface up")
+			continue
+		}
+
+		if !ifaceutil.IsVirtEth(link.Attrs().Name) && !ifaceutil.IsPluggedTimeout(link.Attrs().Name, time.Second*5) {
+			log.Info().Str("interface", link.Attrs().Name).Msg("interface is not plugged in, skipping")
 			continue
 		}
 

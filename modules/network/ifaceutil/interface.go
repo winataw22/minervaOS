@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -38,6 +39,27 @@ func IsPlugged(inf string) bool {
 	}
 	data = bytes.TrimSpace(data)
 	return string(data) == "1"
+}
+
+// IsPluggedTimeout is like IsPlugged but retry for duration time before returning
+func IsPluggedTimeout(name string, duration time.Duration) bool {
+	plugged := false
+	c := time.After(duration)
+	for out := false; out == false; {
+		select {
+		case <-c:
+			out = true
+			break
+		default:
+			plugged = IsPlugged(name)
+			if plugged {
+				out = true
+				break
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	return plugged
 }
 
 // IsVirtEth tests if an interface is a veth

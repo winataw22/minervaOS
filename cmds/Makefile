@@ -1,13 +1,10 @@
-MK_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-OUT = $(shell realpath -m $(MK_DIR)/../bin)
-MODULES = $(shell find $(MK_DIR) -maxdepth 1 -type d -not -name .)
-
-all: $(MODULES)
-	strip $(OUT)/*
-
+OUT = ../../bin
 
 # _base is a hack to only build modules that we know are building atm
 _base: contd flistd storaged upgraded networkd identityd provisiond
+
+all: _base
+	strip $(OUT)/*
 
 .PHONY: output clean
 

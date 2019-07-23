@@ -17,6 +17,7 @@ const redisSocket = "unix:///var/run/redis.sock"
 
 var root = flag.String("root", "/var/modules/upgrade", "root path of the module")
 var broker = flag.String("broker", redisSocket, "connection string to broker")
+var url = flag.String("url", "https://versions.dev.grid.tf", "url of the upgrade server")
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -36,11 +37,11 @@ func main() {
 	}
 
 	// watcher := upgrade.NewPeriodicWatcher(10 * time.Second)
-	publisher := upgrade.NewHTTPPublisher("http://172.20.0.1:8000")
+	publisher := upgrade.NewHTTPPublisher(*url)
 
 	log.Info().Msg("start upgrade daemon")
 
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Minute * 10)
 
 	for range ticker.C {
 		if err := u.Upgrade(publisher); err != nil {

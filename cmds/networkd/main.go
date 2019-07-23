@@ -98,12 +98,6 @@ func main() {
 		}
 	}(ctx, chIface)
 
-	// watcher := network.NewWatcher(nodeID, db)
-	// chNetID := watcher.Watch(ctx)
-	// go networkConfigWorker(ctx, chNetID, networker)
-
-	// time.Sleep(time.Second * 5)
-
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Error().Err(err).Msg("fail to start networkd")
 	}
@@ -114,11 +108,13 @@ func bootstrap() error {
 
 		z := zinit.New("")
 		if err := z.Connect(); err != nil {
+			log.Error().Err(err).Msg("fail to connect to zinit")
 			return err
 		}
 
 		log.Info().Msg("Start network bootstrap")
 		if err := network.Bootstrap(); err != nil {
+			log.Error().Err(err).Msg("fail to boostrap network")
 			return err
 		}
 
@@ -130,10 +126,15 @@ func bootstrap() error {
 			After:   []string{},
 		})
 		if err != nil {
+			log.Error().Err(err).Msg("fail to create dhcp_zos zinit service")
 			return err
 		}
 
-		return z.Monitor("dhcp_zos")
+		if err := z.Monitor("dhcp_zos"); err != nil {
+			log.Error().Err(err).Msg("fail to start monitoring dhcp_zos zinit service")
+			return err
+		}
+		return nil
 	}
 
 	errHandler := func(err error, t time.Duration) {
@@ -174,41 +175,4 @@ func startServer(ctx context.Context, broker string, networker modules.Networker
 		Msg("starting networkd module")
 
 	return server.Run(context.Background())
-}
-
-func networkConfigWorker(ctx context.Context, c <-chan modules.NetID, networker modules.Networker) {
-	var (
-		netID modules.NetID
-		nw    modules.Network
-		err   error
-	)
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info().Msg("network config worker done")
-			return
-
-		case netID = <-c:
-			nw, err = networker.GetNetwork(netID)
-			if err != nil {
-				log.Error().
-					Str("network ID", string(netID)).
-					Err(err).
-					Msg("failed to read network")
-				continue
-			}
-		}
-
-		log.Info().
-			Str("network ID", string(netID)).
-			Msg("configuring network")
-
-		if err := networker.ApplyNetResource(nw); err != nil {
-			log.Error().
-				Str("network ID", string(netID)).
-				Err(err).
-				Msg("failed to configure network")
-		}
-	}
 }

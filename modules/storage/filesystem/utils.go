@@ -34,6 +34,27 @@ func getMountTarget(device string) (string, bool) {
 	return "", false
 }
 
+// IsPathMounted checks if a path is mounted on a disk
+func IsPathMounted(path string) bool {
+	file, err := os.Open("/proc/mounts")
+	if err != nil {
+		panic(fmt.Errorf("failed to read /proc/mounts: %s", err))
+	}
+
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if fields[1] == path {
+			return true
+		}
+	}
+
+	return false
+}
+
 // BindMount remounts an existing directory in a given target using the mount
 // syscall with the BIND flag set
 func BindMount(src Volume, target string) error {

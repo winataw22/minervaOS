@@ -8,13 +8,12 @@ env:
 
 
 install:
-- echo $(pwd); ls *
-- cd modules
-- make getdeps
+- pushd modules && make getdeps && popd
 
 script:
-- make verifiers
-- make build
+- pushd modules && make getdeps && popd
+- pushd modules && make getdeps && popd
+- pushd cmds && make && popd
 
 # after_success:
 # - bash <(curl -s https://codecov.io/bash)
