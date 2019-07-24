@@ -15,14 +15,11 @@ import (
 
 func cmdsProvision(c *cli.Context) error {
 	var (
-		schema []byte
-		path   = c.String("schema")
-		nodeID = c.String("node")
-		err    error
+		schema  []byte
+		path    = c.String("schema")
+		nodeIDs = c.StringSlice("node")
+		err     error
 	)
-	if nodeID == "" {
-		return fmt.Errorf("node ID cannot be empty")
-	}
 
 	if path == "-" {
 		schema, err = ioutil.ReadAll(os.Stdin)
@@ -48,8 +45,11 @@ func cmdsProvision(c *cli.Context) error {
 		return err
 	}
 
-	if err := store.Reserve(r, identity.StrIdentifier(nodeID)); err != nil {
-		return err
+	for _, nodeID := range nodeIDs {
+		if err := store.Reserve(r, identity.StrIdentifier(nodeID)); err != nil {
+			return err
+		}
+		fmt.Printf("reservation send for node %s\n", nodeID)
 	}
 
 	return nil

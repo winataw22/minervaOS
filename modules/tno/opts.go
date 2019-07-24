@@ -69,7 +69,7 @@ func ConfigurePrefixZero(farmAllocation *net.IPNet) Opts {
 // nodeID is the ID of the node used as exit point
 // allocation if the /64 allocation for the exit resource
 // key is the wireguard key pair for the wiregard exit peer
-func ConfigureExitResource(nodeID string, allocation *net.IPNet, key wgtypes.Key, farmAllocSize int) Opts {
+func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP, key wgtypes.Key, farmAllocSize int) Opts {
 	return func(n *modules.Network) error {
 		if n.PrefixZero == nil {
 			return fmt.Errorf("cannot add a node when the network object does not have a PrefixZero set")
@@ -90,7 +90,7 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, key wgtypes.Key
 			Type:   modules.ConnTypeWireguard,
 			Prefix: allocation,
 			Connection: modules.Wireguard{
-				IP:         exitNibble.IP(n.PrefixZero.IP),
+				IP:         publicIP,
 				Port:       1600,
 				Key:        key.PublicKey().String(),
 				PrivateKey: fmt.Sprintf("%x", privateKey),
@@ -129,7 +129,7 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, key wgtypes.Key
 
 // AddNode adds a network resource to the TNO
 // if the node is a publicly accessible node, publicIP and port needs to be not nil
-func AddNode(nodeID string, allocation *net.IPNet, key wgtypes.Key, publicIP net.IP, port uint16) Opts {
+func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Key, publicIP net.IP, port uint16) Opts {
 	return func(n *modules.Network) error {
 
 		if n.PrefixZero == nil {
@@ -160,8 +160,8 @@ func AddNode(nodeID string, allocation *net.IPNet, key wgtypes.Key, publicIP net
 
 		resource := &modules.NetResource{
 			NodeID: &modules.NodeID{
-				ID: nodeID,
-				// FarmerID:       ,
+				ID:             nodeID,
+				FarmerID:       farmID,
 				ReachabilityV6: v6Reach,
 				ReachabilityV4: modules.ReachabilityV4Hidden, //TODO change once we support ipv4 public nodes
 			},

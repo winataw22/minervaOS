@@ -46,7 +46,7 @@ func getNetworkZero(farm string, store *allocationStore) (*net.IPNet, int, error
 	return convert(subnet), allocSize, nil
 }
 
-func allocate(allocation *Allocation) (*net.IPNet, error) {
+func allocate(allocation *allocation) (*net.IPNet, error) {
 	ipv6net, err := netaddr.ParseIPv6Net(allocation.Allocation.String())
 	if err != nil {
 		return nil, err

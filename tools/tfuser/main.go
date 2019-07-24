@@ -31,9 +31,10 @@ func main() {
 		},
 
 		cli.StringFlag{
-			Name:  "tnodb, u",
-			Usage: "URL of the TNODB",
-			Value: "https://tnodb.dev.grid.tf",
+			Name:   "tnodb, u",
+			Usage:  "URL of the TNODB",
+			Value:  "https://tnodb.dev.grid.tf",
+			EnvVar: "TNODB_URL",
 		},
 
 		cli.StringFlag{
@@ -81,12 +82,8 @@ func main() {
 							Usage: "create a new user network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
-									Name:  "farm",
-									Usage: "ID of the exit farm to use for this network",
-								},
-								cli.StringSliceFlag{
 									Name:  "node",
-									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
+									Usage: "node ID of the exit node to use for this network",
 								},
 							},
 							Action: cmdCreateNetwork,
@@ -95,13 +92,13 @@ func main() {
 							Name:  "add",
 							Usage: "add a node to a existing network",
 							Flags: []cli.Flag{
-								cli.StringFlag{
-									Name:  "network",
-									Usage: "ID of the network",
-								},
 								cli.StringSliceFlag{
 									Name:  "node",
 									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
+								},
+								cli.UintFlag{
+									Name:  "port",
+									Usage: "wireguard listenting point, only specify if the node is public",
 								},
 							},
 							Action: cmdsAddNode,
@@ -110,10 +107,6 @@ func main() {
 							Name:  "user",
 							Usage: "add a user to a private network. Use this command if you want to be able to connect to a network from your own computer",
 							Flags: []cli.Flag{
-								cli.StringFlag{
-									Name:  "network",
-									Usage: "ID of the network",
-								},
 								cli.StringFlag{
 									Name:  "user",
 									Usage: "user ID, if not specified, a user ID will be generated automatically",
@@ -187,7 +180,7 @@ func main() {
 					Usage: "path to the provisioning schema, use - to read from stdin",
 					Value: "provision.json",
 				},
-				cli.StringFlag{
+				cli.StringSliceFlag{
 					Name:  "node",
 					Usage: "Node ID where to deploy the workload",
 				},

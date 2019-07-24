@@ -16,6 +16,7 @@ type TNoDB interface {
 	GetFarm(farm identity.Identifier) (Farm, error)
 
 	PublishInterfaces() error
+	GetNode(identity.Identifier) (*Node, error)
 
 	ConfigurePublicIface(node identity.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error
 	ReadPubIface(node identity.Identifier) (*PubIface, error)

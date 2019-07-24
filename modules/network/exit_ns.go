@@ -28,40 +28,6 @@ const (
 // the public namespace is currently uniq for a node so we hardcode its name
 const PublicNamespace = "public"
 
-// type ExitNode struct {
-// 	PublicPrefix *net.IPNet
-// }
-
-// IfaceType define the different public interface
-// supported
-type IfaceType string
-
-const (
-	//VlanIface means we use vlan for the public interface
-	VlanIface IfaceType = "vlan"
-	//MacVlanIface means we use macvlan for the public interface
-	MacVlanIface IfaceType = "macvlan"
-)
-
-// PubIface is the configuration of the interface
-// that is connected to the public internet
-type PubIface struct {
-	Master string
-	// Type define if we need to use
-	// the Vlan field or the MacVlan
-	Type IfaceType
-	Vlan int16
-	// Macvlan net.HardwareAddr
-
-	IPv4 *net.IPNet
-	IPv6 *net.IPNet
-
-	GW4 net.IP
-	GW6 net.IP
-
-	Version int
-}
-
 // CreatePublicNS creates a public namespace in a node
 func CreatePublicNS(iface *PubIface) error {
 	// create net ns

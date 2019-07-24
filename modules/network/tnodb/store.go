@@ -113,13 +113,34 @@ func (s *httpTNoDB) GetFarm(farm identity.Identifier) (network.Farm, error) {
 	return f, err
 }
 
-func (s *httpTNoDB) PublishInterfaces() error {
-	type ifaceInfo struct {
-		Name    string   `json:"name"`
-		Addrs   []string `json:"addrs"`
-		Gateway []string `json:"gateway"`
+func (s *httpTNoDB) GetNode(nodeID identity.Identifier) (*network.Node, error) {
+
+	url := fmt.Sprintf("%s/nodes/%s", s.baseURL, nodeID.Identity())
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
 	}
-	output := []ifaceInfo{}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("node %s node found", nodeID.Identity())
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("wrong response status: %v", resp.Status)
+	}
+
+	node := &network.Node{}
+	if err := json.NewDecoder(resp.Body).Decode(&node); err != nil {
+		return nil, err
+	}
+
+	return node, nil
+}
+
+func (s *httpTNoDB) PublishInterfaces() error {
+	output := []*network.IfaceInfo{}
 
 	links, err := netlink.LinkList()
 	if err != nil {
@@ -145,22 +166,25 @@ func (s *httpTNoDB) PublishInterfaces() error {
 			return err
 		}
 
-		addrs, err := linkAddrs(link)
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 		if err != nil {
 			return err
 		}
 
-		info := ifaceInfo{
+		info := &network.IfaceInfo{
 			Name:  link.Attrs().Name,
-			Addrs: addrs,
+			Addrs: make([]*net.IPNet, len(addrs)),
 		}
+		for i, addr := range addrs {
+			info.Addrs[i] = addr.IPNet
+		}
+
 		if gw != nil {
-			info.Gateway = []string{gw.String()}
+			info.Gateway = append(info.Gateway, gw)
 		}
+
 		output = append(output, info)
 	}
-
-	log.Info().Msgf("%+v", output)
 
 	nodeID, err := identity.LocalNodeID()
 	if err != nil {
@@ -177,6 +201,7 @@ func (s *httpTNoDB) PublishInterfaces() error {
 	if err != nil {
 		return err
 	}
+
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("wrong response status received: %s", resp.Status)
@@ -237,13 +262,8 @@ func (s *httpTNoDB) SelectExitNode(node identity.Identifier) error {
 
 func (s *httpTNoDB) ReadPubIface(node identity.Identifier) (*network.PubIface, error) {
 
-	input := struct {
-		Master  string
-		IPv4    string
-		IPv6    string
-		GW4     string
-		GW6     string
-		Version int
+	iface := &struct {
+		PublicConfig *network.PubIface `json:"public_config"`
 	}{}
 
 	url := fmt.Sprintf("%s/nodes/%s", s.baseURL, node.Identity())
@@ -261,40 +281,15 @@ func (s *httpTNoDB) ReadPubIface(node identity.Identifier) (*network.PubIface, e
 		return nil, fmt.Errorf("wrong response status: %v", resp.Status)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&iface); err != nil {
 		return nil, err
 	}
 
-	exitIface := &network.PubIface{}
-	exitIface.Version = input.Version
-	exitIface.Master = input.Master
-	exitIface.Type = network.MacVlanIface
-	if input.IPv4 != "" {
-		ip, ipnet, err := net.ParseCIDR(input.IPv4)
-		if err != nil {
-			return nil, err
-		}
-		ipnet.IP = ip
-		exitIface.IPv4 = ipnet
-	}
-	if input.IPv6 != "" {
-		ip, ipnet, err := net.ParseCIDR(input.IPv6)
-		if err != nil {
-			return nil, err
-		}
-		ipnet.IP = ip
-		exitIface.IPv6 = ipnet
-	}
-	if input.GW4 != "" {
-		gw := net.ParseIP(input.GW4)
-		exitIface.GW4 = gw
-	}
-	if input.GW6 != "" {
-		gw := net.ParseIP(input.GW6)
-		exitIface.GW6 = gw
+	if iface.PublicConfig == nil {
+		return nil, network.ErrNoPubIface
 	}
 
-	return exitIface, nil
+	return iface.PublicConfig, nil
 }
 
 func (s *httpTNoDB) GetNetwork(netid modules.NetID) (*modules.Network, error) {
@@ -334,16 +329,4 @@ func (s *httpTNoDB) GetNetworksVersion(nodeID identity.Identifier) (map[modules.
 	}
 
 	return versions, nil
-}
-
-func linkAddrs(l netlink.Link) ([]string, error) {
-	addrs, err := netlink.AddrList(l, netlink.FAMILY_ALL)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]string, 0, len(addrs))
-	for _, addr := range addrs {
-		output = append(output, addr.IPNet.String())
-	}
-	return output, nil
 }

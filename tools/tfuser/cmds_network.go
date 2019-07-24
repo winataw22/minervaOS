@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/threefoldtech/zosv2/modules/provision"
@@ -14,7 +15,7 @@ import (
 )
 
 func cmdCreateNetwork(c *cli.Context) error {
-	network, err := createNetwork(c.String("farm"))
+	network, err := createNetwork(c.String("node"))
 	if err != nil {
 		return err
 	}
@@ -31,17 +32,17 @@ func cmdsAddNode(c *cli.Context) error {
 	var (
 		network = &modules.Network{}
 		input   = c.GlobalString("input")
-		netID   = c.String("network")
+		port    = c.Uint("port")
 		err     error
 	)
 
-	network, err = loadNetwork(input, netID)
+	network, err = loadNetwork(input)
 	if err != nil {
 		return err
 	}
 
 	for _, nodeID := range c.StringSlice("node") {
-		network, err = addNode(network, nodeID, "", 0)
+		network, err = addNode(network, nodeID, uint16(port))
 		if err != nil {
 			return errors.Wrap(err, "failed to add the node into the network object")
 		}
@@ -58,7 +59,6 @@ func cmdsAddUser(c *cli.Context) error {
 	var (
 		network = &modules.Network{}
 		input   = c.GlobalString("input")
-		netID   = c.String("network")
 		userID  = c.String("user")
 		err     error
 	)
@@ -71,7 +71,7 @@ func cmdsAddUser(c *cli.Context) error {
 		userID = k.Identity()
 	}
 
-	network, err = loadNetwork(input, netID)
+	network, err = loadNetwork(input)
 	if err != nil {
 		return err
 	}
@@ -89,26 +89,25 @@ func cmdsAddUser(c *cli.Context) error {
 	return output(c.GlobalString("output"), r)
 }
 
-func loadNetwork(name, netID string) (network *modules.Network, err error) {
+func loadNetwork(name string) (network *modules.Network, err error) {
 	network = &modules.Network{}
 
-	if name != "" {
-		f, err := os.Open(name)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
+	if name == "" {
+		return nil, fmt.Errorf("schema name cannot be empty")
+	}
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-		r := &provision.Reservation{}
-		if err := json.NewDecoder(f).Decode(r); err != nil {
-			return nil, errors.Wrapf(err, "failed to decode json encoded reservation at %s", name)
-		}
-
-		if err := json.Unmarshal(r.Data, network); err != nil {
-			return nil, errors.Wrapf(err, "failed to decode json encoded network at %s", name)
-		}
-		return network, nil
+	r := &provision.Reservation{}
+	if err := json.NewDecoder(f).Decode(r); err != nil {
+		return nil, errors.Wrapf(err, "failed to decode json encoded reservation at %s", name)
 	}
 
-	return db.GetNetwork(modules.NetID(netID))
+	if err := json.Unmarshal(r.Data, network); err != nil {
+		return nil, errors.Wrapf(err, "failed to decode json encoded network at %s", name)
+	}
+	return network, nil
 }

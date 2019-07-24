@@ -5,20 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/threefoldtech/zosv2/modules/provision"
 )
-
-type reservation struct {
-	Reservation *provision.Reservation
-	Sent        bool
-}
-
-var reservationStore map[string][]*reservation
-var reservationMu sync.Mutex
 
 func reserve(w http.ResponseWriter, r *http.Request) {
 	nodeID := mux.Vars(r)["node_id"]
@@ -36,9 +27,9 @@ func reserve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reservationMu.Lock()
-	defer reservationMu.Unlock()
-	reservationStore[nodeID] = append(reservationStore[nodeID], &reservation{Reservation: res})
+	provStore.Lock()
+	defer provStore.Unlock()
+	provStore.Reservations[nodeID] = append(provStore.Reservations[nodeID], &reservation{Reservation: res})
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -77,10 +68,10 @@ func getReservations(w http.ResponseWriter, r *http.Request) {
 func getRes(nodeID string) []*provision.Reservation {
 	output := []*provision.Reservation{}
 
-	reservationMu.Lock()
-	defer reservationMu.Unlock()
+	provStore.Lock()
+	defer provStore.Unlock()
 
-	rs, ok := reservationStore[nodeID]
+	rs, ok := provStore.Reservations[nodeID]
 	if ok {
 		for _, res := range rs {
 			if !res.Sent {

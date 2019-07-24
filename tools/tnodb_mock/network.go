@@ -12,7 +12,7 @@ import (
 )
 
 func registerIfaces(w http.ResponseWriter, r *http.Request) {
-	log.Println("ifaces register request received")
+	log.Println("network interfaces register request received")
 
 	nodeID := mux.Vars(r)["node_id"]
 	if _, ok := nodeStore[nodeID]; !ok {
@@ -24,14 +24,14 @@ func registerIfaces(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	ifaces := []ifaceInfo{}
+	ifaces := []*network.IfaceInfo{}
 	if err := json.NewDecoder(r.Body).Decode(&ifaces); err != nil {
 		log.Printf(err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Println("ifaces received", ifaces)
+	fmt.Println("network interfaces received", ifaces)
 
 	nodeStore[nodeID].Ifaces = ifaces
 	w.WriteHeader(http.StatusCreated)
@@ -50,6 +50,9 @@ func chooseExit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("farm id %s not found", node.FarmID), http.StatusNotFound)
 		return
 	}
+
+	// mark the node as possible exit node
+	node.ExitNode = true
 
 	// add the node id to the list of possible exit node of the farm
 	var found = false
@@ -92,16 +95,11 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO verify the iface sent by user actually exists
-	var exitIface *network.PubIface
-	exitIface, ok = exitIfaces[nodeID]
-	if !ok {
-		exitIface = &network.PubIface{}
-		exitIfaces[nodeID] = exitIface
+	if node.PublicConfig == nil {
+		node.PublicConfig = &network.PubIface{}
 	}
 
-	exitIface.Version++
-	exitIface.Master = input.Iface
+	node.PublicConfig.Master = input.Iface
 	for i := range input.IPs {
 		ip, ipnet, err := net.ParseCIDR(input.IPs[i])
 		if err != nil {
@@ -111,18 +109,19 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		ipnet.IP = ip
 
 		if ip.To4() != nil {
-			exitIface.IPv4 = ipnet
+			node.PublicConfig.IPv4 = ipnet
 		} else if ip.To16() != nil {
-			exitIface.IPv6 = ipnet
+			node.PublicConfig.IPv6 = ipnet
 		}
 
 		gw := net.ParseIP(input.GWs[i])
 		if gw.To4() != nil {
-			exitIface.GW4 = gw
+			node.PublicConfig.GW4 = gw
 		} else if gw.To16() != nil {
-			exitIface.GW6 = gw
+			node.PublicConfig.GW6 = gw
 		}
 	}
+	node.PublicConfig.Version++
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -158,7 +157,7 @@ func registerAlloc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allocStore.Allocations[req.FarmerID] = &Allocation{
+	allocStore.Allocations[req.FarmerID] = &allocation{
 		Allocation: prefix,
 	}
 	w.WriteHeader(http.StatusCreated)
@@ -206,43 +205,4 @@ func getAlloc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(&data)
-}
-
-func getNetwork(w http.ResponseWriter, r *http.Request) {
-	netid := mux.Vars(r)["netid"]
-
-	network, ok := networkStore[netid]
-	if !ok {
-		http.Error(w, fmt.Sprintf("network not found"), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(network.Network)
-}
-
-func getNetworksVersion(w http.ResponseWriter, r *http.Request) {
-	nodeID := mux.Vars(r)["node_id"]
-
-	if !nodeExist(nodeID) {
-		http.Error(w, fmt.Sprintf("node %s not found", nodeID), http.StatusNotFound)
-		return
-	}
-
-	output := make(map[string]uint32)
-
-	for nwID, nw := range networkStore {
-		for _, nr := range nw.Network.Resources {
-			if nr.NodeID.ID == nodeID {
-				output[nwID] = nw.Network.Version
-			}
-		}
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(output); err != nil {
-		log.Printf("error encoding network versions: %v\n", err)
-	}
 }

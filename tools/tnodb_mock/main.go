@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -15,74 +14,42 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network"
+	"github.com/threefoldtech/zosv2/modules/provision"
 )
 
-type NodeInfo struct {
-	NodeID string `json:"node_id"`
-	FarmID string `json:"farm_id"`
-
-	Ifaces []ifaceInfo
-}
-
-type ifaceInfo struct {
-	Name    string   `json:"name"`
-	Addrs   []string `json:"addrs"`
-	Gateway []string `json:"gateway"`
-}
-
-func (i ifaceInfo) DefaultIP() (net.IP, error) {
-	if len(i.Gateway) <= 0 {
-		return nil, fmt.Errorf("iterface has not gateway")
-	}
-
-	for _, addr := range i.Addrs {
-		ip, _, err := net.ParseCIDR(addr)
-		if err != nil {
-			continue
-		}
-		if ip.IsLinkLocalUnicast() ||
-			ip.IsLinkLocalMulticast() ||
-			ip.To4() != nil {
-			continue
-		}
-
-		if ip.To16() != nil {
-			return ip, nil
-		}
-	}
-	return nil, fmt.Errorf("no ipv6 address with default gateway")
-}
-
-type FarmInfo struct {
+type farmInfo struct {
 	ID        string   `json:"farm_id"`
 	Name      string   `json:"name"`
 	ExitNodes []string `json:"exit_nodes"`
 }
 
-type NetworkInfo struct {
-	Network   *modules.Network
-	ExitPoint *modules.ExitPoint
+type reservation struct {
+	Reservation *provision.Reservation
+	Sent        bool
 }
 
-var (
-	nodeStore    map[string]*NodeInfo
-	exitIfaces   map[string]*network.PubIface
-	farmStore    map[string]*FarmInfo
-	networkStore map[string]*NetworkInfo
-	allocStore   *allocationStore
-)
+type provisionStore struct {
+	sync.Mutex
+	Reservations map[string][]*reservation `json:"reservations"`
+}
 
 type allocationStore struct {
 	sync.Mutex
-	Allocations map[string]*Allocation `json:"allocations"`
+	Allocations map[string]*allocation `json:"allocations"`
 }
 
-type Allocation struct {
+type allocation struct {
 	Allocation *net.IPNet
 	SubNetUsed []uint64
 }
+
+var (
+	nodeStore  map[string]*network.Node
+	farmStore  map[string]*farmInfo
+	allocStore *allocationStore
+	provStore  *provisionStore
+)
 
 var listen string
 
@@ -91,12 +58,10 @@ func main() {
 
 	flag.Parse()
 
-	nodeStore = make(map[string]*NodeInfo)
-	exitIfaces = make(map[string]*network.PubIface)
-	farmStore = make(map[string]*FarmInfo)
-	networkStore = make(map[string]*NetworkInfo)
-	allocStore = &allocationStore{Allocations: make(map[string]*Allocation)}
-	reservationStore = make(map[string][]*reservation)
+	nodeStore = make(map[string]*network.Node)
+	farmStore = make(map[string]*farmInfo)
+	allocStore = &allocationStore{Allocations: make(map[string]*allocation)}
+	provStore = &provisionStore{Reservations: make(map[string][]*reservation)}
 
 	if err := load(); err != nil {
 		log.Fatalf("failed to load data: %v\n", err)
@@ -115,6 +80,7 @@ func main() {
 	router.HandleFunc("/nodes/{node_id}/configure_public", configurePublic).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}/select_exit", chooseExit).Methods("POST")
 	router.HandleFunc("/nodes", listNodes).Methods("GET")
+
 	router.HandleFunc("/farms", registerFarm).Methods("POST")
 	router.HandleFunc("/farms", listFarm).Methods("GET")
 	router.HandleFunc("/farms/{farm_id}", getFarm).Methods("GET")
@@ -122,7 +88,6 @@ func main() {
 	router.HandleFunc("/allocations", registerAlloc).Methods("POST")
 	router.HandleFunc("/allocations", listAlloc).Methods("GET")
 	router.HandleFunc("/allocations/{farm_id}", getAlloc).Methods("GET")
-	router.HandleFunc("/networks/{netid}", getNetwork).Methods("GET")
 
 	router.HandleFunc("/reserve/{node_id}", reserve).Methods("POST")
 	router.HandleFunc("/reserve/{node_id}", getReservations).Methods("GET")
@@ -152,11 +117,9 @@ func main() {
 func save() error {
 	stores := map[string]interface{}{
 		"nodes":        nodeStore,
-		"exits":        exitIfaces,
 		"farms":        farmStore,
-		"network":      networkStore,
 		"allocations":  allocStore,
-		"reservations": reservationStore,
+		"reservations": provStore,
 	}
 	for name, store := range stores {
 		f, err := os.OpenFile(name+".json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0660)
@@ -174,11 +137,9 @@ func save() error {
 func load() error {
 	stores := map[string]interface{}{
 		"nodes":        &nodeStore,
-		"exits":        &exitIfaces,
 		"farms":        &farmStore,
-		"network":      &networkStore,
 		"allocations":  &allocStore,
-		"reservations": &reservationStore,
+		"reservations": &provStore,
 	}
 	for name, store := range stores {
 		f, err := os.OpenFile(name+".json", os.O_RDONLY, 0660)

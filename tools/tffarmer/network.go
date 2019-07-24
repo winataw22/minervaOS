@@ -35,7 +35,7 @@ func giveAlloc(c *cli.Context) error {
 func getAlloc(c *cli.Context) error {
 
 	farm := c.Args().First()
-	alloc, err := db.RequestAllocation(strID(farm))
+	alloc, _, err := db.RequestAllocation(strID(farm))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get an allocation")
 		return err
