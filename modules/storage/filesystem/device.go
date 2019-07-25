@@ -68,7 +68,7 @@ func DefaultDeviceManager(ctx context.Context) (DeviceManager, error) {
 
 // Devices gets available block devices
 func (l *lsblkDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
-	return l.devices, nil
+	return flattenDevices(l.devices), nil
 }
 
 func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (DeviceCache, error) {
@@ -114,13 +114,12 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) error {
 		return err
 	}
 
-	var devs DeviceCache
-
+	devs := DeviceCache{}
 	for idx := range typedDevs {
 		devs = append(devs, &typedDevs[idx])
 	}
 
-	l.devices = flattenDevices(devs)
+	l.devices = devs
 
 	return nil
 }

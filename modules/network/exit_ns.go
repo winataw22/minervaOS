@@ -46,10 +46,11 @@ func CreatePublicNS(iface *PubIface) error {
 	case MacVlanIface:
 		pubIface, err = macvlan.Create("public", iface.Master, pubNS)
 		if err != nil {
-			return errors.Wrap(err, "failed to create public mac vlan interface")
+			log.Error().Err(err).Msg("failed to create public mac vlan interface")
+			return err
 		}
 	default:
-		return fmt.Errorf("unsupported public interface type %s", iface.Type)
+		return fmt.Errorf("unsupported iface type %s", iface.Type)
 	}
 	var (
 		ips    = make([]*net.IPNet, 0)

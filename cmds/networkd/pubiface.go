@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/network"
@@ -70,8 +69,9 @@ func configuePubIface(iface *network.PubIface) error {
 	}
 
 	if err := network.CreatePublicNS(iface); err != nil {
+		log.Error().Err(err).Msg("failed to configure public namespace")
 		_ = cleanup()
-		return errors.Wrap(err, "failed to configure public namespace")
+		return err
 	}
 
 	return nil

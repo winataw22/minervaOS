@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/pkg/errors"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zosv2/modules"
@@ -44,11 +44,8 @@ type Container struct {
 // ContainerProvision is entry point to container reservation
 func ContainerProvision(ctx context.Context, reservation Reservation) (interface{}, error) {
 	client := GetZBus(ctx)
-	cache := GetCache(ctx)
-
 	containerClient := stubs.NewContainerModuleStub(client)
 	flistClient := stubs.NewFlisterStub(client)
-	storageClient := stubs.NewStorageModuleStub(client)
 
 	var config Container
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
@@ -71,7 +68,6 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 	if err != nil {
 		return nil, err
 	}
-
 	var env []string
 	for k, v := range config.Env {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
@@ -79,16 +75,6 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 
 	var mounts []modules.MountInfo
 	for _, mount := range config.Mounts {
-
-		owner, err := cache.OwnerOf(mount.VolumeID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
-		}
-
-		if owner != reservation.User {
-			return nil, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, reservation.User)
-		}
-
 		// we make sure that mountpoint in config doesn't have relative parts
 		mountpoint := path.Join("/", mount.Mountpoint)
 
@@ -96,25 +82,21 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 			return nil, err
 		}
 
-		source, err := storageClient.Path(mount.VolumeID)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
-		}
-
 		mounts = append(
 			mounts,
 			modules.MountInfo{
-				Source:  source,
+				Source:  mount.VolumeID,
 				Target:  mountpoint,
 				Type:    "none",
 				Options: []string{"bind"},
 			},
 		)
 	}
+
 	id, err := containerClient.Run(
-		fmt.Sprintf("ns%s", reservation.User),
+		reservation.Tenant.String(),
 		modules.Container{
-			Name:   reservation.ID,
+			Name:   uuid.New().String(),
 			RootFS: mnt,
 			Env:    env,
 			Network: modules.NetworkInfo{

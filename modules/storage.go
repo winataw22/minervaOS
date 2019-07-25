@@ -86,15 +86,11 @@ type StorageModule interface {
 	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
 	// It is up to the caller to handle such a situation and decide if he wants
 	// to try again on a different devicetype
-	CreateFilesystem(name string, size uint64, poolType DeviceType) (string, error)
+	CreateFilesystem(size uint64, poolType DeviceType) (string, error)
 
-	// ReleaseFilesystem signals that the named filesystem is no longer needed.
-	// The filesystem will be unmounted and subsequently removed.
-	// All data contained in the filesystem will be lost, and the
+	// ReleaseFilesystem signals that the filesystem at the given mountpoint
+	// is no longer needed. The filesystem will be unmounted and subsequently
+	// removed. All data contained in the filesystem will be lost, and the
 	// space which has been reserved for this filesystem will be reclaimed.
-	ReleaseFilesystem(name string) error
-
-	// Path return the path of the mountpoint of the named filesystem
-	// if no volume with name exists, an empty path and an error is returned
-	Path(name string) (path string, err error)
+	ReleaseFilesystem(path string) error
 }

@@ -3,7 +3,10 @@ package provision
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"syscall"
 	"time"
@@ -76,7 +79,7 @@ func (s *pipeSource) Reservations(ctx context.Context) <-chan Reservation {
 }
 
 type httpSource struct {
-	store  ReservationStore
+	a      string
 	nodeID string
 }
 
@@ -84,11 +87,35 @@ type httpSource struct {
 // reservations. the server should only return unique reservations
 // stall the connection as long as possible if no new reservations
 // are available.
-func HTTPSource(store ReservationStore, nodeID identity.Identifier) ReservationSource {
+func HTTPSource(address string, nodeID identity.Identifier) ReservationSource {
 	return &httpSource{
-		store:  store,
+		a:      address,
 		nodeID: nodeID.Identity(),
 	}
+}
+
+func (s *httpSource) getReservations() (res []Reservation, err error) {
+	response, err := http.Get(s.a + "/" + s.nodeID)
+	if err != nil {
+		return res, err
+	}
+
+	defer func() {
+		ioutil.ReadAll(response.Body)
+		response.Body.Close()
+	}()
+
+	if response.StatusCode != http.StatusOK {
+		return res, fmt.Errorf("reservation request returned: %s", response.Status)
+	}
+
+	if response.Header.Get("content-type") != "application/json" {
+		return res, fmt.Errorf("reservation request returned '%s', expected 'application/json'", response.Header.Get("content-type"))
+	}
+
+	dec := json.NewDecoder(response.Body)
+	err = dec.Decode(&res)
+	return
 }
 
 func (s *httpSource) Reservations(ctx context.Context) <-chan Reservation {
@@ -98,7 +125,7 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan Reservation {
 		for {
 			// backing off of 1 second
 			<-time.After(time.Second)
-			res, err := s.store.Poll(identity.StrIdentifier(s.nodeID), false)
+			res, err := s.getReservations()
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get reservation")
 				continue
@@ -109,7 +136,7 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan Reservation {
 				break
 			default:
 				for _, r := range res {
-					ch <- *r
+					ch <- r
 				}
 			}
 		}

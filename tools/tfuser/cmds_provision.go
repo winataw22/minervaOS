@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/pkg/errors"
+	"github.com/google/uuid"
 	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/provision"
 
@@ -15,17 +15,11 @@ import (
 
 func cmdsProvision(c *cli.Context) error {
 	var (
-		schema   []byte
-		path     = c.String("schema")
-		nodeIDs  = c.StringSlice("node")
-		seedPath = c.String("seed")
-		err      error
+		schema  []byte
+		path    = c.String("schema")
+		nodeIDs = c.StringSlice("node")
+		err     error
 	)
-
-	keypair, err := identity.LoadSeed(seedPath)
-	if err != nil {
-		return err
-	}
 
 	if path == "-" {
 		schema, err = ioutil.ReadAll(os.Stdin)
@@ -41,12 +35,11 @@ func cmdsProvision(c *cli.Context) error {
 		return err
 	}
 
-	// set the user ID into the reservation schema
-	r.User = keypair.Identity()
-
-	if err := r.Sign(keypair.PrivateKey); err != nil {
-		return errors.Wrap(err, "failed to sign the reservation")
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return err
 	}
+	r.ID = id.String()
 
 	if err := output(path, r); err != nil {
 		return err
@@ -60,6 +53,7 @@ func cmdsProvision(c *cli.Context) error {
 	}
 
 	return nil
+
 }
 
 func embed(schema interface{}, t provision.ReservationType) (*provision.Reservation, error) {
