@@ -22,8 +22,8 @@ func NewStorageModuleStub(client zbus.Client) *StorageModuleStub {
 	}
 }
 
-func (s *StorageModuleStub) CreateFilesystem(arg0 uint64, arg1 modules.DeviceType) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1}
+func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 modules.DeviceType) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "CreateFilesystem", args...)
 	if err != nil {
 		panic(err)

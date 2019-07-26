@@ -215,11 +215,12 @@ func (s *httpTNoDB) ConfigurePublicIface(node identity.Identifier, ips []*net.IP
 		Iface string   `json:"iface"`
 		IPs   []string `json:"ips"`
 		GWs   []string `json:"gateways"`
-		// Type todo allow to chose type of connection
+		Type  network.IfaceType
 	}{
 		Iface: iface,
 		IPs:   make([]string, len(ips)),
 		GWs:   make([]string, len(gws)),
+		Type:  network.MacVlanIface, //TODO: allow to chose type of connection
 	}
 
 	for i := range ips {

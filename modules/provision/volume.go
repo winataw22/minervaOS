@@ -19,6 +19,11 @@ const (
 	SSDDiskType DiskType = "SSD"
 )
 
+const (
+	// Gigabyte to byte conversion
+	Gigabyte = 1024 * 1024 * 1024
+)
+
 // Volume defines a mount point
 type Volume struct {
 	// Size of the volume in GiB
@@ -35,7 +40,12 @@ func VolumeProvision(ctx context.Context, reservation Reservation) (interface{},
 		return nil, err
 	}
 
+	volumeID, err := HexHash(reservation)
+	if err != nil {
+		return nil, err
+	}
+
 	storageClient := stubs.NewStorageModuleStub(client)
 
-	return storageClient.CreateFilesystem(config.Size, modules.DeviceType(config.Type))
+	return storageClient.CreateFilesystem(volumeID, config.Size*Gigabyte, modules.DeviceType(config.Type))
 }

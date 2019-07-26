@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/identity"
+	"github.com/threefoldtech/zosv2/modules/version"
 )
 
 const seedPath = "/var/cache/seed.txt"
@@ -15,10 +16,16 @@ const seedPath = "/var/cache/seed.txt"
 func main() {
 	var (
 		tnodbURL string
+		ver      bool
 	)
 
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
+	flag.BoolVar(&ver, "v", false, "show version and exit")
+
 	flag.Parse()
+	if ver {
+		version.ShowAndExit(false)
+	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 

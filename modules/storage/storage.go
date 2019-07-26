@@ -185,10 +185,10 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 }
 
 // CreateFilesystem with the given size in a storage pool.
-func (s *storageModule) CreateFilesystem(size uint64, poolType modules.DeviceType) (string, error) {
+func (s *storageModule) CreateFilesystem(name string, size uint64, poolType modules.DeviceType) (string, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
 
-	fs, err := s.createSubvol(size, uuid.New().String(), poolType)
+	fs, err := s.createSubvol(size, name, poolType)
 	if err != nil {
 		return "", err
 	}

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"net"
 	"testing"
 	"time"
 
@@ -29,6 +30,42 @@ func TestParseDate(t *testing.T) {
 			}
 
 			if ok := assert.Equal(t, c.Output, d.Time); !ok {
+				t.Error()
+			}
+		})
+	}
+}
+
+func TestParseIPRange(t *testing.T) {
+	parser := func(t *testing.T, in string) IPRange {
+		//not in is surrounded by "" because it's json
+		if err := json.Unmarshal([]byte(in), &in); err != nil {
+			t.Fatal(err)
+		}
+		_, ipNet, err := net.ParseCIDR(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return IPRange{*ipNet}
+	}
+
+	cases := []struct {
+		Input  string
+		Output func(*testing.T, string) IPRange
+	}{
+		{`"192.168.1.0/24"`, parser},
+		{`"2001:db8::/32"`, parser},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Input, func(t *testing.T) {
+			var d IPRange
+			err := json.Unmarshal([]byte(c.Input), &d)
+			if ok := assert.NoError(t, err); !ok {
+				t.Fatal()
+			}
+
+			if ok := assert.Equal(t, c.Output(t, c.Input), d); !ok {
 				t.Error()
 			}
 		})

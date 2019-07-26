@@ -11,6 +11,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/provision"
+	"github.com/threefoldtech/zosv2/modules/version"
 )
 
 func main() {
@@ -21,18 +22,23 @@ func main() {
 		resURL       string
 		tnodbURL     string
 		debug        bool
+		ver          bool
 	)
 
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
 	flag.StringVar(&resURL, "url", "https://tnodb.dev.grid.tf/reserve", "URL of the reservation server to poll from")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
+	flag.BoolVar(&ver, "v", false, "show version and exit")
+
+	flag.Parse()
+	if ver {
+		version.ShowAndExit(false)
+	}
 
 	if debug {
 		log.Logger.Level(zerolog.DebugLevel)
 	}
-
-	flag.Parse()
 
 	nodeID, err := identity.LocalNodeID()
 	if err != nil {

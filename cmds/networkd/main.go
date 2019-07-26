@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/identity"
+	"github.com/threefoldtech/zosv2/modules/version"
 
 	"github.com/cenkalti/backoff"
 
@@ -29,13 +30,18 @@ func main() {
 		tnodbURL string
 		root     string
 		broker   string
+		ver      bool
 	)
 
 	flag.StringVar(&root, "root", "/var/cache/modules/network", "root path of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
+	flag.BoolVar(&ver, "v", false, "show version and exit")
 
 	flag.Parse()
+	if ver {
+		version.ShowAndExit(false)
+	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 

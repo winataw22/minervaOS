@@ -27,26 +27,19 @@ const (
 // ReplyTo defines how report the result of the provisioning operation
 type ReplyTo string
 
-// Tenant defines the tenant identity
-type Tenant string
-
-func (t Tenant) String() string {
-	return string(t)
-}
-
 // Reservation struct
 type Reservation struct {
 	// ID of the reservation
 	ID string `json:"id"`
-	// Tenant ID
-	Tenant Tenant `json:"tenant"`
-	// ReplyTo is a dummy attribute to hold the 3bot address
-	// we need to report to once the reservation is done
-	ReplyTo ReplyTo `json:"reply-to"`
+	// Identification of the user requesting the reservation
+	User string `json:"user_id"`
 	// Type of the reservation (container, zdb, vm, etc...)
 	Type ReservationType `json:"type"`
 	// Data is the reservation type arguments.
 	Data json.RawMessage `json:"data"`
+	// Signature is the signature to the reservation
+	// it contains all the field of this struct except the signature itself
+	Signature []byte
 }
 
 // ReservationSource interface. The source

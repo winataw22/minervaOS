@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"time"
@@ -117,4 +118,27 @@ func (d *Date) UnmarshalJSON(bytes []byte) error {
 // MarshalJSON formats a text
 func (d Date) MarshalJSON() ([]byte, error) {
 	return []byte(d.Format("02/01/2006 15:04")), nil
+}
+
+// IPRange type
+type IPRange struct{ net.IPNet }
+
+// UnmarshalText loads IPRange from string
+func (i *IPRange) UnmarshalText(text []byte) error {
+	_, net, err := net.ParseCIDR(string(text))
+	if err != nil {
+		return err
+	}
+
+	i.IPNet = *net
+	return nil
+}
+
+// MarshalText dumps iprange as a string
+func (i *IPRange) MarshalText() ([]byte, error) {
+	return []byte(i.String()), nil
+}
+
+func (i IPRange) String() string {
+	return i.IPNet.String()
 }

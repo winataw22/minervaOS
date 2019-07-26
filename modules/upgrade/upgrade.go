@@ -1,13 +1,16 @@
 package upgrade
 
 import (
-	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zosv2/modules/zinit"
 
@@ -26,6 +29,10 @@ const (
 	hookPostStart hookType = "post-start"
 )
 
+const (
+	provisionModuleName = "provisiond"
+)
+
 // Upgrader is the component that is responsible
 // to keep 0-OS up to date
 type Upgrader struct {
@@ -36,19 +43,14 @@ type Upgrader struct {
 }
 
 // New creates a new UpgradeModule object
-func New(root string, flister modules.Flister) (*Upgrader, error) {
+func New(root string, flister modules.Flister, zinit *zinit.Client) *Upgrader {
 	if err := os.MkdirAll(root, 0770); err != nil {
-		return nil, err
+		return nil
 	}
 
 	version, err := ensureVersionFile(root)
 	if err != nil {
-		return nil, err
-	}
-
-	zinit := zinit.New("/var/run/zinit.sock")
-	if err := zinit.Connect(); err != nil {
-		return nil, err
+		return nil
 	}
 
 	log.Info().Msgf("current version %s", version.String())
@@ -57,7 +59,7 @@ func New(root string, flister modules.Flister) (*Upgrader, error) {
 		root:    root,
 		flister: flister,
 		zinit:   zinit,
-	}, nil
+	}
 }
 
 func ensureVersionFile(root string) (version semver.Version, err error) {
@@ -77,6 +79,30 @@ func ensureVersionFile(root string) (version semver.Version, err error) {
 		}
 	}
 	return version, nil
+}
+
+func (u *Upgrader) enterSelfUpgrade(version semver.Version) error {
+	path := filepath.Join(u.root, "selfupgraded")
+	if err := ioutil.WriteFile(path, []byte(version.String()), 0400); err != nil {
+		return errors.Wrap(err, "fail to write selfupgrade file")
+	}
+	return nil
+}
+
+func (u *Upgrader) isInSelfUpgrade(version semver.Version) (bool, error) {
+	path := filepath.Join(u.root, "selfupgraded")
+
+	defer os.Remove(path)
+
+	v, err := ioutil.ReadFile(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return true, err
+	}
+
+	return string(v) == version.String(), nil
 }
 
 // Upgrade is the method that does a full upgrade flow
@@ -105,7 +131,7 @@ func (u *Upgrader) Upgrade(p Publisher) error {
 				Err(err).
 				Str("version", version.String()).
 				Msg("fail to retrieve upgrade from publisher")
-			break
+			return errors.Wrap(err, "fail to retrieve upgrade from publisher")
 		}
 
 		log.Info().
@@ -113,7 +139,19 @@ func (u *Upgrader) Upgrade(p Publisher) error {
 			Str("new version", version.String()).
 			Msg("start upgrade")
 
-		if err := u.applyUpgrade(upgrade); err != nil {
+		// during an upgrade we always stop provisiond to avoid
+		// modifying the system while we upgraded
+		if err := u.zinit.Stop(provisionModuleName); err != nil {
+			log.Error().Err(err).Msgf("failed to stop %s", provisionModuleName)
+			return errors.Wrapf(err, "failed to stop %s", provisionModuleName)
+		}
+		defer func() {
+			if err := u.zinit.Start(provisionModuleName); err != nil {
+				log.Error().Err(err).Msgf("failed to start %s", provisionModuleName)
+			}
+		}()
+
+		if err := u.applyUpgrade(version, upgrade); err != nil {
 			log.Error().
 				Err(err).
 				Str("version", version.String()).
@@ -194,8 +232,7 @@ func versionsToApply(current, latest semver.Version, p Publisher) ([]semver.Vers
 	return toApply, nil
 }
 
-func (u *Upgrader) applyUpgrade(upgrade Upgrade) error {
-
+func (u *Upgrader) applyUpgrade(version semver.Version, upgrade Upgrade) error {
 	log.Info().Str("flist", upgrade.Flist).Msg(("start applying upgrade"))
 
 	flistRoot, err := u.flister.Mount(upgrade.Flist, upgrade.Storage)
@@ -212,31 +249,63 @@ func (u *Upgrader) applyUpgrade(upgrade Upgrade) error {
 		log.Error().Err(err).Msg("fail to execute pre-copy script")
 	}
 
-	// copy file from upgrade flist to root filesystem
 	files, err := listDir(flistRoot)
 	if err != nil {
 		return err
 	}
-	if err := mergeFs(files, "/"); err != nil {
+
+	log.Debug().Strs("files", files).Msg("prepare to copy new files")
+	if err := mergeFs(files, "/", flistRoot); err != nil {
 		return err
 	}
-	log.Info().Str("flist", upgrade.Flist).Msg(("upgrade applied"))
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookPostCopy))); err != nil {
 		log.Error().Err(err).Msg("fail to execute post-copy script")
 	}
 
-	for i, path := range files {
-		files[i] = trimMounpoint(flistRoot, path)
-	}
-	services := servicesToRestart(files)
+	services := servicesToRestart(files, flistRoot)
+	log.Info().Strs("services", services).Msg("services to upgrade")
 
 	for _, service := range services {
+		if service == "upgraded" {
+			inUpgrade, err := u.isInSelfUpgrade(version)
+			if err != nil {
+				return err
+			}
+
+			if !inUpgrade {
+				log.Info().Msg("start self upgrade")
+				if err := u.enterSelfUpgrade(version); err != nil {
+					return err
+				}
+				log.Info().Msg("upgraded will now exit")
+				log.Info().Msg("it will be restarted by zinit and then continue the test of the upgrade")
+				// exit and wait for zinit to restart us
+				os.Exit(0)
+			}
+		}
+	}
+
+	for _, service := range services {
+		if service == "upgraded" {
+			// we already dealt with upgraded
+			continue
+		}
 		log.Info().Str("service", service).Msg("stop service")
 		if err := u.zinit.Stop(service); err != nil {
 			return err
 		}
 	}
+	for _, service := range services {
+		if service == "upgraded" {
+			// we already dealt with upgraded
+			continue
+		}
+		if err := u.waitServiceStop(time.Millisecond*500, service); err != nil {
+			return errors.Wrap(err, "failed to stop service")
+		}
+	}
+	log.Info().Msg("all services stopped")
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookMigrate))); err != nil {
 		log.Error().Err(err).Msg("fail to execute migrate script")
@@ -253,15 +322,14 @@ func (u *Upgrader) applyUpgrade(upgrade Upgrade) error {
 		log.Error().Err(err).Msg("fail to execute post-start script")
 	}
 
+	log.Info().Str("flist", upgrade.Flist).Msg(("upgrade applied"))
+
 	return nil
-	// TODO:
-	// identify which module has been updated
-	// if present call migration
-	// restart the required module
 }
 
 func executeHook(path string) error {
 	name := filepath.Base(path)
+	log.Info().Msgf("prepare to execute %s hook", name)
 
 	info, err := os.Stat(path)
 	if err != nil {
@@ -289,9 +357,14 @@ func executeHook(path string) error {
 // servicesToRestart look into the files of an upgrade flist
 // and check if the file located in the /bin directory have a matching init service
 // it retruns the name of all the init services that matches
-func servicesToRestart(files []string) []string {
+func servicesToRestart(files []string, mountpoint string) []string {
 	services := []string{}
 	for _, file := range files {
+
+		if mountpoint != "" {
+			file = strings.TrimPrefix(file, mountpoint)
+
+		}
 		if file[:4] != "/bin" {
 			continue
 		}
@@ -310,17 +383,19 @@ func trimMounpoint(mountpoint, path string) string {
 	return path[len(mountpoint):]
 }
 
-func mergeFs(files []string, destination string) error {
+func mergeFs(files []string, destination string, flistRoot string) error {
 
 	skippingFiles := []string{
 		fmt.Sprintf("/%s", string(hookPreCopy)),
 		fmt.Sprintf("/%s", string(hookPostCopy)),
 		fmt.Sprintf("/%s", string(hookMigrate)),
 		fmt.Sprintf("/%s", string(hookPostStart)),
+		"/bin/upgraded",
 	}
 
-	for _, path := range files {
-		dest, err := changeRoot(destination, path)
+	for _, flistPath := range files {
+
+		dest, err := changeRoot(destination, trimMounpoint(flistRoot, flistPath))
 		if err != nil {
 			return err
 		}
@@ -335,19 +410,19 @@ func mergeFs(files []string, destination string) error {
 			return err
 		}
 
-		info, err := os.Stat(path)
+		info, err := os.Stat(flistPath)
 		if err != nil {
 			return err
 		}
 
 		// upgrade flist should only container directory and regular files
 		if !info.Mode().IsRegular() {
-			log.Info().Msgf("skip %s: not a regular file", path)
+			log.Info().Msgf("skip %s: not a regular file", flistPath)
 			continue
 		}
 
 		// copy the file to final destination
-		if err := copyFile(dest, path); err != nil {
+		if err := copyFile(dest, flistPath); err != nil {
 			return err
 		}
 	}
@@ -364,6 +439,13 @@ func isIn(target string, list []string) bool {
 }
 
 func copyFile(dst, src string) error {
+	log.Info().Str("source", src).Str("destination", dst).Msg("copy file")
+
+	dstOld := dst + ".old"
+	if err := os.Rename(dst, dstOld); err != nil {
+		return err
+	}
+
 	fSrc, err := os.Open(src)
 	if err != nil {
 		return err
@@ -381,8 +463,11 @@ func copyFile(dst, src string) error {
 	}
 	defer fDst.Close()
 
-	_, err = io.Copy(fDst, fSrc)
-	return err
+	if _, err = io.Copy(fDst, fSrc); err != nil {
+		return err
+	}
+
+	return os.Remove(dstOld)
 }
 
 var errNotAbsolute = errors.New("path is not absolute")
@@ -402,4 +487,26 @@ func changeRoot(base, path string) (string, error) {
 		return filepath.Join(base, ss[1]), nil
 	}
 	return base, nil
+}
+
+func (u *Upgrader) waitServiceStop(dureation time.Duration, service string) error {
+	log.Info().Str("service", service).Msg("waiting for service to stop")
+	timeout := time.After(time.Second * 10)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout reached while waiting for service %s to be stopped", service)
+		default:
+			status, err := u.zinit.Status(service)
+			if err != nil {
+				return err
+			}
+			if status.State == zinit.ServiceStatusRunning {
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			return nil
+		}
+	}
 }
