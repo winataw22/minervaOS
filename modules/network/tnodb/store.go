@@ -15,6 +15,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/vishvananda/netlink"
 )
@@ -28,7 +29,7 @@ func NewHTTPHTTPTNoDB(url string) network.TNoDB {
 	return &httpTNoDB{baseURL: url}
 }
 
-func (s *httpTNoDB) RegisterAllocation(farm modules.Identifier, allocation *net.IPNet) error {
+func (s *httpTNoDB) RegisterAllocation(farm identity.Identifier, allocation *net.IPNet) error {
 	req := struct {
 		FarmerID string `json:"farmer_id"`
 		Alloc    string `json:"allocation"`
@@ -60,7 +61,7 @@ func (s *httpTNoDB) RegisterAllocation(farm modules.Identifier, allocation *net.
 	return nil
 }
 
-func (s *httpTNoDB) RequestAllocation(farm modules.Identifier) (*net.IPNet, *net.IPNet, error) {
+func (s *httpTNoDB) RequestAllocation(farm identity.Identifier) (*net.IPNet, *net.IPNet, error) {
 	url := fmt.Sprintf("%s/%s/%s", s.baseURL, "allocations", farm.Identity())
 	resp, err := http.Get(url)
 	if err != nil {
@@ -97,7 +98,7 @@ func (s *httpTNoDB) RequestAllocation(farm modules.Identifier) (*net.IPNet, *net
 	return alloc, farmAlloc, nil
 }
 
-func (s *httpTNoDB) GetFarm(farm modules.Identifier) (network.Farm, error) {
+func (s *httpTNoDB) GetFarm(farm identity.Identifier) (network.Farm, error) {
 	f := network.Farm{}
 
 	url := fmt.Sprintf("%s/farms/%s", s.baseURL, farm.Identity())
@@ -112,7 +113,7 @@ func (s *httpTNoDB) GetFarm(farm modules.Identifier) (network.Farm, error) {
 	return f, err
 }
 
-func (s *httpTNoDB) GetNode(nodeID modules.Identifier) (*network.Node, error) {
+func (s *httpTNoDB) GetNode(nodeID identity.Identifier) (*network.Node, error) {
 
 	url := fmt.Sprintf("%s/nodes/%s", s.baseURL, nodeID.Identity())
 
@@ -138,7 +139,7 @@ func (s *httpTNoDB) GetNode(nodeID modules.Identifier) (*network.Node, error) {
 	return node, nil
 }
 
-func (s *httpTNoDB) PublishInterfaces(local modules.Identifier) error {
+func (s *httpTNoDB) PublishInterfaces() error {
 	output := []*network.IfaceInfo{}
 
 	links, err := netlink.LinkList()
@@ -185,7 +186,12 @@ func (s *httpTNoDB) PublishInterfaces(local modules.Identifier) error {
 		output = append(output, info)
 	}
 
-	url := fmt.Sprintf("%s/nodes/%s/interfaces", s.baseURL, local.Identity())
+	nodeID, err := identity.LocalNodeID()
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/nodes/%s/interfaces", s.baseURL, nodeID.Identity())
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(output); err != nil {
 		return err
@@ -204,12 +210,12 @@ func (s *httpTNoDB) PublishInterfaces(local modules.Identifier) error {
 	return nil
 }
 
-func (s *httpTNoDB) ConfigurePublicIface(node modules.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error {
+func (s *httpTNoDB) ConfigurePublicIface(node identity.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error {
 	output := struct {
-		Iface string            `json:"iface"`
-		IPs   []string          `json:"ips"`
-		GWs   []string          `json:"gateways"`
-		Type  network.IfaceType `json:"iface_type"`
+		Iface string   `json:"iface"`
+		IPs   []string `json:"ips"`
+		GWs   []string `json:"gateways"`
+		Type  network.IfaceType
 	}{
 		Iface: iface,
 		IPs:   make([]string, len(ips)),
@@ -240,7 +246,7 @@ func (s *httpTNoDB) ConfigurePublicIface(node modules.Identifier, ips []*net.IPN
 	return nil
 }
 
-func (s *httpTNoDB) SelectExitNode(node modules.Identifier) error {
+func (s *httpTNoDB) SelectExitNode(node identity.Identifier) error {
 	url := fmt.Sprintf("%s/nodes/%s/select_exit", s.baseURL, node.Identity())
 
 	resp, err := http.Post(url, "application/json", nil)
@@ -255,7 +261,7 @@ func (s *httpTNoDB) SelectExitNode(node modules.Identifier) error {
 	return nil
 }
 
-func (s *httpTNoDB) ReadPubIface(node modules.Identifier) (*network.PubIface, error) {
+func (s *httpTNoDB) ReadPubIface(node identity.Identifier) (*network.PubIface, error) {
 
 	iface := &struct {
 		PublicConfig *network.PubIface `json:"public_config"`
@@ -310,7 +316,7 @@ func (s *httpTNoDB) GetNetwork(netid modules.NetID) (*modules.Network, error) {
 	return network, nil
 }
 
-func (s *httpTNoDB) GetNetworksVersion(nodeID modules.Identifier) (map[modules.NetID]uint32, error) {
+func (s *httpTNoDB) GetNetworksVersion(nodeID identity.Identifier) (map[modules.NetID]uint32, error) {
 	url := fmt.Sprintf("%s/networks/%s/versions", s.baseURL, nodeID.Identity())
 	resp, err := http.Get(url)
 	if err != nil {

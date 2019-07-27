@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/threefoldtech/zosv2/modules/identity"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zosv2/modules"
@@ -12,12 +14,12 @@ import (
 // Watcher is an object that is responsible to
 // watch the tnodb for update networks object
 type Watcher struct {
-	nodeID modules.Identifier
+	nodeID identity.Identifier
 	db     TNoDB
 }
 
 // NewWatcher creates a new watcher for a specific node
-func NewWatcher(nodeID modules.Identifier, db TNoDB) *Watcher {
+func NewWatcher(nodeID identity.Identifier, db TNoDB) *Watcher {
 	return &Watcher{
 		nodeID: nodeID,
 		db:     db,

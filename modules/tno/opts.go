@@ -77,7 +77,7 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP
 
 		exitNibble := newNibble(allocation, farmAllocSize)
 
-		pk, err := crypto.KeyFromID(modules.StrIdentifier(nodeID))
+		pk, err := crypto.KeyFromID(identity.StrIdentifier(nodeID))
 		if err != nil {
 			return errors.Wrapf(err, "failed to extract public key from node ID %s", nodeID)
 		}
@@ -149,7 +149,7 @@ func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Ke
 			peers = n.Resources[0].Peers
 		}
 
-		pk, err := crypto.KeyFromID(modules.StrIdentifier(nodeID))
+		pk, err := crypto.KeyFromID(identity.StrIdentifier(nodeID))
 		if err != nil {
 			return errors.Wrapf(err, "failed to extract public key from node ID %s", nodeID)
 		}
@@ -214,15 +214,6 @@ func AddUser(userID string, allocation *net.IPNet, key wgtypes.Key) Opts {
 			peers = n.Resources[0].Peers
 		}
 
-		pk, err := crypto.KeyFromID(identity.StrIdentifier(userID))
-		if err != nil {
-			return errors.Wrapf(err, "failed to extract public key from user ID %s", userID)
-		}
-		privateKey, err := crypto.Encrypt([]byte(key.String()), pk)
-		if err != nil {
-			return err
-		}
-
 		resource := &modules.NetResource{
 			NodeID: &modules.NodeID{
 				ID: userID,
@@ -243,8 +234,7 @@ func AddUser(userID string, allocation *net.IPNet, key wgtypes.Key) Opts {
 			Type:   modules.ConnTypeWireguard,
 			Prefix: allocation,
 			Connection: modules.Wireguard{
-				Key:        key.PublicKey().String(),
-				PrivateKey: fmt.Sprintf("%x", privateKey),
+				Key: key.PublicKey().String(),
 			},
 		}
 

@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/threefoldtech/zosv2/modules"
 )
 
 // IDStore is the interface defining the
 // client side of an identity store
 type IDStore interface {
-	RegisterNode(node modules.Identifier, farm modules.Identifier) error
-	RegisterFarm(farm modules.Identifier, name string) error
+	RegisterNode(node Identifier, farm Identifier) error
+	RegisterFarm(farm Identifier, name string) error
 }
 
 type httpIDStore struct {
@@ -31,7 +29,7 @@ type nodeRegisterReq struct {
 }
 
 // RegisterNode implements the IDStore interface
-func (s *httpIDStore) RegisterNode(node modules.Identifier, farm modules.Identifier) error {
+func (s *httpIDStore) RegisterNode(node Identifier, farm Identifier) error {
 	buf := bytes.Buffer{}
 	err := json.NewEncoder(&buf).Encode(nodeRegisterReq{
 		NodeID: node.Identity(),
@@ -58,7 +56,7 @@ type farmRegisterReq struct {
 }
 
 // RegisterFarm implements the IDStore interface
-func (s *httpIDStore) RegisterFarm(farm modules.Identifier, name string) error {
+func (s *httpIDStore) RegisterFarm(farm Identifier, name string) error {
 	buf := bytes.Buffer{}
 	err := json.NewEncoder(&buf).Encode(farmRegisterReq{
 		ID:   farm.Identity(),

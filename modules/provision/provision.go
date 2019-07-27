@@ -39,7 +39,7 @@ type Reservation struct {
 	Data json.RawMessage `json:"data"`
 	// Signature is the signature to the reservation
 	// it contains all the field of this struct except the signature itself
-	Signature []byte `json:"signature"`
+	Signature []byte
 }
 
 // ReservationSource interface. The source

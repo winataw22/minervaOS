@@ -5,25 +5,26 @@ import (
 	"net"
 
 	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zosv2/modules/identity"
 )
 
 // TNoDB define the interface to implement
 // to talk to a Tenant Network object database
 type TNoDB interface {
-	RegisterAllocation(farm modules.Identifier, allocation *net.IPNet) error
-	RequestAllocation(farm modules.Identifier) (*net.IPNet, *net.IPNet, error)
-	GetFarm(farm modules.Identifier) (Farm, error)
+	RegisterAllocation(farm identity.Identifier, allocation *net.IPNet) error
+	RequestAllocation(farm identity.Identifier) (*net.IPNet, *net.IPNet, error)
+	GetFarm(farm identity.Identifier) (Farm, error)
 
-	PublishInterfaces(node modules.Identifier) error
-	GetNode(modules.Identifier) (*Node, error)
+	PublishInterfaces() error
+	GetNode(identity.Identifier) (*Node, error)
 
-	ConfigurePublicIface(node modules.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error
-	ReadPubIface(node modules.Identifier) (*PubIface, error)
+	ConfigurePublicIface(node identity.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error
+	ReadPubIface(node identity.Identifier) (*PubIface, error)
 
-	SelectExitNode(node modules.Identifier) error
+	SelectExitNode(node identity.Identifier) error
 
 	GetNetwork(netID modules.NetID) (*modules.Network, error)
-	GetNetworksVersion(nodeID modules.Identifier) (versions map[modules.NetID]uint32, err error)
+	GetNetworksVersion(nodeID identity.Identifier) (versions map[modules.NetID]uint32, err error)
 }
 
 // Farm hold the ID, name and list of possible exit node of a farm

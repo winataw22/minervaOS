@@ -12,7 +12,6 @@ import (
 type (
 	tnodbKey struct{}
 	zbusKey  struct{}
-	cacheKey struct{}
 )
 
 // WithTnoDB adds a tnodb middleware
@@ -44,19 +43,4 @@ func GetZBus(ctx context.Context) zbus.Client {
 	}
 
 	return value.(zbus.Client)
-}
-
-// WithCache adds the reservations lru cache to context
-func WithCache(ctx context.Context, cache *Cache) context.Context {
-	return context.WithValue(ctx, cacheKey{}, cache)
-}
-
-// GetCache gets the reservation lru cache from context
-func GetCache(ctx context.Context) *Cache {
-	value := ctx.Value(cacheKey{})
-	if value == nil {
-		panic("no reservation cache associated with context")
-	}
-
-	return value.(*Cache)
 }
