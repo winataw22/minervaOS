@@ -109,20 +109,20 @@ func addNode(nw *modules.Network, nodeID string, port uint16) (*modules.Network,
 	return nw, nil
 }
 
-func addUser(network *modules.Network, userID string) (*modules.Network, error) {
+func addUser(network *modules.Network, userID string) (*modules.Network, string, error) {
 	if len(network.Resources) <= 0 {
-		return nil, fmt.Errorf("cannot add a node to network without exit node")
+		return nil, "", fmt.Errorf("cannot add a node to network without exit node")
 	}
 
 	farmID := network.Resources[0].NodeID.FarmerID
 	allocation, _, err := db.RequestAllocation(identity.StrIdentifier(farmID))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	// todo serialize the key somewhere
 
@@ -130,12 +130,12 @@ func addUser(network *modules.Network, userID string) (*modules.Network, error) 
 		tno.AddUser(userID, allocation, key),
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	network.Version++
 
-	return network, nil
+	return network, key.String(), nil
 }
 
 func reserveNetwork(network *modules.Network) error {

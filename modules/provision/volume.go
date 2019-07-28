@@ -40,12 +40,7 @@ func VolumeProvision(ctx context.Context, reservation Reservation) (interface{},
 		return nil, err
 	}
 
-	volumeID, err := HexHash(reservation)
-	if err != nil {
-		return nil, err
-	}
-
 	storageClient := stubs.NewStorageModuleStub(client)
 
-	return storageClient.CreateFilesystem(volumeID, config.Size*Gigabyte, modules.DeviceType(config.Type))
+	return storageClient.CreateFilesystem(reservation.ID, config.Size*Gigabyte, modules.DeviceType(config.Type))
 }

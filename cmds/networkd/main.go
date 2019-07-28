@@ -104,6 +104,10 @@ func main() {
 		}
 	}(ctx, chIface)
 
+	if err := ready(); err != nil {
+		log.Fatal().Err(err).Msg("failed to mark networkd as ready")
+	}
+
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Error().Err(err).Msg("fail to start networkd")
 	}
@@ -181,4 +185,10 @@ func startServer(ctx context.Context, broker string, networker modules.Networker
 		Msg("starting networkd module")
 
 	return server.Run(context.Background())
+}
+
+func ready() error {
+	f, err := os.Create("/var/run/networkd.ready")
+	defer f.Close()
+	return err
 }

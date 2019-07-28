@@ -3,18 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"net"
 	"strings"
+	"text/template"
 
 	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/crypto"
-	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/network/ip"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func genWGQuick(network *modules.Network, userID string) (string, error) {
+func genWGQuick(network *modules.Network, userID string, wgPrivateKey string) (string, error) {
 
 	type Peer struct {
 		Key        string
@@ -41,12 +38,9 @@ func genWGQuick(network *modules.Network, userID string) (string, error) {
 		return "", fmt.Errorf("missing exit peer %s", exitNr.Prefix.String())
 	}
 
-	key, err := extractPrivateKey(localNr)
-	if err != nil {
-		return "", err
+	d := data{
+		PrivateKey: wgPrivateKey,
 	}
-
-	d := data{PrivateKey: key.String()}
 
 	localNibble := ip.NewNibble(localNr.Prefix, 0)
 	a, b, err := localNibble.ToV4()
@@ -135,33 +129,4 @@ func endpoint(peer *modules.Peer) string {
 		endpoint = fmt.Sprintf("%s:%d", peer.Connection.IP.String(), peer.Connection.Port)
 	}
 	return endpoint
-}
-
-func extractPrivateKey(r *modules.NetResource) (wgtypes.Key, error) {
-	key := wgtypes.Key{}
-
-	peer := getPeer(r.Peers, r.Prefix.String())
-
-	if peer.Connection.PrivateKey == "" {
-		return key, fmt.Errorf("wireguard private key is empty")
-	}
-
-	// private key is hex encoded in the network object
-	sk := ""
-	_, err := fmt.Sscanf(peer.Connection.PrivateKey, "%x", &sk)
-	if err != nil {
-		return key, err
-	}
-
-	// TODO: change me once identity is available over zbus
-	keyPair, err := identity.LoadSeed("/var/cache/seed.txt")
-	if err != nil {
-		return key, err
-	}
-	decoded, err := crypto.Decrypt([]byte(sk), keyPair.PrivateKey)
-	if err != nil {
-		return key, err
-	}
-
-	return wgtypes.ParseKey(string(decoded))
 }

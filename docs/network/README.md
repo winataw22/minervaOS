@@ -64,7 +64,7 @@ We still need to figure out a way to get the routes properly installed, we'll do
 
 The node is now configured to be used as an exit node.
 
-5. Mark a node a being an exit node
+5. Mark a node as being an exit node
 
 The farmer then needs to select which node he agrees to use as an exit node for the grid
 
@@ -75,10 +75,190 @@ tffarmer select-exit kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=
 
 ## How to create a user private network
 
-The only thing a user needs to do before creating a new private network is to select a farm with an exit node. Then he needs to do a request to the TNODB for a new network. The request is a POST request to the `/networks` endpoint of the TNODB with the body of the request containing the identity of the chosen exit farm.
+1. Choose an exit node
+2. Request an new allocation from the farm of the exit node
+  - a GET request on the tnodb_mock at `/allocations/{farm_id}` will give you a new allocation
+3. Creates the network schema
 
-```json
-{"exit_farm": "ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E="}
+Steps 1 and 2 are easy enough to be done even manually but step 3 requires a deep knowledge of how networking works
+as well as the specific requirement of 0-OS network system. 
+This is why we provide a tool that simplify this process for you, [tfuser](../../tools/tfuser).
+
+Using tfuser creating a network becomes trivial:
+```bash
+# creates a new network with node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk as exit node
+# and output the result into network.json
+tfuser generate --output network.json network create --node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk
 ```
 
-The response body will contain a [network objet](https://github.com/threefoldtech/zosv2/blob/09de5a396bf60b794d2930ced1079a38bd5a9724/modules/network.go#L63). The network objet has an identifier, the network ID. The user can now use this network ID when he wants to provision some container on the grid.
+network.json will now contains something like:
+
+```json
+{
+  "id": "",
+  "tenant": "",
+  "reply-to": "",
+  "type": "network",
+  "data": {
+    "network_id": "J1UHHAizuCU6s9jPax1i1TUhUEQzWkKiPhBA452RagEp",
+    "resources": [
+      {
+        "node_id": {
+          "id": "DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk",
+          "farmer_id": "7koUE4nRbdsqEbtUVBhx3qvRqF58gfeHGMRGJxjqwfZi",
+          "reachability_v4": "public",
+          "reachability_v6": "public"
+        },
+        "prefix": "2001:b:a:8ac6::/64",
+        "link_local": "fe80::8ac6/64",
+        "peers": [
+          {
+            "type": "wireguard",
+            "prefix": "2001:b:a:8ac6::/64",
+            "Connection": {
+              "ip": "2a02:1802:5e::223",
+              "port": 1600,
+              "key": "PK1L7n+5Fo1znwD/Dt9lAupL19i7a6zzDopaEY7uOUE=",
+              "private_key": "9220e4e29f0acbf3bd7ef500645b78ae64b688399eb0e9e4e7e803afc4dd72418a1c5196208cb147308d7faf1212758042f19f06f64bad6ffe1f5ed707142dc8cc0a67130b9124db521e3a65e4aee18a0abf00b6f57dd59829f59662"
+            }
+          }
+        ],
+        "exit_point": true
+      }
+    ],
+    "prefix_zero": "2001:b:a::/64",
+    "exit_point": {
+      "ipv4_conf": null,
+      "ipv4_dnat": null,
+      "ipv6_conf": {
+        "addr": "fe80::8ac6/64",
+        "gateway": "fe80::1",
+        "metric": 0,
+        "iface": "public"
+      },
+      "ipv6_allow": []
+    },
+    "allocation_nr": 0,
+    "version": 0
+  }
+}
+```
+
+Which is a valid network schema. This network only contains a single exit node though, so not really useful.
+Let's add another node to the network:
+
+```bash
+tfuser generate --output network.json network --input network.json add --node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4
+```
+
+result looks like:
+
+```json
+{
+  "id": "",
+  "tenant": "",
+  "reply-to": "",
+  "type": "network",
+  "data": {
+    "network_id": "J1UHHAizuCU6s9jPax1i1TUhUEQzWkKiPhBA452RagEp",
+    "resources": [
+      {
+        "node_id": {
+          "id": "DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk",
+          "farmer_id": "7koUE4nRbdsqEbtUVBhx3qvRqF58gfeHGMRGJxjqwfZi",
+          "reachability_v4": "public",
+          "reachability_v6": "public"
+        },
+        "prefix": "2001:b:a:8ac6::/64",
+        "link_local": "fe80::8ac6/64",
+        "peers": [
+          {
+            "type": "wireguard",
+            "prefix": "2001:b:a:8ac6::/64",
+            "Connection": {
+              "ip": "2a02:1802:5e::223",
+              "port": 1600,
+              "key": "PK1L7n+5Fo1znwD/Dt9lAupL19i7a6zzDopaEY7uOUE=",
+              "private_key": "9220e4e29f0acbf3bd7ef500645b78ae64b688399eb0e9e4e7e803afc4dd72418a1c5196208cb147308d7faf1212758042f19f06f64bad6ffe1f5ed707142dc8cc0a67130b9124db521e3a65e4aee18a0abf00b6f57dd59829f59662"
+            }
+          },
+          {
+            "type": "wireguard",
+            "prefix": "2001:b:a:b744::/64",
+            "Connection": {
+              "ip": "<nil>",
+              "port": 0,
+              "key": "3auHJw3XHFBiaI34C9pB/rmbomW3yQlItLD4YSzRvwc=",
+              "private_key": "96dc64ff11d05e8860272b91bf09d52d306b8ad71e5c010c0ccbcc8d8d8f602c57a30e786d0299731b86908382e4ea5a82f15b41ebe6ce09a61cfb8373d2024c55786be3ecad21fe0ee100339b5fa904961fbbbd25699198c1da86c5"
+            }
+          }
+        ],
+        "exit_point": true
+      },
+      {
+        "node_id": {
+          "id": "4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4",
+          "farmer_id": "7koUE4nRbdsqEbtUVBhx3qvRqF58gfeHGMRGJxjqwfZi",
+          "reachability_v4": "hidden",
+          "reachability_v6": "hidden"
+        },
+        "prefix": "2001:b:a:b744::/64",
+        "link_local": "fe80::b744/64",
+        "peers": [
+          {
+            "type": "wireguard",
+            "prefix": "2001:b:a:8ac6::/64",
+            "Connection": {
+              "ip": "2a02:1802:5e::223",
+              "port": 1600,
+              "key": "PK1L7n+5Fo1znwD/Dt9lAupL19i7a6zzDopaEY7uOUE=",
+              "private_key": "9220e4e29f0acbf3bd7ef500645b78ae64b688399eb0e9e4e7e803afc4dd72418a1c5196208cb147308d7faf1212758042f19f06f64bad6ffe1f5ed707142dc8cc0a67130b9124db521e3a65e4aee18a0abf00b6f57dd59829f59662"
+            }
+          },
+          {
+            "type": "wireguard",
+            "prefix": "2001:b:a:b744::/64",
+            "Connection": {
+              "ip": "<nil>",
+              "port": 0,
+              "key": "3auHJw3XHFBiaI34C9pB/rmbomW3yQlItLD4YSzRvwc=",
+              "private_key": "96dc64ff11d05e8860272b91bf09d52d306b8ad71e5c010c0ccbcc8d8d8f602c57a30e786d0299731b86908382e4ea5a82f15b41ebe6ce09a61cfb8373d2024c55786be3ecad21fe0ee100339b5fa904961fbbbd25699198c1da86c5"
+            }
+          }
+        ],
+        "exit_point": false
+      }
+    ],
+    "prefix_zero": "2001:b:a::/64",
+    "exit_point": {
+      "ipv4_conf": null,
+      "ipv4_dnat": null,
+      "ipv6_conf": {
+        "addr": "fe80::8ac6/64",
+        "gateway": "fe80::1",
+        "metric": 0,
+        "iface": "public"
+      },
+      "ipv6_allow": []
+    },
+    "allocation_nr": 0,
+    "version": 1
+  }
+}
+```
+
+Our network schema is now ready, but before we can provision it onto a node, we need to sign it and send it to the bcdb.
+To be able to sign it we need to have a pair of key. You can use `tfuser id` command to create an identity:
+
+```bash
+tfuser id --output user.seed
+```
+
+We can now provision the network on both nodes:
+
+```bash
+tfuser provision --schema network.json \
+--node  DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk \
+--node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4 \
+--seed user.seed
+```
