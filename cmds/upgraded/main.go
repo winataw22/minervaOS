@@ -4,6 +4,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/threefoldtech/zosv2/modules/zinit"
+
 	"flag"
 
 	"github.com/rs/zerolog"
@@ -14,20 +16,27 @@ import (
 	"github.com/threefoldtech/zosv2/modules/version"
 )
 
-const redisSocket = "unix:///var/run/redis.sock"
+const (
+	redisSocket = "unix:///var/run/redis.sock"
+	zinitSocket = "/var/run/zinit.sock"
+)
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	var (
-		root   string
-		broker string
-		url    string
-		ver    bool
+		root     string
+		broker   string
+		url      string
+		interval int
+		ver      bool
 	)
+
 	flag.StringVar(&root, "root", "/var/modules/upgrade", "root path of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.StringVar(&url, "url", "https://versions.dev.grid.tf", "url of the upgrade server")
+	flag.IntVar(&interval, "interval", 600, "interval in seconds between update checks, default to 600")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	flag.Parse()
 	if ver {
@@ -41,18 +50,22 @@ func main() {
 	}
 
 	flister := stubs.NewFlisterStub(zbusClient)
-
-	u, err := upgrade.New(root, flister)
-	if err != nil {
-		log.Fatal().Err(err).Msg("fail to instantiate upgrade module")
+	zinit := zinit.New(zinitSocket)
+	if err := zinit.Connect(); err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to zinit")
 	}
+
+	u := upgrade.New(root, flister, zinit)
 
 	// watcher := upgrade.NewPeriodicWatcher(10 * time.Second)
 	publisher := upgrade.NewHTTPPublisher(url)
 
 	log.Info().Msg("start upgrade daemon")
 
-	ticker := time.NewTicker(time.Minute * 10)
+	// try to upgrade as soon as we boot, then check periodically
+	_ = u.Upgrade(publisher)
+
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
 
 	for range ticker.C {
 		if err := u.Upgrade(publisher); err != nil {

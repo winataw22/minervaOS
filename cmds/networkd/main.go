@@ -7,10 +7,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zosv2/modules/version"
+
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/identity"
-	"github.com/threefoldtech/zosv2/modules/version"
 
 	"github.com/cenkalti/backoff"
 
@@ -45,6 +46,13 @@ func main() {
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
+	client, err := zbus.NewRedisClient(broker)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to zbus broker")
+	}
+
+	identity := stubs.NewIdentityManagerStub(client)
+
 	if err := os.MkdirAll(root, 0750); err != nil {
 		log.Error().Err(err).Msgf("fail to create module root")
 	}
@@ -61,20 +69,12 @@ func main() {
 	}
 
 	log.Info().Msg("network bootstraped successfully")
-	var (
-		nodeID identity.Identifier
-		err    error
-	)
-	nodeID, err = identity.LocalNodeID()
-	for err != nil {
-		log.Info().Msg("wait for node identity to be generated")
-		time.Sleep(time.Second * 1)
-		nodeID, err = identity.LocalNodeID()
-	}
+
+	nodeID := identity.NodeID()
 
 	networker := network.NewNetworker(nodeID, db, root)
 
-	if err := publishIfaces(db); err != nil {
+	if err := publishIfaces(nodeID, db); err != nil {
 		log.Error().Err(err).Msg("failed to publish network interfaces to tnodb")
 		os.Exit(1)
 	}
@@ -103,6 +103,10 @@ func main() {
 			}
 		}
 	}(ctx, chIface)
+
+	if err := ready(); err != nil {
+		log.Fatal().Err(err).Msg("failed to mark networkd as ready")
+	}
 
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Error().Err(err).Msg("fail to start networkd")
@@ -152,10 +156,10 @@ func bootstrap() error {
 	return backoff.RetryNotify(f, backoff.NewExponentialBackOff(), errHandler)
 }
 
-func publishIfaces(db network.TNoDB) error {
+func publishIfaces(id modules.Identifier, db network.TNoDB) error {
 	f := func() error {
 		log.Info().Msg("try to publish interfaces to TNoDB")
-		return db.PublishInterfaces()
+		return db.PublishInterfaces(id)
 	}
 	errHandler := func(err error, _ time.Duration) {
 		if err != nil {
@@ -181,4 +185,10 @@ func startServer(ctx context.Context, broker string, networker modules.Networker
 		Msg("starting networkd module")
 
 	return server.Run(context.Background())
+}
+
+func ready() error {
+	f, err := os.Create("/var/run/networkd.ready")
+	defer f.Close()
+	return err
 }

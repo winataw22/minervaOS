@@ -8,6 +8,7 @@ import (
 
 	"os"
 
+	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/identity"
 	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/tnodb"
@@ -139,8 +140,7 @@ func (f strID) Identity() string {
 	return string(f)
 }
 
-func loadFarmID(seedPath string) (identity.Identifier, error) {
-
+func loadFarmID(seedPath string) (modules.Identifier, error) {
 	if seedPath == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -158,8 +158,7 @@ func loadFarmID(seedPath string) (identity.Identifier, error) {
 	return farmID, nil
 }
 
-func generateKeyPair(seedPath string) (identity.Identifier, error) {
-
+func generateKeyPair(seedPath string) (modules.Identifier, error) {
 	log.Debug().Msg("generating new key pair")
 	keypair, err := identity.GenerateKeyPair()
 	if err != nil {
@@ -175,7 +174,7 @@ func generateKeyPair(seedPath string) (identity.Identifier, error) {
 		seedPath = filepath.Join(cwd, "farm.seed")
 	}
 
-	if err := identity.SerializeSeed(keypair, seedPath); err != nil {
+	if err := keypair.Save(seedPath); err != nil {
 		log.Error().Err(err).Msg("fail to save identity seed on disk")
 		return nil, err
 	}

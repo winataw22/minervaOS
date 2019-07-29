@@ -7,8 +7,6 @@ import (
 
 	"github.com/threefoldtech/zosv2/modules/provision"
 
-	"github.com/threefoldtech/zosv2/modules/identity"
-
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/urfave/cli"
@@ -57,18 +55,15 @@ func cmdsAddNode(c *cli.Context) error {
 }
 func cmdsAddUser(c *cli.Context) error {
 	var (
-		network = &modules.Network{}
-		input   = c.GlobalString("input")
-		userID  = c.String("user")
-		err     error
+		network    = &modules.Network{}
+		input      = c.GlobalString("input")
+		userID     = c.String("user")
+		privateKey string
+		err        error
 	)
 
 	if userID == "" {
-		k, err := identity.GenerateKeyPair()
-		if err != nil {
-			return err
-		}
-		userID = k.Identity()
+		return fmt.Errorf("user ID cannot be empty. generate an identiy using the `id` command")
 	}
 
 	network, err = loadNetwork(input)
@@ -76,7 +71,7 @@ func cmdsAddUser(c *cli.Context) error {
 		return err
 	}
 
-	network, err = addUser(network, userID)
+	network, privateKey, err = addUser(network, userID)
 	if err != nil {
 		return errors.Wrap(err, "failed to add the node into the network object")
 	}
@@ -86,7 +81,37 @@ func cmdsAddUser(c *cli.Context) error {
 		return err
 	}
 
+	fmt.Printf("wireguard private key: %s\n", privateKey)
+	fmt.Printf("save this key somewhere, you will need it to generate the wg-quick configuration file with the `wg` command\n")
+
 	return output(c.GlobalString("output"), r)
+}
+
+func cmdsWGQuick(c *cli.Context) error {
+	var (
+		network    = &modules.Network{}
+		input      = c.GlobalString("input")
+		userID     = c.String("user")
+		privateKey = c.String("key")
+		err        error
+	)
+
+	if privateKey == "" {
+		return fmt.Errorf("private key cannot be empty")
+	}
+
+	network, err = loadNetwork(input)
+	if err != nil {
+		return err
+	}
+
+	out, err := genWGQuick(network, userID, privateKey)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(out)
+	return nil
 }
 
 func loadNetwork(name string) (network *modules.Network, err error) {

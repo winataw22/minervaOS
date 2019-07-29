@@ -124,7 +124,10 @@ func (c *containerModule) ensureNamespace(ctx context.Context, client *container
 // Run creates and starts a container
 // THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data modules.Container) (id modules.ContainerID, err error) {
-	log.Info().Msgf("create new container %v", data)
+	log.Info().
+		Str("namesapce", ns).
+		Str("data", fmt.Sprintf("%+v", data)).
+		Msgf("create new container")
 	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New(c.containerd)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-func TestEncrypt(t *testing.T) {
+func TestPublicKeyEncryption(t *testing.T) {
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 
@@ -20,6 +20,24 @@ func TestEncrypt(t *testing.T) {
 	require.NoError(t, err)
 	clear, err := Decrypt(cipher, sk)
 	assert.Equal(t, clear, msg)
+}
+
+func TestSignature(t *testing.T) {
+	pk, sk, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	message := []byte("hello world")
+
+	signature, err := Sign(sk, message)
+	require.NoError(t, err)
+
+	assert.NoError(t, Verify(pk, message, signature))
+
+	// mess up with the signature
+	signature[0] = 'a'
+	signature[1] = 'b'
+
+	assert.Error(t, Verify(pk, message, signature))
 }
 
 // TestPyNACLCompatibility test the compatibility between

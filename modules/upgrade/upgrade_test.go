@@ -243,3 +243,23 @@ func TestChangeBase(t *testing.T) {
 		})
 	}
 }
+
+func TestSelfUpgrade(t *testing.T) {
+	root, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	defer os.RemoveAll(root)
+
+	u := New(root, nil, nil)
+
+	version := semver.MustParse("0.0.1")
+	err = u.enterSelfUpgrade(version)
+	require.NoError(t, err)
+
+	inUpgrad, err := u.isInSelfUpgrade(version)
+	require.NoError(t, err)
+	assert.True(t, inUpgrad)
+
+	inUpgrad, err = u.isInSelfUpgrade(semver.MustParse("0.1.0"))
+	require.NoError(t, err)
+	assert.False(t, inUpgrad)
+}

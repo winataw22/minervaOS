@@ -33,9 +33,9 @@ func GenerateKeyPair() (k KeyPair, err error) {
 	return k, nil
 }
 
-// SerializeSeed saves the seed of a key pair in a file located at path
-func SerializeSeed(keypair KeyPair, path string) error {
-	seed := keypair.PrivateKey.Seed()
+// Save saves the seed of a key pair in a file located at path
+func (k *KeyPair) Save(path string) error {
+	seed := k.PrivateKey.Seed()
 
 	return ioutil.WriteFile(path, seed, 0400)
 }
@@ -48,16 +48,22 @@ func LoadSeed(path string) (k KeyPair, err error) {
 		return k, err
 	}
 
+	return FromSeed(seed)
+}
+
+// FromSeed creates a new key pair from seed
+func FromSeed(seed []byte) (pair KeyPair, err error) {
 	if len(seed) != ed25519.SeedSize {
-		return k, fmt.Errorf("seed has the wrong size %d", len(seed))
+		return pair, fmt.Errorf("seed has the wrong size %d", len(seed))
 	}
 
 	privateKey := ed25519.NewKeyFromSeed(seed)
 	publicKey := make([]byte, ed25519.PublicKeySize)
 	copy(publicKey, privateKey[32:])
-	k = KeyPair{
+	pair = KeyPair{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 	}
-	return k, nil
+
+	return pair, nil
 }

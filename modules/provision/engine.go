@@ -25,26 +25,42 @@ func New(source ReservationSource) Engine {
 // reservations
 func (e *defaultEngine) Run(ctx context.Context) error {
 	for reservation := range e.source.Reservations(ctx) {
-		log.Info().Str("type", string(reservation.Type)).Msg("got reservation")
+		log.Info().
+			Str("id", string(reservation.ID)).
+			Str("type", string(reservation.Type)).
+			Msg("got reservation")
+
+		if err := Verify(reservation); err != nil {
+			log.Warn().
+				Err(err).
+				Str("id", string(reservation.ID)).
+				Msg("verification of reservation signature failed")
+			continue
+		}
 
 		fn, ok := types[reservation.Type]
 		if !ok {
-			e.reply(reservation.ReplyTo, reservation.ID, nil, fmt.Errorf("unknown reservation type '%s'", reservation.Type))
+			log.Error().Str("type", string(reservation.Type)).Msgf("type of reservation not supported")
 			continue
 		}
 
 		result, err := fn(ctx, reservation)
-		e.reply(reservation.ReplyTo, reservation.ID, result, err)
+		if err != nil {
+			log.Error().Err(err).Msgf("provisioning of reservation %s failed", reservation.ID)
+		}
+		e.reply(reservation.ID, result, err)
 	}
 
 	return nil
 }
 
-func (e *defaultEngine) reply(to ReplyTo, id string, result interface{}, err error) {
+func (e *defaultEngine) reply(id string, result interface{}, err error) {
 	//TODO: actually push the reply to the endpoint defined by `to`
 	if err != nil {
-		log.Error().Err(err).Str("reply-to", string(to)).
-			Str("id", id).Msgf("failed to apply provision")
+		log.Error().
+			Err(err).
+			Str("id", id).
+			Msgf("failed to apply provision")
 
 		return
 	}
