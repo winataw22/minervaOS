@@ -55,7 +55,7 @@ func main() {
 
 	nodeID := manager.NodeID()
 	log.Info().
-		Str("identify", nodeID.Identity()).
+		Str("identity", nodeID.Identity()).
 		Msg("node identity loaded")
 
 	// Node registration can happen in the background.
