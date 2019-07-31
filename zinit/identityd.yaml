@@ -1,5 +1,4 @@
 exec: /bin/identityd
-oneshot: true
+test: test -e /var/cache/modules/identity/seed.txt
 after:
-  - boot
-  - dhcp_zos
+  - storaged

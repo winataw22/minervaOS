@@ -1,3 +1,5 @@
-exec: provisiond -broker unix:///var/run/redis.sock
+exec: provisiond
 after:
   - boot
+  - flistd
+  - contd

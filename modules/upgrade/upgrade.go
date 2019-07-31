@@ -247,6 +247,7 @@ func (u *Upgrader) applyUpgrade(version semver.Version, upgrade Upgrade) error {
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookPreCopy))); err != nil {
 		log.Error().Err(err).Msg("fail to execute pre-copy script")
+		return err
 	}
 
 	files, err := listDir(flistRoot)
@@ -261,6 +262,7 @@ func (u *Upgrader) applyUpgrade(version semver.Version, upgrade Upgrade) error {
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookPostCopy))); err != nil {
 		log.Error().Err(err).Msg("fail to execute post-copy script")
+		return err
 	}
 
 	services := servicesToRestart(files, flistRoot)
@@ -309,6 +311,7 @@ func (u *Upgrader) applyUpgrade(version semver.Version, upgrade Upgrade) error {
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookMigrate))); err != nil {
 		log.Error().Err(err).Msg("fail to execute migrate script")
+		return err
 	}
 
 	for _, service := range services {
@@ -320,6 +323,7 @@ func (u *Upgrader) applyUpgrade(version semver.Version, upgrade Upgrade) error {
 
 	if err := executeHook(filepath.Join(flistRoot, string(hookPostStart))); err != nil {
 		log.Error().Err(err).Msg("fail to execute post-start script")
+		return err
 	}
 
 	log.Info().Str("flist", upgrade.Flist).Msg(("upgrade applied"))

@@ -188,6 +188,7 @@ func property(line string) (property Property, err error) {
 // Kind defines the kind of a type
 type Kind int
 
+// List of all the supported JSX types
 const (
 	UnknownKind Kind = iota
 	IntegerKind
@@ -196,13 +197,13 @@ const (
 	StringKind
 	MobileKind
 	EmailKind
-	IpPortKind
-	IpAddressKind
-	IpRangeKind
+	IPPortKind
+	IPAddressKind
+	IPRangeKind
 	DateKind
 	DateTimeKind
 	NumericKind
-	GuidKind
+	GUIDKind
 	DictKind
 	ListKind
 	ObjectKind
@@ -242,13 +243,13 @@ var (
 		"bool":      BoolKind,
 		"mobile":    MobileKind,
 		"email":     EmailKind,
-		"ipport":    IpPortKind,
-		"ipaddr":    IpAddressKind,
-		"iprange":   IpRangeKind,
+		"ipport":    IPPortKind,
+		"ipaddr":    IPAddressKind,
+		"iprange":   IPRangeKind,
 		"date":      DateKind,
 		"time":      DateTimeKind,
 		"numeric":   NumericKind,
-		"guid":      GuidKind,
+		"guid":      GUIDKind,
 		"dict":      DictKind,
 		"map":       DictKind,
 		"yaml":      YamlKind,

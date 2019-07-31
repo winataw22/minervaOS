@@ -6,12 +6,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zosv2/modules/identity"
+	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
 )
 
-func watchPubIface(ctx context.Context, nodeID identity.Identifier, db network.TNoDB, ifaceVersion int) <-chan *network.PubIface {
+func watchPubIface(ctx context.Context, nodeID modules.Identifier, db network.TNoDB, ifaceVersion int) <-chan *network.PubIface {
 	var currentVersion = ifaceVersion
 
 	ch := make(chan *network.PubIface)

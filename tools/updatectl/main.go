@@ -18,6 +18,12 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Usage = "upgradectl help to generate proper upgraded files for upgraded"
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "dir,d",
+			Usage: "set working directory",
+		},
+	}
 
 	app.Commands = []cli.Command{
 		{
@@ -55,7 +61,14 @@ func release(c *cli.Context) error {
 		tx      = c.String("tx")
 		version = c.Args().First()
 		storage = c.String("storage")
+		dir     = c.GlobalString("dir")
 	)
+
+	if dir != "" {
+		if err := os.Chdir(dir); err != nil {
+			return err
+		}
+	}
 
 	if flist == "" {
 		return fmt.Errorf("flist must be specified")

@@ -1,3 +1,4 @@
 exec: networkd
+test: test -e /var/run/networkd.ready
 after:
- - node-ready
+ - identityd

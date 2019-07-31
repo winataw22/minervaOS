@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/threefoldtech/zosv2/modules/identity"
+
 	"golang.org/x/crypto/ed25519"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -113,9 +115,12 @@ func TestCreateNetwork(t *testing.T) {
 	dir, err := ioutil.TempDir("", netName)
 	require.NoError(t, err)
 
+	idMgr, err := identity.NewManager(filepath.Join(dir, "id"))
+	require.NoError(t, err)
+
 	storage := filepath.Join(dir, netName)
 	networker := &networker{
-		nodeID:     node1.NodeID,
+		identity:   idMgr,
 		storageDir: storage,
 	}
 

@@ -25,13 +25,14 @@ type farmInfo struct {
 }
 
 type reservation struct {
-	Reservation *provision.Reservation
-	Sent        bool
+	Reservation *provision.Reservation `json:"reservation"`
+	NodeID      string                 `json:"node_id"`
+	Sent        bool                   `json:"sent"`
 }
 
 type provisionStore struct {
 	sync.Mutex
-	Reservations map[string][]*reservation `json:"reservations"`
+	Reservations []*reservation `json:"reservations"`
 }
 
 type allocationStore struct {
@@ -61,7 +62,7 @@ func main() {
 	nodeStore = make(map[string]*network.Node)
 	farmStore = make(map[string]*farmInfo)
 	allocStore = &allocationStore{Allocations: make(map[string]*allocation)}
-	provStore = &provisionStore{Reservations: make(map[string][]*reservation)}
+	provStore = &provisionStore{Reservations: make([]*reservation, 0, 20)}
 
 	if err := load(); err != nil {
 		log.Fatalf("failed to load data: %v\n", err)
@@ -89,8 +90,9 @@ func main() {
 	router.HandleFunc("/allocations", listAlloc).Methods("GET")
 	router.HandleFunc("/allocations/{farm_id}", getAlloc).Methods("GET")
 
-	router.HandleFunc("/reserve/{node_id}", reserve).Methods("POST")
-	router.HandleFunc("/reserve/{node_id}", getReservations).Methods("GET")
+	router.HandleFunc("/reservations/{node_id}", reserve).Methods("POST")
+	router.HandleFunc("/reservations/{node_id}/poll", pollReservations).Methods("GET")
+	router.HandleFunc("/reservations/{id}", getReservation).Methods("GET")
 
 	log.Printf("start on %s\n", listen)
 	loggedRouter := handlers.LoggingHandler(os.Stderr, router)

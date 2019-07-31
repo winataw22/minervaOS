@@ -30,7 +30,7 @@ func TestSerialize(t *testing.T) {
 		_ = os.Remove(f.Name())
 	}()
 
-	err = SerializeSeed(keypair, f.Name())
+	err = keypair.Save(f.Name())
 	require.NoError(t, err)
 
 	keypair2, err := LoadSeed(f.Name())

@@ -22,8 +22,8 @@ var (
 		BoolKind:      {"", "bool"},
 		DateKind:      {"github.com/threefoldtech/zosv2/modules/schema", "Date"},
 		NumericKind:   {"github.com/threefoldtech/zosv2/modules/schema", "Numeric"},
-		IpAddressKind: {"net", "IP"},
-		IpRangeKind:   {"github.com/threefoldtech/zosv2/modules/schema", "IPRange"},
+		IPAddressKind: {"net", "IP"},
+		IPRangeKind:   {"github.com/threefoldtech/zosv2/modules/schema", "IPRange"},
 		//TODO add other types here (for example, Email, Phone, etc..)
 	}
 )

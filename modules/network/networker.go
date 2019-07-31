@@ -9,8 +9,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zosv2/modules/crypto"
-	"github.com/threefoldtech/zosv2/modules/identity"
 
 	"github.com/threefoldtech/zosv2/modules/network/ip"
 
@@ -24,15 +22,15 @@ import (
 )
 
 type networker struct {
-	nodeID     identity.Identifier
+	identity   modules.IdentityManager
 	storageDir string
 	tnodb      TNoDB
 }
 
 // NewNetworker create a new modules.Networker that can be used over zbus
-func NewNetworker(nodeID identity.Identifier, tnodb TNoDB, storageDir string) modules.Networker {
+func NewNetworker(identity modules.IdentityManager, tnodb TNoDB, storageDir string) modules.Networker {
 	nw := &networker{
-		nodeID:     nodeID,
+		identity:   identity,
 		storageDir: storageDir,
 		tnodb:      tnodb,
 	}
@@ -86,7 +84,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 
 	localResource := n.localResource(network.Resources)
 	if localResource == nil {
-		return "", fmt.Errorf("not network resource for this node: %s", n.nodeID.Identity())
+		return "", fmt.Errorf("not network resource for this node: %s", n.identity.NodeID())
 	}
 	exitNetRes, err := exitResource(network.Resources)
 	if err != nil {
@@ -94,12 +92,12 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 	}
 	nibble := ip.NewNibble(localResource.Prefix, network.AllocationNR)
 
-	wgKey, err := extractPrivateKey(localResource)
+	wgKey, err := n.extractPrivateKey(localResource)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to extract private key from network object")
 	}
 
-	// the flow is a bit different is the network namespace already exist or not
+	// the flow is a bit different if the network namespace already exist or not
 	// if it already exists, we skip the all network resource creation
 	// and only do the wireguard configuration
 	// so any new updated wireguard peer will be updated
@@ -167,7 +165,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 	// map the network ID to the network namespace
 	path := filepath.Join(n.storageDir, string(network.NetID))
 	if err := ioutil.WriteFile(path, []byte(nibble.NetworkName()), 0660); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "fail to write file that maps network ID to network namespace")
 	}
 
 	return nibble.NetworkName(), nil
@@ -213,7 +211,7 @@ func (n *networker) DeleteNetResource(network modules.Network) error {
 	return nil
 }
 
-func extractPrivateKey(r *modules.NetResource) (wgtypes.Key, error) {
+func (n *networker) extractPrivateKey(r *modules.NetResource) (wgtypes.Key, error) {
 	key := wgtypes.Key{}
 
 	peer, err := getPeer(r.Prefix.String(), r.Peers)
@@ -231,12 +229,7 @@ func extractPrivateKey(r *modules.NetResource) (wgtypes.Key, error) {
 		return key, err
 	}
 
-	// TODO: change me once identity is available over zbus
-	keyPair, err := identity.LoadSeed("/var/cache/seed.txt")
-	if err != nil {
-		return key, err
-	}
-	decoded, err := crypto.Decrypt([]byte(sk), keyPair.PrivateKey)
+	decoded, err := n.identity.Decrypt([]byte(sk))
 	if err != nil {
 		return key, err
 	}

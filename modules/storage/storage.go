@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -195,30 +194,44 @@ func (s *storageModule) CreateFilesystem(name string, size uint64, poolType modu
 	return fs.Path(), nil
 }
 
-// ReleaseFilesystem at the given path, this will unmount and then delete
+// ReleaseFilesystem with the given name, this will unmount and then delete
 // the filesystem. After this call, the caller must not perform any more actions
 // on this filesystem
-func (s *storageModule) ReleaseFilesystem(path string) error {
-	log.Info().Msgf("Deleting volume at %v", path)
+func (s *storageModule) ReleaseFilesystem(name string) error {
+	log.Info().Msgf("Deleting volume %v", name)
 
 	for idx := range s.volumes {
-		if !strings.HasPrefix(path, s.volumes[idx].Path()) {
-			continue
-		}
 		filesystems, err := s.volumes[idx].Volumes()
 		if err != nil {
 			return err
 		}
 		for jdx := range filesystems {
-			if filesystems[jdx].Path() == path {
+			if filesystems[jdx].Name() == name {
 				log.Debug().Msgf("Removing filesystem %v in volume %v", filesystems[jdx].Name(), s.volumes[idx].Name())
 				return s.volumes[idx].RemoveVolume(filesystems[jdx].Name())
 			}
 		}
 	}
 
-	log.Warn().Msgf("Could not find filesystem %v", path)
+	log.Warn().Msgf("Could not find filesystem %v", name)
 	return nil
+}
+
+// Path return the path of the mountpoint of the named filesystem
+// if no volume with name exists, an empty path and an error is returned
+func (s *storageModule) Path(name string) (string, error) {
+	for idx := range s.volumes {
+		filesystems, err := s.volumes[idx].Volumes()
+		if err != nil {
+			return "", err
+		}
+		for jdx := range filesystems {
+			if filesystems[jdx].Name() == name {
+				return filesystems[jdx].Path(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("Could not find filesystem %v", name)
 }
 
 // ensureCache creates a "cache" subvolume and mounts it in /var

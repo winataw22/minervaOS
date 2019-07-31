@@ -1,3 +1,4 @@
 exec: contd -broker unix:///var/run/redis.sock -root /var/cache/modules/containerd
 after:
+  - containerd
   - boot

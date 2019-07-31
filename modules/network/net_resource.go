@@ -383,7 +383,7 @@ func configWG(localResource *modules.NetResource, network *modules.Network, wgPe
 // localResource return the net resource of the local node from a list of net resources
 func (n *networker) localResource(resources []*modules.NetResource) *modules.NetResource {
 	for _, resource := range resources {
-		if resource.NodeID.ID == n.nodeID.Identity() {
+		if resource.NodeID.ID == n.identity.NodeID().Identity() {
 			return resource
 		}
 	}
