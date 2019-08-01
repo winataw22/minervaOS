@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zosv2/modules/flist/mock"
 )
 
 func testFlistModule(t *testing.T) (modules.Flister, func()) {
@@ -18,7 +19,8 @@ func testFlistModule(t *testing.T) (modules.Flister, func()) {
 	cleanup := func() {
 		os.RemoveAll(root)
 	}
-	return New(root), cleanup
+
+	return New(root, &mock.StorageMock{}), cleanup
 }
 func TestMountUmount(t *testing.T) {
 	require := require.New(t)

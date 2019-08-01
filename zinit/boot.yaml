@@ -6,6 +6,7 @@ exec: "true"
 oneshot: true
 after:
   # list of all services that must be running before moving on
+  - node-ready
   - storaged
   - networkd
   - identityd

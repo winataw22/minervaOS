@@ -1,16 +1,22 @@
 package network
 
 import (
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
+	"github.com/vishvananda/netlink"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/pkg/errors"
 
-	"github.com/threefoldtech/zosv2/modules/network/ip"
+	"github.com/containernetworking/plugins/pkg/ip"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
+	nib "github.com/threefoldtech/zosv2/modules/network/ip"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
@@ -65,12 +71,108 @@ func validateNetwork(n *modules.Network) error {
 	return nil
 }
 
-func (n networker) Namespace(id modules.NetID) (string, error) {
-	b, err := ioutil.ReadFile(filepath.Join(n.storageDir, string(id)))
+func (n networker) namespaceOf(net *modules.Network) (string, error) {
+	nibble, err := n.nibble(net)
 	if err != nil {
 		return "", err
 	}
-	return string(b), err
+	return nibble.NetworkName(), nil
+}
+
+func (n networker) bridgeOf(net *modules.Network) (string, error) {
+	nibble, err := n.nibble(net)
+	if err != nil {
+		return "", err
+	}
+	return nibble.BridgeName(), nil
+}
+
+func (n *networker) Join(member string, id modules.NetID) (join modules.Member, err error) {
+	// TODO:
+	// 1- Make sure this network id is actually deployed
+	// 2- Create a new namespace, then create a veth pair inside this namespace
+	// 3- Hook one end to the NR bridge
+	// 4- Assign IP to the veth endpoint inside the namespace.
+	// 5- return the namespace name
+
+	log.Info().Str("network-id", string(id)).Msg("joining network")
+
+	net, err := n.networkOf(id)
+	if err != nil {
+		return join, errors.Wrapf(err, "couldn't load network with id (%s)", id)
+	}
+
+	// 1- Make sure this network is is deployed
+	brName, err := n.bridgeOf(net)
+	if err != nil {
+		return join, errors.Wrapf(err, "failed to get bridge for network: %v", id)
+	}
+
+	br, err := bridge.Get(brName)
+	if err != nil {
+		return join, err
+	}
+	join.Namespace = member
+	netspace, err := namespace.Create(member)
+	if err != nil {
+		return join, err
+	}
+
+	defer func() {
+		if err != nil {
+			namespace.Delete(netspace)
+		}
+	}()
+
+	var hostVethName string
+	err = netspace.Do(func(host ns.NetNS) error {
+		if err := ifaceutil.SetLoUp(); err != nil {
+			return err
+		}
+
+		log.Info().
+			Str("namespace", join.Namespace).
+			Str("veth", "eth0").
+			Msg("Create veth pair in net namespace")
+		hostVeth, containerVeth, err := ip.SetupVeth("eth0", 1500, host)
+		if err != nil {
+			return errors.Wrapf(err, "failed to create veth pair in namespace (%s)", join.Namespace)
+		}
+
+		hostVethName = hostVeth.Name
+
+		eth0, err := netlink.LinkByName(containerVeth.Name)
+		if err != nil {
+			return err
+		}
+
+		config, err := n.allocateIP(member, net)
+		if err != nil {
+			return err
+		}
+
+		if err := netlink.AddrAdd(eth0, &netlink.Addr{IPNet: &config.Address}); err != nil {
+			return err
+		}
+
+		join.IP = config.Address.IP
+		return netlink.RouteAdd(&netlink.Route{Gw: config.Gateway})
+	})
+
+	if err != nil {
+		return join, err
+	}
+
+	hostVeth, err := netlink.LinkByName(hostVethName)
+	if err != nil {
+		return join, err
+	}
+
+	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", hostVeth.Attrs().Name), "1"); err != nil {
+		return join, errors.Wrapf(err, "failed to disable ip6 on bridge %s", hostVeth.Attrs().Name)
+	}
+
+	return join, bridge.AttachNic(hostVeth, br)
 }
 
 // ApplyNetResource implements modules.Networker interface
@@ -90,7 +192,7 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	nibble := ip.NewNibble(localResource.Prefix, network.AllocationNR)
+	nibble := nib.NewNibble(localResource.Prefix, network.AllocationNR)
 
 	wgKey, err := n.extractPrivateKey(localResource)
 	if err != nil {
@@ -164,11 +266,41 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 
 	// map the network ID to the network namespace
 	path := filepath.Join(n.storageDir, string(network.NetID))
-	if err := ioutil.WriteFile(path, []byte(nibble.NetworkName()), 0660); err != nil {
-		return "", errors.Wrap(err, "fail to write file that maps network ID to network namespace")
+	file, err := os.Create(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	enc := json.NewEncoder(file)
+	if err := enc.Encode(network); err != nil {
+		return "", errors.Wrap(err, "failed to store network object")
 	}
 
 	return nibble.NetworkName(), nil
+}
+
+func (n *networker) nibble(network *modules.Network) (*nib.Nibble, error) {
+	localResource := n.localResource(network.Resources)
+	if localResource == nil {
+		return nil, fmt.Errorf("not network resource for this node: %s", n.identity.NodeID())
+	}
+
+	return nib.NewNibble(localResource.Prefix, network.AllocationNR), nil
+}
+
+func (n *networker) networkOf(id modules.NetID) (*modules.Network, error) {
+	path := filepath.Join(n.storageDir, string(id))
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	dec := json.NewDecoder(file)
+
+	var net modules.Network
+	return &net, dec.Decode(&net)
 }
 
 // ApplyNetResource implements modules.Networker interface

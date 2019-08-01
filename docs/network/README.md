@@ -59,7 +59,6 @@ tffarmer configure-public --ip 172.20.0.2/24 --gw 172.20.0.1 --iface eth1 kV3u7G
 #public interface configured on node kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=
 ```
 
-
 We still need to figure out a way to get the routes properly installed, we'll do static on the toplevel router for now to do a demo.
 
 The node is now configured to be used as an exit node.
@@ -81,10 +80,11 @@ tffarmer select-exit kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=
 3. Creates the network schema
 
 Steps 1 and 2 are easy enough to be done even manually but step 3 requires a deep knowledge of how networking works
-as well as the specific requirement of 0-OS network system. 
+as well as the specific requirement of 0-OS network system.
 This is why we provide a tool that simplify this process for you, [tfuser](../../tools/tfuser).
 
 Using tfuser creating a network becomes trivial:
+
 ```bash
 # creates a new network with node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk as exit node
 # and output the result into network.json
@@ -148,7 +148,7 @@ Which is a valid network schema. This network only contains a single exit node t
 Let's add another node to the network:
 
 ```bash
-tfuser generate --output network.json network --input network.json add --node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4
+tfuser generate --output network.json network --input network.json add-node --node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4
 ```
 
 result looks like:

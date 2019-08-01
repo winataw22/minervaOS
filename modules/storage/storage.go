@@ -75,7 +75,7 @@ func (s *storageModule) initialize(policy modules.StoragePolicy) error {
 	// remount all existing pools
 	log.Info().Msgf("Remounting existing volumes")
 	log.Debug().Msgf("Searching for existing volumes")
-	existingPools, err := fs.List(ctx)
+	existingPools, err := fs.List(ctx, filesystem.All)
 	if err != nil {
 		return err
 	}

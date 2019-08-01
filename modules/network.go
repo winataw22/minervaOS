@@ -8,11 +8,25 @@ import (
 
 //go:generate zbusc -module network -version 0.0.1 -name network -package stubs github.com/threefoldtech/zosv2/modules+Networker stubs/network_stub.go
 
+// Member holds information about a join operation
+type Member struct {
+	// Namespace is the namespace of the member
+	Namespace string
+	// IP is the IP assigned to this member
+	IP net.IP
+}
+
 //Networker is the interface for the network module
 type Networker interface {
 	ApplyNetResource(Network) (string, error)
 	DeleteNetResource(Network) error
-	Namespace(NetID) (string, error)
+	// Join a network (with network id) will create a new isolated namespace
+	// that is hooked to the network bridge with a veth pair, and assign it a
+	// new IP from the network resource range. The method return the new namespace
+	// name.
+	// The member name specifies the name of the member, and must be unique
+	// The NetID is the network id to join
+	Join(member string, id NetID) (Member, error)
 }
 
 // NetID is a type defining the ID of a network

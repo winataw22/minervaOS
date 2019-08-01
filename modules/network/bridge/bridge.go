@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 )
 
@@ -34,6 +35,20 @@ func New(name string) (*netlink.Bridge, error) {
 	}
 
 	return newBr, nil
+}
+
+// Get a bridge by name
+func Get(name string) (*netlink.Bridge, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "bridge %s not found", name)
+	}
+
+	if link.Type() != "bridge" {
+		return nil, fmt.Errorf("device '%s' is not a bridge", name)
+	}
+
+	return link.(*netlink.Bridge), nil
 }
 
 // Delete remove a bridge

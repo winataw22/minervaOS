@@ -25,6 +25,7 @@ func main() {
 	app := cli.NewApp()
 	app.Usage = "Create and manage a Threefold farm"
 	app.Version = "0.0.1"
+	app.EnableBashCompletion = true
 
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{

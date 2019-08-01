@@ -4,8 +4,8 @@ go 1.12
 
 require (
 	github.com/Microsoft/go-winio v0.4.12 // indirect
-	github.com/Microsoft/hcsshim v0.8.6 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
+	github.com/alexflint/go-filemutex v0.0.0-20171028004239-d358565f3c3f // indirect
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/cgroups v0.0.0-20190603164311-51b62d303d38 // indirect
 	github.com/containerd/containerd v1.2.3
@@ -14,8 +14,7 @@ require (
 	github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448 // indirect
 	github.com/containerd/typeurl v0.0.0-20190515163108-7312978f2987 // indirect
 	github.com/containernetworking/cni v0.7.1
-	github.com/containernetworking/plugins v0.8.1
-	github.com/coreos/go-iptables v0.4.1 // indirect
+	github.com/containernetworking/plugins v0.8.2-0.20190724153215-ded2f1757770
 	github.com/coreos/go-systemd v0.0.0-20190612170431-362f06ec6bc1 // indirect
 	github.com/dave/jennifer v1.3.0
 	github.com/deckarep/golang-set v1.7.1
@@ -43,18 +42,16 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.1
 	github.com/pkg/errors v0.8.1
 	github.com/rs/zerolog v1.14.3
-	github.com/safchain/ethtool v0.0.0-20190326074333-42ed695e3de8 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/threefoldtech/zbus v0.0.0-20190613083559-f8f4719d6595
 	github.com/vishvananda/netlink v1.0.0
-	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980 // indirect
-	golang.org/x/sys v0.0.0-20190614084037-d442b75600c5
+	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 // indirect
+	golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20190607034155-226bf4e412cd
 	google.golang.org/appengine v1.6.1 // indirect
 	google.golang.org/genproto v0.0.0-20190611190212-a7e196e89fd3 // indirect

@@ -7,7 +7,6 @@ require (
 	github.com/rs/zerolog v1.14.3
 	github.com/threefoldtech/zbus v0.0.0-20190711124326-09379d5f12e0
 	github.com/threefoldtech/zosv2/modules v0.0.0-20190614135932-35b94bfa4dbe
-	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
 )
 
 replace github.com/threefoldtech/zosv2/modules => ../../modules/

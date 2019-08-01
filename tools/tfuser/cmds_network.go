@@ -63,7 +63,7 @@ func cmdsAddUser(c *cli.Context) error {
 	)
 
 	if userID == "" {
-		return fmt.Errorf("user ID cannot be empty. generate an identiy using the `id` command")
+		return fmt.Errorf("user ID cannot be empty. generate an identity using the `id` command")
 	}
 
 	network, err = loadNetwork(input)
@@ -112,6 +112,36 @@ func cmdsWGQuick(c *cli.Context) error {
 
 	fmt.Println(out)
 	return nil
+}
+
+func cmdsRemoveNode(c *cli.Context) error {
+	var (
+		network = &modules.Network{}
+		input   = c.GlobalString("input")
+		nodeID  = c.String("node")
+		err     error
+	)
+
+	if nodeID == "" {
+		return fmt.Errorf("node ID cannot be empty")
+	}
+
+	network, err = loadNetwork(input)
+	if err != nil {
+		return err
+	}
+
+	network, err = removeNode(network, nodeID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to remove node %s from the network object", nodeID)
+	}
+
+	r, err := embed(network, provision.NetworkReservation)
+	if err != nil {
+		return err
+	}
+
+	return output(c.GlobalString("output"), r)
 }
 
 func loadNetwork(name string) (network *modules.Network, err error) {

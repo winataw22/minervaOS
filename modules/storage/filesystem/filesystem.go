@@ -52,6 +52,14 @@ type Pool interface {
 	// Health() ?
 }
 
+// Filter closure for Filesystem list
+type Filter func(pool Pool) bool
+
+// All is default filter
+func All(Pool) bool {
+	return true
+}
+
 // Filesystem defines a filesystem interface
 type Filesystem interface {
 	// Create a new filesystem.
@@ -61,5 +69,5 @@ type Filesystem interface {
 	// profile: Raid profile of the filesystem
 	Create(ctx context.Context, name string, devices DeviceCache, profile modules.RaidProfile) (Pool, error)
 	// List all existing filesystems on the node
-	List(ctx context.Context) ([]Pool, error)
+	List(ctx context.Context, filter Filter) ([]Pool, error)
 }

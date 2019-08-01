@@ -31,10 +31,10 @@ import (
 
 type TestDevices map[string]string
 
-func (d TestDevices) Loops() []Device {
-	var loops []Device
+func (d TestDevices) Loops() DeviceCache {
+	var loops DeviceCache
 	for _, loop := range d {
-		loops = append(loops, Device{Path: loop})
+		loops = append(loops, &Device{Path: loop})
 	}
 
 	return loops
@@ -90,16 +90,13 @@ func setupDevices(count int) (devices TestDevices, err error) {
 }
 
 type TestDeviceManager struct {
-	devices TestDevices
+	devices DeviceCache
 }
 
-func (m TestDeviceManager) Device(ctx context.Context, device string) (*Device, error) {
+func (m TestDeviceManager) Device(ctx context.Context, path string) (*Device, error) {
 	for _, loop := range m.devices {
-		if loop == device {
-			return &Device{
-				Path: loop,
-				Type: "loop",
-			}, nil
+		if loop.Path == path {
+			return loop, nil
 		}
 	}
 
@@ -107,19 +104,17 @@ func (m TestDeviceManager) Device(ctx context.Context, device string) (*Device, 
 }
 
 func (m TestDeviceManager) ByLabel(ctx context.Context, label string) (DeviceCache, error) {
-	return nil, nil
+	var filterred DeviceCache
+	for _, device := range m.devices {
+		if device.Label == label {
+			filterred = append(filterred, device)
+		}
+	}
+	return filterred, nil
 }
 
 func (m TestDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
-	var devices DeviceCache
-	for _, loop := range m.devices {
-		devices = append(devices, &Device{
-			Path: loop,
-			Type: "loop",
-		})
-	}
-
-	return devices, nil
+	return m.devices, nil
 }
 
 func (m TestDeviceManager) Scan(ctx context.Context) error {
@@ -260,13 +255,10 @@ func TestBtrfsSingle(t *testing.T) {
 		t.Fatal("failed to initialize devices", err)
 	}
 	defer devices.Destroy()
+	loops := devices.Loops()
 
-	fs := NewBtrfs(TestDeviceManager{devices})
-	devs := DeviceCache{}
-	for idx := range devices.Loops() {
-		devs = append(devs, &devices.Loops()[idx])
-	}
-	pool, err := fs.Create(context.Background(), "test-single", devs, modules.Single)
+	fs := NewBtrfs(TestDeviceManager{loops})
+	pool, err := fs.Create(context.Background(), "test-single", loops, modules.Single)
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -284,12 +276,9 @@ func TestBtrfsRaid1(t *testing.T) {
 	defer devices.Destroy()
 
 	loops := devices.Loops()
-	fs := NewBtrfs(TestDeviceManager{devices})
-	devs := DeviceCache{}
-	for idx := range devices.Loops()[:2] {
-		devs = append(devs, &devices.Loops()[idx])
-	}
-	pool, err := fs.Create(context.Background(), "test-raid1", devs, modules.Raid1) //use the first 2 disks
+	fs := NewBtrfs(TestDeviceManager{loops})
+
+	pool, err := fs.Create(context.Background(), "test-raid1", loops[:2], modules.Raid1) //use the first 2 disks
 
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
@@ -309,7 +298,7 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	t.Run("add device", func(t *testing.T) {
 		// add a device to array
-		err = pool.AddDevice(&loops[2])
+		err = pool.AddDevice(loops[2])
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()
 		}
@@ -317,7 +306,7 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	t.Run("remove device", func(t *testing.T) {
 		// remove device from array
-		err = pool.RemoveDevice(&loops[0])
+		err = pool.RemoveDevice(loops[0])
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()
 		}
@@ -326,7 +315,7 @@ func TestBtrfsRaid1(t *testing.T) {
 	t.Run("remove second device", func(t *testing.T) {
 		// remove a 2nd device should fail because raid1 should
 		// have at least 2 devices
-		err = pool.RemoveDevice(&loops[1])
+		err = pool.RemoveDevice(loops[1])
 		if ok := assert.Error(t, err); !ok {
 			t.Fatal()
 		}
@@ -340,22 +329,23 @@ func TestBtrfsList(t *testing.T) {
 	}
 
 	defer devices.Destroy()
-
-	fs := NewBtrfs(TestDeviceManager{devices})
-
 	loops := devices.Loops()
+	fs := NewBtrfs(TestDeviceManager{loops})
+
 	names := make(map[string]struct{})
 	for i, loop := range loops {
 		name := fmt.Sprintf("test-list-%d", i)
 		names[name] = struct{}{}
-		_, err := fs.Create(context.Background(), name, DeviceCache{&loop}, modules.Single)
-
+		_, err := fs.Create(context.Background(), name, DeviceCache{loop}, modules.Single)
 		if ok := assert.NoError(t, err); !ok {
 			t.Fatal()
 		}
 	}
 
-	pools, err := fs.List(context.Background())
+	pools, err := fs.List(context.Background(), func(p Pool) bool {
+		return strings.HasPrefix(p.Name(), "test-")
+	})
+
 	if ok := assert.NoError(t, err); !ok {
 		t.Fatal()
 	}

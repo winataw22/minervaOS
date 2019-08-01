@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/flist"
+	"github.com/threefoldtech/zosv2/modules/flist/mock"
 	"github.com/threefoldtech/zosv2/modules/stubs"
 )
 
@@ -34,7 +35,7 @@ func testFlistModule(t *testing.T) (modules.Flister, func()) {
 	cleanup := func() {
 		os.RemoveAll(root)
 	}
-	return flist.New(root), cleanup
+	return flist.New(root, &mock.StorageMock{}), cleanup
 }
 
 func testPrepareRPC(t *testing.T) (modules.Flister, func()) {

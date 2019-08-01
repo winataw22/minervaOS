@@ -49,7 +49,12 @@ func nodeDetail(w http.ResponseWriter, r *http.Request) {
 
 func listNodes(w http.ResponseWriter, r *http.Request) {
 	var nodes = make([]*network.Node, 0, len(nodeStore))
+	farm := r.URL.Query().Get("farm")
+
 	for _, node := range nodeStore {
+		if farm != "" && node.FarmID != farm {
+			continue
+		}
 		nodes = append(nodes, node)
 	}
 

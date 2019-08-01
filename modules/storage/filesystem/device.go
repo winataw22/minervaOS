@@ -74,9 +74,9 @@ func (l *lsblkDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
 func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (DeviceCache, error) {
 	var filtered DeviceCache
 
-	for idx := range l.devices {
-		if l.devices[idx].Label == label {
-			filtered = append(filtered, l.devices[idx])
+	for _, device := range l.devices {
+		if device.Label == label {
+			filtered = append(filtered, device)
 		}
 	}
 

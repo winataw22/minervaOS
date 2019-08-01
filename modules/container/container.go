@@ -156,7 +156,7 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 			Options: []string{"rbind"}, // mount options
 		})
 		data.RootFS = "/usr/lib/corex"
-		data.Entrypoint = "/bin/corex --chroot /sandbox -d 7"
+		data.Entrypoint = "/bin/corex --ipv6 --chroot /sandbox -d 7"
 	}
 
 	args, err := shlex.Split(data.Entrypoint)

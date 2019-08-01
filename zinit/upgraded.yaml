@@ -1,3 +1,4 @@
 exec: upgraded
 after:
   - boot
+  - flistd

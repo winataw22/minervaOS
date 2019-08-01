@@ -92,7 +92,10 @@ func (b *btrfs) Create(ctx context.Context, name string, devices DeviceCache, po
 	return newBtrfsPool(name, devices), nil
 }
 
-func (b *btrfs) List(ctx context.Context) ([]Pool, error) {
+func (b *btrfs) List(ctx context.Context, filter Filter) ([]Pool, error) {
+	if filter == nil {
+		filter = All
+	}
 	var pools []Pool
 	available, err := BtrfsList(ctx, "", false)
 	if err != nil {
@@ -110,12 +113,18 @@ func (b *btrfs) List(ctx context.Context) ([]Pool, error) {
 			return nil, err
 		}
 
+		pool := newBtrfsPool(fs.Label, devices)
+
+		if !filter(pool) {
+			continue
+		}
+
 		if len(devices) == 0 {
 			// since this should not be able to happen consider it an error
 			return nil, fmt.Errorf("pool %v has no corresponding devices on the system", fs.Label)
 		}
 
-		pools = append(pools, newBtrfsPool(fs.Label, devices))
+		pools = append(pools, pool)
 	}
 
 	return pools, nil

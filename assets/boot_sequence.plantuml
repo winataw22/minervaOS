@@ -1,0 +1,47 @@
+@startuml
+
+package "node-ready"{
+    [local-modprobe]
+    [udev-trigger]
+    [redis]
+    [haveged]
+    [cgroup]
+    [redis]
+}
+
+package "boot" {
+    [storaged]
+    [networkd]
+    [identityd]
+}
+
+package "internal modules"{
+    [flistd]
+    [containerd]
+    [contd]
+    [upgraded]
+    [provisiond]
+}
+
+
+[udev-trigger] <-- [storaged]
+[storaged] <- [identityd]
+
+[identityd] <- [networkd]
+
+[networkd] <-- [containerd]
+[storaged] <-- [containerd]
+
+[containerd] <-- [contd]
+
+[storaged] <-- [flistd]
+[networkd] <-- [flistd]
+
+[flistd] <-- [upgraded]
+[networkd] <-- [upgraded]
+
+[networkd] <-- [provisiond]
+[flistd] <-- [provisiond]
+[contd] <-- [provisiond]
+
+@enduml
