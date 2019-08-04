@@ -71,13 +71,10 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 		Msg("deploying network")
 
 	networkMgr := stubs.NewNetworkerStub(GetZBus(ctx))
-	join, err := networkMgr.Join(reservation.ID, modules.NetID(config.Network.NetwokID))
+	ns, err := networkMgr.Join(modules.NetID(config.Network.NetwokID))
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: Push IP back to bcdb
-	log.Info().Str("ip", join.IP.String()).Str("container", reservation.ID).Msg("assigned an IP")
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
 	mnt, err := flistClient.Mount(config.FList, "")
@@ -131,7 +128,7 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 			RootFS: mnt,
 			Env:    env,
 			Network: modules.NetworkInfo{
-				Namespace: join.Namespace,
+				Namespace: ns,
 			},
 			Mounts:      mounts,
 			Entrypoint:  config.Entrypoint,

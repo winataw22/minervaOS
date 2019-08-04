@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
 )
 
@@ -41,7 +40,7 @@ func New(name string) (*netlink.Bridge, error) {
 func Get(name string) (*netlink.Bridge, error) {
 	link, err := netlink.LinkByName(name)
 	if err != nil {
-		return nil, errors.Wrapf(err, "bridge %s not found", name)
+		return nil, err
 	}
 
 	if link.Type() != "bridge" {

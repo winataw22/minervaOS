@@ -102,7 +102,7 @@ func main() {
 							Action: cmdCreateNetwork,
 						},
 						{
-							Name:  "add-node",
+							Name:  "add",
 							Usage: "add a node to a existing network",
 							Flags: []cli.Flag{
 								cli.StringSliceFlag{
@@ -117,18 +117,7 @@ func main() {
 							Action: cmdsAddNode,
 						},
 						{
-							Name:  "remove-node",
-							Usage: "prints the wg-quick configuration file for a certain user in the network",
-							Flags: []cli.Flag{
-								cli.StringFlag{
-									Name:  "node",
-									Usage: "node ID to remove from the network",
-								},
-							},
-							Action: cmdsRemoveNode,
-						},
-						{
-							Name:  "add-user",
+							Name:  "user",
 							Usage: "prints the wg-quick configuration file for a certain user in the network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
