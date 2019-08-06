@@ -40,7 +40,8 @@ Tunnels 6in4 then do not apply, and IPv4 proxies can be handled locally.
 
 IPv6 allocations are simple to come by, it's just a matter of requesting an
 allocation from the LIR (Local Internet Registrar). Mostly they will give a /48
-to start with, that gives ample space already. (65536 subnets).  As the smallest Router advertisement prefix from an allocation is a /48, when explaining to the network admin from the DC what your IPv6 Requirements are, they'll gladly give you a /40. And if that doesn't suffice, you can just ask a /32 from the RIR, the IPv6 space is so vast that it's only an administrative entry. (a /32 gives you 2^32 /64 prefixes, that is as many as the full IPv4 Address space).  
+to start with, that gives ample space already. (65536 subnets).   
+As the smallest advertised (BGP) prefix for an allocation is a /48, when explaining to the network admin from the DC what your IPv6 Requirements are, they'll gladly give you a /40. And if that doesn't suffice, you can just ask a /32 from the RIR, the IPv6 space is so vast that it's only an administrative entry. (a /32 gives you 2^32 /64 prefixes, that is as many as the full IPv4 Address space).  
 
 We then need to be able to hand out an allocation from that range for a tenant
 service/network and announce a route, e.g. upstream
@@ -107,7 +108,8 @@ No need to work for this, as that can be viewed in the future
 
 1. ### Jool as a means to NAT ipv6 to ipv4 (snat/dnat) and vice-versa
 
-
+1. ### Implement the Network Resources(NR) as dual-stack 
+We can of course also have the NRs as dual-stack (carrying both IPv6 as IPv4), where the IPv4 part can then be penultimate routed to the Exitpoint, and NATed to the Exterior, whereas the IPv6 part is fully routed.
 
 
 ## IPv6 prefixes for tenant networks (l2/l3) and prefix delegations.
@@ -154,19 +156,5 @@ Having Tenant networks mixed address space numberings add to complexity, so we'l
 
 5. ### Considerations for farms (or nodes that live in a same subnet/prefix)
 
-Noded being part of a farm and all of them deployed in the same Datacentre, connected to same switches, and mostly with multiple network interfaces are different beasts altogether. There we might envision to have specific containers that are using more performant interfaces.  
-We can surmise that these are 'trusted' networks, if the user trusts the farmer. Given that, in order to keep an interconnect between sone customer workloads performant, and not using encryption for tunneling (also alleviating cpu usage, as encryption is either way an expensive thing to do), we can use basically the same concept but over vxlans or GRE tunnels.
-
-
-6. ### Building tunnels 
-
-
-
-
-
-## Service Registration and Discovery (aka DNS)
-
-1. ### IPv4/IPv6 Considerations and crossing boundaries
-
-2. ### Exposing an IPv4 address in an IPv6 world (DNS64)
-
+Nodes being part of a 'farm' and all of them deployed in the same Datacentre, connected to same switches, and mostly with multiple network interfaces are different beasts altogether. There we might envision to have specific containers that are using more performant interfaces.  
+We can surmise that these are 'trusted' networks, if the user trusts the farmer (basically the same type of trust you can give to an AWS node, or a DigitalOcean Droplet). Given that, in order to keep an interconnect between sone customer workloads performant, and not using encryption for tunneling (also alleviating cpu usage, as encryption is either way an expensive thing to do), we can use basically the same concept but over vxlans or GRE tunnels (like all other players do).

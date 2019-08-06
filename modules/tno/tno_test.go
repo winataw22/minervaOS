@@ -10,6 +10,89 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+func mustParseCIDR(cidr string) *net.IPNet {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	ipnet.IP = ip
+	return ipnet
+}
+
+var peers = []*modules.Peer{
+	{
+		Type:   modules.ConnTypeWireguard,
+		Prefix: mustParseCIDR("2a02:1802:5e:ff02::/64"),
+		Connection: modules.Wireguard{
+			IP:   net.ParseIP("2001:1:1:1::1"),
+			Port: 1601,
+			Key:  "4w4woC+AuDUAaRipT49M8SmTkzERps3xA5i0BW4hPiw=",
+		},
+	},
+	{
+		Type:   modules.ConnTypeWireguard,
+		Prefix: mustParseCIDR("2a02:1802:5e:cc02::/64"),
+		Connection: modules.Wireguard{
+			IP:   net.ParseIP("2001:1:1:2::1"),
+			Port: 1602,
+			Key:  "HXnTmizQdGlAuE9PpVPw1Drg2WygUsxwGnJY+A5xgVo=",
+		},
+	},
+	{
+		Type:   modules.ConnTypeWireguard,
+		Prefix: mustParseCIDR("2a02:1802:5e:aaaa::/64"),
+		Connection: modules.Wireguard{
+			IP:   net.ParseIP("2001:3:3:3::3"),
+			Port: 1603,
+			Key:  "5Adc456lkjlRtRipT49M8SmTkzERps3xA5i0BW4hPiw=",
+		},
+	},
+}
+
+var node1 = &modules.NetResource{
+	NodeID: &modules.NodeID{
+		ID:             "node1",
+		ReachabilityV4: modules.ReachabilityV4Public,
+		ReachabilityV6: modules.ReachabilityV6Public,
+	},
+	Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
+	LinkLocal: mustParseCIDR("fe80::ff02/64"),
+	Peers:     peers,
+	ExitPoint: true,
+}
+var node2 = &modules.NetResource{
+	NodeID: &modules.NodeID{
+		ID:             "node2",
+		ReachabilityV4: modules.ReachabilityV4Hidden,
+		ReachabilityV6: modules.ReachabilityV6ULA,
+	},
+	Prefix:    mustParseCIDR("2a02:1802:5e:cc02::/64"),
+	LinkLocal: mustParseCIDR("fe80::cc02/64"),
+	Peers:     peers,
+}
+
+var node3 = &modules.NetResource{
+	NodeID: &modules.NodeID{
+		ID:             "node3",
+		ReachabilityV4: modules.ReachabilityV4Public,
+		ReachabilityV6: modules.ReachabilityV6Public,
+	},
+	Prefix:    mustParseCIDR("2a02:1802:5e:aaaa::/64"),
+	LinkLocal: mustParseCIDR("fe80::aaaa/64"),
+	Peers:     peers,
+}
+
+var networks = []*modules.Network{
+	{
+		NetID: "net1",
+		Resources: []*modules.NetResource{
+			node1, node2, node3,
+		},
+		PrefixZero: mustParseCIDR("2a02:1802:5e:0000::/64"),
+		Exit:       &modules.ExitPoint{},
+	},
+}
+
 func TestGenerateID(t *testing.T) {
 	n := &modules.Network{}
 
@@ -204,4 +287,20 @@ func TestAddUser(t *testing.T) {
 	assert.Nil(t, n.Resources[0].Peers[0].Connection.IP)
 	assert.Zero(t, n.Resources[0].Peers[0].Connection.Port)
 	assert.Equal(t, key.PublicKey().String(), n.Resources[0].Peers[0].Connection.Key)
+}
+
+func TestRemoveNode(t *testing.T) {
+	n := networks[0]
+
+	assert.EqualValues(t, node1, n.Resources[0])
+	assert.EqualValues(t, node2, n.Resources[1])
+	assert.EqualValues(t, node3, n.Resources[2])
+
+	err := Configure(n, []Opts{
+		RemoveNode(node1.NodeID.ID),
+	})
+	require.NoError(t, err)
+
+	assert.EqualValues(t, node2, n.Resources[0])
+	assert.EqualValues(t, node3, n.Resources[1])
 }

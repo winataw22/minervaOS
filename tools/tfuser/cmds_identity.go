@@ -9,18 +9,19 @@ import (
 )
 
 func cmdsGenerateID(c *cli.Context) error {
-	k, err := identity.GenerateKeyPair()
-	if err != nil {
-		return err
-	}
 
 	output := c.String("output")
 
-	_, err = identity.LoadSeed(output)
+	k, err := identity.LoadSeed(output)
 	if err == nil {
 		fmt.Printf("a seed already exists at %s\n", output)
 		fmt.Printf("identity: %s\n", k.Identity())
 		return nil
+	}
+
+	k, err = identity.GenerateKeyPair()
+	if err != nil {
+		return err
 	}
 
 	if err := k.Save(c.String("output")); err != nil {

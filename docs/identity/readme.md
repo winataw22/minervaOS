@@ -1,0 +1,78 @@
+# Identity Module
+
+## ZBus
+Storage module is available on zbus over the following channel
+
+| module | object | version |
+|--------|--------|---------|
+| identity|[manager](#interface)| 0.0.1|
+
+## Introduction
+Identity manager is responsible for node identification on the grid. The manager make sure the node has one valid ID during the entire lifetime of the node, and that node id is registered on the grid.
+
+On first boot, the identity manager will generate an ID and then persist this ID for life. The node registration happens to the BCDB once the network is reachable, and after that the node will be available for reservations.
+
+Since the identity daemon is the only one that can access the node private key, it provides an interface to sign, verify and encrypt data. This methods are available for other modules on the local node to use.
+
+## On Node Booting
+- Check if node already has a seed generated
+- If yes, load the node identity
+- If not, generate a new ID
+- Once identity is loaded, register the node to bcdb, this will keep runing in the background until successful.
+- Start the zbus daemon.
+
+### zinit unit
+The zinit unit file of the module specify the command line,  test command, and the order where the services need to be booted.
+
+`identityd` require `storaged` to make sure the seed is persisted over reboots, to make sure node has the same ID during the full life time of the node.
+The identityd daemon is only considered running if the seed file exists.
+
+```yaml
+exec: /bin/identityd
+test: test -e /var/cache/modules/identity/seed.txt
+after:
+  - storaged
+```
+
+## Interface
+```go
+package modules
+
+// Identifier is the interface that defines
+// how an object can be used as an identity
+type Identifier interface {
+	Identity() string
+}
+
+// StrIdentifier is a helper type that implement the Identifier interface
+// on top of simple string
+type StrIdentifier string
+
+// Identity implements the Identifier interface
+func (s StrIdentifier) Identity() string {
+	return string(s)
+}
+
+// IdentityManager interface.
+type IdentityManager interface {
+	// NodeID returns the node id (public key)
+	NodeID() StrIdentifier
+
+	// FarmID return the farm id this node is part of. this is usually a configuration
+	// that the node is booted with. An error is returned if the farmer id is not configured
+	FarmID() (StrIdentifier, error)
+
+	// Sign signs the message with privateKey and returns a signature.
+	Sign(message []byte) ([]byte, error)
+
+	// Verify reports whether sig is a valid signature of message by publicKey.
+	Verify(message, sig []byte) error
+
+	// Encrypt encrypts message with the public key of the node
+	Encrypt(message []byte) ([]byte, error)
+
+	// Decrypt decrypts message with the private of the node
+	Decrypt(message []byte) ([]byte, error)
+}
+
+```

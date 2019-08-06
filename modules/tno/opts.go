@@ -256,3 +256,43 @@ func AddUser(userID string, allocation *net.IPNet, key wgtypes.Key) Opts {
 		return nil
 	}
 }
+
+// RemoveNode remove a network resource associated with nodeID and
+// all the occurrence of this peer in all other resources
+func RemoveNode(nodeID string) Opts {
+
+	return func(n *modules.Network) error {
+		var prefix *net.IPNet
+		for i, r := range n.Resources {
+			if r.NodeID.ID == nodeID {
+				prefix = r.Prefix
+				n.Resources = removeResource(n.Resources, i)
+			}
+		}
+
+		if prefix == nil {
+			// node ID not present in the TNO
+			return nil
+		}
+
+		for _, r := range n.Resources {
+			for i, peer := range r.Peers {
+				if peer.Prefix.String() == prefix.String() {
+					r.Peers = removePeer(r.Peers, i)
+					break
+				}
+			}
+
+		}
+
+		return nil
+	}
+}
+
+func removeResource(s []*modules.NetResource, i int) []*modules.NetResource {
+	return append(s[:i], s[i+1:]...)
+}
+
+func removePeer(s []*modules.Peer, i int) []*modules.Peer {
+	return append(s[:i], s[i+1:]...)
+}

@@ -43,6 +43,10 @@ func createNetworkResource(localResource *modules.NetResource, network *modules.
 		return err
 	}
 
+	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", bridgeName), "1"); err != nil {
+		return errors.Wrapf(err, "failed to disable ip6 on bridge %s", bridgeName)
+	}
+
 	log.Info().Str("namespace", netnsName).Msg("Create namesapce")
 	netResNS, err := namespace.Create(netnsName)
 	if err != nil {
@@ -106,6 +110,10 @@ func createNetworkResource(localResource *modules.NetResource, network *modules.
 	hostVeth, err := netlink.LinkByName(hostIface.Name)
 	if err != nil {
 		return err
+	}
+
+	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", hostVeth.Attrs().Name), "1"); err != nil {
+		return errors.Wrapf(err, "failed to disable ip6 on veth %s", hostVeth.Attrs().Name)
 	}
 
 	log.Info().

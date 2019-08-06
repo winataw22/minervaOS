@@ -51,7 +51,7 @@ func (s *NetworkerStub) DeleteNetResource(arg0 modules.Network) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 string, arg1 modules.NetID) (ret0 string, ret1 error) {
+func (s *NetworkerStub) Join(arg0 string, arg1 modules.NetID) (ret0 modules.Member, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.Request(s.module, s.object, "Join", args...)
 	if err != nil {
