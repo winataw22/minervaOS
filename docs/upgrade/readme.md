@@ -1,4 +1,12 @@
-# 0-OS upgrade
+# Upgrade module
+
+## Zbus
+
+Upgrade is an autonomous module and is not reachable over zbus.
+
+## zinit unit
+
+Upgrade module depends on network and flist module. This is because is requires network connection to check for new update and the flist module to download the upgrade flist on the node.
 
 ## Philosophy
 
@@ -26,13 +34,11 @@ The upgrade transaction should contains a description and signature of all the n
 
 The only way to get code onto a 0-OS is using flist. An upgrade flist will be composed of the new binary to install and in some case a migration script.
 
-The content of the upgrade flist will be cached on disk, so in the event of a power failure, the node can just restart and restart all the workloads without downloading all the new modules again.
-
 ![upgrade flow](../../assets/0-OS_upgrade_flow.png)
 
 ### Flist upgrade layout
 
-The files in the upgrade flist needs to be located in the filesystem tree at the same destination they would need to be in 0-OS. This allow the upgrade code to stays simple and only does a copy from the flist to the cache disk of 0-OS.
+The files in the upgrade flist needs to be located in the filesystem tree at the same destination they would need to be in 0-OS. This allow the upgrade code to stays simple and only does a copy from the flist to the root filesystem of the node.
 
 Some hooks scripts will be executed during the upgrade flow if there are present in the flist. These files needs to be executable, be located at the root of the flist and named:
 
@@ -57,8 +63,8 @@ upgrade flist:
 ```
 root
 ├── bin
-│   ├── flist_module_0.2.0
-│   └── containerd
+│   ├── containerd
+│   └── flist_module_0.2.0
 ├── etc
 |   └── containerd
 |       └── config.toml
@@ -90,3 +96,5 @@ This component is going to be responsible to watch new upgrade being publish on 
   - it always needs to aim for a minimal to no downtime if possible.
   - if some downtime is required, arrange to make it during a low traffic hour to impact as less as possible the users.
 - in the event of the cache being corrupted, it will need to re-downloads all the component requires to run the workload present on the node. Some workload might still required previous version of some component, so during re-population of the cache it needs to make sure to grab all the versions required.
+
+In practice the actual upgrade watcher doesn't have the logic to schedule upgrade yet. It will directly apply the upgrade as soon as it finds it. This will be improved in combing versions

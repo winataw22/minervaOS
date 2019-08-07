@@ -25,7 +25,7 @@ else (no)
   note right: prevent this upgrade to be applied again
   :start services;
   if (service started?) then (yes)
-   :log success;
+   :upgrade done;
     stop
   else (no)
     :notify owner system is not healthy anymore;
