@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/threefoldtech/zosv2/modules/identity"
-
 	"golang.org/x/crypto/ed25519"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -27,6 +25,44 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vishvananda/netlink"
 )
+
+type testIdentityManager struct {
+	id   string
+	farm string
+}
+
+var _ modules.IdentityManager = (*testIdentityManager)(nil)
+
+// NodeID returns the node id (public key)
+func (t *testIdentityManager) NodeID() modules.StrIdentifier {
+	return modules.StrIdentifier(t.id)
+}
+
+// FarmID return the farm id this node is part of. this is usually a configuration
+// that the node is booted with. An error is returned if the farmer id is not configured
+func (t *testIdentityManager) FarmID() (modules.StrIdentifier, error) {
+	return modules.StrIdentifier(t.farm), nil
+}
+
+// Sign signs the message with privateKey and returns a signature.
+func (t *testIdentityManager) Sign(message []byte) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// Verify reports whether sig is a valid signature of message by publicKey.
+func (t *testIdentityManager) Verify(message, sig []byte) error {
+	return fmt.Errorf("not implemented")
+}
+
+// Encrypt encrypts message with the public key of the node
+func (t *testIdentityManager) Encrypt(message []byte) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// Decrypt decrypts message with the private of the node
+func (t *testIdentityManager) Decrypt(message []byte) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 var peers = []*modules.Peer{
 	{
@@ -115,12 +151,9 @@ func TestCreateNetwork(t *testing.T) {
 	dir, err := ioutil.TempDir("", netName)
 	require.NoError(t, err)
 
-	idMgr, err := identity.NewManager(filepath.Join(dir, "id"))
-	require.NoError(t, err)
-
 	storage := filepath.Join(dir, netName)
 	networker := &networker{
-		identity:   idMgr,
+		identity:   &testIdentityManager{id: "test-node"},
 		storageDir: storage,
 	}
 

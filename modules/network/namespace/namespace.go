@@ -121,6 +121,9 @@ func getCurrentThreadNetNSPath() string {
 
 // Delete deletes a network namespace
 func Delete(ns ns.NetNS) error {
+	if ns == nil {
+		return fmt.Errorf("invalid namespace")
+	}
 	if err := ns.Close(); err != nil {
 		return err
 	}

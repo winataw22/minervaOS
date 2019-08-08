@@ -137,6 +137,18 @@ func addUser(network *modules.Network, userID string) (*modules.Network, string,
 	return network, key.String(), nil
 }
 
+func removeNode(network *modules.Network, nodeID string) (*modules.Network, error) {
+	err := tno.Configure(network, []tno.Opts{
+		tno.RemoveNode(nodeID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	network.Version++
+	return network, nil
+}
+
 func reserveNetwork(network *modules.Network) error {
 	raw, err := json.Marshal(network)
 	if err != nil {
