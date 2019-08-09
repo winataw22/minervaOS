@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/vishvananda/netlink"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -165,6 +166,10 @@ func (n *networker) Join(member string, id modules.NetID) (join modules.Member, 
 	hostVeth, err := netlink.LinkByName(hostVethName)
 	if err != nil {
 		return join, err
+	}
+
+	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", hostVeth.Attrs().Name), "1"); err != nil {
+		return join, errors.Wrapf(err, "failed to disable ip6 on bridge %s", hostVeth.Attrs().Name)
 	}
 
 	return join, bridge.AttachNic(hostVeth, br)

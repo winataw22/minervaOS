@@ -202,11 +202,11 @@ func GenerateKey(dir string) (wgtypes.Key, error) {
 	if err != nil {
 		return wgtypes.Key{}, err
 	}
-	if err := os.MkdirAll(dir, 700); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return wgtypes.Key{}, err
 	}
 
-	if err := ioutil.WriteFile(path, []byte(key.String()), 400); err != nil {
+	if err := ioutil.WriteFile(path, []byte(key.String()), 0400); err != nil {
 		return wgtypes.Key{}, err
 	}
 	return key, nil

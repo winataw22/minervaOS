@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/Microsoft/go-winio v0.4.12 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
-	github.com/alexflint/go-filemutex v0.0.0-20171028004239-d358565f3c3f // indirect
+	github.com/alexflint/go-filemutex v0.0.0-20171028004239-d358565f3c3f
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containerd/cgroups v0.0.0-20190603164311-51b62d303d38 // indirect
 	github.com/containerd/containerd v1.2.3
