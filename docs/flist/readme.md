@@ -8,6 +8,12 @@ Flist module is available on zbus over the following channel
 |--------|--------|---------|
 |flist   |[flist](#public-interface)| 0.0.1
 
+## Home Directory
+flist keeps some data in the following locations
+| directory | path|
+|----|---|
+| root| `/var/cache/modules/containerd`|
+
 ## Introduction
 
 This module is responsible to "mount an flist" in the filesystem of the node. The mounted directory contains all the files required by containers or (in the future) VMs.

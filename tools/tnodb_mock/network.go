@@ -99,6 +99,7 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		node.PublicConfig = &network.PubIface{}
 	}
 
+	node.PublicConfig.Type = network.MacVlanIface //TODO: change me once we support other types
 	node.PublicConfig.Master = input.Iface
 	for i := range input.IPs {
 		ip, ipnet, err := net.ParseCIDR(input.IPs[i])

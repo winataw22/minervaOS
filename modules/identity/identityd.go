@@ -35,7 +35,7 @@ func NewManager(path string) (modules.IdentityManager, error) {
 	} else {
 		pair, err = FromSeed(seed)
 		if err != nil {
-			return nil, errors.Wrap(err, "invlaid seed file")
+			return nil, errors.Wrap(err, "invalid seed file")
 		}
 	}
 

@@ -3,6 +3,7 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	nib "github.com/threefoldtech/zosv2/modules/network/ip"
+	"github.com/threefoldtech/zosv2/modules/network/macvlan"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
@@ -25,6 +27,11 @@ import (
 
 	"github.com/threefoldtech/zosv2/modules"
 	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
+)
+
+const (
+	// ZDBIface is the name of the intefface used in the 0-db network namespace
+	ZDBIface = "zdb0"
 )
 
 type networker struct {
@@ -58,7 +65,19 @@ func validateNetwork(n *modules.Network) error {
 	if len(n.Resources) < 1 {
 		return fmt.Errorf("Network needs at least one network ressource")
 	}
-	// TODO validate each resource
+
+	for i, r := range n.Resources {
+		nibble := nib.NewNibble(r.Prefix, n.AllocationNR)
+		if r.Prefix == nil {
+			return fmt.Errorf("Prefix for network resource %s is empty", r.NodeID.Identity())
+		}
+
+		peer := r.Peers[i]
+		expectedPort := nibble.WireguardPort()
+		if peer.Connection.Port != 0 && peer.Connection.Port != expectedPort {
+			return fmt.Errorf("Wireguard port for peer %s should be %d", r.NodeID.Identity(), expectedPort)
+		}
+	}
 
 	if n.Exit == nil {
 		return fmt.Errorf("Exit point cannot be empty")
@@ -173,6 +192,84 @@ func (n *networker) Join(member string, id modules.NetID) (join modules.Member, 
 	}
 
 	return join, bridge.AttachNic(hostVeth, br)
+}
+
+// ZDBPrepare sends a macvlan interface into the
+// network namespace of a ZDB container
+func (n networker) ZDBPrepare() (string, error) {
+
+	netNSName, err := ifaceutil.RandomName("zdb-ns-")
+	if err != nil {
+		return "", err
+	}
+
+	netNs, err := createNetNS(netNSName)
+	if err != nil {
+		return "", err
+	}
+	defer netNs.Close()
+
+	// find which interface to use as master for the macvlan
+	pubIface := DefaultBridge
+	if namespace.Exists(PublicNamespace) {
+		master, err := publicMasterIface()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to retrieve the master interface name of the public interface")
+		}
+		pubIface = master
+	}
+
+	macVlan, err := macvlan.Create(ZDBIface, pubIface, netNs)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create public mac vlan interface")
+	}
+
+	// we don't set any route or ip
+	if err := macvlan.Install(macVlan, []*net.IPNet{}, []*netlink.Route{}, netNs); err != nil {
+		return "", err
+	}
+
+	return netNSName, nil
+}
+
+// Addrs return the IP addresses of interface
+func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
+	var ips []net.IP
+
+	f := func(_ ns.NetNS) error {
+		link, err := netlink.LinkByName(iface)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get interface %s", iface)
+		}
+
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
+		}
+		ips = make([]net.IP, len(addrs))
+		for i, addr := range addrs {
+			ips[i] = addr.IP
+		}
+		return nil
+	}
+
+	if netns != "" {
+		netNS, err := namespace.GetByName(netns)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get network namespace %s", netns)
+		}
+		defer netNS.Close()
+
+		if err := netNS.Do(f); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := f(nil); err != nil {
+			return nil, err
+		}
+	}
+
+	return ips, nil
 }
 
 // ApplyNetResource implements modules.Networker interface
@@ -367,4 +464,55 @@ func (n *networker) extractPrivateKey(r *modules.NetResource) (wgtypes.Key, erro
 	}
 
 	return wgtypes.ParseKey(string(decoded))
+}
+
+// publicMasterIface return the name of the master interface
+// of the public interface
+func publicMasterIface() (string, error) {
+	netns, err := namespace.GetByName(PublicNamespace)
+	if err != nil {
+		return "", err
+	}
+	defer netns.Close()
+
+	var iface string
+	if err := netns.Do(func(_ ns.NetNS) error {
+		pl, err := netlink.LinkByName(PublicIface)
+		if err != nil {
+			return err
+		}
+		index := pl.Attrs().MasterIndex
+		if index == 0 {
+			return fmt.Errorf("public iface has not master")
+		}
+		ml, err := netlink.LinkByIndex(index)
+		if err != nil {
+			return err
+		}
+		iface = ml.Attrs().Name
+		return nil
+	}); err != nil {
+		return "", err
+	}
+
+	return iface, nil
+}
+
+// createNetNS create a network namespace and set lo interface up
+func createNetNS(name string) (ns.NetNS, error) {
+
+	netNs, err := namespace.Create(name)
+	if err != nil {
+		return nil, err
+	}
+
+	err = netNs.Do(func(_ ns.NetNS) error {
+		return ifaceutil.SetLoUp()
+	})
+	if err != nil {
+		namespace.Delete(netNs)
+		return nil, err
+	}
+
+	return netNs, nil
 }

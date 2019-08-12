@@ -50,15 +50,13 @@ A Node responsible for ExitPoints as wel as a Public endpoint will know so becau
 
 With that information, a Node can then build the Network Namespace from which it builds the Wireguard Interfaces prior to sending them in the ExitPoint Namespace.
 
-
-
 So the Global Registry hands out
-  - Tenant Network Objects
+  - Tenant Network Objects 
   - Public Interface Objects
 
 They are related :
   - A Node can have Network Resources
-  - A Network Resource can have (1) Public Interface
+  - A Network Resource can have (1) Public Interface, and that ONLY when that NR is an ExitPoint
   - Both are part of a Tenant Network
 
 A TNo defines a Network where ONLY the ExitPoint is flagged as being one. No more.  
@@ -68,7 +66,4 @@ When the Node (networkd) needs to setup a Public node, it will need to act diffe
     - If there is Public Exit Namespace, request one, and set it up first.
 
 
-FarmerID
-NodeID
-TenantNetworks []Network
 

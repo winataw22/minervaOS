@@ -189,7 +189,7 @@ func TestAddNode(t *testing.T) {
 				},
 				key:      key,
 				publicIP: net.ParseIP("2a02:1802:5e::afba"),
-				port:     1600,
+				port:     44986,
 			},
 		},
 		{
@@ -203,7 +203,7 @@ func TestAddNode(t *testing.T) {
 				},
 				key:      key,
 				publicIP: nil,
-				port:     0,
+				port:     44986,
 			},
 		},
 	}
@@ -212,7 +212,7 @@ func TestAddNode(t *testing.T) {
 			n := &modules.Network{}
 
 			err = Configure(n, []Opts{
-				AddNode(tt.args.nodeID, tt.args.farmID, tt.args.allocation, tt.args.key, tt.args.publicIP, tt.args.port),
+				AddNode(tt.args.nodeID, tt.args.farmID, tt.args.allocation, tt.args.key, tt.args.publicIP),
 			})
 			assert.Error(t, err, "AddNode should return an error if the network does not have a PrefixZero configured")
 
@@ -222,7 +222,7 @@ func TestAddNode(t *testing.T) {
 			}
 
 			err = Configure(n, []Opts{
-				AddNode(tt.args.nodeID, tt.args.farmID, tt.args.allocation, tt.args.key, tt.args.publicIP, tt.args.port),
+				AddNode(tt.args.nodeID, tt.args.farmID, tt.args.allocation, tt.args.key, tt.args.publicIP),
 			})
 
 			require.NoError(t, err)

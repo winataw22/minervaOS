@@ -43,7 +43,7 @@ func (r *Reservation) Sign(privateKey ed25519.PrivateKey) error {
 }
 
 // Verify verifies the signature of the reservation
-func Verify(r Reservation) error {
+func Verify(r *Reservation) error {
 	buf := &bytes.Buffer{}
 	//FIME: Since the ID is only set when the reservation is sent to bcdb
 	// we cannot use it in the signature. This is a problem

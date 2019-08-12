@@ -8,6 +8,12 @@ Storage module is available on zbus over the following channel
 |--------|--------|---------|
 | container|[container](#interface)| 0.0.1|
 
+## Home Directory
+contd keeps some data in the following locations
+| directory | path|
+|----|---|
+| root| `/var/cache/modules/containerd`|
+
 ## Introduction
 
 The container module, is a proxy to [containerd](https://github.com/containerd/containerd). The proxy provides integration with zbus.

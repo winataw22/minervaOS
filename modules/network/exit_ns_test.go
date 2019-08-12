@@ -17,7 +17,7 @@ func TestCreatePublicNS(t *testing.T) {
 	}
 
 	defer func() {
-		pubNS, _ := namespace.GetByName("public")
+		pubNS, _ := namespace.GetByName(PublicNamespace)
 		err := namespace.Delete(pubNS)
 		require.NoError(t, err)
 	}()

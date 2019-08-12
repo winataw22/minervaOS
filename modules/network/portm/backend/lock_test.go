@@ -1,49 +1,47 @@
 package backend
 
-// import (
-// 	"io/ioutil"
-// 	"os"
-// 	"path/filepath"
+import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"testing"
 
-// 	. "github.com/onsi/ginkgo"
-// 	. "github.com/onsi/gomega"
-// )
+	"github.com/stretchr/testify/require"
+)
 
-// var _ = Describe("Lock Operations", func() {
-// 	It("locks a file path", func() {
-// 		dir, err := ioutil.TempDir("", "")
-// 		Expect(err).ToNot(HaveOccurred())
-// 		defer os.RemoveAll(dir)
+func TestLockOperations(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
 
-// 		// create a dummy file to lock
-// 		path := filepath.Join(dir, "x")
-// 		f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0666)
-// 		Expect(err).ToNot(HaveOccurred())
-// 		err = f.Close()
-// 		Expect(err).ToNot(HaveOccurred())
+	// create a dummy file to lock
+	path := filepath.Join(dir, "x")
+	f, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	err = f.Close()
+	require.NoError(t, err)
 
-// 		// now use it to lock
-// 		m, err := NewFileLock(path)
-// 		Expect(err).ToNot(HaveOccurred())
+	// now use it to lock
+	m, err := NewFileLock(path)
+	require.NoError(t, err)
 
-// 		err = m.Lock()
-// 		Expect(err).ToNot(HaveOccurred())
-// 		err = m.Unlock()
-// 		Expect(err).ToNot(HaveOccurred())
-// 	})
+	err = m.Lock()
+	require.NoError(t, err)
+	err = m.Unlock()
+	require.NoError(t, err)
+}
 
-// 	It("locks a folder path", func() {
-// 		dir, err := ioutil.TempDir("", "")
-// 		Expect(err).ToNot(HaveOccurred())
-// 		defer os.RemoveAll(dir)
+func TestLockFolderPath(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
 
-// 		// use the folder to lock
-// 		m, err := NewFileLock(dir)
-// 		Expect(err).ToNot(HaveOccurred())
+	// use the folder to lock
+	m, err := NewFileLock(dir)
+	require.NoError(t, err)
 
-// 		err = m.Lock()
-// 		Expect(err).ToNot(HaveOccurred())
-// 		err = m.Unlock()
-// 		Expect(err).ToNot(HaveOccurred())
-// 	})
-// })
+	err = m.Lock()
+	require.NoError(t, err)
+	err = m.Unlock()
+	require.NoError(t, err)
+}

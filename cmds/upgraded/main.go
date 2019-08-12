@@ -30,7 +30,7 @@ func main() {
 		ver      bool
 	)
 
-	flag.StringVar(&root, "root", "/var/modules/upgrade", "root path of the module")
+	flag.StringVar(&root, "root", "/var/cache/modules/upgraded", "root path of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.StringVar(&url, "url", "https://versions.dev.grid.tf", "url of the upgrade server")
 	flag.IntVar(&interval, "interval", 600, "interval in seconds between update checks, default to 600")

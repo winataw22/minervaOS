@@ -59,7 +59,7 @@ PersistentKeepalive = 20
   - an exitpoint with it's own Public IP
     - for IPv4, that means that and IPv4 address needs to be bought, as without it, there is no NAT to the Routable Internet available. 
     - Although we actually could provide a global Routing Namespace that does NAT for all IPv4 Network resources in all Tenant Networks, it's just setting it up with correct firewall rules, and proper vrf with route leaking and conntrack zones (LATER). 
-    NOTE: This might aver to be really necesary for reaching to the internet, as IPv6 coverage is still very low in a lot of regions, let alone implemented at ISP level. E.g. Telenet has less than 60% coverage of the home networks, as many routers are not updatable and until they break will not be replaced.
+    NOTE: This might aver to be really necesary for reaching to the internet, as IPv6 coverage is still very low in a lot of regions, let alone implemented at ISP level. E.g. Telenet has less than 60% coverage of the home networks, as many routers are not updatable and until they break will not be replaced. (got it from a telenetter himself)
 
 As it is, there are no firewall rules necessary, as nothing lives in that namespace, it's only used as a conduit for Wireguard listening ports and their associated traffic.
 So for the Wireguard Public namespace:

@@ -19,7 +19,7 @@ func TestVerifySignature(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	r := Reservation{
+	r := &Reservation{
 		ID:   "reservationID",
 		User: keyPair.Identity(),
 		Type: ContainerReservation,

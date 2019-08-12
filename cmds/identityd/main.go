@@ -8,7 +8,7 @@ import (
 
 	"github.com/threefoldtech/zbus"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/identity"
@@ -29,7 +29,7 @@ func main() {
 		ver          bool
 	)
 
-	flag.StringVar(&root, "root", "/var/cache/modules/identity", "root working directory of the module")
+	flag.StringVar(&root, "root", "/var/cache/modules/identityd", "root working directory of the module")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
 	flag.BoolVar(&ver, "v", false, "show version and exit")

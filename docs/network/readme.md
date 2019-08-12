@@ -8,6 +8,13 @@ Network module is available on zbus over the following channel
 |--------|--------|---------|
 | network|[network](#interface)| 0.0.1|
 
+## Home Directory
+network keeps some data in the following locations
+| directory | path|
+|----|---|
+| root| `/var/cache/modules/network`|
+
+
 ## Interface
 
 ```go

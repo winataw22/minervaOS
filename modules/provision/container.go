@@ -29,6 +29,8 @@ type Mount struct {
 type Container struct {
 	// URL of the flist
 	FList string `json:"flist"`
+	// URL of the storage backend for the flist
+	FlistStorage string `json:"flist"`
 	// Env env variables to container in format
 	Env map[string]string `json:"env"`
 	// Entrypoint the process to start inside the container
@@ -42,9 +44,9 @@ type Container struct {
 }
 
 // ContainerProvision is entry point to container reservation
-func ContainerProvision(ctx context.Context, reservation Reservation) (interface{}, error) {
+func containerProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
 	client := GetZBus(ctx)
-	cache := GetCache(ctx)
+	cache := GetOwnerCache(ctx)
 
 	containerClient := stubs.NewContainerModuleStub(client)
 	flistClient := stubs.NewFlisterStub(client)
@@ -65,6 +67,10 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 		return nil, err
 	}
 
+	if err := validateContainerConfig(config); err != nil {
+		return nil, errors.Wrap(err, "container provision schema not valid")
+	}
+
 	log.Debug().
 		Str("network-id", config.Network.NetwokID).
 		Str("config", fmt.Sprintf("%+v", config)).
@@ -80,7 +86,7 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 	log.Info().Str("ip", join.IP.String()).Str("container", reservation.ID).Msg("assigned an IP")
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
-	mnt, err := flistClient.Mount(config.FList, "")
+	mnt, err := flistClient.Mount(config.FList, config.FlistStorage)
 	if err != nil {
 		return nil, err
 	}
@@ -149,4 +155,39 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 
 	log.Info().Msgf("container created with id: '%s'", id)
 	return id, nil
+}
+
+func containerDecommission(ctx context.Context, reservation *Reservation) error {
+	client := GetZBus(ctx)
+
+	container := stubs.NewContainerModuleStub(client)
+	flist := stubs.NewFlisterStub(client)
+
+	id := modules.ContainerID(reservation.ID)
+
+	info, err := container.Inspect(reservation.User, id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to inspect container %s", id)
+	}
+
+	if err := container.Delete(reservation.User, modules.ContainerID(id)); err != nil {
+		return errors.Wrapf(err, "failed to delete container %s", id)
+	}
+
+	if err := flist.Umount(info.RootFS); err != nil {
+		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
+	}
+	return nil
+}
+
+func validateContainerConfig(config Container) error {
+	if config.Network.NetwokID == "" {
+		return fmt.Errorf("network ID cannot be empty")
+	}
+
+	if config.FList == "" {
+		return fmt.Errorf("missing flist url")
+	}
+
+	return nil
 }

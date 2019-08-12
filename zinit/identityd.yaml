@@ -1,4 +1,4 @@
-exec: /bin/identityd
-test: test -e /var/cache/modules/identity/seed.txt
+exec: /bin/identityd -broker unix:///var/run/redis.sock -root /var/cache/modules/identityd
+test: test -e /var/cache/modules/identityd/seed.txt
 after:
   - storaged

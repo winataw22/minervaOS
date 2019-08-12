@@ -48,6 +48,8 @@ type Pool interface {
 	RemoveDevice(device *Device) error
 	// Type of the physical storage in this pool
 	Type() modules.DeviceType
+	// Reserved is reserved size of the devices in bytes
+	Reserved() (uint64, error)
 
 	// Health() ?
 }

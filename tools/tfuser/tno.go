@@ -27,24 +27,18 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 		return nil, err
 	}
 
-	farm, err := db.GetFarm(modules.StrIdentifier(node.FarmID))
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get farm %s detail", node.FarmID)
+	if !node.ExitNode {
+		return nil, fmt.Errorf("node %s cannot be used as exit node", nodeID)
 	}
 
-	if len(farm.ExitNodes) <= 0 {
-		return nil, fmt.Errorf("farm %s has not possible exit node", node.FarmID)
+	pubIface, err := db.ReadPubIface(modules.StrIdentifier(node.NodeID))
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to read public interface config")
 	}
-	exitNodeID := farm.ExitNodes[0]
 
 	allocation, farmAlloc, err := db.RequestAllocation(modules.StrIdentifier(node.FarmID))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to request a new allocation")
-	}
-
-	pubIface, err := db.ReadPubIface(modules.StrIdentifier(exitNodeID))
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to read public interface config")
 	}
 
 	_, farmAllocSize := farmAlloc.Mask.Size()
@@ -58,7 +52,7 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 	err = tno.Configure(network, []tno.Opts{
 		tno.GenerateID(),
 		tno.ConfigurePrefixZero(farmAlloc),
-		tno.ConfigureExitResource(exitNodeID, allocation, pubIface.IPv6.IP, key, farmAllocSize),
+		tno.ConfigureExitResource(node.NodeID, allocation, pubIface.IPv6.IP, key, farmAllocSize),
 	})
 	if err != nil {
 		return nil, err
@@ -68,7 +62,7 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 	return network, nil
 }
 
-func addNode(nw *modules.Network, nodeID string, port uint16) (*modules.Network, error) {
+func addNode(nw *modules.Network, nodeID string) (*modules.Network, error) {
 	if len(nw.Resources) <= 0 {
 		return nil, fmt.Errorf("cannot add a node to network without exit node")
 	}
@@ -97,7 +91,7 @@ func addNode(nw *modules.Network, nodeID string, port uint16) (*modules.Network,
 	}
 
 	err = tno.Configure(nw, []tno.Opts{
-		tno.AddNode(nodeID, farmID, allocation, key, ip, port),
+		tno.AddNode(nodeID, farmID, allocation, key, ip),
 	})
 	if err != nil {
 		return nil, err
@@ -159,7 +153,7 @@ func reserveNetwork(network *modules.Network) error {
 	if err != nil {
 		return err
 	}
-	r := provision.Reservation{
+	r := &provision.Reservation{
 		ID:   id.String(),
 		Type: provision.NetworkReservation,
 		Data: raw,

@@ -4,6 +4,13 @@
 
 Upgrade is an autonomous module and is not reachable over zbus.
 
+## Home Directory
+upgrade keeps some data in the following locations
+| directory | path|
+|----|---|
+| root| `/var/cache/modules/upgrade`|
+
+
 ## zinit unit
 
 Upgrade module depends on network and flist module. This is because is requires network connection to check for new update and the flist module to download the upgrade flist on the node.

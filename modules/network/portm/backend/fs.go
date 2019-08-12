@@ -8,13 +8,14 @@ import (
 )
 
 const lastPort = "last_reserved"
-const LineBreak = "\r\n"
 
 type fsStore struct {
 	*FileLock
 	root string
 }
 
+// NewFSStore creates a backend for port manager that stores
+// the allocated port in a filesystem
 func NewFSStore(root string) (Store, error) {
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return nil, err
@@ -86,20 +87,22 @@ func (s *fsStore) GetByNS(ns string) ([]int, error) {
 	var ports []int
 	dir := filepath.Join(s.root, ns)
 
+	infos, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
 	// walk through all ips in this network to get the ones which belong to a specific ID
-	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
 		}
 
 		p, err := strconv.Atoi(info.Name())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		ports = append(ports, p)
-
-		return nil
-	})
+	}
 
 	return ports, nil
 }

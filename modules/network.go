@@ -27,6 +27,15 @@ type Networker interface {
 	// The member name specifies the name of the member, and must be unique
 	// The NetID is the network id to join
 	Join(member string, id NetID) (Member, error)
+
+	// ZDBPrepare creates a network namespace with a macvlan interface into it
+	// to allow the 0-db container to be publicly accessible
+	// it retusn the name of the network namespace created
+	ZDBPrepare() (string, error)
+
+	// Addrs return the IP addresses of interface
+	// if the interface is in a network namespace netns needs to be not empty
+	Addrs(iface string, netns string) ([]net.IP, error)
 }
 
 // NetID is a type defining the ID of a network

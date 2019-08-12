@@ -16,9 +16,9 @@ func TestPrefixAllocation(t *testing.T) {
 		{"2a02:2788:1000::/48"},
 		{"2a02:2788:0100::/48"},
 	} {
-		_, allocation, err := net.ParseCIDR(tc.Alloc)
+		_, a, err := net.ParseCIDR(tc.Alloc)
 		require.NoError(t, err)
-		alloc := &Allocation{Allocation: allocation}
+		alloc := &allocation{Allocation: a}
 		subnet, err := allocate(alloc)
 		require.NoError(t, err)
 		fmt.Println(subnet.String())

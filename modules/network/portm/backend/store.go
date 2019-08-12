@@ -1,5 +1,7 @@
 package backend
 
+// Store define the interface to implement to be used
+// as a backend for a port Allocator
 type Store interface {
 	Lock() error
 	Unlock() error

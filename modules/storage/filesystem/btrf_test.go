@@ -52,7 +52,7 @@ func (d TestDevices) Destroy() {
 	}
 }
 
-func setupDevices(count int) (devices TestDevices, err error) {
+func SetupDevices(count int) (devices TestDevices, err error) {
 	devices = make(TestDevices)
 
 	defer func() {
@@ -250,7 +250,7 @@ func basePoolTest(t *testing.T, pool Pool) {
 }
 
 func TestBtrfsSingle(t *testing.T) {
-	devices, err := setupDevices(1)
+	devices, err := SetupDevices(1)
 	if err != nil {
 		t.Fatal("failed to initialize devices", err)
 	}
@@ -268,7 +268,7 @@ func TestBtrfsSingle(t *testing.T) {
 }
 
 func TestBtrfsRaid1(t *testing.T) {
-	devices, err := setupDevices(3)
+	devices, err := SetupDevices(3)
 	if err != nil {
 		t.Fatal("failed to initialize devices", err)
 	}
@@ -323,7 +323,7 @@ func TestBtrfsRaid1(t *testing.T) {
 }
 
 func TestBtrfsList(t *testing.T) {
-	devices, err := setupDevices(2)
+	devices, err := SetupDevices(2)
 	if err != nil {
 		t.Fatal("failed to initialize devices", err)
 	}

@@ -6,12 +6,17 @@ version = github.com/threefoldtech/zosv2/modules/version
 ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revision) -X $(version).Dirty=$(dirty)'
 
 # _base is a hack to only build modules that we know are building atm
-_base: contd flistd storaged upgraded networkd identityd provisiond
+# _base: contd flistd storaged upgraded networkd identityd provisiond
+_base: $(shell ls -d */)
 
 all: _base
 	strip $(OUT)/*
 
 .PHONY: output clean
+
+tidy:
+	$(foreach var,$(shell ls -d */),pushd $(var);go mod tidy;popd;)
+	git add */go.sum */go.mod
 
 output:
 	mkdir -p $(OUT)

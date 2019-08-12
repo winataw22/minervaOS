@@ -104,6 +104,44 @@ func TestReserve(t *testing.T) {
 	assert.True(t, p2 <= pRange.End)
 }
 
+func TestReserveConcurent(t *testing.T) {
+	store := newTestStore()
+	pRange := PortRange{
+		Start: 1000,
+		End:   6000,
+	}
+	ns := "ns"
+	N := 5
+	wg := sync.WaitGroup{}
+	reserved := make([][]int, N)
+
+	for i := 0; i < N; i++ {
+		wg.Add(1)
+		go func(reserved [][]int, i int) {
+			defer wg.Done()
+			alloc := NewAllocator(pRange, store)
+			reserved[i] = make([]int, 0, 20)
+
+			for y := 0; y < 20; y++ {
+				p, err := alloc.Reserve(ns)
+				require.NoError(t, err)
+				reserved[i] = append(reserved[i], p)
+			}
+		}(reserved, i)
+	}
+
+	wg.Wait()
+	// ensure all reserved ports are unique
+	allReserved := make(map[int]struct{})
+	for i := 0; i < N; i++ {
+		for y := 0; y < 20; y++ {
+			_, exists := allReserved[reserved[i][y]]
+			assert.False(t, exists, "same port should not have been reserved twice")
+			allReserved[reserved[i][y]] = struct{}{}
+		}
+	}
+}
+
 func TestReuseReleased(t *testing.T) {
 	store := newTestStore()
 	pRange := PortRange{

@@ -23,7 +23,7 @@ func main() {
 		ver          bool
 	)
 
-	flag.StringVar(&moduleRoot, "root", "/var/modules/flist", "root working directory of the module")
+	flag.StringVar(&moduleRoot, "root", "/var/cache/modules/flistd", "root working directory of the module")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.UintVar(&workerNr, "workers", 1, "number of workers")
 	flag.BoolVar(&ver, "v", false, "show version and exit")

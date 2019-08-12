@@ -1,0 +1,45 @@
+name: build
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up Go 1.12
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.12
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Get dependencies
+      run: |
+        cd modules
+        make getdeps
+      env:
+        GO111MODULE: on
+        
+    - name: Run verifiers
+      run: |
+        cd modules
+        make verifiers
+      env:
+        GO111MODULE: on
+        
+    - name: Build modules
+      run: |
+        cd modules
+        make build
+      env:
+        GO111MODULE: on
+   
+    - name: Build binaries
+      run: |
+        cd cmds
+        make
+      env:
+        GO111MODULE: on
