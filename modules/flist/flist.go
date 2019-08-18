@@ -41,11 +41,11 @@ type flistModule struct {
 	pid        string
 	log        string
 
-	storage modules.VolumeAllocater
+	storage modules.StorageModule
 }
 
 // New creates a new flistModule
-func New(root string, storage modules.VolumeAllocater) modules.Flister {
+func New(root string, storage modules.StorageModule) modules.Flister {
 	if root == "" {
 		root = defaultRoot
 	}

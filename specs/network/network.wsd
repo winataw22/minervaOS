@@ -1,0 +1,13 @@
+@startuml
+start 
+:(DSL);
+if (requires networking) then (yes)
+    if (network does not exist) then (yes)
+        :create networ;
+    else (no)
+    endif
+    :join network;
+endif
+:create component;
+stop
+@enduml

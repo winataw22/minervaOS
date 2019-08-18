@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
@@ -16,33 +14,18 @@ import (
 	"github.com/urfave/cli"
 )
 
-var (
-	day             = time.Hour * 24
-	defaultDuration = day * 30
-)
-
 func cmdsProvision(c *cli.Context) error {
 	var (
 		schema   []byte
 		path     = c.String("schema")
 		nodeIDs  = c.StringSlice("node")
 		seedPath = c.String("seed")
-		d        = c.String("duration")
 		err      error
 	)
 
-	duration, err := time.ParseDuration(d)
-	if err != nil {
-		nrDays, err := strconv.Atoi(d)
-		if err != nil {
-			return errors.Wrap(err, "unsupported duration format")
-		}
-		duration = time.Duration(nrDays) * day
-	}
-
 	keypair, err := identity.LoadSeed(seedPath)
 	if err != nil {
-		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
+		return err
 	}
 
 	if path == "-" {
@@ -51,16 +34,13 @@ func cmdsProvision(c *cli.Context) error {
 		schema, err = ioutil.ReadFile(path)
 	}
 	if err != nil {
-		return errors.Wrap(err, "could not find provision schema")
+		return err
 	}
 
-	r := &provision.Reservation{}
-	if err := json.Unmarshal(schema, r); err != nil {
-		return errors.Wrap(err, "failed to read the provision schema")
+	r := provision.Reservation{}
+	if err := json.Unmarshal(schema, &r); err != nil {
+		return err
 	}
-
-	r.Duration = duration
-	r.Created = time.Now()
 
 	// set the user ID into the reservation schema
 	r.User = keypair.Identity()
@@ -70,14 +50,14 @@ func cmdsProvision(c *cli.Context) error {
 	}
 
 	if err := output(path, r); err != nil {
-		return errors.Wrapf(err, "failed to write provision schema to %s after signature", path)
+		return err
 	}
 
 	for _, nodeID := range nodeIDs {
 		if err := store.Reserve(r, modules.StrIdentifier(nodeID)); err != nil {
-			return errors.Wrap(err, "failed to send reservation")
+			return err
 		}
-		fmt.Printf("reservation for %v send to node %s\n", duration, nodeID)
+		fmt.Printf("reservation send for node %s\n", nodeID)
 	}
 
 	return nil

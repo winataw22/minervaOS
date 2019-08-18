@@ -86,7 +86,6 @@ func TestNetworkUnmarshal(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	t.Skip()
 	network := &Network{
 		NetID: NetID("test"),
 	}

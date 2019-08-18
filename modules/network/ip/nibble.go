@@ -1,7 +1,6 @@
 package ip
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 )
@@ -55,11 +54,6 @@ func (n *Nibble) nocolonhex() string {
 // WiregardName return the deterministic wireguard name
 func (n *Nibble) WiregardName() string {
 	return fmt.Sprintf("wg-%s-%d", n.nocolonhex(), n.allocNr)
-}
-
-// WireguardPort return the deterministic wireguard listen port
-func (n *Nibble) WireguardPort() uint16 {
-	return binary.BigEndian.Uint16(n.nibble)
 }
 
 // BridgeName return the deterministic bridge name

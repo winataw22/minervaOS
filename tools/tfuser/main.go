@@ -15,7 +15,7 @@ import (
 
 var (
 	db    network.TNoDB
-	store *provision.HTTPStore
+	store provision.ReservationStore
 )
 
 func main() {
@@ -52,7 +52,7 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		db = tnodb.NewHTTPHTTPTNoDB(c.String("tnodb"))
-		store = provision.NewHTTPStore(c.String("provision"))
+		store = provision.NewhHTTPStore(c.String("provision"))
 
 		return nil
 	}
@@ -75,16 +75,20 @@ func main() {
 			Usage:   "Group of command to generate provisioning schemas",
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name: "schema,s",
-					Usage: `location of the generated schema. 
-					For the network sub-commands add-node and add-user this flag is
-					also used to read the network schema before modifying it`,
+					Name:  "output,o",
+					Usage: "file name where to write the result of the command",
 				},
 			},
 			Subcommands: []cli.Command{
 				{
 					Name:  "network",
 					Usage: "Manage private networks",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "input,i",
+							Usage: "file name to a json encoded network definition",
+						},
+					},
 					Subcommands: []cli.Command{
 						{
 							Name:  "create",
@@ -104,6 +108,10 @@ func main() {
 								cli.StringSliceFlag{
 									Name:  "node",
 									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
+								},
+								cli.UintFlag{
+									Name:  "port",
+									Usage: "wireguard listenting point, only specify if the node is public",
 								},
 							},
 							Action: cmdsAddNode,
@@ -125,7 +133,7 @@ func main() {
 							Flags: []cli.Flag{
 								cli.StringFlag{
 									Name:  "user",
-									Usage: "user ID",
+									Usage: "user ID, if not specified, a user ID will be generated automatically",
 								},
 							},
 							Action: cmdsAddUser,
@@ -156,10 +164,6 @@ func main() {
 							Usage: "URL to the flist",
 						},
 						cli.StringFlag{
-							Name:  "storage",
-							Usage: "URL to the flist storage backend",
-						},
-						cli.StringFlag{
 							Name:  "entrypoint",
 							Usage: "optional entrypoint. If specified it overwrites the entrypoint from the flist",
 						},
@@ -184,7 +188,7 @@ func main() {
 				},
 				{
 					Name:  "storage",
-					Usage: "Generate volumes and 0-db namespace provisioning schema",
+					Usage: "Generate volumes and 0-db provisioning schema",
 					Subcommands: []cli.Command{
 						{
 							Name:    "volume",
@@ -202,34 +206,6 @@ func main() {
 							},
 							Action: generateVolume,
 						},
-						{
-							Name:  "zdb",
-							Usage: "reserve a 0-db namespace",
-							Flags: []cli.Flag{
-								cli.Uint64Flag{
-									Name:  "size, s",
-									Usage: "Size of the volume in GiB",
-									Value: 1,
-								},
-								cli.StringFlag{
-									Name:  "type, t",
-									Usage: "Type of disk to use, HHD or SSD",
-								},
-								cli.StringFlag{
-									Name:  "mode, m",
-									Usage: "0-DB mode (user, seq)",
-								},
-								cli.StringFlag{
-									Name:  "password, p",
-									Usage: "optional password",
-								},
-								cli.BoolFlag{
-									Name:  "public",
-									Usage: "TODO",
-								},
-							},
-							Action: generateZDB,
-						},
 					},
 				},
 			},
@@ -246,10 +222,6 @@ func main() {
 				cli.StringSliceFlag{
 					Name:  "node",
 					Usage: "Node ID where to deploy the workload",
-				},
-				cli.StringFlag{
-					Name:  "duration",
-					Usage: "duration of the reservation. By default is number of days. But also support notation with duration suffix like m for minute or h for hours",
 				},
 				cli.StringFlag{
 					Name:   "seed",

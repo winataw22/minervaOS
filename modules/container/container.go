@@ -183,15 +183,12 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 		)
 	}
 
-	// we never allow any container to boot without a network namespace
-	if data.Network.Namespace == "" {
-		return "", fmt.Errorf("cannot create container without network namespace")
+	if data.Network.Namespace != "" {
+		opts = append(
+			opts,
+			withNetworkNamespace(data.Network.Namespace),
+		)
 	}
-
-	opts = append(
-		opts,
-		withNetworkNamespace(data.Network.Namespace),
-	)
 
 	for _, mount := range data.Mounts {
 		opts = append(
@@ -222,8 +219,9 @@ func (c *containerModule) Run(ns string, data modules.Container) (id modules.Con
 	}
 	log.Info().Msgf("args %+v", spec.Process.Args)
 	log.Info().Msgf("root %+v", spec.Root)
-	for _, linxNS := range spec.Linux.Namespaces {
-		log.Info().Msgf("namespace %+v", linxNS.Type)
+	for _, ns := range spec.Linux.Namespaces {
+		log.Info().Msgf("namespace %+v", ns.Type)
+
 	}
 
 	defer func() {
@@ -295,8 +293,8 @@ func (c *containerModule) Inspect(ns string, id modules.ContainerID) (result mod
 	}
 
 	for _, namespace := range spec.Linux.Namespaces {
-		if namespace.Type == specs.NetworkNamespace {
-			result.Network.Namespace = filepath.Base(namespace.Path)
+		if namespace.Type == "network" {
+			result.Network.Namespace = namespace.Path
 		}
 	}
 

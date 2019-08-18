@@ -21,12 +21,11 @@ func generateContainer(c *cli.Context) error {
 	}
 
 	container := provision.Container{
-		FList:        c.String("flist"),
-		FlistStorage: c.String("storage"),
-		Env:          envs,
-		Entrypoint:   c.String("entrypoint"),
-		Interactive:  c.Bool("corex"),
-		Mounts:       mounts,
+		FList:       c.String("flist"),
+		Env:         envs,
+		Entrypoint:  c.String("entrypoint"),
+		Interactive: c.Bool("corex"),
+		Mounts:      mounts,
 		Network: provision.Network{
 			NetwokID: c.String("network"),
 		},

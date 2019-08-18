@@ -1,7 +1,6 @@
 package tno
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 )
@@ -29,11 +28,6 @@ func (n nibble) IP(ip net.IP) net.IP {
 	copy(i[:], ip)
 	copy(i[net.IPv6len-len(n):], n)
 	return net.IP(i[:])
-}
-
-// WireguardPort return the deterministic wireguard listen port
-func (n nibble) WireguardPort() uint16 {
-	return binary.BigEndian.Uint16(n)
 }
 
 func newNibble(prefix *net.IPNet, size int) nibble {

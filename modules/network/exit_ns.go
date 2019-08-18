@@ -24,13 +24,9 @@ const (
 	ipv4InterfaceArpProxySysctlTemplate = "net.ipv4.conf.%s.proxy_arp"
 )
 
-const (
-	// PublicNamespace is the name of the public namespace of a node
-	// the public namespace is currently uniq for a node so we hardcode its name
-	PublicNamespace = "public"
-	// PublicIface is the name of the interface we create in the public namespace
-	PublicIface = "public"
-)
+// PublicNamespace is the name of the public namespace of a node
+// the public namespace is currently uniq for a node so we hardcode its name
+const PublicNamespace = "public"
 
 // CreatePublicNS creates a public namespace in a node
 func CreatePublicNS(iface *PubIface) error {
@@ -48,7 +44,7 @@ func CreatePublicNS(iface *PubIface) error {
 
 	switch iface.Type {
 	case MacVlanIface:
-		pubIface, err = macvlan.Create(PublicIface, iface.Master, pubNS)
+		pubIface, err = macvlan.Create("public", iface.Master, pubNS)
 		if err != nil {
 			return errors.Wrap(err, "failed to create public mac vlan interface")
 		}
@@ -121,7 +117,7 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 	nibble := ip.NewNibble(nr.Prefix, 0) //FIXME: alloc number not always 0
 
 	pubIface := &current.Interface{}
-	pubNS, err := namespace.GetByName(PublicNamespace)
+	pubNS, err := namespace.GetByName("public")
 
 	if err == nil { // there is a public namespace on the node
 		var ifaceIndex int
@@ -130,7 +126,7 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 		// get the name of the public interface in the public namespace
 		if err := pubNS.Do(func(_ ns.NetNS) error {
 			// get the name of the interface connected to the public segment
-			public, err := netlink.LinkByName(PublicIface)
+			public, err := netlink.LinkByName("public")
 			if err != nil {
 				return errors.Wrap(err, "failed to get public link")
 			}
@@ -173,7 +169,7 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 	}
 	defer nrNS.Close()
 
-	pubMacVlan, err := macvlan.Create(PublicIface, pubIface.Name, nrNS)
+	pubMacVlan, err := macvlan.Create("public", pubIface.Name, nrNS)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create public mac vlan interface")
 		return errors.Wrap(err, "failed to create public mac vlan interface")
@@ -217,4 +213,19 @@ func configNetResAsExitPoint(nr *modules.NetResource, ep *modules.ExitPoint, pre
 	}
 
 	return nil
+}
+
+func getPublicMasterIface() (netlink.Link, error) {
+	// get the name of the interface connected to the public segment
+	public, err := netlink.LinkByName("public")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get public link")
+	}
+
+	index := public.Attrs().MasterIndex
+	master, err := netlink.LinkByIndex(index)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get link by index %d", index)
+	}
+	return master, nil
 }

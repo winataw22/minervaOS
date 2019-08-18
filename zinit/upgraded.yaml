@@ -1,4 +1,4 @@
-exec: upgraded -root /var/cache/modules/upgraded
+exec: upgraded
 after:
   - boot
   - flistd

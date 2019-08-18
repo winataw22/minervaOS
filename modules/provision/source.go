@@ -2,69 +2,71 @@ package provision
 
 import (
 	"context"
-	"fmt"
-	"sync"
+	"encoding/json"
+	"io"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules"
 )
 
-type httpSource struct {
-	store  ReservationPoller
-	nodeID string
+type pipeSource struct {
+	p string
 }
 
-// ReservationPoller define the interface to implement
-// to poll the BCDB for new reservation
-type ReservationPoller interface {
-	// Poll ask the store to send us reservation for a specific node ID
-	// if all is true, the store sends all the reservation every registered for the node ID
-	// otherwise it just sends reservation not pulled yet.
-	Poll(nodeID modules.Identifier, all bool) ([]*Reservation, error)
+// FifoSource reads reservations from a fifo file
+func FifoSource(p string) (ReservationSource, error) {
+	err := syscall.Mkfifo(p, 0600)
+	if err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+
+	return &pipeSource{p}, nil
 }
 
-// HTTPSource does a long poll on address to get new
-// reservations. the server should only return unique reservations
-// stall the connection as long as possible if no new reservations
-// are available.
-func HTTPSource(store ReservationPoller, nodeID modules.Identifier) ReservationSource {
-	return &httpSource{
-		store:  store,
-		nodeID: nodeID.Identity(),
+func (s *pipeSource) readToEnd(ctx context.Context, dec *json.Decoder, ch chan<- Reservation) error {
+	var res Reservation
+	// problem here that this will block until
+	// something is pushed on the file, even
+	// if context was canceled
+	for {
+		err := dec.Decode(&res)
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		select {
+		case ch <- res:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 
-func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
-	log.Info().Msg("start reservation http source")
-	ch := make(chan *Reservation)
-
-	// on the first run we will get all the reservation
-	// ever made to this know, to make sure we provision
-	// everything at boot
-	// after that, we only ask for the new reservations
-	firstRun := true
+func (s *pipeSource) Reservations(ctx context.Context) <-chan Reservation {
+	ch := make(chan Reservation)
 	go func() {
-		defer close(ch)
+		defer func() {
+			close(ch)
+		}()
+
 		for {
-			// backing off of 1 second
-			<-time.After(time.Second)
-			log.Info().Msg("check for new reservations")
-
-			res, err := s.store.Poll(modules.StrIdentifier(s.nodeID), firstRun)
+			file, err := os.Open(s.p)
 			if err != nil {
-				log.Error().Err(err).Msg("failed to get reservation")
-				time.Sleep(time.Second * 10)
+				log.Error().Err(err).Msgf("failed to open pipe")
+				break
 			}
-			firstRun = false
 
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				for _, r := range res {
-					ch <- r
-				}
+			dec := json.NewDecoder(file)
+			err = s.readToEnd(ctx, dec, ch)
+			file.Close()
+
+			if err != nil {
+				log.Error().Err(err).Msgf("failed to decode reservation item")
 			}
 		}
 	}()
@@ -72,100 +74,85 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 	return ch
 }
 
-// ReservationExpirer define the interface to implement
-// to get all the reservation that have expired
-type ReservationExpirer interface {
-	// GetExpired returns all id the the reservations that are expired
-	// at the time of the function call
-	GetExpired() ([]*Reservation, error)
+type httpSource struct {
+	store  ReservationStore
+	nodeID string
 }
 
-type decommissionSource struct {
-	store ReservationExpirer
-}
-
-// NewDecommissionSource creates a ReservationSource that sends reservation
-// that have expired into it's output channel
-func NewDecommissionSource(store ReservationExpirer) ReservationSource {
-	return &decommissionSource{
-		store: store,
+// HTTPSource does a long poll on address to get new
+// reservations. the server should only return unique reservations
+// stall the connection as long as possible if no new reservations
+// are available.
+func HTTPSource(store ReservationStore, nodeID modules.Identifier) ReservationSource {
+	return &httpSource{
+		store:  store,
+		nodeID: nodeID.Identity(),
 	}
 }
 
-func (s *decommissionSource) Reservations(ctx context.Context) <-chan *Reservation {
-	log.Info().Msg("start decommission source")
-	c := make(chan *Reservation)
-
+func (s *httpSource) Reservations(ctx context.Context) <-chan Reservation {
+	ch := make(chan Reservation)
 	go func() {
-		defer close(c)
-
+		defer close(ch)
 		for {
-			<-time.After(time.Minute * 10) //TODO: make configuration ? default value ?
-			log.Info().Msg("check for expired reservation")
-
-			reservations, err := s.store.GetExpired()
+			// backing off of 1 second
+			<-time.After(time.Second)
+			res, err := s.store.Poll(modules.StrIdentifier(s.nodeID), false)
 			if err != nil {
-				log.Error().Err(err).Msg("error while getting expired reservation id")
-				continue
+				log.Error().Err(err).Msg("failed to get reservation")
+				time.Sleep(time.Second * 10)
 			}
 
 			select {
 			case <-ctx.Done():
-				return
+				break
 			default:
-				for _, r := range reservations {
-					log.Info().
-						Str("id", string(r.ID)).
-						Str("type", string(r.Type)).
-						Time("created", r.Created).
-						Str("duration", fmt.Sprintf("%v", r.Duration)).
-						Msg("reservation expired")
-					c <- r
+				for _, r := range res {
+					ch <- *r
 				}
+			}
+		}
+
+	}()
+	return ch
+}
+
+type compinedSource struct {
+	s1 ReservationSource
+	s2 ReservationSource
+}
+
+// CompinedSource compines 2 different sources into one source
+// Then it can be nested for any number of sources
+func CompinedSource(s1, s2 ReservationSource) ReservationSource {
+	return &compinedSource{s1, s2}
+}
+
+func (s *compinedSource) Reservations(ctx context.Context) <-chan Reservation {
+	ch := make(chan Reservation)
+	go func() {
+		defer close(ch)
+
+		ch1 := s.s1.Reservations(ctx)
+		ch2 := s.s2.Reservations(ctx)
+
+		for {
+			var res Reservation
+			select {
+			case res = <-ch1:
+			case res = <-ch2:
+			case <-ctx.Done():
+				return
+			}
+
+			select {
+			case ch <- res:
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
 
-	return c
-}
+	return ch
 
-type combinedSource struct {
-	Sources []ReservationSource
-}
-
-// CombinedSource merge different ReservationSources into one ReservationSource
-func CombinedSource(sources ...ReservationSource) ReservationSource {
-	return &combinedSource{
-		Sources: sources,
-	}
-}
-
-func (s *combinedSource) Reservations(ctx context.Context) <-chan *Reservation {
-	var wg sync.WaitGroup
-
-	out := make(chan *Reservation)
-
-	// Start an send goroutine for each input channel in cs. send
-	// copies values from c to out until c is closed, then calls wg.Done.
-	send := func(c <-chan *Reservation) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-
-	wg.Add(len(s.Sources))
-	for _, source := range s.Sources {
-		c := source.Reservations(ctx)
-		go send(c)
-	}
-
-	// Start a goroutine to close out once all the send goroutines are
-	// done.  This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-
-	return out
 }
