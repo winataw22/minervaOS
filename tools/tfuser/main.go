@@ -15,7 +15,7 @@ import (
 
 var (
 	db    network.TNoDB
-	store provision.ReservationStore
+	store *provision.HTTPStore
 )
 
 func main() {
@@ -52,7 +52,7 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		db = tnodb.NewHTTPHTTPTNoDB(c.String("tnodb"))
-		store = provision.NewhHTTPStore(c.String("provision"))
+		store = provision.NewHTTPStore(c.String("provision"))
 
 		return nil
 	}
@@ -108,10 +108,6 @@ func main() {
 								cli.StringSliceFlag{
 									Name:  "node",
 									Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
-								},
-								cli.UintFlag{
-									Name:  "port",
-									Usage: "wireguard listenting point, only specify if the node is public",
 								},
 							},
 							Action: cmdsAddNode,
@@ -222,6 +218,11 @@ func main() {
 				cli.StringSliceFlag{
 					Name:  "node",
 					Usage: "Node ID where to deploy the workload",
+				},
+				cli.Int64Flag{
+					Name:  "duration",
+					Usage: "duration of the reservation in days",
+					Value: 1,
 				},
 				cli.StringFlag{
 					Name:   "seed",

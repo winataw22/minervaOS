@@ -91,7 +91,7 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP
 			Prefix: allocation,
 			Connection: modules.Wireguard{
 				IP:         publicIP,
-				Port:       1600,
+				Port:       exitNibble.WireguardPort(),
 				Key:        key.PublicKey().String(),
 				PrivateKey: fmt.Sprintf("%x", privateKey),
 			},
@@ -129,7 +129,7 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP
 
 // AddNode adds a network resource to the TNO
 // if the node is a publicly accessible node, publicIP and port needs to be not nil
-func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Key, publicIP net.IP, port uint16) Opts {
+func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Key, publicIP net.IP) Opts {
 	return func(n *modules.Network) error {
 
 		if n.PrefixZero == nil {
@@ -140,7 +140,7 @@ func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Ke
 		exitNibble := newNibble(allocation, allocSize)
 
 		v6Reach := modules.ReachabilityV6ULA
-		if publicIP != nil && port != 0 {
+		if publicIP != nil {
 			v6Reach = modules.ReachabilityV6Public
 		}
 
@@ -178,7 +178,7 @@ func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Ke
 			Type:   modules.ConnTypeWireguard,
 			Prefix: allocation,
 			Connection: modules.Wireguard{
-				Port:       port,
+				Port:       exitNibble.WireguardPort(),
 				Key:        key.PublicKey().String(),
 				PrivateKey: fmt.Sprintf("%x", privateKey),
 			},

@@ -68,7 +68,7 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 	return network, nil
 }
 
-func addNode(nw *modules.Network, nodeID string, port uint16) (*modules.Network, error) {
+func addNode(nw *modules.Network, nodeID string) (*modules.Network, error) {
 	if len(nw.Resources) <= 0 {
 		return nil, fmt.Errorf("cannot add a node to network without exit node")
 	}
@@ -97,7 +97,7 @@ func addNode(nw *modules.Network, nodeID string, port uint16) (*modules.Network,
 	}
 
 	err = tno.Configure(nw, []tno.Opts{
-		tno.AddNode(nodeID, farmID, allocation, key, ip, port),
+		tno.AddNode(nodeID, farmID, allocation, key, ip),
 	})
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func reserveNetwork(network *modules.Network) error {
 	if err != nil {
 		return err
 	}
-	r := provision.Reservation{
+	r := &provision.Reservation{
 		ID:   id.String(),
 		Type: provision.NetworkReservation,
 		Data: raw,

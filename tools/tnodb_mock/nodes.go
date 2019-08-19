@@ -43,7 +43,7 @@ func nodeDetail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(&node); err != nil {
-		log.Println("error writing node: %v", err)
+		log.Printf("error writing node: %v", err)
 	}
 }
 

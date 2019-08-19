@@ -42,9 +42,9 @@ type Container struct {
 }
 
 // ContainerProvision is entry point to container reservation
-func ContainerProvision(ctx context.Context, reservation Reservation) (interface{}, error) {
+func containerProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
 	client := GetZBus(ctx)
-	cache := GetCache(ctx)
+	cache := GetOwnerCache(ctx)
 
 	containerClient := stubs.NewContainerModuleStub(client)
 	flistClient := stubs.NewFlisterStub(client)
@@ -149,4 +149,27 @@ func ContainerProvision(ctx context.Context, reservation Reservation) (interface
 
 	log.Info().Msgf("container created with id: '%s'", id)
 	return id, nil
+}
+
+func containerDecommission(ctx context.Context, reservation *Reservation) error {
+	client := GetZBus(ctx)
+
+	container := stubs.NewContainerModuleStub(client)
+	flist := stubs.NewFlisterStub(client)
+
+	id := modules.ContainerID(reservation.ID)
+
+	info, err := container.Inspect(reservation.User, id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to inspect container %s", id)
+	}
+
+	if err := container.Delete(reservation.User, modules.ContainerID(id)); err != nil {
+		return errors.Wrapf(err, "failed to delete container %s", id)
+	}
+
+	if err := flist.Umount(info.RootFS); err != nil {
+		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
+	}
+	return nil
 }

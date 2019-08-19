@@ -46,17 +46,17 @@ func GetZBus(ctx context.Context) zbus.Client {
 	return value.(zbus.Client)
 }
 
-// WithCache adds the reservations lru cache to context
-func WithCache(ctx context.Context, cache *Cache) context.Context {
+// WithOwnerCache adds the owner cache to context
+func WithOwnerCache(ctx context.Context, cache *OwnerCache) context.Context {
 	return context.WithValue(ctx, cacheKey{}, cache)
 }
 
-// GetCache gets the reservation lru cache from context
-func GetCache(ctx context.Context) *Cache {
+// GetOwnerCache gets the owner cache from context
+func GetOwnerCache(ctx context.Context) *OwnerCache {
 	value := ctx.Value(cacheKey{})
 	if value == nil {
 		panic("no reservation cache associated with context")
 	}
 
-	return value.(*Cache)
+	return value.(*OwnerCache)
 }

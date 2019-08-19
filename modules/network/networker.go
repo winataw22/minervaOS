@@ -58,7 +58,20 @@ func validateNetwork(n *modules.Network) error {
 	if len(n.Resources) < 1 {
 		return fmt.Errorf("Network needs at least one network ressource")
 	}
-	// TODO validate each resource
+
+	for _, r := range n.Resources {
+		nibble := nib.NewNibble(r.Prefix, n.AllocationNR)
+		if r.Prefix == nil {
+			return fmt.Errorf("Prefix for network resource %s is empty", r.NodeID.Identity())
+		}
+
+		for _, peer := range r.Peers {
+			expectedPort := nibble.WireguardPort()
+			if peer.Connection.Port != 0 && peer.Connection.Port != expectedPort {
+				return fmt.Errorf("Wireguard port for peer %s should be %d", r.NodeID.Identity(), expectedPort)
+			}
+		}
+	}
 
 	if n.Exit == nil {
 		return fmt.Errorf("Exit point cannot be empty")

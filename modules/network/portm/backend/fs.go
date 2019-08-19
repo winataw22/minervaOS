@@ -8,13 +8,14 @@ import (
 )
 
 const lastPort = "last_reserved"
-const LineBreak = "\r\n"
 
 type fsStore struct {
 	*FileLock
 	root string
 }
 
+// NewFSStore creates a backend for port manager that stores
+// the allocated port in a filesystem
 func NewFSStore(root string) (Store, error) {
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return nil, err

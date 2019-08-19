@@ -132,7 +132,7 @@ So we can leverage the User Network Object that is stored somewhere to insert th
 
 Seen that there are linux boxes that can contain a full BGP database, we can assume that adding 1000's of routes into a kernel will not be a big problem, but these tests have not been done, we can only surmise that it will work.
 
-Also havind __all__ routes in a container is not really necessary, as we can configure multiple router containers to be responsible for only a part fo the User Networks.
+Also having __all__ routes in a container is not really necessary, as we can configure multiple router containers to be responsible for only a part fo the User Networks.
 
 This also gives us an easy way to do self healing, in case a Node containing the Routing Container fails, as we can just reapply the same User Network Objects to a new container in another node.
 
@@ -151,6 +151,4 @@ We need to address that. We're missing:
   - how will a service (running flist with an UTS namespace) be registered and associated with a Network Resource?
   - where will these services be registered so they can be found by hostname or SRV record
   - how will the Network Resources do DNS, where are these nameservices going to run
-  - ... etc ...
-
-
+  - ... etc ... To be Continued...

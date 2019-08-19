@@ -12,7 +12,7 @@ install:
 
 script:
 - pushd modules && make getdeps && popd
-- pushd modules && make getdeps && popd
+- pushd modules && make verifiers && popd
 - pushd cmds && make && popd
 
 # after_success:

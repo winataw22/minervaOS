@@ -25,7 +25,6 @@ require (
 	github.com/dspinhirne/netaddr-go v0.0.0-20180510133009-a6cfb692cb10
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gogo/googleapis v1.2.0 // indirect
-	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6
 	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
 	github.com/google/uuid v1.1.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365

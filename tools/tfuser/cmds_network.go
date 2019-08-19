@@ -30,7 +30,6 @@ func cmdsAddNode(c *cli.Context) error {
 	var (
 		network = &modules.Network{}
 		input   = c.GlobalString("input")
-		port    = c.Uint("port")
 		err     error
 	)
 
@@ -40,7 +39,7 @@ func cmdsAddNode(c *cli.Context) error {
 	}
 
 	for _, nodeID := range c.StringSlice("node") {
-		network, err = addNode(network, nodeID, uint16(port))
+		network, err = addNode(network, nodeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to add the node into the network object")
 		}

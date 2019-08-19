@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
@@ -14,14 +15,26 @@ import (
 	"github.com/urfave/cli"
 )
 
+var (
+	day             = time.Hour * 24
+	defaultDuration = day * 30
+)
+
 func cmdsProvision(c *cli.Context) error {
 	var (
 		schema   []byte
 		path     = c.String("schema")
 		nodeIDs  = c.StringSlice("node")
 		seedPath = c.String("seed")
+		duration = time.Duration(c.Int64("duration"))
 		err      error
 	)
+
+	if duration == 0 {
+		duration = defaultDuration
+	} else {
+		duration = duration * day
+	}
 
 	keypair, err := identity.LoadSeed(seedPath)
 	if err != nil {
@@ -37,10 +50,13 @@ func cmdsProvision(c *cli.Context) error {
 		return err
 	}
 
-	r := provision.Reservation{}
-	if err := json.Unmarshal(schema, &r); err != nil {
+	r := &provision.Reservation{}
+	if err := json.Unmarshal(schema, r); err != nil {
 		return err
 	}
+
+	r.Duration = duration
+	r.Created = time.Now()
 
 	// set the user ID into the reservation schema
 	r.User = keypair.Identity()
