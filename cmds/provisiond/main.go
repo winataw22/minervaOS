@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"path/filepath"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/threefoldtech/zosv2/modules/provision"
 	"github.com/threefoldtech/zosv2/modules/version"
 )
+
+const storageDir = "/var/cache/modules/provision"
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -56,11 +59,11 @@ func main() {
 	nodeID := identity.NodeID()
 
 	// to get reservation from tnodb
-	httpStore := provision.NewHTTPStore(resURL)
+	remoteStore := provision.NewHTTPStore(resURL)
 	// to store reservation locally on the node
-	memStore := provision.NewMemStore()
+	localStore := provision.NewFSStore(filepath.Join(storageDir, "reservations"))
 	// to get the user ID of a reservation
-	ownerCache := provision.NewCache(memStore, httpStore)
+	ownerCache := provision.NewCache(localStore, remoteStore)
 
 	// create context and add middlewares
 	ctx := context.Background()
@@ -71,11 +74,11 @@ func main() {
 	// From here we start the real provision engine that will live
 	// for the rest of the life of the node
 	source := provision.CombinedSource(
-		provision.HTTPSource(httpStore, nodeID),
-		provision.NewDecommissionSource(memStore),
+		provision.HTTPSource(remoteStore, nodeID),
+		provision.NewDecommissionSource(localStore),
 	)
 
-	engine := provision.New(source, memStore)
+	engine := provision.New(source, localStore)
 
 	log.Info().
 		Str("broker", msgBrokerCon).

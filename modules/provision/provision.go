@@ -42,10 +42,10 @@ type Reservation struct {
 	// Type of the reservation (container, zdb, vm, etc...)
 	Type ReservationType `json:"type"`
 	// Data is the reservation type arguments.
-	Data json.RawMessage `json:"data"`
+	Data json.RawMessage `json:"data,omitempty"`
 	// Signature is the signature to the reservation
 	// it contains all the field of this struct except the signature itself
-	Signature []byte `json:"signature"`
+	Signature []byte `json:"signature,omitempty"`
 	// Date of creation
 	Created time.Time `json:"created"`
 	// Duration of the reservation
