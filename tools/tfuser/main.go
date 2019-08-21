@@ -184,7 +184,7 @@ func main() {
 				},
 				{
 					Name:  "storage",
-					Usage: "Generate volumes and 0-db provisioning schema",
+					Usage: "Generate volumes and 0-db namespace provisioning schema",
 					Subcommands: []cli.Command{
 						{
 							Name:    "volume",
@@ -201,6 +201,34 @@ func main() {
 								},
 							},
 							Action: generateVolume,
+						},
+						{
+							Name:  "zdb",
+							Usage: "reserve a 0-db namespace",
+							Flags: []cli.Flag{
+								cli.Uint64Flag{
+									Name:  "size, s",
+									Usage: "Size of the volume in GiB",
+									Value: 1,
+								},
+								cli.StringFlag{
+									Name:  "type, t",
+									Usage: "Type of disk to use, HHD or SSD",
+								},
+								cli.StringFlag{
+									Name:  "mode, m",
+									Usage: "0-DB mode (user, seq)",
+								},
+								cli.StringFlag{
+									Name:  "password, p",
+									Usage: "optional password",
+								},
+								cli.BoolFlag{
+									Name:  "public",
+									Usage: "TODO",
+								},
+							},
+							Action: generateZDB,
 						},
 					},
 				},
@@ -219,10 +247,9 @@ func main() {
 					Name:  "node",
 					Usage: "Node ID where to deploy the workload",
 				},
-				cli.Int64Flag{
+				cli.StringFlag{
 					Name:  "duration",
-					Usage: "duration of the reservation in days",
-					Value: 1,
+					Usage: "duration of the reservation. By default is number of days. But also support notation with duration suffix like m for minute or h for hours",
 				},
 				cli.StringFlag{
 					Name:   "seed",

@@ -28,6 +28,8 @@ const (
 	VolumeReservation ReservationType = "volume"
 	// NetworkReservation type
 	NetworkReservation ReservationType = "network"
+	// ZDBReservation type
+	ZDBReservation ReservationType = "zdb"
 )
 
 // ReplyTo defines how report the result of the provisioning operation
@@ -107,11 +109,13 @@ var (
 		ContainerReservation: containerProvision,
 		VolumeReservation:    volumeProvision,
 		NetworkReservation:   networkProvision,
+		ZDBReservation:       zdbProvision,
 	}
 
 	decommissioners = map[ReservationType]decommissioner{
 		ContainerReservation: containerDecommission,
 		VolumeReservation:    volumeDecommission,
 		NetworkReservation:   networkDecommission,
+		ZDBReservation:       zdbDecommission,
 	}
 )

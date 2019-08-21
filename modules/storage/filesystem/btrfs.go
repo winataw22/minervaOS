@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/threefoldtech/zosv2/modules"
 )
 
@@ -328,6 +330,7 @@ func (p *btrfsPool) Usage() (usage Usage, err error) {
 
 	var totalSize uint64
 	for _, dev := range fsi[0].Devices {
+		log.Debug().Int64("size", dev.Size).Str("device", dev.Path).Msg("pool usage")
 		totalSize += uint64(dev.Size)
 	}
 
@@ -348,6 +351,26 @@ func (p *btrfsPool) FsType() string {
 func (p *btrfsPool) Type() modules.DeviceType {
 	// We only create heterogenous pools for now
 	return p.devices[0].DiskType
+}
+
+// Reserved is reserved size of the devices in bytes
+func (p *btrfsPool) Reserved() (uint64, error) {
+
+	volumes, err := p.Volumes()
+	if err != nil {
+		return 0, err
+	}
+
+	var total uint64
+	for _, volume := range volumes {
+		usage, err := volume.Usage()
+		if err != nil {
+			return 0, err
+		}
+		total += usage.Size
+	}
+
+	return total, nil
 }
 
 type btrfsVolume string
@@ -421,6 +444,7 @@ func (v btrfsVolume) Limit(size uint64) error {
 	if size > 0 {
 		limit = fmt.Sprint(size)
 	}
+	log.Debug().Str("limit", limit).Msgf("limit volume %s", v.Name())
 	_, err := run(ctx, "btrfs", "qgroup", "limit", limit, string(v))
 
 	return err

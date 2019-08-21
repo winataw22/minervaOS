@@ -17,10 +17,16 @@ type FSStore struct {
 }
 
 // NewFSStore creates a in memory reservation store
-func NewFSStore(root string) *FSStore {
+func NewFSStore(root string) (*FSStore, error) {
+	if err := os.RemoveAll(root); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(root, 0770); err != nil {
+		return nil, err
+	}
 	return &FSStore{
 		root: root,
-	}
+	}, nil
 }
 
 // Add a reservation to the store

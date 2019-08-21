@@ -65,6 +65,10 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 		return nil, err
 	}
 
+	if err := validateContainerConfig(config); err != nil {
+		return nil, errors.Wrap(err, "container provision schema not valid")
+	}
+
 	log.Debug().
 		Str("network-id", config.Network.NetwokID).
 		Str("config", fmt.Sprintf("%+v", config)).
@@ -171,5 +175,17 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 	if err := flist.Umount(info.RootFS); err != nil {
 		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
 	}
+	return nil
+}
+
+func validateContainerConfig(config Container) error {
+	if config.Network.NetwokID == "" {
+		return fmt.Errorf("network ID cannot be empty")
+	}
+
+	if config.FList == "" {
+		return fmt.Errorf("missing flist url")
+	}
+
 	return nil
 }

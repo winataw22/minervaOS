@@ -7,6 +7,7 @@ require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/alexflint/go-filemutex v0.0.0-20171028004239-d358565f3c3f
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/containerd/cgroups v0.0.0-20190603164311-51b62d303d38 // indirect
 	github.com/containerd/containerd v1.2.3
 	github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc // indirect
@@ -23,8 +24,10 @@ require (
 	github.com/docker/go-events v0.0.0-20170721190031-9461782956ad // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dspinhirne/netaddr-go v0.0.0-20180510133009-a6cfb692cb10
+	github.com/garyburd/redigo v1.6.0
 	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gogo/googleapis v1.2.0 // indirect
+	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf
 	github.com/google/uuid v1.1.1
 	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365

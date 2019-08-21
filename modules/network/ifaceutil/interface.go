@@ -2,6 +2,7 @@ package ifaceutil
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -124,4 +125,16 @@ func SetLoUp() error {
 		return err
 	}
 	return err
+}
+
+// RandomName generate a random string that can be used for
+// interface or network namespace
+// if prefix is not None, the random name is prefixed with it
+func RandomName(prefix string) (string, error) {
+	b := make([]byte, 4)
+	_, err := rand.Reader.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random name: %v", err)
+	}
+	return fmt.Sprintf("%s%x", prefix, b), nil
 }

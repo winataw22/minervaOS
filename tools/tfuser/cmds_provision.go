@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,14 +27,17 @@ func cmdsProvision(c *cli.Context) error {
 		path     = c.String("schema")
 		nodeIDs  = c.StringSlice("node")
 		seedPath = c.String("seed")
-		duration = time.Duration(c.Int64("duration"))
+		d        = c.String("duration")
 		err      error
 	)
 
-	if duration == 0 {
-		duration = defaultDuration
-	} else {
-		duration = duration * day
+	duration, err := time.ParseDuration(d)
+	if err != nil {
+		nrDays, err := strconv.Atoi(d)
+		if err != nil {
+			return fmt.Errorf("unsupported duration format")
+		}
+		duration = time.Duration(nrDays) * day
 	}
 
 	keypair, err := identity.LoadSeed(seedPath)
@@ -73,7 +77,7 @@ func cmdsProvision(c *cli.Context) error {
 		if err := store.Reserve(r, modules.StrIdentifier(nodeID)); err != nil {
 			return err
 		}
-		fmt.Printf("reservation send for node %s\n", nodeID)
+		fmt.Printf("reservation for %v send to node %s\n", duration, nodeID)
 	}
 
 	return nil

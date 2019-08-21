@@ -50,6 +50,10 @@ func main() {
 		log.Fatal().Msg("reservation URL cannot be empty")
 	}
 
+	if err := os.MkdirAll(storageDir, 0770); err != nil {
+		log.Fatal().Err(err).Msg("failed to create cache directory")
+	}
+
 	client, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
@@ -61,7 +65,10 @@ func main() {
 	// to get reservation from tnodb
 	remoteStore := provision.NewHTTPStore(resURL)
 	// to store reservation locally on the node
-	localStore := provision.NewFSStore(filepath.Join(storageDir, "reservations"))
+	localStore, err := provision.NewFSStore(filepath.Join(storageDir, "reservations"))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create local reservation store")
+	}
 	// to get the user ID of a reservation
 	ownerCache := provision.NewCache(localStore, remoteStore)
 
@@ -70,6 +77,7 @@ func main() {
 	ctx = provision.WithZBus(ctx, client)
 	ctx = provision.WithTnoDB(ctx, tnodbURL)
 	ctx = provision.WithOwnerCache(ctx, ownerCache)
+	ctx = provision.WithZDBMapping(ctx, &provision.ZDBMapping{})
 
 	// From here we start the real provision engine that will live
 	// for the rest of the life of the node

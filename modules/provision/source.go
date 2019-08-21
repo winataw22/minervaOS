@@ -36,6 +36,7 @@ func HTTPSource(store ReservationPoller, nodeID modules.Identifier) ReservationS
 }
 
 func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
+	log.Info().Msg("start reservation http source")
 	ch := make(chan *Reservation)
 
 	// on the first run we will get all the reservation
@@ -92,6 +93,7 @@ func NewDecommissionSource(store ReservationExpirer) ReservationSource {
 }
 
 func (s *decommissionSource) Reservations(ctx context.Context) <-chan *Reservation {
+	log.Info().Msg("start decommission source")
 	c := make(chan *Reservation)
 
 	go func() {

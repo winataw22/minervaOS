@@ -8,7 +8,7 @@ import (
 
 	"github.com/threefoldtech/zbus"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/identity"
