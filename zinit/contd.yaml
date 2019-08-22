@@ -1,4 +1,4 @@
-exec: contd -broker unix:///var/run/redis.sock -root /var/cache/modules/containerd
+exec: contd -broker unix:///var/run/redis.sock -root /var/cache/modules/contd
 after:
   - containerd
   - boot

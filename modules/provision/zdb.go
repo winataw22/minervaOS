@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules"
+	nwmod "github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/stubs"
 )
 
@@ -101,8 +102,17 @@ func zdbProvision(ctx context.Context, reservation *Reservation) (interface{}, e
 			return nil, err
 		}
 
-		containerIP, err = network.ZDBIp(c.Network.Namespace)
+		ips, err := network.Addrs(nwmod.ZDBIface, c.Network.Namespace)
 		if err != nil {
+			return nil, errors.Wrap(err, "failed to get 0-db container IP")
+		}
+		for _, ip := range ips {
+			if isPublic(ip) {
+				containerIP = ip
+				break
+			}
+		}
+		if containerIP == nil {
 			return nil, errors.Wrap(err, "failed to get 0-db container IP")
 		}
 		addr := zdbConnectionURL(containerIP.String(), zdbPort)
@@ -152,8 +162,17 @@ func zdbProvision(ctx context.Context, reservation *Reservation) (interface{}, e
 			return nil, errors.Wrap(err, "failed to have a 0-db container running")
 		}
 
-		containerIP, err = network.ZDBIp(c.Network.Namespace)
+		ips, err := network.Addrs(nwmod.ZDBIface, c.Network.Namespace)
 		if err != nil {
+			return nil, errors.Wrap(err, "failed to get 0-db container IP")
+		}
+		for _, ip := range ips {
+			if isPublic(ip) {
+				containerIP = ip
+				break
+			}
+		}
+		if containerIP == nil {
 			return nil, errors.Wrap(err, "failed to get 0-db container IP")
 		}
 	}
@@ -256,14 +275,19 @@ func createZdbContainer(ctx context.Context, name string, mode modules.ZDBMode, 
 	}
 
 	getIP := func() error {
-		ip, err := network.ZDBIp(netNsName)
+		ips, err := network.Addrs(nwmod.ZDBIface, netNsName)
 		if err != nil {
-			slog.Debug().Err(err).Msg("not up public found, waiting...")
+			slog.Debug().Err(err).Msg("not ip public found, waiting")
 			return err
 		}
-		containerIP = ip
-		slog.Debug().IPAddr("ip", ip).Msg("0-db container public ip found")
-		return nil
+		for _, ip := range ips {
+			if isPublic(ip) {
+				slog.Debug().IPAddr("ip", ip).Msg("0-db container public ip found")
+				containerIP = ip
+				return nil
+			}
+		}
+		return fmt.Errorf("not up public found, waiting")
 	}
 
 	bo := backoff.NewExponentialBackOff()
@@ -310,10 +334,20 @@ func zdbDecommission(ctx context.Context, reservation *Reservation) error {
 		return err
 	}
 
-	containerIP, err = network.ZDBIp(c.Network.Namespace)
+	ips, err := network.Addrs(nwmod.ZDBIface, c.Network.Namespace)
 	if err != nil {
 		return errors.Wrap(err, "failed to get 0-db container IP")
 	}
+	for _, ip := range ips {
+		if isPublic(ip) {
+			containerIP = ip
+			break
+		}
+	}
+	if containerIP == nil {
+		return errors.Wrap(err, "failed to get 0-db container IP")
+	}
+
 	addr := zdbConnectionURL(containerIP.String(), zdbPort)
 
 	slog.Debug().Str("addr", addr).Msg("connect to 0-db and delete namespace")
@@ -341,4 +375,16 @@ func zdbDecommission(ctx context.Context, reservation *Reservation) error {
 }
 func zdbConnectionURL(ip string, port uint16) string {
 	return fmt.Sprintf("tcp://[%s]:%d", ip, port)
+}
+
+// isPublic check if ip is a IPv6 public address
+func isPublic(ip net.IP) bool {
+	if ip.To4() != nil {
+		return false
+	}
+
+	return !(ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast())
 }

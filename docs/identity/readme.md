@@ -8,6 +8,13 @@ Storage module is available on zbus over the following channel
 |--------|--------|---------|
 | identity|[manager](#interface)| 0.0.1|
 
+## Home Directory
+identity keeps some data in the following locations
+| directory | path|
+|----|---|
+| root| `/var/cache/modules/identity`|
+
+
 ## Introduction
 
 Identity manager is responsible for node identification on the grid. The manager make sure the node has one valid ID during the entire lifetime of the node, and that node id is registered on the grid.

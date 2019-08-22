@@ -34,7 +34,7 @@ func main() {
 		ver      bool
 	)
 
-	flag.StringVar(&root, "root", "/var/cache/modules/network", "root path of the module")
+	flag.StringVar(&root, "root", "/var/cache/modules/networkd", "root path of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
 	flag.BoolVar(&ver, "v", false, "show version and exit")

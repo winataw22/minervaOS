@@ -29,6 +29,11 @@ import (
 	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
 )
 
+const (
+	// ZDBIface is the name of the intefface used in the 0-db network namespace
+	ZDBIface = "zdb0"
+)
+
 type networker struct {
 	identity   modules.IdentityManager
 	storageDir string
@@ -214,7 +219,7 @@ func (n networker) ZDBPrepare() (string, error) {
 		pubIface = master
 	}
 
-	macVlan, err := macvlan.Create("zdb0", pubIface, netNs)
+	macVlan, err := macvlan.Create(ZDBIface, pubIface, netNs)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create public mac vlan interface")
 	}
@@ -227,32 +232,44 @@ func (n networker) ZDBPrepare() (string, error) {
 	return netNSName, nil
 }
 
-func (n networker) ZDBIp(netNSName string) (net.IP, error) {
-	netNS, err := namespace.GetByName(netNSName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get network namespace %s", netNSName)
-	}
-
-	var publicIP net.IP
+// Addrs return the IP addresses of interface
+func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
+	var ips []net.IP
 
 	f := func(_ ns.NetNS) error {
-		ip, err := findPublicAddr("zdb0")
+		link, err := netlink.LinkByName(iface)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to get interface %s", iface)
 		}
-		publicIP = ip
+
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
+		}
+		ips = make([]net.IP, len(addrs))
+		for i, addr := range addrs {
+			ips[i] = addr.IP
+		}
 		return nil
 	}
 
-	if err := netNS.Do(f); err != nil {
-		log.Error().Err(err).Msgf("failed to get public IP on interface zdb0 in namespace %s", netNSName)
+	if netns != "" {
+		netNS, err := namespace.GetByName(netns)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get network namespace %s", netns)
+		}
+		defer netNS.Close()
+
+		if err := netNS.Do(f); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := f(nil); err != nil {
+			return nil, err
+		}
 	}
 
-	if publicIP == nil {
-		return nil, fmt.Errorf("not public up found on interface zdb0")
-	}
-
-	return publicIP, nil
+	return ips, nil
 }
 
 // ApplyNetResource implements modules.Networker interface
@@ -447,30 +464,6 @@ func (n *networker) extractPrivateKey(r *modules.NetResource) (wgtypes.Key, erro
 	}
 
 	return wgtypes.ParseKey(string(decoded))
-}
-
-func findPublicAddr(iface string) (net.IP, error) {
-	link, err := netlink.LinkByName(iface)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get interface %s", iface)
-	}
-
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
-	}
-
-	for _, addr := range addrs {
-		log.Debug().IPAddr("ip", addr.IP).Msg("check if ip is public")
-		if addr.IP.IsLoopback() ||
-			addr.IP.IsLinkLocalUnicast() ||
-			addr.IP.IsLinkLocalMulticast() ||
-			addr.IP.IsInterfaceLocalMulticast() {
-			continue
-		}
-		return addr.IP, nil
-	}
-	return nil, fmt.Errorf("no public address found on interface %s", iface)
 }
 
 // publicMasterIface return the name of the master interface

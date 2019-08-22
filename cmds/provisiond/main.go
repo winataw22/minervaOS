@@ -16,8 +16,6 @@ import (
 	"github.com/threefoldtech/zosv2/modules/version"
 )
 
-const storageDir = "/var/cache/modules/provision"
-
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
@@ -25,10 +23,12 @@ func main() {
 		msgBrokerCon string
 		resURL       string
 		tnodbURL     string
+		storageDir   string
 		debug        bool
 		ver          bool
 	)
 
+	flag.StringVar(&storageDir, "root", "/var/cache/modules/provisiond", "root path of the module")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
 	flag.StringVar(&resURL, "url", "https://tnodb.dev.grid.tf", "URL of the reservation server to poll from")

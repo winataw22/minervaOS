@@ -32,9 +32,10 @@ type Networker interface {
 	// to allow the 0-db container to be publicly accessible
 	// it retusn the name of the network namespace created
 	ZDBPrepare() (string, error)
-	// ZDBIP returns the ip of the macvlan interface
-	// of the network namespace of a ZDB container
-	ZDBIp(netNSName string) (net.IP, error)
+
+	// Addrs return the IP addresses of interface
+	// if the interface is in a network namespace netns needs to be not empty
+	Addrs(iface string, netns string) ([]net.IP, error)
 }
 
 // NetID is a type defining the ID of a network
