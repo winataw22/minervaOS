@@ -88,7 +88,7 @@ Using tfuser creating a network becomes trivial:
 ```bash
 # creates a new network with node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk as exit node
 # and output the result into network.json
-tfuser generate --output network.json network create --node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk
+tfuser generate --schema network.json network create --node DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk
 ```
 
 network.json will now contains something like:
@@ -148,7 +148,7 @@ Which is a valid network schema. This network only contains a single exit node t
 Let's add another node to the network:
 
 ```bash
-tfuser generate --output network.json network --input network.json add-node --node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4
+tfuser generate --schema network.json network add-node --node 4hpUjrbYS4YeFbvLoeSR8LGJKVkB97JyS83UEhFUU3S4
 ```
 
 result looks like:

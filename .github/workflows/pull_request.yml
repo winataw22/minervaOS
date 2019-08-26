@@ -1,0 +1,14 @@
+on: pull_request
+name: Add new pull requests to projects
+jobs:
+  build:
+    name: alex-page/add-new-pulls-project
+    runs-on: ubuntu-latest
+    steps:
+    - name: alex-page/add-new-pulls-project
+      uses: alex-page/add-new-pulls-project@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        args: '"zero-os_2.0.0 (active)" "In Progress"'
+

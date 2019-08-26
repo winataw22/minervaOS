@@ -23,17 +23,17 @@ func cmdCreateNetwork(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), r)
+	return output(c.GlobalString("schema"), r)
 }
 
 func cmdsAddNode(c *cli.Context) error {
 	var (
 		network = &modules.Network{}
-		input   = c.GlobalString("input")
+		schema  = c.GlobalString("schema")
 		err     error
 	)
 
-	network, err = loadNetwork(input)
+	network, err = loadNetwork(schema)
 	if err != nil {
 		return err
 	}
@@ -50,12 +50,12 @@ func cmdsAddNode(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), r)
+	return output(schema, r)
 }
 func cmdsAddUser(c *cli.Context) error {
 	var (
 		network    = &modules.Network{}
-		input      = c.GlobalString("input")
+		schema     = c.GlobalString("schema")
 		userID     = c.String("user")
 		privateKey string
 		err        error
@@ -65,7 +65,7 @@ func cmdsAddUser(c *cli.Context) error {
 		return fmt.Errorf("user ID cannot be empty. generate an identity using the `id` command")
 	}
 
-	network, err = loadNetwork(input)
+	network, err = loadNetwork(schema)
 	if err != nil {
 		return err
 	}
@@ -83,13 +83,13 @@ func cmdsAddUser(c *cli.Context) error {
 	fmt.Printf("wireguard private key: %s\n", privateKey)
 	fmt.Printf("save this key somewhere, you will need it to generate the wg-quick configuration file with the `wg` command\n")
 
-	return output(c.GlobalString("output"), r)
+	return output(schema, r)
 }
 
 func cmdsWGQuick(c *cli.Context) error {
 	var (
 		network    = &modules.Network{}
-		input      = c.GlobalString("input")
+		schema     = c.GlobalString("schema")
 		userID     = c.String("user")
 		privateKey = c.String("key")
 		err        error
@@ -99,7 +99,7 @@ func cmdsWGQuick(c *cli.Context) error {
 		return fmt.Errorf("private key cannot be empty")
 	}
 
-	network, err = loadNetwork(input)
+	network, err = loadNetwork(schema)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func cmdsWGQuick(c *cli.Context) error {
 func cmdsRemoveNode(c *cli.Context) error {
 	var (
 		network = &modules.Network{}
-		input   = c.GlobalString("input")
+		schema  = c.GlobalString("schema")
 		nodeID  = c.String("node")
 		err     error
 	)
@@ -125,7 +125,7 @@ func cmdsRemoveNode(c *cli.Context) error {
 		return fmt.Errorf("node ID cannot be empty")
 	}
 
-	network, err = loadNetwork(input)
+	network, err = loadNetwork(schema)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func cmdsRemoveNode(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), r)
+	return output(schema, r)
 }
 
 func loadNetwork(name string) (network *modules.Network, err error) {

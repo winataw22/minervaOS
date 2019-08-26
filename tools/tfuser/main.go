@@ -75,20 +75,16 @@ func main() {
 			Usage:   "Group of command to generate provisioning schemas",
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name:  "output,o",
-					Usage: "file name where to write the result of the command",
+					Name: "schema,s",
+					Usage: `location of the generated schema. 
+					For the network sub-commands add-node and add-user this flag is
+					also used to read the network schema before modifying it`,
 				},
 			},
 			Subcommands: []cli.Command{
 				{
 					Name:  "network",
 					Usage: "Manage private networks",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "input,i",
-							Usage: "file name to a json encoded network definition",
-						},
-					},
 					Subcommands: []cli.Command{
 						{
 							Name:  "create",
@@ -129,7 +125,7 @@ func main() {
 							Flags: []cli.Flag{
 								cli.StringFlag{
 									Name:  "user",
-									Usage: "user ID, if not specified, a user ID will be generated automatically",
+									Usage: "user ID",
 								},
 							},
 							Action: cmdsAddUser,
@@ -158,6 +154,10 @@ func main() {
 						cli.StringFlag{
 							Name:  "flist",
 							Usage: "URL to the flist",
+						},
+						cli.StringFlag{
+							Name:  "storage",
+							Usage: "URL to the flist storage backend",
 						},
 						cli.StringFlag{
 							Name:  "entrypoint",

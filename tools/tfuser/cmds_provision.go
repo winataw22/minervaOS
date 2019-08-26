@@ -35,14 +35,14 @@ func cmdsProvision(c *cli.Context) error {
 	if err != nil {
 		nrDays, err := strconv.Atoi(d)
 		if err != nil {
-			return fmt.Errorf("unsupported duration format")
+			return errors.Wrap(err, "unsupported duration format")
 		}
 		duration = time.Duration(nrDays) * day
 	}
 
 	keypair, err := identity.LoadSeed(seedPath)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}
 
 	if path == "-" {
@@ -51,12 +51,12 @@ func cmdsProvision(c *cli.Context) error {
 		schema, err = ioutil.ReadFile(path)
 	}
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not find provision schema")
 	}
 
 	r := &provision.Reservation{}
 	if err := json.Unmarshal(schema, r); err != nil {
-		return err
+		return errors.Wrap(err, "failed to read the provision schema")
 	}
 
 	r.Duration = duration
@@ -70,12 +70,12 @@ func cmdsProvision(c *cli.Context) error {
 	}
 
 	if err := output(path, r); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to write provision schema to %s after signature", path)
 	}
 
 	for _, nodeID := range nodeIDs {
 		if err := store.Reserve(r, modules.StrIdentifier(nodeID)); err != nil {
-			return err
+			return errors.Wrap(err, "failed to send reservation")
 		}
 		fmt.Printf("reservation for %v send to node %s\n", duration, nodeID)
 	}
