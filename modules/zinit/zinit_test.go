@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestParseList(t *testing.T) {
@@ -49,6 +50,7 @@ name: ntp
 pid: 223
 state: Running
 target: Up
+log: Ring
 after:
   - network-dhcp: Success`
 	status, err := parseStatus(s)
@@ -60,4 +62,27 @@ after:
 		State:  ServiceStatusRunning,
 		Target: ServiceTargetUp,
 	}, status)
+}
+
+func TestParseService(t *testing.T) {
+	b := []byte(`
+exec: /bin/true
+test: test -e /bin/true
+oneshot: false
+log: ring
+after:
+ - one
+ - two	
+`)
+	var s InitService
+	err := yaml.Unmarshal(b, &s)
+	require.NoError(t, err)
+
+	assert.Equal(t, InitService{
+		Exec:    "/bin/true",
+		Test:    "test -e /bin/true",
+		Oneshot: false,
+		Log:     RingLogType,
+		After:   []string{"one", "two"},
+	}, s)
 }

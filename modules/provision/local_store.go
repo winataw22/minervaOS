@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/threefoldtech/zosv2/modules/versioned"
 )
 
 // FSStore is a in reservation store
@@ -47,8 +49,12 @@ func (s *FSStore) Add(r *Reservation) error {
 		return err
 	}
 	defer f.Close()
+	writer, err := versioned.NewWriter(f, reservationSchemaLastVersion)
+	if err != nil {
+		return err
+	}
 
-	if err := json.NewEncoder(f).Encode(r); err != nil {
+	if err := json.NewEncoder(writer).Encode(r); err != nil {
 		return err
 	}
 
@@ -117,13 +123,26 @@ func (s *FSStore) Get(id string) (*Reservation, error) {
 		return nil, err
 	}
 	defer f.Close()
-
-	r := &Reservation{}
-	if err := json.NewDecoder(f).Decode(r); err != nil {
-		return nil, err
+	reader, err := versioned.NewReader(f)
+	if versioned.IsNotVersioned(err) {
+		if _, err := f.Seek(0, 0); err != nil { // make sure to read from start
+			return nil, err
+		}
+		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), f)
 	}
 
-	return r, nil
+	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", reservationSchemaV1))
+	var reservation Reservation
+
+	if validV1(reader.Version()) {
+		if err := json.NewDecoder(reader).Decode(&reservation); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown reservation object version (%s)", reader.Version())
+	}
+
+	return &reservation, nil
 }
 
 // Close makes sure the backend of the store is closed properly

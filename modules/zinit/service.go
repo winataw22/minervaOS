@@ -3,16 +3,39 @@ package zinit
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v2"
+)
+
+// LogType is an enum type
+type LogType string
+
+// UnmarshalYAML implements the  yaml.Unmarshaler interface
+func (s *LogType) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var buf string
+	if err := unmarshal(&buf); err != nil {
+		return err
+	}
+	*s = LogType(strings.ToLower(buf))
+	return nil
+}
+
+// All the type of logging supported by zinit
+const (
+	StdoutLogType LogType = "stdout"
+	RingLogType           = "ring"
 )
 
 // InitService represent a Zinit service file
 type InitService struct {
 	Exec    string
 	Oneshot bool
+	Test    string
 	After   []string
+	Log     LogType
 }
 
 // AddService write the service into a file in the expected location for Zinit
@@ -24,4 +47,11 @@ func AddService(name string, service InitService) error {
 	}
 	path := filepath.Join("/etc/zinit", fmt.Sprintf("%s.yaml", name))
 	return ioutil.WriteFile(path, b, 0660)
+}
+
+// RemoveService delete the service file from the filesystem
+// make sure the service has been stopped and forgot before deleting it
+func RemoveService(name string) error {
+	path := filepath.Join("/etc/zinit", fmt.Sprintf("%s.yaml", name))
+	return os.RemoveAll(path)
 }

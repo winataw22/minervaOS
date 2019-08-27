@@ -70,6 +70,7 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 				if err := e.decommission(ctx, reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to decommission reservation %s", reservation.ID)
 				}
+				slog.Info().Msg("reservation decommission successful")
 			}
 		}
 	}

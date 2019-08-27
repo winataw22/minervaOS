@@ -33,7 +33,7 @@ func TestSerialize(t *testing.T) {
 	err = keypair.Save(f.Name())
 	require.NoError(t, err)
 
-	keypair2, err := LoadSeed(f.Name())
+	keypair2, err := LoadKeyPair(f.Name())
 	require.NoError(t, err)
 
 	assert.Equal(t, keypair.PrivateKey, keypair2.PrivateKey)

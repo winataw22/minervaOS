@@ -45,16 +45,18 @@ spelling:
 # Builds minio, runs the verifiers then runs the tests.
 check: test
 test: verifiers build
-	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
 	# we already ran vet separately, so safe to turn it off here
-	@CGO_ENABLED=0 go test -v -vet=off ./...
+	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
+	for pkg in $(shell go list ./... | grep -Ev "stubs|flist|provision|network|storage" ); do \
+		go test -v -vet=off $$pkg; \
+	done
 
 testrace: verifiers build
 	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
 	# we already ran vet separately, so safe to turn it off here
 	@CGO_ENABLED=1 go test -v -vet=off -race ./...
 
-coverage: build
+coverage: verifiers build
 	@(env bash $(PWD)/buildscripts/go-coverage.sh)
 
 generate:

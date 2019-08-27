@@ -2,11 +2,18 @@ package identity
 
 import (
 	"fmt"
-	"io/ioutil"
 
 	"github.com/jbenet/go-base58"
+	"github.com/threefoldtech/zosv2/modules/versioned"
 
 	"golang.org/x/crypto/ed25519"
+)
+
+var (
+	//SeedVersion1 version
+	seedVersion1 = versioned.MustParse("1.0.0")
+	//SeedVersionLatest link to latest seed version
+	seedVersionLatest = seedVersion1
 )
 
 // KeyPair holds a public and private side of an ed25519 key pair
@@ -37,13 +44,32 @@ func GenerateKeyPair() (k KeyPair, err error) {
 func (k *KeyPair) Save(path string) error {
 	seed := k.PrivateKey.Seed()
 
-	return ioutil.WriteFile(path, seed, 0400)
+	return versioned.WriteFile(path, seedVersionLatest, seed, 0400)
 }
 
-// LoadSeed reads a seed from a file located at path and re-create a
+// LoadSeed from path
+func LoadSeed(path string) ([]byte, error) {
+	version, seed, err := versioned.ReadFile(path)
+	if versioned.IsNotVersioned(err) {
+		// this is a compatibility code for seed files
+		// in case it does not have any version information
+		versioned.WriteFile(path, seedVersionLatest, seed, 0400)
+		version = seedVersionLatest
+	} else if err != nil {
+		return nil, err
+	}
+
+	if version.NE(seedVersionLatest) {
+		return nil, fmt.Errorf("unknown seed version")
+	}
+
+	return seed, nil
+}
+
+// LoadKeyPair reads a seed from a file located at path and re-create a
 // KeyPair using the seed
-func LoadSeed(path string) (k KeyPair, err error) {
-	seed, err := ioutil.ReadFile(path)
+func LoadKeyPair(path string) (k KeyPair, err error) {
+	seed, err := LoadSeed(path)
 	if err != nil {
 		return k, err
 	}

@@ -2,7 +2,6 @@ package identity
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/threefoldtech/zosv2/modules/crypto"
@@ -21,7 +20,7 @@ type identityManager struct {
 // not exist
 func NewManager(path string) (modules.IdentityManager, error) {
 	var pair KeyPair
-	if seed, err := ioutil.ReadFile(path); os.IsNotExist(err) {
+	if seed, err := LoadSeed(path); os.IsNotExist(err) {
 		pair, err = GenerateKeyPair()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate key pair")

@@ -19,6 +19,7 @@ import (
 	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	nib "github.com/threefoldtech/zosv2/modules/network/ip"
 	"github.com/threefoldtech/zosv2/modules/network/macvlan"
+	"github.com/threefoldtech/zosv2/modules/versioned"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
@@ -368,8 +369,12 @@ func (n *networker) ApplyNetResource(network modules.Network) (string, error) {
 		return "", err
 	}
 	defer file.Close()
+	writer, err := versioned.NewWriter(file, modules.NetworkSchemaLatestVersion)
+	if err != nil {
+		return "", err
+	}
 
-	enc := json.NewEncoder(file)
+	enc := json.NewEncoder(writer)
 	if err := enc.Encode(network); err != nil {
 		return "", errors.Wrap(err, "failed to store network object")
 	}
@@ -393,11 +398,32 @@ func (n *networker) networkOf(id modules.NetID) (*modules.Network, error) {
 		return nil, err
 	}
 	defer file.Close()
+	reader, err := versioned.NewReader(file)
+	if versioned.IsNotVersioned(err) {
+		// old data that doesn't have any version information
+		if _, err := file.Seek(0, 0); err != nil {
+			return nil, err
+		}
 
-	dec := json.NewDecoder(file)
+		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), file)
+	} else if err != nil {
+		return nil, err
+	}
 
 	var net modules.Network
-	return &net, dec.Decode(&net)
+	dec := json.NewDecoder(reader)
+
+	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", modules.NetworkSchemaV1))
+
+	if validV1(reader.Version()) {
+		if err := dec.Decode(&net); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("unknown network object version (%s)", reader.Version())
+	}
+
+	return &net, nil
 }
 
 // ApplyNetResource implements modules.Networker interface

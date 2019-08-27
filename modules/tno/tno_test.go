@@ -151,7 +151,7 @@ func TestConfigureExitResource(t *testing.T) {
 	assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Peers[0].Prefix.String())
 	assert.Equal(t, modules.ConnTypeWireguard, n.Resources[0].Peers[0].Type)
 	assert.Equal(t, "2a02:1802:5e::223", n.Resources[0].Peers[0].Connection.IP.String())
-	assert.Equal(t, uint16(1600), n.Resources[0].Peers[0].Connection.Port)
+	assert.Equal(t, uint16(44986), n.Resources[0].Peers[0].Connection.Port)
 	assert.Equal(t, key.PublicKey().String(), n.Resources[0].Peers[0].Connection.Key)
 
 	assert.NotNil(t, n.Exit)

@@ -232,6 +232,20 @@ func main() {
 						},
 					},
 				},
+				{
+					Name:  "debug",
+					Usage: "Enable debug mode on a node. In this mode the forward its logs to the specified redis endpoint",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name: "endpoint",
+						},
+						cli.StringFlag{
+							Name:  "channel",
+							Usage: "name of the redis pubsub channel to use, if empty the node will push to {nodeID}-logs",
+						},
+					},
+					Action: generateDebug,
+				},
 			},
 		},
 		{

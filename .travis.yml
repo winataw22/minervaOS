@@ -11,12 +11,12 @@ install:
 - pushd modules && make getdeps && popd
 
 script:
-- pushd modules && make getdeps && popd
 - pushd modules && make verifiers && popd
+- pushd modules && make coverage && popd
 - pushd cmds && make && popd
 
-# after_success:
-# - bash <(curl -s https://codecov.io/bash)
+after_success:
+- pushd modules && bash <(curl -s https://codecov.io/bash)
 
 go:
 - '1.12.5'

@@ -124,8 +124,8 @@ func (c *Client) Monitor(service string) error {
 	return err
 }
 
-// Fortget forget a service. you can only forget a stopped service
-func (c *Client) forget(service string) error {
+// Forget forgets a service. you can only forget a stopped service
+func (c *Client) Forget(service string) error {
 	_, err := c.cmd(fmt.Sprintf("forget %s", service))
 	return err
 }

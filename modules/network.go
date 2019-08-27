@@ -2,6 +2,8 @@ package modules
 
 import (
 	"net"
+
+	"github.com/threefoldtech/zosv2/modules/versioned"
 )
 
 //go:generate mkdir -p stubs
@@ -79,6 +81,13 @@ type NodeID struct {
 func (n *NodeID) Identity() string {
 	return n.ID
 }
+
+var (
+	// NetworkSchemaV1 network object schema version 1.0.0
+	NetworkSchemaV1 = versioned.MustParse("1.0.0")
+	// NetworkSchemaLatestVersion network object latest version
+	NetworkSchemaLatestVersion = NetworkSchemaV1
+)
 
 // Network represent a full network owned by a user
 type Network struct {
