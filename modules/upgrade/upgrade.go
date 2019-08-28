@@ -445,9 +445,22 @@ func isIn(target string, list []string) bool {
 func copyFile(dst, src string) error {
 	log.Info().Str("source", src).Str("destination", dst).Msg("copy file")
 
-	dstOld := dst + ".old"
-	if err := os.Rename(dst, dstOld); err != nil {
-		return err
+	var (
+		isNew  = false
+		dstOld string
+	)
+
+	if _, err := os.Stat(dst); os.IsNotExist(err) {
+		// case where this is a new file
+		// we just need to copy from flist to root
+		isNew = true
+	}
+
+	if !isNew {
+		dstOld = dst + ".old"
+		if err := os.Rename(dst, dstOld); err != nil {
+			return err
+		}
 	}
 
 	fSrc, err := os.Open(src)
@@ -471,7 +484,10 @@ func copyFile(dst, src string) error {
 		return err
 	}
 
-	return os.Remove(dstOld)
+	if !isNew {
+		return os.Remove(dstOld)
+	}
+	return nil
 }
 
 var errNotAbsolute = errors.New("path is not absolute")

@@ -1,1 +1,9 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/9c879faaf83b87c075bbe7411b0d9f70
+module github.com/threefoldtech/zosv2/cmds/zlf
+
+go 1.12
+
+require (
+	github.com/go-redis/redis v6.15.2+incompatible
+	github.com/onsi/ginkgo v1.9.0 // indirect
+	github.com/onsi/gomega v1.6.0 // indirect
+)

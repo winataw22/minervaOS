@@ -31,11 +31,11 @@ const (
 
 // InitService represent a Zinit service file
 type InitService struct {
-	Exec    string
-	Oneshot bool
-	Test    string
-	After   []string
-	Log     LogType
+	Exec    string   `yaml:"exec,omitempty"`
+	Oneshot bool     `yaml:"oneshot,omitempty"`
+	Test    string   `yaml:"test,omitempty"`
+	After   []string `yaml:"after,omitempty"`
+	Log     LogType  `yaml:"log,omitempty"`
 }
 
 // AddService write the service into a file in the expected location for Zinit

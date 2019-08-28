@@ -6,7 +6,7 @@ actor "User 3Bot" as user
 actor "Farmer 3Bot" as farmer
 database "TF Directory" as directory
 database TFChain as tfchain
-database "Notary Chain" as notarychain
+database BCDB as bcdb
 boundary Node as node
 
 == Resource research ==
@@ -14,22 +14,22 @@ user -> directory: User look where to deploy the workload
 activate directory
 user <- directory: Gives detail about the farmer owning the node selected
 deactivate directory
-== Resource negotiation ==
+== Price negotiation ==
 user -> farmer: Start negotiation
 activate farmer
 farmer <-> user: negotiate prices
 deactivate farmer
 == Resource reservation  ==
 user -> tfchain: lock some TFT
-user -> notarychain: write description of the workload
-user -> node: notify some provisioning is waiting
+user -> bcdb: write description of the workload
 activate node
 == Resource provisioning  ==
-node -> notarychain: read description of the workload
+node -> bcdb: read description of the workload
 node -> node: provision workload
-node -> user: notify workload is ready
+node -> bcdb: write result of the provisining
+user <- bcdb: read the connection information to his workload
 deactivate node
 tfchain -> farmer: TFT are unlock progresively to the farmer
 == Resource monitoring ==
-user <-> node: monitor workload
+user <-> node: use / monitor workload
 @enduml
