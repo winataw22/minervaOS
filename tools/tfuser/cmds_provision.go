@@ -40,7 +40,7 @@ func cmdsProvision(c *cli.Context) error {
 		duration = time.Duration(nrDays) * day
 	}
 
-	keypair, err := identity.LoadSeed(seedPath)
+	keypair, err := identity.LoadKeyPair(seedPath)
 	if err != nil {
 		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}

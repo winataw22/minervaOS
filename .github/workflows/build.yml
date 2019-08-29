@@ -44,3 +44,10 @@ jobs:
         make
       env:
         GO111MODULE: on
+
+    - name: Build tools
+      run: |
+        cd tools
+        make
+      env:
+        GO111MODULE: on

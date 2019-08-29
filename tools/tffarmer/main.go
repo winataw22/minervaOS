@@ -151,7 +151,7 @@ func loadFarmID(seedPath string) (modules.Identifier, error) {
 	}
 
 	log.Debug().Msgf("loading seed from %s", seedPath)
-	farmID, err := identity.LoadSeed(seedPath)
+	farmID, err := identity.LoadKeyPair(seedPath)
 	if err != nil {
 		return nil, err
 	}

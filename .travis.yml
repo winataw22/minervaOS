@@ -14,6 +14,7 @@ script:
 - pushd modules && make verifiers && popd
 - pushd modules && make coverage && popd
 - pushd cmds && make && popd
+- pushd tools && make && popd
 
 after_success:
 - pushd modules && bash <(curl -s https://codecov.io/bash)

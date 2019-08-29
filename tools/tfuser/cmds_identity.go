@@ -12,7 +12,7 @@ func cmdsGenerateID(c *cli.Context) error {
 
 	output := c.String("output")
 
-	k, err := identity.LoadSeed(output)
+	k, err := identity.LoadKeyPair(output)
 	if err == nil {
 		fmt.Printf("a seed already exists at %s\n", output)
 		fmt.Printf("identity: %s\n", k.Identity())

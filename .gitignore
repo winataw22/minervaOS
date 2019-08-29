@@ -3,6 +3,13 @@
 out/
 bin/
 
+# tools binaries
+tools/bcdb_mock/bcdb_mock
+tools/tfuser/tfuser
+tools/tffarmer/tffarmer
+tools/schemac/schemac
+tools/upgradectl/upgradectl
+
 qemu/node*
 qemu/*.efi
 
