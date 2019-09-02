@@ -30,7 +30,7 @@ type Container struct {
 	// URL of the flist
 	FList string `json:"flist"`
 	// URL of the storage backend for the flist
-	FlistStorage string `json:"flist"`
+	FlistStorage string `json:"flist_storage"`
 	// Env env variables to container in format
 	Env map[string]string `json:"env"`
 	// Entrypoint the process to start inside the container
@@ -41,6 +41,13 @@ type Container struct {
 	Mounts []Mount `json:"mounts"`
 	// Network network info for container
 	Network Network `json:"network"`
+}
+
+// ContainerResult is the information return to the BCDB
+// after deploying a container
+type ContainerResult struct {
+	ID string `json:"id"`
+	IP string `json:"ip"`
 }
 
 // ContainerProvision is entry point to container reservation
@@ -154,7 +161,10 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 	}
 
 	log.Info().Msgf("container created with id: '%s'", id)
-	return id, nil
+	return ContainerResult{
+		ID: string(id),
+		IP: join.IP.String(),
+	}, nil
 }
 
 func containerDecommission(ctx context.Context, reservation *Reservation) error {

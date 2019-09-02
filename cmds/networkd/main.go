@@ -20,6 +20,7 @@ import (
 	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/tnodb"
+	"github.com/threefoldtech/zosv2/modules/network/types"
 	"github.com/threefoldtech/zosv2/modules/zinit"
 )
 
@@ -84,7 +85,7 @@ func main() {
 	ifaceVersion := -1
 	exitIface, err := db.ReadPubIface(nodeID)
 	if err == nil {
-		if err := configuePubIface(exitIface); err != nil {
+		if err := configurePubIface(exitIface); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
 			os.Exit(1)
 		}
@@ -95,11 +96,11 @@ func main() {
 	defer cancel()
 
 	chIface := watchPubIface(ctx, nodeID, db, ifaceVersion)
-	go func(ctx context.Context, ch <-chan *network.PubIface) {
+	go func(ctx context.Context, ch <-chan *types.PubIface) {
 		for {
 			select {
 			case iface := <-ch:
-				_ = configuePubIface(iface)
+				_ = configurePubIface(iface)
 			case <-ctx.Done():
 				return
 			}

@@ -60,7 +60,7 @@ var node1 = &modules.NetResource{
 	Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
 	LinkLocal: mustParseCIDR("fe80::ff02/64"),
 	Peers:     peers,
-	ExitPoint: true,
+	ExitPoint: 1,
 }
 
 var node2 = &modules.NetResource{

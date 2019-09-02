@@ -1,6 +1,7 @@
 package tno
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -58,7 +59,7 @@ var node1 = &modules.NetResource{
 	Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
 	LinkLocal: mustParseCIDR("fe80::ff02/64"),
 	Peers:     peers,
-	ExitPoint: true,
+	ExitPoint: 1,
 }
 var node2 = &modules.NetResource{
 	NodeID: &modules.NodeID{
@@ -127,36 +128,35 @@ func TestConfigureExitResource(t *testing.T) {
 			Mask: net.CIDRMask(64, 128),
 		},
 	}
+	exitNodeNr := uint8(2)
 	allocation := &net.IPNet{
-		IP:   net.ParseIP("2a02:1802:5e:afba::"),
+		IP:   net.ParseIP(fmt.Sprintf("2a02:1802:5e:%dfba::", exitNodeNr)),
 		Mask: net.CIDRMask(64, 128),
 	}
 
 	key, err := wgtypes.GeneratePrivateKey()
 	require.NoError(t, err)
 
-	publicIP := net.ParseIP("2a02:1802:5e::223")
-
 	err = Configure(n, []Opts{
-		ConfigureExitResource("DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk", allocation, publicIP, key, 48),
+		ConfigureExitResource("DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk", allocation, net.ParseIP("2a02:1802:5e:0:1000:0:ff:1"), key, exitNodeNr),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(n.Resources))
 	assert.Equal(t, "DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk", n.Resources[0].NodeID.ID)
 	// assert.Equal(t, "", n.Resources[0].NodeID.FarmerID)
-	assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Prefix.String())
-	assert.Equal(t, "fe80::afba/64", n.Resources[0].LinkLocal.String())
-	assert.True(t, n.Resources[0].ExitPoint)
+	assert.Equal(t, "2a02:1802:5e:2fba::/64", n.Resources[0].Prefix.String())
+	assert.Equal(t, "fe80::2fba/64", n.Resources[0].LinkLocal.String())
+	assert.EqualValues(t, exitNodeNr, n.Resources[0].ExitPoint)
 	assert.Equal(t, 1, len(n.Resources[0].Peers))
-	assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Peers[0].Prefix.String())
+	assert.Equal(t, "2a02:1802:5e:2fba::/64", n.Resources[0].Peers[0].Prefix.String())
 	assert.Equal(t, modules.ConnTypeWireguard, n.Resources[0].Peers[0].Type)
-	assert.Equal(t, "2a02:1802:5e::223", n.Resources[0].Peers[0].Connection.IP.String())
-	assert.Equal(t, uint16(44986), n.Resources[0].Peers[0].Connection.Port)
+	assert.Equal(t, "2a02:1802:5e:0:1000:0:ff:1", n.Resources[0].Peers[0].Connection.IP.String())
+	assert.Equal(t, uint16(12218), n.Resources[0].Peers[0].Connection.Port)
 	assert.Equal(t, key.PublicKey().String(), n.Resources[0].Peers[0].Connection.Key)
 
 	assert.NotNil(t, n.Exit)
 	assert.NotNil(t, n.Exit.Ipv6Conf)
-	assert.Equal(t, "fe80::afba/64", n.Exit.Ipv6Conf.Addr.String())
+	assert.Equal(t, "fe80::2fba:1/64", n.Exit.Ipv6Conf.Addr.String())
 	assert.Equal(t, "fe80::1", n.Exit.Ipv6Conf.Gateway.String())
 	assert.Equal(t, "public", n.Exit.Ipv6Conf.Iface)
 }
@@ -231,7 +231,7 @@ func TestAddNode(t *testing.T) {
 			// assert.Equal(t, "", n.Resources[0].NodeID.FarmerID)
 			assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Prefix.String())
 			assert.Equal(t, "fe80::afba/64", n.Resources[0].LinkLocal.String())
-			assert.False(t, n.Resources[0].ExitPoint)
+			assert.Equal(t, 0, n.Resources[0].ExitPoint)
 			assert.Equal(t, modules.ReachabilityV4Hidden, n.Resources[0].NodeID.ReachabilityV4)
 			if tt.args.publicIP != nil && tt.args.port != 0 {
 				assert.Equal(t, modules.ReachabilityV6Public, n.Resources[0].NodeID.ReachabilityV6)
@@ -280,7 +280,7 @@ func TestAddUser(t *testing.T) {
 	// assert.Equal(t, "", n.Resources[0].NodeID.FarmerID)
 	assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Prefix.String())
 	assert.Equal(t, "fe80::afba/64", n.Resources[0].LinkLocal.String())
-	assert.False(t, n.Resources[0].ExitPoint)
+	assert.Equal(t, 0, n.Resources[0].ExitPoint)
 	require.Equal(t, 1, len(n.Resources[0].Peers))
 	assert.Equal(t, "2a02:1802:5e:afba::/64", n.Resources[0].Peers[0].Prefix.String())
 	assert.Equal(t, modules.ConnTypeWireguard, n.Resources[0].Peers[0].Type)

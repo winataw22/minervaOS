@@ -14,7 +14,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/threefoldtech/zosv2/modules/network"
+	"github.com/threefoldtech/zosv2/modules/network/types"
 	"github.com/threefoldtech/zosv2/modules/provision"
 )
 
@@ -27,7 +27,6 @@ type farmInfo struct {
 type reservation struct {
 	Reservation *provision.Reservation `json:"reservation"`
 	NodeID      string                 `json:"node_id"`
-	Sent        bool                   `json:"sent"`
 }
 
 type provisionStore struct {
@@ -46,7 +45,7 @@ type allocation struct {
 }
 
 var (
-	nodeStore  map[string]*network.Node
+	nodeStore  map[string]*types.Node
 	farmStore  map[string]*farmInfo
 	allocStore *allocationStore
 	provStore  *provisionStore
@@ -59,7 +58,7 @@ func main() {
 
 	flag.Parse()
 
-	nodeStore = make(map[string]*network.Node)
+	nodeStore = make(map[string]*types.Node)
 	farmStore = make(map[string]*farmInfo)
 	allocStore = &allocationStore{Allocations: make(map[string]*allocation)}
 	provStore = &provisionStore{Reservations: make([]*reservation, 0, 20)}
@@ -88,11 +87,12 @@ func main() {
 
 	router.HandleFunc("/allocations", registerAlloc).Methods("POST")
 	router.HandleFunc("/allocations", listAlloc).Methods("GET")
-	router.HandleFunc("/allocations/{farm_id}", getAlloc).Methods("GET")
+	router.HandleFunc("/allocations/{node_id}", getAlloc).Methods("GET")
 
 	router.HandleFunc("/reservations/{node_id}", reserve).Methods("POST")
 	router.HandleFunc("/reservations/{node_id}/poll", pollReservations).Methods("GET")
 	router.HandleFunc("/reservations/{id}", getReservation).Methods("GET")
+	router.HandleFunc("/reservations/{id}", reservationResult).Methods("PUT")
 
 	log.Printf("start on %s\n", listen)
 	loggedRouter := handlers.LoggingHandler(os.Stderr, router)

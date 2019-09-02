@@ -54,7 +54,7 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 			res, err := s.store.Poll(modules.StrIdentifier(s.nodeID), firstRun)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get reservation")
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * 20)
 			}
 			firstRun = false
 
@@ -101,7 +101,7 @@ func (s *decommissionSource) Reservations(ctx context.Context) <-chan *Reservati
 
 		for {
 			// <-time.After(time.Minute * 10) //TODO: make configuration ? default value ?
-			<-time.After(time.Second * 10) //TODO: make configuration ? default value ?
+			<-time.After(time.Second * 20) //TODO: make configuration ? default value ?
 			log.Info().Msg("check for expired reservation")
 
 			reservations, err := s.store.GetExpired()

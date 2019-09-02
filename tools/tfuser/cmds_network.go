@@ -15,7 +15,7 @@ import (
 func cmdCreateNetwork(c *cli.Context) error {
 	network, err := createNetwork(c.String("node"))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create network schema")
 	}
 
 	r, err := embed(network, provision.NetworkReservation)

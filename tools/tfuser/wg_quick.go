@@ -8,7 +8,6 @@ import (
 	"text/template"
 
 	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/network/ip"
 )
 
 func genWGQuick(network *modules.Network, userID string, wgPrivateKey string) (string, error) {
@@ -42,16 +41,16 @@ func genWGQuick(network *modules.Network, userID string, wgPrivateKey string) (s
 		PrivateKey: wgPrivateKey,
 	}
 
-	localNibble := ip.NewNibble(localNr.Prefix, 0)
-	a, b, err := localNibble.ToV4()
-	if err != nil {
-		return "", err
-	}
+	// localNibble, err := ip.NewNibble(localNr.Prefix, 0)
+	// if err != nil {
+	// 	return "", err
+	// }
 
+	// TODO: add method for this in nibble struct
 	d.Address = strings.Join([]string{
 		localNr.Prefix.String(),
 		localNr.LinkLocal.String(),
-		fmt.Sprintf("10.255.%d.%d/16", a, b),
+		fmt.Sprintf("10.255.%d.%d/16", localNr.Prefix.IP[6], localNr.Prefix.IP[7]),
 	}, ", ")
 
 	netIPNet := network.PrefixZero
@@ -105,7 +104,7 @@ func getNetRes(nrs []*modules.NetResource, id string) *modules.NetResource {
 
 func getExitNetRes(nrs []*modules.NetResource) *modules.NetResource {
 	for _, nr := range nrs {
-		if nr.ExitPoint {
+		if nr.ExitPoint > 0 {
 			return nr
 		}
 	}

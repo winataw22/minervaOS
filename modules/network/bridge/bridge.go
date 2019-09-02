@@ -2,7 +2,7 @@ package bridge
 
 import (
 	"fmt"
-	"syscall"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/vishvananda/netlink"
@@ -15,7 +15,7 @@ func New(name string) (*netlink.Bridge, error) {
 	attrs.MTU = 1500
 	bridge := &netlink.Bridge{LinkAttrs: attrs}
 
-	if err := netlink.LinkAdd(bridge); err != nil && err != syscall.EEXIST {
+	if err := netlink.LinkAdd(bridge); err != nil && !os.IsExist(err) {
 		return bridge, err
 	}
 

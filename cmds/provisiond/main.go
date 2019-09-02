@@ -86,7 +86,7 @@ func main() {
 		provision.NewDecommissionSource(localStore),
 	)
 
-	engine := provision.New(source, localStore)
+	engine := provision.New(source, localStore, remoteStore)
 
 	log.Info().
 		Str("broker", msgBrokerCon).

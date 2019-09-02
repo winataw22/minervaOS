@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/network"
+	"github.com/threefoldtech/zosv2/modules/network/types"
 	"github.com/threefoldtech/zosv2/modules/provision"
 	"github.com/threefoldtech/zosv2/modules/tno"
 )
@@ -24,24 +24,22 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 
 	node, err := db.GetNode(modules.StrIdentifier(nodeID))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get node detail from BCDB")
 	}
 
-	if !node.ExitNode {
+	if node.ExitNode <= 0 {
 		return nil, fmt.Errorf("node %s cannot be used as exit node", nodeID)
 	}
 
-	pubIface, err := db.ReadPubIface(modules.StrIdentifier(node.NodeID))
+	publicIP, err := selectPublicIP(node)
 	if err != nil {
-		return nil, errors.Wrap(err, "fail to read public interface config")
+		return nil, err
 	}
 
-	allocation, farmAlloc, err := db.RequestAllocation(modules.StrIdentifier(node.FarmID))
+	allocation, farmAlloc, exitNodeNr, err := db.RequestAllocation(modules.StrIdentifier(node.NodeID))
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to request a new allocation")
 	}
-
-	_, farmAllocSize := farmAlloc.Mask.Size()
 
 	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
@@ -52,7 +50,7 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 	err = tno.Configure(network, []tno.Opts{
 		tno.GenerateID(),
 		tno.ConfigurePrefixZero(farmAlloc),
-		tno.ConfigureExitResource(node.NodeID, allocation, pubIface.IPv6.IP, key, farmAllocSize),
+		tno.ConfigureExitResource(node.NodeID, allocation, publicIP, key, exitNodeNr),
 	})
 	if err != nil {
 		return nil, err
@@ -62,20 +60,39 @@ func createNetwork(nodeID string) (*modules.Network, error) {
 	return network, nil
 }
 
+func selectPublicIP(node *types.Node) (net.IP, error) {
+	if node.PublicConfig != nil && node.PublicConfig.IPv6 != nil {
+		return node.PublicConfig.IPv6.IP, nil
+	}
+
+	for _, iface := range node.Ifaces {
+		for _, addr := range iface.Addrs {
+			if addr.IP.IsGlobalUnicast() {
+				return addr.IP, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no public address found")
+}
+
 func addNode(nw *modules.Network, nodeID string) (*modules.Network, error) {
 	if len(nw.Resources) <= 0 {
 		return nil, fmt.Errorf("cannot add a node to network without exit node")
 	}
 
-	farmID := nw.Resources[0].NodeID.FarmerID
-
-	allocation, _, err := db.RequestAllocation(modules.StrIdentifier(farmID))
+	farm, err := db.GetNode(modules.StrIdentifier(nodeID))
 	if err != nil {
 		return nil, err
 	}
 
+	allocation, _, _, err := db.RequestAllocation(nw.Resources[0].NodeID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to request a new allocation")
+	}
+
 	var (
-		pubIface *network.PubIface
+		pubIface *types.PubIface
 		ip       net.IP
 	)
 	pubIface, err = db.ReadPubIface(modules.StrIdentifier(nodeID))
@@ -91,7 +108,7 @@ func addNode(nw *modules.Network, nodeID string) (*modules.Network, error) {
 	}
 
 	err = tno.Configure(nw, []tno.Opts{
-		tno.AddNode(nodeID, farmID, allocation, key, ip),
+		tno.AddNode(nodeID, farm.FarmID, allocation, key, ip),
 	})
 	if err != nil {
 		return nil, err
@@ -108,7 +125,7 @@ func addUser(network *modules.Network, userID string) (*modules.Network, string,
 	}
 
 	farmID := network.Resources[0].NodeID.FarmerID
-	allocation, _, err := db.RequestAllocation(modules.StrIdentifier(farmID))
+	allocation, _, _, err := db.RequestAllocation(modules.StrIdentifier(farmID))
 	if err != nil {
 		return nil, "", err
 	}
@@ -117,7 +134,6 @@ func addUser(network *modules.Network, userID string) (*modules.Network, string,
 	if err != nil {
 		return nil, "", err
 	}
-	// todo serialize the key somewhere
 
 	err = tno.Configure(network, []tno.Opts{
 		tno.AddUser(userID, allocation, key),

@@ -29,7 +29,7 @@ func New(name string) (*Wireguard, error) {
 	attrs.MTU = 1420
 
 	wg := &Wireguard{attrs: &attrs}
-	if err := netlink.LinkAdd(wg); err != nil {
+	if err := netlink.LinkAdd(wg); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	return wg, nil
@@ -80,7 +80,7 @@ func (w *Wireguard) SetAddr(cidr string) error {
 		return err
 	}
 
-	if err := netlink.AddrAdd(w, addr); err != nil {
+	if err := netlink.AddrAdd(w, addr); err != nil && !os.IsExist(err) {
 		return err
 	}
 	return nil
@@ -94,7 +94,7 @@ type Peer struct {
 }
 
 // Configure configures the wiregard configuration
-func (w *Wireguard) Configure(privateKey string, listentPort int, peers []Peer) error {
+func (w *Wireguard) Configure(privateKey string, listentPort int, peers []*Peer) error {
 
 	if err := netlink.LinkSetDown(w); err != nil {
 		return err

@@ -141,7 +141,7 @@ type NetResource struct {
 	// IPv6Allow []net.IPNet
 
 	// Mark this NetResource as the exit point of the network
-	ExitPoint bool `json:"exit_point"`
+	ExitPoint int `json:"exit_point"`
 }
 
 // Peer is a peer for which we have a tunnel established and the

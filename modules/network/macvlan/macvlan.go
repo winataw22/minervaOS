@@ -3,6 +3,7 @@ package macvlan
 import (
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/rs/zerolog/log"
 
@@ -85,7 +86,7 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 	return mv, nil
 }
 
-// Install configures a macvlan intefaces created with Create method
+// Install configures a macvlan interfaces created with Create method
 func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
 	return netns.Do(func(_ ns.NetNS) error {
 		name := link.Attrs().Name
@@ -93,7 +94,7 @@ func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, n
 		for _, ip := range ips {
 			if err := netlink.AddrAdd(link, &netlink.Addr{
 				IPNet: ip,
-			}); err != nil {
+			}); err != nil && !os.IsExist(err) {
 				log.Error().
 					Str("addr", ip.String()).
 					Str("link", link.Attrs().Name).
@@ -107,7 +108,7 @@ func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, n
 		}
 
 		for _, route := range routes {
-			if err := netlink.RouteAdd(route); err != nil {
+			if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
 				log.Error().
 					Str("route", route.String()).
 					Str("link", link.Attrs().Name).
@@ -118,4 +119,29 @@ func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, n
 
 		return nil
 	})
+}
+
+// GetByName return a macvlan object by its name
+func GetByName(name string) (*netlink.Macvlan, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	macvlan, ok := link.(*netlink.Macvlan)
+	if !ok {
+		return nil, fmt.Errorf("link %s is not a macvlan", name)
+	}
+	return macvlan, nil
+}
+
+// Exists check if a macvlan interface exists
+func Exists(name string, netNS ns.NetNS) bool {
+	exist := false
+	netNS.Do(func(_ ns.NetNS) error {
+		_, err := netlink.LinkByName(name)
+		exist = err == nil
+		return nil
+	})
+	return exist
 }

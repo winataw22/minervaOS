@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/threefoldtech/zosv2/modules/network"
+	"github.com/threefoldtech/zosv2/modules/network/types"
 )
 
 func registerNode(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +15,7 @@ func registerNode(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	node := &network.Node{}
+	node := &types.Node{}
 	if err := json.NewDecoder(r.Body).Decode(&node); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -48,7 +48,7 @@ func nodeDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func listNodes(w http.ResponseWriter, r *http.Request) {
-	var nodes = make([]*network.Node, 0, len(nodeStore))
+	var nodes = make([]*types.Node, 0, len(nodeStore))
 	farm := r.URL.Query().Get("farm")
 
 	for _, node := range nodeStore {

@@ -150,7 +150,7 @@ func (r *NetResource) UnmarshalJSON(b []byte) error {
 		Prefix    string  `json:"prefix"`
 		LinkLocal string  `json:"link_local"`
 		Peers     []*Peer `json:"peers"`
-		ExitPoint bool    `json:"exit_point"`
+		ExitPoint int     `json:"exit_point"`
 	}{}
 
 	if err := json.Unmarshal(b, &tmp); err != nil {
@@ -188,7 +188,7 @@ func (r *NetResource) MarshalJSON() ([]byte, error) {
 		Prefix    string  `json:"prefix"`
 		LinkLocal string  `json:"link_local"`
 		Peers     []*Peer `json:"peers"`
-		ExitPoint bool    `json:"exit_point"`
+		ExitPoint int     `json:"exit_point"`
 	}{
 		NodeID:    r.NodeID,
 		Prefix:    r.Prefix.String(),

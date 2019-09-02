@@ -9,12 +9,13 @@ import (
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
+	"github.com/threefoldtech/zosv2/modules/network/types"
 )
 
-func watchPubIface(ctx context.Context, nodeID modules.Identifier, db network.TNoDB, ifaceVersion int) <-chan *network.PubIface {
+func watchPubIface(ctx context.Context, nodeID modules.Identifier, db network.TNoDB, ifaceVersion int) <-chan *types.PubIface {
 	var currentVersion = ifaceVersion
 
-	ch := make(chan *network.PubIface)
+	ch := make(chan *types.PubIface)
 	go func() {
 		defer func() {
 			close(ch)
@@ -55,9 +56,9 @@ func watchPubIface(ctx context.Context, nodeID modules.Identifier, db network.TN
 	return ch
 }
 
-func configuePubIface(iface *network.PubIface) error {
+func configurePubIface(iface *types.PubIface) error {
 	cleanup := func() error {
-		pubNs, err := namespace.GetByName(network.PublicNamespace)
+		pubNs, err := namespace.GetByName(types.PublicNamespace)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to find public namespace")
 			return err

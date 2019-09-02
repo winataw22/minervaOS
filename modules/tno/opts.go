@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/threefoldtech/zosv2/modules/network/ip"
+
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 	"github.com/dspinhirne/netaddr-go"
@@ -69,13 +71,16 @@ func ConfigurePrefixZero(farmAllocation *net.IPNet) Opts {
 // nodeID is the ID of the node used as exit point
 // allocation if the /64 allocation for the exit resource
 // key is the wireguard key pair for the wiregard exit peer
-func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP, key wgtypes.Key, farmAllocSize int) Opts {
+func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP, key wgtypes.Key, exitNodeNr uint8) Opts {
 	return func(n *modules.Network) error {
 		if n.PrefixZero == nil {
 			return fmt.Errorf("cannot add a node when the network object does not have a PrefixZero set")
 		}
 
-		exitNibble := newNibble(allocation, farmAllocSize)
+		exitNibble, err := ip.NewNibble(allocation, 0)
+		if err != nil {
+			return err
+		}
 
 		pk, err := crypto.KeyFromID(modules.StrIdentifier(nodeID))
 		if err != nil {
@@ -104,21 +109,15 @@ func ConfigureExitResource(nodeID string, allocation *net.IPNet, publicIP net.IP
 				ReachabilityV6: modules.ReachabilityV6Public,
 				ReachabilityV4: modules.ReachabilityV4Public,
 			},
-			Prefix: allocation,
-			LinkLocal: &net.IPNet{
-				IP:   exitNibble.fe80(),
-				Mask: net.CIDRMask(64, 128),
-			},
+			Prefix:    allocation,
+			LinkLocal: exitNibble.WGLL(),
 			Peers:     []*modules.Peer{exitPeer},
-			ExitPoint: true,
+			ExitPoint: int(exitNodeNr),
 		})
 
 		n.Exit = &modules.ExitPoint{
 			Ipv6Conf: &modules.Ipv6Conf{
-				Addr: &net.IPNet{
-					IP:   exitNibble.fe80(),
-					Mask: net.CIDRMask(64, 128),
-				},
+				Addr:    exitNibble.EPPubLL(),
 				Gateway: net.ParseIP("fe80::1"),
 				Iface:   "public",
 			},
@@ -136,8 +135,10 @@ func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Ke
 			return fmt.Errorf("cannot add a node when the network object does not have a PrefixZero set")
 		}
 
-		allocSize, _ := n.PrefixZero.Mask.Size()
-		exitNibble := newNibble(allocation, allocSize)
+		exitNibble, err := ip.NewNibble(allocation, 0)
+		if err != nil {
+			return err
+		}
 
 		v6Reach := modules.ReachabilityV6ULA
 		if publicIP != nil {
@@ -165,13 +166,10 @@ func AddNode(nodeID string, farmID string, allocation *net.IPNet, key wgtypes.Ke
 				ReachabilityV6: v6Reach,
 				ReachabilityV4: modules.ReachabilityV4Hidden, //TODO change once we support ipv4 public nodes
 			},
-			Prefix: allocation,
-			LinkLocal: &net.IPNet{
-				IP:   exitNibble.fe80(),
-				Mask: net.CIDRMask(64, 128),
-			},
+			Prefix:    allocation,
+			LinkLocal: exitNibble.WGLL(),
 			Peers:     peers,
-			ExitPoint: false,
+			ExitPoint: 0,
 		}
 
 		peer := &modules.Peer{
@@ -206,8 +204,10 @@ func AddUser(userID string, allocation *net.IPNet, key wgtypes.Key) Opts {
 			return fmt.Errorf("cannot add a node when the network object does not have a PrefixZero set")
 		}
 
-		allocSize, _ := n.PrefixZero.Mask.Size()
-		exitNibble := newNibble(allocation, allocSize)
+		nibble, err := ip.NewNibble(allocation, 0)
+		if err != nil {
+			return err
+		}
 
 		var peers []*modules.Peer
 		if len(n.Resources) > 0 {
@@ -230,13 +230,10 @@ func AddUser(userID string, allocation *net.IPNet, key wgtypes.Key) Opts {
 				ReachabilityV6: modules.ReachabilityV6ULA,
 				ReachabilityV4: modules.ReachabilityV4Hidden,
 			},
-			Prefix: allocation,
-			LinkLocal: &net.IPNet{
-				IP:   exitNibble.fe80(),
-				Mask: net.CIDRMask(64, 128),
-			},
+			Prefix:    allocation,
+			LinkLocal: nibble.WGLL(),
 			Peers:     peers,
-			ExitPoint: false,
+			ExitPoint: 0,
 		}
 
 		peer := &modules.Peer{

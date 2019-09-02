@@ -27,7 +27,9 @@ func debugProvision(ctx context.Context, reservation *Reservation) (interface{},
 		return nil, err
 	}
 
-	return startZLF(ctx, reservation.ID, cfg)
+	_, err := startZLF(ctx, reservation.ID, cfg)
+	// nothing to return to BCDB
+	return nil, err
 }
 
 func debugDecommission(ctx context.Context, reservation *Reservation) error {

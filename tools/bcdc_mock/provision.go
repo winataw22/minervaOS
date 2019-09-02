@@ -59,7 +59,7 @@ func pollReservations(w http.ResponseWriter, r *http.Request) {
 		output = getRes(nodeID, all)
 	} else {
 		// otherwise start long polling
-		timeout := time.Now().Add(time.Second * 10)
+		timeout := time.Now().Add(time.Second * 20)
 		for {
 			output = getRes(nodeID, all)
 			if len(output) > 0 {
@@ -92,11 +92,10 @@ func getRes(nodeID string, all bool) []*provision.Reservation {
 			continue
 		}
 		// if we are long polling, only return the new reservation
-		if !all && r.Sent {
+		if !all && r.Reservation.Result != nil || r.Reservation.Expired() {
 			continue
 		}
 		output = append(output, r.Reservation)
-		r.Sent = true
 	}
 
 	return output
@@ -121,4 +120,36 @@ func getReservation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func reservationResult(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	provStore.Lock()
+
+	var rsvt *reservation
+	for _, rsvt = range provStore.Reservations {
+		if rsvt.Reservation.ID == id {
+			break
+		}
+	}
+	provStore.Unlock()
+
+	if r == nil {
+		http.Error(w, fmt.Sprintf("reservation %s not found", id), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Add("content-type", "application/json")
+
+	defer r.Body.Close()
+	result := &provision.Result{}
+	if err := json.NewDecoder(r.Body).Decode(result); err != nil {
+		log.Printf("failed to decode reservation result: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	rsvt.Reservation.Result = result
+
+	w.WriteHeader(http.StatusOK)
 }

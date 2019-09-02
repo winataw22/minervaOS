@@ -32,19 +32,6 @@ func giveAlloc(c *cli.Context) error {
 	return nil
 }
 
-func getAlloc(c *cli.Context) error {
-
-	farm := c.Args().First()
-	alloc, _, err := db.RequestAllocation(strID(farm))
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get an allocation")
-		return err
-	}
-
-	fmt.Printf("allocation received: %s\n", alloc.String())
-	return nil
-}
-
 func configPublic(c *cli.Context) error {
 	var (
 		ips   []*net.IPNet

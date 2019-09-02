@@ -90,13 +90,6 @@ func main() {
 					Action: giveAlloc,
 				},
 				{
-					Name:      "get-alloc",
-					Category:  "network",
-					Usage:     "get an allocation for a tenant network",
-					ArgsUsage: "farm_id",
-					Action:    getAlloc,
-				},
-				{
 					Name:     "configure-public",
 					Category: "network",
 					Usage: `configure the public interface of a node.

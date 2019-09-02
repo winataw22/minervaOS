@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containernetworking/plugins/pkg/ns"
+
 	"github.com/rs/zerolog/log"
 
 	"github.com/vishvananda/netlink"
@@ -137,4 +139,72 @@ func RandomName(prefix string) (string, error) {
 		return "", fmt.Errorf("failed to generate random name: %v", err)
 	}
 	return fmt.Sprintf("%s%x", prefix, b), nil
+}
+
+// MakeVethPair creates a veth pair
+func MakeVethPair(name, peer string, mtu int) (netlink.Link, error) {
+	veth := &netlink.Veth{
+		LinkAttrs: netlink.LinkAttrs{
+			Name:  name,
+			Flags: net.FlagUp,
+			MTU:   mtu,
+		},
+		PeerName: peer,
+	}
+	if err := netlink.LinkAdd(veth); err != nil {
+		return nil, err
+	}
+	// Re-fetch the link to get its creation-time parameters, e.g. index and mac
+	veth2, err := netlink.LinkByName(name)
+	if err != nil {
+		netlink.LinkDel(veth) // try and clean up the link if possible.
+		return nil, err
+	}
+
+	return veth2, nil
+}
+
+// Exists test check if the named interface exists
+// if netNS is not nil switch in the network namespace
+// before checking
+func Exists(name string, netNS ns.NetNS) bool {
+	exist := false
+	if netNS != nil {
+		netNS.Do(func(_ ns.NetNS) error {
+			_, err := netlink.LinkByName(name)
+			exist = err == nil
+			return nil
+		})
+	} else {
+		_, err := netlink.LinkByName(name)
+		exist = err == nil
+	}
+	return exist
+}
+
+// Delete deletes the named interface
+// if netNS is not nil Exists switch in the network namespace
+// before deleting
+func Delete(name string, netNS ns.NetNS) error {
+	if netNS != nil {
+		return netNS.Do(func(_ ns.NetNS) error {
+			link, err := netlink.LinkByName(name)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
+			return netlink.LinkDel(link)
+		})
+	}
+
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	return netlink.LinkDel(link)
 }

@@ -39,7 +39,7 @@ func TestConfigure(t *testing.T) {
 	peerPublicKey := "mR5fBXohKe2MZ6v+GLwlKwrvkFxo1VvV3bPNHDBhOAI="
 	allowedIps := []string{"172.21.0.0/24", "192.168.1.10/32", "fe80::f002/128"}
 
-	err = wg.Configure(privateKey, 1600, []Peer{
+	err = wg.Configure(privateKey, 1600, []*Peer{
 		{
 			PublicKey:  peerPublicKey,
 			AllowedIPs: allowedIps,

@@ -33,7 +33,7 @@ func TestExpired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.args.r.expired(); got != tt.want {
+			if got := tt.args.r.Expired(); got != tt.want {
 				t.Errorf("expired() = %v, want %v", got, tt.want)
 			}
 		})
