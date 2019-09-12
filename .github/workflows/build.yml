@@ -7,10 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go 1.12
+    - name: Set up go 1.13
       uses: actions/setup-go@v1
       with:
-        go-version: 1.12
+        go-version: 1.13
       id: go
 
     - name: Check out code into the Go module directory
@@ -22,14 +22,14 @@ jobs:
         make getdeps
       env:
         GO111MODULE: on
-        
+
     - name: Run tests
       run: |
         cd modules
         make coverage
       env:
         GO111MODULE: on
-    
+
     - name: Send coverage
       if: success()
       run: |
@@ -37,7 +37,7 @@ jobs:
         bash <(curl -s https://codecov.io/bash)
       env:
         CODECOV_TOKEN: 83d31816-f8ad-4d22-9bf5-21f42e3c58f7
-        
+
     - name: Build binaries
       run: |
         cd cmds
@@ -51,3 +51,18 @@ jobs:
         make
       env:
         GO111MODULE: on
+
+    - name: Collecting files
+      if: success()
+      run: |
+        mkdir -p /tmp/archive/{bin,etc/zinit}
+        cp bin/* /tmp/archive/bin/
+        cp -r zinit/* /tmp/archive/etc/zinit
+
+    - uses: threefoldtech/action-publish@v1-release
+      name: Build FList
+      if: success()
+      with:
+        root: /tmp/archive
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.ref }}.tar.gz

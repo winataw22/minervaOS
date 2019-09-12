@@ -84,6 +84,7 @@ func (nr *NetResource) Join(containerID string) (join modules.Member, err error)
 	return join, bridge.AttachNic(hostVeth, br)
 }
 
+// this IP is generated for IPv6 only so for IPv4 we still need to set an IP from IPAM
 func containerIP(prefix *net.IPNet, containerID string) *net.IPNet {
 	h := blake2b.Sum512([]byte(containerID))
 

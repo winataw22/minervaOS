@@ -70,7 +70,12 @@ func TestNetworkUnmarshal(t *testing.T) {
 				"gateway": "2a02:2788:864:1314:9eb6:d0ff:fe97:1",
 				"metric": 301,
 				"iface": "wlna0"
-			}
+			},
+			"ipv6_allow": [{
+				"ipv6_dest": "2a02:2788:864:1314::200",
+				"port"     : 8080,
+				"protocol" : "tcp"
+			}]
 		}
 	}`
 

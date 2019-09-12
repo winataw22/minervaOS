@@ -1,4 +1,3 @@
 exec: networkd -broker unix:///var/run/redis.sock -root /var/cache/modules/networkd
-test: test -e /var/run/networkd.ready
 after:
-  - identityd
+  - boot

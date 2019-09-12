@@ -44,7 +44,14 @@ func (n *NodeID) Identity() string {
 	return n.ID
 }
 
-// Network represent a full network owned by a user
+var (
+	// NetworkSchemaV1 network object schema version 1.0.0
+	NetworkSchemaV1 = versioned.MustParse("1.0.0")
+	// NetworkSchemaLatestVersion network object latest version
+	NetworkSchemaLatestVersion = NetworkSchemaV1
+)
+
+// Network represents a full network owned by a user
 type Network struct {
 	// some type of identification... an uuid ?
 	// that netid is bound to a user and an allowed (bought) creation of a
@@ -52,23 +59,16 @@ type Network struct {
 	// needs to be queried from somewhere(TBD) to be filled in
 	NetID NetID `json:"network_id"`
 
-    // By convention in an exit provider network, PrefixZero is the 0th 
-    // network prefix of the allocation.
-    // also, by convention the base prefix is always a /48 (65500+) Network Resources
-    // that can be used. 
-    // In case a new /48 needs to be allocated, the AllocationNR is incremented
 	PrefixZero *net.IPNet
 
 	// a netresource is a group of interconnected prefixes for a netid
 	// needs to be queried and updated when the netresource is created
-    Resources []*NetResource `json:"resources"`
-
+	Resources []*NetResource `json:"resources"`
 	// the exit is the ultimate default gateway container
 	// as well the prefix as the local config needs to be queried.
 	// - the prefix from the grid
 	// - the exit prefix and default gw from the local allocation
-    Exit *ExitPoint `json:"exit_point"`
-
+	Exit *ExitPoint `json:"exit_point"`
 	// AllocationNr is for when a new allocation has been necessary and needs to
 	// be added to the pool for Prefix allocations.
 	// this is needed as we set up deterministic interface names, that could conflict with
@@ -76,7 +76,7 @@ type Network struct {
 	AllocationNR int8 `json:"allocation_nr"`
 
 	// Version is an incremental number updated each time the network object
-	// is changed. This allows nodes to know when a network object needs to re-applied
+	// is changed. This allow node to know when a network object needs to re-applied
 	Version uint32 `json:"version"`
 }
 
@@ -103,7 +103,7 @@ type NetResource struct {
 	// IPv6Allow []net.IPNet
 
 	// Mark this NetResource as the exit point of the network
-	ExitPoint bool `json:"exit_point"`
+	ExitPoint int `json:"exit_point"`
 }
 
 // Peer is a peer for which we have a tunnel established and the
@@ -189,22 +189,6 @@ type Ipv6Conf struct {
 	Metric  uint32     `json:"metric"`
 	Iface   string     `json:"iface"`
 }
-
-// definition for later usage
-// an l2vxlan wil be connected to a default bridge that gets attached to the
-// network resource. That way we can easily add a vxlan to that bridge for
-// local interconnectivity
-// type l2vxlan {
-//     // deterministic or stored...
-//     NICName string
-//     // Or it's through fdb entries
-//     Option<Vec<peer>>
-//     // Or it's in a multicast vxlan
-//     Option<group>
-//     // a vxlan always has an ID
-//     id
-// }
-
 ```
 
 ### Other things that need to be in place.

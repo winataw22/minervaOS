@@ -192,8 +192,8 @@ type ExitPoint struct {
 	Ipv4Conf *Ipv4Conf `json:"ipv4_conf"`
 	Ipv4DNAT []*DNAT   `json:"ipv4_dnat"`
 
-	Ipv6Conf  *Ipv6Conf `json:"ipv6_conf"`
-	Ipv6Allow []net.IP  `json:"ipv6_allow"`
+	Ipv6Conf  *Ipv6Conf    `json:"ipv6_conf"`
+	Ipv6Allow []*Ipv6Allow `json:"ipv6_allow"`
 }
 
 // DNAT represents an ipv4/6 portforwarding/firewalling
@@ -207,10 +207,17 @@ type DNAT struct {
 	Protocol string `json:"protocol"`
 }
 
+// Ipv6Allow represents a filter rule for an IPv6 addr/port
+type Ipv6Allow struct {
+	Ipv6Dest net.IP `json:"ipv6_dest"`
+	Port     uint16 `json:"port"`
+	Protocol string `json:"protocol"`
+}
+
 //Ipv4Conf represents the the IPv4 configuration of an exit container
 type Ipv4Conf struct {
 	// cidr
-	CIDR    *net.IPNet `json:"cird"`
+	CIDR    *net.IPNet `json:"cidr"`
 	Gateway net.IP     `json:"gateway"`
 	Metric  uint32     `json:"metric"`
 	// deterministic name in function of the prefix and it's allocation

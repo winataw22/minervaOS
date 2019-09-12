@@ -15,6 +15,7 @@ import (
 // some reservations
 type ReservationReadWriter interface {
 	Add(r *Reservation) error
+	Get(id string) (*Reservation, error)
 	Remove(id string) error
 }
 
@@ -22,6 +23,7 @@ type ReservationReadWriter interface {
 // to send the provision result to BCDB
 type Feedbacker interface {
 	Feedback(id string, r *Result) error
+	Deleted(id string) error
 }
 
 type defaultEngine struct {
@@ -71,17 +73,17 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 				Str("duration", fmt.Sprintf("%v", reservation.Duration)).
 				Logger()
 
-			if !reservation.Expired() {
-				slog.Info().Msg("start provisioning reservation")
-				if err := e.provision(ctx, reservation); err != nil {
-					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
-				}
-			} else {
+			if reservation.Expired() || reservation.ToDelete {
 				slog.Info().Msg("start decommissioning reservation")
 				if err := e.decommission(ctx, reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to decommission reservation %s", reservation.ID)
 				}
 				slog.Info().Msg("reservation decommission successful")
+			} else {
+				slog.Info().Msg("start provisioning reservation")
+				if err := e.provision(ctx, reservation); err != nil {
+					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
+				}
 			}
 		}
 	}
@@ -95,6 +97,12 @@ func (e *defaultEngine) provision(ctx context.Context, r *Reservation) error {
 	fn, ok := provisioners[r.Type]
 	if !ok {
 		return fmt.Errorf("type of reservation not supported: %s", r.Type)
+	}
+
+	_, err := e.store.Get(r.ID)
+	if err == nil {
+		log.Info().Str("id", r.ID).Msg("reservation already deployed")
+		return nil
 	}
 
 	result, err := fn(ctx, r)
@@ -122,12 +130,17 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 
 	err := fn(ctx, r)
 	if err != nil {
-		errors.Wrap(err, "decommissioning of reservation failed")
+		return errors.Wrap(err, "decommissioning of reservation failed")
 	}
 
 	if err := e.store.Remove(r.ID); err != nil {
-		errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
+		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
 	}
+
+	if err := e.fb.Deleted(r.ID); err != nil {
+		return errors.Wrap(err, "failed to mark reservation as deleted")
+	}
+
 	return nil
 }
 

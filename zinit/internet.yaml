@@ -1,0 +1,4 @@
+exec: internet
+oneshot: true
+after:
+  - udev-trigger

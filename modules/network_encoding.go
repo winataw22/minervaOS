@@ -339,10 +339,10 @@ func (d *DNAT) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements encoding/json.Unmarshaler
 func (e *ExitPoint) UnmarshalJSON(b []byte) error {
 	tmp := struct {
-		Ipv4Conf  *Ipv4Conf `json:"ipv4_conf"`
-		Ipv4Dnat  []*DNAT   `json:"ipv4_dnat"`
-		Ipv6Conf  *Ipv6Conf `json:"ipv6_conf"`
-		Ipv6Allow []net.IP  `json:"ipv6_allow"`
+		Ipv4Conf  *Ipv4Conf    `json:"ipv4_conf"`
+		Ipv4Dnat  []*DNAT      `json:"ipv4_dnat"`
+		Ipv6Conf  *Ipv6Conf    `json:"ipv6_conf"`
+		Ipv6Allow []*Ipv6Allow `json:"ipv6_allow"`
 	}{}
 
 	if err := json.Unmarshal(b, &tmp); err != nil {
@@ -361,18 +361,21 @@ func (e *ExitPoint) UnmarshalJSON(b []byte) error {
 // MarshalJSON implements encoding/json.Marshaler
 func (e *ExitPoint) MarshalJSON() ([]byte, error) {
 	tmp := struct {
-		Ipv4Conf  *Ipv4Conf `json:"ipv4_conf"`
-		Ipv4Dnat  []*DNAT   `json:"ipv4_dnat"`
-		Ipv6Conf  *Ipv6Conf `json:"ipv6_conf"`
-		Ipv6Allow []string  `json:"ipv6_allow"`
+		Ipv4Conf  *Ipv4Conf    `json:"ipv4_conf"`
+		Ipv4Dnat  []*DNAT      `json:"ipv4_dnat"`
+		Ipv6Conf  *Ipv6Conf    `json:"ipv6_conf"`
+		Ipv6Allow []*Ipv6Allow `json:"ipv6_allow"`
 	}{
-		Ipv4Conf: e.Ipv4Conf,
-		Ipv4Dnat: e.Ipv4DNAT,
-		Ipv6Conf: e.Ipv6Conf,
+		Ipv4Conf:  e.Ipv4Conf,
+		Ipv4Dnat:  e.Ipv4DNAT,
+		Ipv6Conf:  e.Ipv6Conf,
+		Ipv6Allow: e.Ipv6Allow,
 	}
-	ips := make([]string, 0, len(e.Ipv6Allow))
+	var ips []*Ipv6Allow
 	for i, ip := range e.Ipv6Allow {
-		ips[i] = ip.String()
+		d := ip.Ipv6Dest
+		p := ip.Port
+		ips[i] = &Ipv6Allow{Ipv6Dest: d, Port: p}
 	}
 	tmp.Ipv6Allow = ips
 	return json.Marshal(tmp)

@@ -21,10 +21,10 @@ type ReservationPoller interface {
 	// Poll ask the store to send us reservation for a specific node ID
 	// if all is true, the store sends all the reservation every registered for the node ID
 	// otherwise it just sends reservation not pulled yet.
-	Poll(nodeID modules.Identifier, all bool) ([]*Reservation, error)
+	Poll(nodeID modules.Identifier, all bool, since time.Time) ([]*Reservation, error)
 }
 
-// HTTPSource does a long poll on address to get new
+// HTTPSource does a long poll on address to get new and to be deleted
 // reservations. the server should only return unique reservations
 // stall the connection as long as possible if no new reservations
 // are available.
@@ -43,7 +43,7 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 	// ever made to this know, to make sure we provision
 	// everything at boot
 	// after that, we only ask for the new reservations
-	firstRun := true
+	lastRun := time.Time{}
 	go func() {
 		defer close(ch)
 		for {
@@ -51,12 +51,17 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 			<-time.After(time.Second)
 			log.Info().Msg("check for new reservations")
 
-			res, err := s.store.Poll(modules.StrIdentifier(s.nodeID), firstRun)
+			all := false
+			if (lastRun == time.Time{}) {
+				all = true
+			}
+
+			res, err := s.store.Poll(modules.StrIdentifier(s.nodeID), all, lastRun)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get reservation")
 				time.Sleep(time.Second * 20)
 			}
-			firstRun = false
+			lastRun = time.Now()
 
 			select {
 			case <-ctx.Done():

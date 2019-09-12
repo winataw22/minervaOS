@@ -18,7 +18,7 @@ type (
 
 // WithTnoDB adds a tnodb middleware
 func WithTnoDB(ctx context.Context, address string) context.Context {
-	value := tnodb.NewHTTPHTTPTNoDB(address)
+	value := tnodb.NewHTTPTNoDB(address)
 	return context.WithValue(ctx, tnodbKey{}, value)
 }
 

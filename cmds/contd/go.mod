@@ -1,6 +1,6 @@
 module github.com/threefoldtech/zosv2/cmds/contd
 
-go 1.12
+go 1.13
 
 require (
 	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect

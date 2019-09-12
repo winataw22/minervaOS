@@ -1,6 +1,6 @@
 module github.com/threefoldtech/zosv2/cmds/schemac
 
-go 1.12
+go 1.13
 
 replace github.com/threefoldtech/zosv2/modules => ../../modules/
 

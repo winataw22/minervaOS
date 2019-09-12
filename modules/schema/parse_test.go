@@ -66,17 +66,17 @@ func TestTypeDef(t *testing.T) {
 			},
 		},
 		{
-			`(LO) ! refernece.to.another.object`,
+			`(LO) ! reference.to.another.object`,
 			&Type{
 				Kind: ListKind,
 				Element: &Type{
 					Kind:      ObjectKind,
-					Reference: "refernece.to.another.object",
+					Reference: "reference.to.another.object",
 				},
 			},
 		},
 		{
-			`(Lmultiline) ! refernece.to.another.object`,
+			`(Lmultiline) ! reference.to.another.object`,
 			&Type{
 				Kind: ListKind,
 				Element: &Type{

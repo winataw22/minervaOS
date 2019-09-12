@@ -48,7 +48,7 @@ func main() {
 
 		url := c.String("tnodb")
 		idStore = identity.NewHTTPIDStore(url)
-		db = tnodb.NewHTTPHTTPTNoDB(url)
+		db = tnodb.NewHTTPTNoDB(url)
 
 		return nil
 	}

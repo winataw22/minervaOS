@@ -24,7 +24,7 @@ import (
 	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
 )
 
-// NetResource gold the logic to confiure an network resource
+// NetResource holds the logic to configure an network resource
 type NetResource struct {
 	resource       *modules.NetResource
 	exit           *modules.NetResource
@@ -61,12 +61,12 @@ func New(nodeID string, network *modules.Network, privateKey wgtypes.Key) (*NetR
 	return nr, nil
 }
 
-// Nibble returns the nibble object of the networkr resource
+// Nibble returns the nibble object of the Network Resource
 func (nr *NetResource) Nibble() *zosip.Nibble {
 	return nr.nibble
 }
 
-// IsExit return the exitNode number and true if this network resource hold
+// IsExit returns the exitNode number and true if this network resource holds
 // the exit point of the network
 // otherwise it returns 0 and false
 func (nr *NetResource) IsExit() (int, bool) {
@@ -78,7 +78,7 @@ func (nr *NetResource) NamespaceName() string {
 	return nr.nibble.NamespaceName()
 }
 
-// Create setup the basic component of the network resource
+// Create setup the basic components of the network resource
 // network namespace, bridge, wireguard interface and veth pair
 func (nr *NetResource) Create(pubNS ns.NetNS) error {
 	if err := nr.createBridge(); err != nil {

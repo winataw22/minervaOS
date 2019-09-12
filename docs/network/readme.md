@@ -34,7 +34,7 @@ Zero-OS is meant to provide services in the Threefold grid, and with grid, we na
 For this, apart from all the other absolutely wonderful services in 0-OS, there is the network daemon. If it doesn't succeed it's bootstrap, nothing else will, and 0-OS will stop there.
 
 So it (the network daemon, that is)
-  - Configures the Node's initial network configuration, so that the Node can register itself.  For now we assume that the Node is connected to a network (ethernet segment) that provides IP addresses over DHCP, be it IPv4 or IPv6, or that there is a Routing Avertisement (RA) daemon for IPv6 running on that network. [TODO 0-boot setup](network/zeroboot.md)  
+  - Configures the Node's initial network configuration, so that the Node can register itself.  For now we assume that the Node is connected to a network (ethernet segment) that provides IP addresses over DHCP, be it IPv4 or IPv6, or that there is a Routing Avertisement (RA) daemon for IPv6 running on that network.  
   Only once it has received an IP Address, most other internal services will be able to start. ([John Gage](https://www.networkcomputing.com/cloud-infrastructure/network-computer-again) from Sun said that `The Network is the Computer`, here that is absolutely true)
 
   - Notifies [zinit](https://github.com/threefoldtech/zinit/blob/master/docs/readme.md) (the services orchestrator in 0-OS) that it can register the dhcp client as a permanent process on the intitially discovered NIC (Network Interface Card) and that zinit can start other processes, one of which takes care of registering the node to the grid. (more elaborate explanation about that in [identity service](../identity/readme.md).
@@ -82,7 +82,6 @@ So. Let's have some abbreviations settled first:
     - a veth pair is a concept in linux that creates 2 virtual network interfaces that are interconnected with a virtual cable. what goes in on one end of the pair, gets out on the other end, and vice-versa.
     - a bridge in linux is a concept of a virtual switch that can contain virtual interfaces. When you attach an interface to a bridge, it is a virtual switch with one port. You can add as many interfaces to that virtual switch as you like.
 
-## Nodes, ExitNodes, ExitPoints, Network Resources and how they are related.
 
 
 

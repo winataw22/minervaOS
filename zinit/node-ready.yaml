@@ -12,4 +12,3 @@ after:
   - redis
   - haveged
   - cgroup
-  - redis

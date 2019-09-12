@@ -51,7 +51,7 @@ func main() {
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-		db = tnodb.NewHTTPHTTPTNoDB(c.String("tnodb"))
+		db = tnodb.NewHTTPTNoDB(c.String("tnodb"))
 		store = provision.NewHTTPStore(c.String("provision"))
 
 		return nil

@@ -219,6 +219,8 @@ That's it. The rest is derived. Interface names are derived. IP (as well IPv4 as
 While that doesn't give a user a lot of leeway to shape things to his own ideas, it has the major benefit that the network can get out of a User's way. He doesn't have to think about it, and the network 'just' exists, just like the Internet does.  
 Services started will be reachable for IPv6, and when a user owns IPv4 addresses, he can just PortForward into his network, as that network supports IPv4 too.
 
-So: deterministic is our word for deriving parameters from just the Allocation that is assiggned to the Network Resource. The main advantage is that given the allocation received, everything falls automatically in place, and no queries to some database or shared state need to be done. 
+So: deterministic is our word for deriving parameters from just the Prefix Allocation that is assiggned to the Network Resource. The main advantage is that given the allocation received, everything falls automatically in place, and no queries to some database or shared state need to be done. 
 
-It can be that purists don't like it, and there surely will be some even better ideas to get determinism going, but right now, it really works, and also gives us real ease to reason about how that thing is working. Implementing a complex structure that is a mesh of connections with their associated routes, keys, addresses, peers, ports gets a lot more easy to reason about. That will be the same for tools to list and show the network structures in the (nearby) future.
+It can be that purists don't like it, and there surely will be some even better ideas to get determinism going, but right now, it really works, and also gives us real ease to reason about how that thing is working. Implementing a complex structure that is a mesh of connections with their associated routes, keys, addresses, peers, ports gets a lot more easy to implement and verify correctness. That will be the same for tools to list and show the network structures in the (nearby) future.
+
+
