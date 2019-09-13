@@ -41,19 +41,6 @@ func reserve(w http.ResponseWriter, r *http.Request) {
 
 func pollReservations(w http.ResponseWriter, r *http.Request) {
 	nodeID := mux.Vars(r)["node_id"]
-	var since time.Time
-	s := r.URL.Query().Get("since")
-	if s == "" {
-		// if since is not specificed, send all reservation since last hour
-		since = time.Now().Add(-time.Hour)
-	} else {
-		timestamp, err := strconv.ParseInt(s, 10, 64)
-		if err != nil {
-			http.Error(w, "since query argument format not valid", http.StatusBadRequest)
-			return
-		}
-		since = time.Unix(timestamp, 0)
-	}
 
 	_, ok := nodeStore[nodeID]
 	if !ok {
@@ -69,12 +56,12 @@ func pollReservations(w http.ResponseWriter, r *http.Request) {
 	output := []*provision.Reservation{}
 	if all {
 		// just get all reservation for this nodeID
-		output = getRes(nodeID, all, since)
+		output = getRes(nodeID, all)
 	} else {
 		// otherwise start long polling
 		timeout := time.Now().Add(time.Second * 20)
 		for {
-			output = getRes(nodeID, all, since)
+			output = getRes(nodeID, all)
 			if len(output) > 0 {
 				break
 			}
@@ -93,7 +80,7 @@ func pollReservations(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getRes(nodeID string, all bool, since time.Time) []*provision.Reservation {
+func getRes(nodeID string, all bool) []*provision.Reservation {
 	output := []*provision.Reservation{}
 
 	provStore.Lock()
@@ -104,12 +91,11 @@ func getRes(nodeID string, all bool, since time.Time) []*provision.Reservation {
 		if r.NodeID != nodeID {
 			continue
 		}
-
-		if all ||
-			(!r.Reservation.Expired() && since.Before(r.Reservation.Created)) ||
-			(r.Reservation.ToDelete && !r.Deleted) {
-			output = append(output, r.Reservation)
+		// if we are long polling, only return the new reservation
+		if !all && r.Reservation.Result != nil || r.Reservation.Expired() {
+			continue
 		}
+		output = append(output, r.Reservation)
 	}
 
 	return output
@@ -166,49 +152,4 @@ func reservationResult(w http.ResponseWriter, r *http.Request) {
 	rsvt.Reservation.Result = result
 
 	w.WriteHeader(http.StatusOK)
-}
-
-func reservationDeleted(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-
-	provStore.Lock()
-	defer provStore.Unlock()
-
-	var rsvt *reservation
-	for _, rsvt = range provStore.Reservations {
-		if rsvt.Reservation.ID == id {
-			break
-		}
-	}
-
-	if r == nil {
-		http.Error(w, fmt.Sprintf("reservation %s not found", id), http.StatusNotFound)
-		return
-	}
-
-	rsvt.Deleted = true
-
-	w.WriteHeader(http.StatusOK)
-
-}
-
-func deleteReservation(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-
-	provStore.Lock()
-	defer provStore.Unlock()
-
-	w.Header().Add("content-type", "application/json")
-
-	for _, r := range provStore.Reservations {
-		if r.Reservation.ID == id {
-
-			r.Reservation.ToDelete = true
-
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-	}
-
-	w.WriteHeader(http.StatusNotFound)
 }

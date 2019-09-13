@@ -26,7 +26,6 @@ type farmInfo struct {
 
 type reservation struct {
 	Reservation *provision.Reservation `json:"reservation"`
-	Deleted     bool                   `json:"deleted"`
 	NodeID      string                 `json:"node_id"`
 }
 
@@ -94,8 +93,6 @@ func main() {
 	router.HandleFunc("/reservations/{node_id}/poll", pollReservations).Methods("GET")
 	router.HandleFunc("/reservations/{id}", getReservation).Methods("GET")
 	router.HandleFunc("/reservations/{id}", reservationResult).Methods("PUT")
-	router.HandleFunc("/reservations/{id}/deleted", reservationDeleted).Methods("PUT")
-	router.HandleFunc("/reservations/{id}", deleteReservation).Methods("DELETE")
 
 	log.Printf("start on %s\n", listen)
 	loggedRouter := handlers.LoggingHandler(os.Stderr, router)
