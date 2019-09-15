@@ -1,0 +1,6 @@
+# Override the default bootstrap procedure
+# embedded in the image if using overlay
+exec: "true"
+oneshot: true
+after:
+  - internet

@@ -22,14 +22,14 @@ jobs:
         make getdeps
       env:
         GO111MODULE: on
-        
+
     - name: Run tests
       run: |
         cd modules
         make coverage
       env:
         GO111MODULE: on
-    
+
     - name: Send coverage
       if: success()
       run: |
@@ -37,7 +37,7 @@ jobs:
         bash <(curl -s https://codecov.io/bash)
       env:
         CODECOV_TOKEN: 83d31816-f8ad-4d22-9bf5-21f42e3c58f7
-        
+
     - name: Build binaries
       run: |
         cd cmds
@@ -65,4 +65,4 @@ jobs:
       with:
         root: /tmp/archive
         token: ${{ secrets.HUB_JWT }}
-        name: zos.tar.gz
+        name: zos-${{ github.ref }}.tar.gz

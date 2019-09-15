@@ -1,0 +1,5 @@
+exec: sh /etc/zinit/init/bootstrap.sh
+oneshot: true
+log: stdout # to see the logs on terminal
+after:
+  - internet
