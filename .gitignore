@@ -1,7 +1,7 @@
 # editors
 .vscode/
 out/
-bin/
+/bin/
 
 # tools binaries
 tools/bcdb_mock/bcdb_mock
