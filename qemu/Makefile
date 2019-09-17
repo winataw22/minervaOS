@@ -12,4 +12,4 @@ kernel:
 	ln -sf zosv2.efi zos.efi
 
 start:
-	bash vm.sh -n node1
+	bash vm.sh -n node1 -c "runmode=development"

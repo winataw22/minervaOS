@@ -12,8 +12,8 @@ import (
 // IDStore is the interface defining the
 // client side of an identity store
 type IDStore interface {
-	RegisterNode(node modules.Identifier, farm modules.Identifier) error
-	RegisterFarm(farm modules.Identifier, name string) error
+	RegisterNode(node modules.Identifier, farm modules.Identifier, version string) (string, error)
+	RegisterFarm(farm modules.Identifier, name string, email string, wallet []string) (string, error)
 }
 
 type httpIDStore struct {
@@ -31,25 +31,25 @@ type nodeRegisterReq struct {
 }
 
 // RegisterNode implements the IDStore interface
-func (s *httpIDStore) RegisterNode(node modules.Identifier, farm modules.Identifier) error {
+func (s *httpIDStore) RegisterNode(node modules.Identifier, farm modules.Identifier, version string) (string, error) {
 	buf := bytes.Buffer{}
 	err := json.NewEncoder(&buf).Encode(nodeRegisterReq{
 		NodeID: node.Identity(),
 		FarmID: farm.Identity(),
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	resp, err := http.Post(s.baseURL+"/nodes", "application/json", &buf)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("wrong response status code received: %v", resp.Status)
+		return "", fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}
 
-	return nil
+	return "(unknown)", nil
 }
 
 type farmRegisterReq struct {
@@ -58,23 +58,23 @@ type farmRegisterReq struct {
 }
 
 // RegisterFarm implements the IDStore interface
-func (s *httpIDStore) RegisterFarm(farm modules.Identifier, name string) error {
+func (s *httpIDStore) RegisterFarm(farm modules.Identifier, name string, email string, wallet []string) (string, error) {
 	buf := bytes.Buffer{}
 	err := json.NewEncoder(&buf).Encode(farmRegisterReq{
 		ID:   farm.Identity(),
 		Name: name,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	resp, err := http.Post(s.baseURL+"/farms", "application/json", &buf)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("wrong response status code received: %v", resp.Status)
+		return "", fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}
 
-	return nil
+	return name, nil
 }

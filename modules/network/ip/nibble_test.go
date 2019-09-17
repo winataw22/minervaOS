@@ -182,6 +182,17 @@ func TestRouteIPv4DefaultExit(t *testing.T) {
 		Gw:  net.ParseIP(fmt.Sprintf("10.255.255.02")),
 	}, actual)
 }
+
+func TestRouteIPv4DefaultContainer(t *testing.T) {
+	prefix := mustParseCIDR("2a02:1802:5e:ff02::/64")
+	nibble, _ := NewNibble(prefix, 0)
+	actual := nibble.RouteIPv4DefaultContainer()
+	assert.Equal(t, &netlink.Route{
+		Dst: mustParseCIDR("0.0.0.0/0"),
+		Gw:  net.ParseIP(fmt.Sprintf("10.255.2.1")),
+	}, actual)
+}
+
 func TestEPToGWName(t *testing.T) {
 	prefix := mustParseCIDR("2a02:1802:5e:ff02::/64")
 	nibble, _ := NewNibble(prefix, 0)

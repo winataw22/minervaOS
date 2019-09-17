@@ -30,7 +30,7 @@ func registerFarm(c *cli.Context) error {
 		}
 	}
 
-	if err := idStore.RegisterFarm(farmID, name); err != nil {
+	if _, err := idStore.RegisterFarm(farmID, name, "", []string{}); err != nil {
 		return err
 	}
 	fmt.Println("Farm registered successfully")

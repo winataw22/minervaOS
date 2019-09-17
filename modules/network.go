@@ -12,10 +12,9 @@ import (
 
 // Member holds information about a join operation
 type Member struct {
-	// Namespace is the namespace of the member
 	Namespace string
-	// IP is the IP assigned to this member
-	IP net.IP
+	IPv6      net.IP
+	IPv4      net.IP
 }
 
 //Networker is the interface for the network module

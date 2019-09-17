@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/threefoldtech/zosv2/modules"
 )
@@ -45,17 +46,22 @@ func (s *HTTPStore) Reserve(r *Reservation, nodeID modules.Identifier) error {
 }
 
 // Poll retrieves reservations from BCDB. If all is true, it returns all the reservations
-// for this node, otherwise is return only the reservation never sent yet and do long polling
-func (s *HTTPStore) Poll(nodeID modules.Identifier, all bool) ([]*Reservation, error) {
+// for this node.
+// otherwise it returns only the reservation never sent yet or the reservation that needs to be deleted
+// and do long polling
+func (s *HTTPStore) Poll(nodeID modules.Identifier, all bool, since time.Time) ([]*Reservation, error) {
 	u, err := url.Parse(fmt.Sprintf("%s/reservations/%s/poll", s.baseURL, nodeID.Identity()))
 	if err != nil {
 		return nil, err
 	}
+	q := u.Query()
 	if all {
-		q := u.Query()
 		q.Add("all", "true")
-		u.RawQuery = q.Encode()
 	}
+	if since.Unix() > 0 {
+		q.Add("since", fmt.Sprintf("%d", since.Unix()))
+	}
+	u.RawQuery = q.Encode()
 
 	resp, err := http.Get(u.String())
 	if err != nil {
@@ -113,6 +119,28 @@ func (s *HTTPStore) Feedback(id string, r *Result) error {
 	}
 
 	req, err := http.NewRequest("PUT", url, buf)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("wrong response status code %s", resp.Status)
+	}
+	return nil
+}
+
+// Deleted marks a reservation as deleted
+func (s *HTTPStore) Deleted(id string) error {
+	url := fmt.Sprintf("%s/reservations/%s/deleted", s.baseURL, id)
+
+	req, err := http.NewRequest("PUT", url, nil)
 	if err != nil {
 		return err
 	}

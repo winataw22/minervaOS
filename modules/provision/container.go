@@ -46,8 +46,9 @@ type Container struct {
 // ContainerResult is the information return to the BCDB
 // after deploying a container
 type ContainerResult struct {
-	ID string `json:"id"`
-	IP string `json:"ip"`
+	ID   string `json:"id"`
+	IPv6 string `json:"ipv6"`
+	IPv4 string `json:"ipv4"`
 }
 
 // ContainerProvision is entry point to container reservation
@@ -90,7 +91,11 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 	}
 
 	// TODO: Push IP back to bcdb
-	log.Info().Str("ip", join.IP.String()).Str("container", reservation.ID).Msg("assigned an IP")
+	log.Info().
+		Str("ipv6", join.IPv6.String()).
+		Str("ipv4", join.IPv4.String()).
+		Str("container", reservation.ID).
+		Msg("assigned an IP")
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
 	mnt, err := flistClient.Mount(config.FList, config.FlistStorage)
@@ -162,8 +167,9 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 
 	log.Info().Msgf("container created with id: '%s'", id)
 	return ContainerResult{
-		ID: string(id),
-		IP: join.IP.String(),
+		ID:   string(id),
+		IPv6: join.IPv6.String(),
+		IPv4: join.IPv4.String(),
 	}, nil
 }
 
