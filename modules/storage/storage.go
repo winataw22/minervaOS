@@ -55,6 +55,27 @@ func New() (modules.StorageModule, error) {
 	return s, err
 }
 
+// Total gives the total amount of storage available for a device type
+func (s *storageModule) Total(kind modules.DeviceType) (uint64, error) {
+	var total uint64
+
+	for idx := range s.volumes {
+		// ignore pools which don't have the right device type
+		if s.volumes[idx].Type() != kind {
+			continue
+		}
+
+		usage, err := s.volumes[idx].Usage()
+		if err != nil {
+			log.Error().Msgf("Failed to get current volume usage: %v", err)
+			return 0, err
+		}
+
+		total += usage.Size
+	}
+	return total, nil
+}
+
 /**
 initialize, must be called at least onetime each boot.
 What Initialize will do is the following:

@@ -104,4 +104,7 @@ type VolumeAllocater interface {
 type StorageModule interface {
 	VolumeAllocater
 	ZDBAllocater
+
+	// Total gives the total amount of storage available for a device type
+	Total(kind DeviceType) (uint64, error)
 }

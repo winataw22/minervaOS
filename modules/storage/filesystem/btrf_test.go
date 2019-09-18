@@ -27,6 +27,7 @@ import (
 	"github.com/threefoldtech/zosv2/modules"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestDevices map[string]string
@@ -133,27 +134,19 @@ func TestMain(m *testing.M) {
 func basePoolTest(t *testing.T, pool Pool) {
 	t.Run("test mounted", func(t *testing.T) {
 		_, mounted := pool.Mounted()
-		if ok := assert.False(t, mounted); !ok {
-			t.Error()
-		}
+		assert.False(t, mounted)
 	})
 
 	t.Run("test path", func(t *testing.T) {
-		if ok := assert.Equal(t, path.Join("/mnt", pool.Name()), pool.Path()); !ok {
-			t.Error()
-		}
+		assert.Equal(t, path.Join("/mnt", pool.Name()), pool.Path())
 	})
 
 	t.Run("test mount", func(t *testing.T) {
 		// mount device
 		target, err := pool.Mount()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		assert.NoError(t, err)
 
-		if ok := assert.Equal(t, target, pool.Path()); !ok {
-			t.Error()
-		}
+		assert.Equal(t, target, pool.Path())
 	})
 
 	defer pool.UnMount()
@@ -161,117 +154,85 @@ func basePoolTest(t *testing.T, pool Pool) {
 	t.Run("test no subvolumes", func(t *testing.T) {
 		// no volumes
 		volumes, err := pool.Volumes()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
-		if ok := assert.Empty(t, volumes); !ok {
-			t.Error()
-		}
+		assert.Empty(t, volumes)
 	})
 
 	var volume Volume
 	var err error
 	t.Run("test create volume", func(t *testing.T) {
 		volume, err = pool.AddVolume("subvol1")
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
-		if ok := assert.Equal(t, path.Join("/mnt", pool.Name(), "subvol1"), volume.Path()); !ok {
-			t.Error()
-		}
+		assert.Equal(t, path.Join("/mnt", pool.Name(), "subvol1"), volume.Path())
 	})
 
 	t.Run("test list volumes", func(t *testing.T) {
 		volumes, err := pool.Volumes()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
-		if ok := assert.Len(t, volumes, 1); !ok {
-			t.Error()
-		}
+		assert.Len(t, volumes, 1)
+	})
+
+	t.Run("test usage", func(t *testing.T) {
+		usage, err := pool.Usage()
+		require.NoError(t, err)
+		assert.Equal(t, uint64(1024*1024*1024), usage.Size)
 	})
 
 	t.Run("test subvolume list no subvolumes", func(t *testing.T) {
 		volumes, err := volume.Volumes()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
-		if ok := assert.Empty(t, volumes); !ok {
-			t.Error()
-		}
+		assert.Empty(t, volumes)
 	})
 
 	t.Run("test limit subvolume", func(t *testing.T) {
 		usage, err := volume.Usage()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
 		// Note: an empty subvolume has an overhead of 16384 bytes
-		if ok := assert.Equal(t, Usage{Used: 16384}, usage); !ok {
-			t.Fail()
-		}
+		assert.Equal(t, Usage{Used: 16384}, usage)
 
 		err = volume.Limit(50 * 1024 * 1024)
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
 		usage, err = volume.Usage()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
 		// Note: an empty subvolume has an overhead of 16384 bytes
-		if ok := assert.Equal(t, Usage{Used: 16384, Size: 50 * 1024 * 1024}, usage); !ok {
-			t.Fail()
-		}
+		assert.Equal(t, Usage{Used: 16384, Size: 50 * 1024 * 1024}, usage)
 	})
 
 	t.Run("test remove subvolume", func(t *testing.T) {
 		err = pool.RemoveVolume("subvol1")
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 		// no volumes after delete
 		volumes, err := pool.Volumes()
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 
-		if ok := assert.Empty(t, volumes); !ok {
-			t.Error()
-		}
+		assert.Empty(t, volumes)
 	})
 }
 
 func TestBtrfsSingle(t *testing.T) {
 	devices, err := SetupDevices(1)
-	if err != nil {
-		t.Fatal("failed to initialize devices", err)
-	}
+	require.NoError(t, err, "failed to initialize devices")
+
 	defer devices.Destroy()
 	loops := devices.Loops()
 
 	fs := NewBtrfs(TestDeviceManager{loops})
 	pool, err := fs.Create(context.Background(), "test-single", loops, modules.Single)
-
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
+	require.NoError(t, err)
 
 	basePoolTest(t, pool)
 }
 
 func TestBtrfsRaid1(t *testing.T) {
 	devices, err := SetupDevices(3)
-	if err != nil {
-		t.Fatal("failed to initialize devices", err)
-	}
+	require.NoError(t, err, "failed to initialize devices")
 
 	defer devices.Destroy()
 
@@ -280,17 +241,13 @@ func TestBtrfsRaid1(t *testing.T) {
 
 	pool, err := fs.Create(context.Background(), "test-raid1", loops[:2], modules.Raid1) //use the first 2 disks
 
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
+	require.NoError(t, err)
 
 	basePoolTest(t, pool)
 
 	//make sure pool is mounted
 	_, err = pool.Mount()
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
+	require.NoError(t, err)
 
 	defer pool.UnMount()
 
@@ -299,34 +256,26 @@ func TestBtrfsRaid1(t *testing.T) {
 	t.Run("add device", func(t *testing.T) {
 		// add a device to array
 		err = pool.AddDevice(loops[2])
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("remove device", func(t *testing.T) {
 		// remove device from array
 		err = pool.RemoveDevice(loops[0])
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("remove second device", func(t *testing.T) {
 		// remove a 2nd device should fail because raid1 should
 		// have at least 2 devices
 		err = pool.RemoveDevice(loops[1])
-		if ok := assert.Error(t, err); !ok {
-			t.Fatal()
-		}
+		require.Error(t, err)
 	})
 }
 
 func TestBtrfsList(t *testing.T) {
 	devices, err := SetupDevices(2)
-	if err != nil {
-		t.Fatal("failed to initialize devices", err)
-	}
+	require.NoError(t, err, "failed to initialize devices")
 
 	defer devices.Destroy()
 	loops := devices.Loops()
@@ -337,18 +286,14 @@ func TestBtrfsList(t *testing.T) {
 		name := fmt.Sprintf("test-list-%d", i)
 		names[name] = struct{}{}
 		_, err := fs.Create(context.Background(), name, DeviceCache{loop}, modules.Single)
-		if ok := assert.NoError(t, err); !ok {
-			t.Fatal()
-		}
+		require.NoError(t, err)
 	}
 
 	pools, err := fs.List(context.Background(), func(p Pool) bool {
 		return strings.HasPrefix(p.Name(), "test-")
 	})
 
-	if ok := assert.NoError(t, err); !ok {
-		t.Fatal()
-	}
+	require.NoError(t, err)
 
 	for _, pool := range pools {
 		if !strings.HasPrefix(pool.Name(), "test-list") {
@@ -356,14 +301,12 @@ func TestBtrfsList(t *testing.T) {
 		}
 
 		_, exist := names[pool.Name()]
-		if !exist {
-			t.Fatalf("pool %s is not listed", pool)
-		}
+		require.True(t, exist, "pool %s is not listed", pool)
 
 		delete(names, pool.Name())
 	}
 
-	if ok := assert.Len(t, names, 0); !ok {
-		t.Fatal("not all pools were listed")
-	}
+	ok := assert.Len(t, names, 0)
+	assert.True(t, ok, "not all pools were listed")
+
 }

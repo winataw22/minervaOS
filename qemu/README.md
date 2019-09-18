@@ -2,14 +2,45 @@
 
 This folder contains a script that you can use to run 0-OS in a VM using qemu.
 
-For ease of use a Makefile is also provided. To prepare your environment call `make prepare`. This will :
+## Requirements
 
-- copy `zinit` binary into the overlay
-- download a 0-OS kernel
+When you download a pre-built kernel, you're ready to go already, all you need
+is able to run a qemu machine with an internet access.
 
-You also need to create a bridge called `zos0` and have a dhcp server giving out IP on the bridge range.
+If you want to hack the code and try in a real environment, you can use helpers provided here
+to setup an overlay in qemu which (kind of) patch the kernel image on boot time.
+
+### Default Image
+
+You can simply use the makefile provided and do: `make kernel`
+
+This will download the latest prebuilt kernel from our server.
+
+### Hack the code
+
+In order to use the full power of theses scripts, you'll need in addition:
+- A self compiled version of [z-init](https://github.com/threefoldtech/zinit/)
+- All the binaries from this repository compiled
+- A working qemu
+
+Then you can use the full power of the overlay. Everything is already setup using symlinks
+to use your local binaries inside the image.
+
+### Use the Makefile
+
+To prepare your environment call `make prepare`. This will:
+
+- Copy `zinit` binary into the overlay
+- Download a 0-OS kernel
 
 To start the 0-OS VM, do `make start`
+
+### Reach internet inside the VM
+
+You need to be able to reach internet inside the VM, 0-OS needs internet.
+
+If you want to use theses script, you'll need to create a bridge called zos0 and
+have a dhcp server giving out ip on the bridge range.
 
 ## Prepare the bridge manually
 

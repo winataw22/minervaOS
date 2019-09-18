@@ -34,6 +34,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.1
 	github.com/pkg/errors v0.8.1
 	github.com/rs/zerolog v1.15.0
+	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/threefoldtech/zbus v0.0.0-20190711124326-09379d5f12e0

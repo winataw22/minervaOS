@@ -1,11 +1,1 @@
-module github.com/threefoldtech/zosv2/cmds/tffarmer
-
-go 1.13
-
-replace github.com/threefoldtech/zosv2/modules => ../../modules/
-
-require (
-	github.com/rs/zerolog v1.14.3
-	github.com/threefoldtech/zosv2/modules v0.0.0-00010101000000-000000000000
-	github.com/urfave/cli v1.20.0
-)
+/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/5cba1d835cd566e72011abff72821f83
