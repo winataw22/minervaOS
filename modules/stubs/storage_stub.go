@@ -1,1 +1,116 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/79ef6bf4d0e2b6f87353db38ab3c58bb
+package stubs
+
+import (
+	zbus "github.com/threefoldtech/zbus"
+	modules "github.com/threefoldtech/zosv2/modules"
+)
+
+type StorageModuleStub struct {
+	client zbus.Client
+	module string
+	object zbus.ObjectID
+}
+
+func NewStorageModuleStub(client zbus.Client) *StorageModuleStub {
+	return &StorageModuleStub{
+		client: client,
+		module: "storage",
+		object: zbus.ObjectID{
+			Name:    "storage",
+			Version: "0.0.1",
+		},
+	}
+}
+
+func (s *StorageModuleStub) Allocate(arg0 modules.DeviceType, arg1 uint64, arg2 modules.ZDBMode) (ret0 string, ret1 string, ret2 error) {
+	args := []interface{}{arg0, arg1, arg2}
+	result, err := s.client.Request(s.module, s.object, "Allocate", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) Claim(arg0 string, arg1 uint64) (ret0 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "Claim", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 modules.DeviceType) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
+	result, err := s.client.Request(s.module, s.object, "CreateFilesystem", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) Path(arg0 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "Path", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) ReleaseFilesystem(arg0 string) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "ReleaseFilesystem", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) Total(arg0 modules.DeviceType) (ret0 uint64, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "Total", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
