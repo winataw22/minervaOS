@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zosv2/modules/utils"
 	"github.com/threefoldtech/zosv2/modules/version"
 
 	"github.com/threefoldtech/zbus"
@@ -94,7 +95,7 @@ func main() {
 	}(ctx, chIface)
 
 	if err := startServer(ctx, broker, networker); err != nil {
-		log.Error().Err(err).Msg("fail to start networkd")
+		log.Fatal().Err(err).Msg("unexpected error")
 	}
 }
 
@@ -126,5 +127,14 @@ func startServer(ctx context.Context, broker string, networker modules.Networker
 		Uint("worker nr", 1).
 		Msg("starting networkd module")
 
-	return server.Run(context.Background())
+	ctx, _ = utils.WithSignal(ctx)
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		return err
+	}
+
+	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules"
 )
 
@@ -23,26 +24,31 @@ func NewHTTPStore(url string) *HTTPStore {
 }
 
 // Reserve adds a reservation to the BCDB
-func (s *HTTPStore) Reserve(r *Reservation, nodeID modules.Identifier) error {
+func (s *HTTPStore) Reserve(r *Reservation, nodeID modules.Identifier) (string, error) {
 	url := fmt.Sprintf("%s/reservations/%s", s.baseURL, nodeID.Identity())
 
 	buf := &bytes.Buffer{}
 
 	if err := json.NewEncoder(buf).Encode(r); err != nil {
-		return err
+		return "", err
 	}
+
 	resp, err := http.Post(url, "application/json", buf)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer resp.Body.Close()
 
+	// Extract the Location header which contains
+	// url to get information about the created resource
+	resource := resp.Header.Get("Location")
+
 	if resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("wrong response status code %s", resp.Status)
+		return "", fmt.Errorf("wrong response status code %s", resp.Status)
 	}
 
-	return nil
+	return resource, nil
 }
 
 // Poll retrieves reservations from BCDB. If all is true, it returns all the reservations
@@ -62,6 +68,8 @@ func (s *HTTPStore) Poll(nodeID modules.Identifier, all bool, since time.Time) (
 		q.Add("since", fmt.Sprintf("%d", since.Unix()))
 	}
 	u.RawQuery = q.Encode()
+
+	log.Info().Str("url", u.String()).Msg("fetching")
 
 	resp, err := http.Get(u.String())
 	if err != nil {

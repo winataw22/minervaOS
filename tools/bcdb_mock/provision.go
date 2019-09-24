@@ -36,6 +36,7 @@ func reserve(w http.ResponseWriter, r *http.Request) {
 		Reservation: res,
 		NodeID:      nodeID,
 	})
+	w.Header().Set("Location", "/reservations/"+res.ID)
 	w.WriteHeader(http.StatusCreated)
 }
 

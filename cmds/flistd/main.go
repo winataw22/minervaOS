@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zosv2/modules/utils"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
@@ -16,6 +19,8 @@ import (
 const module = "flist"
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
 	var (
 		moduleRoot   string
 		msgBrokerCon string
@@ -52,7 +57,12 @@ func main() {
 		Uint("worker nr", workerNr).
 		Msg("starting flist module")
 
-	if err := server.Run(context.Background()); err != nil {
-		log.Error().Err(err).Msg("unexpected error")
+	ctx, _ := utils.WithSignal(context.Background())
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		log.Fatal().Err(err).Msg("unexpected error")
 	}
 }

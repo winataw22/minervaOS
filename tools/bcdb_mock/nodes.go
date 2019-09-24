@@ -17,20 +17,22 @@ func registerNode(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	input := &types.Node{}
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	n := &types.Node{}
+	if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	n, ok := nodeStore[input.NodeID]
-	if !ok {
-		nodeStore[input.NodeID] = &node{
-			Node: input,
+	i, ok := nodeStore[n.NodeID]
+	if !ok || i.Node == nil {
+		nodeStore[n.NodeID] = node{
+			Node:     n,
+			Capacity: &capacity.Capacity{},
 		}
+
 	} else {
-		n.NodeID = input.NodeID
-		n.FarmID = input.FarmID
+		i.Node.NodeID = n.NodeID
+		i.Node.FarmID = n.FarmID
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -46,7 +48,7 @@ func nodeDetail(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(&node); err != nil {
+	if err := json.NewEncoder(w).Encode(&node.Node); err != nil {
 		log.Printf("error writing node: %v", err)
 	}
 }
@@ -56,7 +58,7 @@ func listNodes(w http.ResponseWriter, r *http.Request) {
 	farm := r.URL.Query().Get("farm")
 
 	for _, node := range nodeStore {
-		if farm != "" && node.FarmID != farm {
+		if farm != "" && node.Node.FarmID != farm {
 			continue
 		}
 		nodes = append(nodes, node.Node)
@@ -78,12 +80,12 @@ func registerFarm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	farmStore[info.ID] = &info
+	farmStore[info.ID] = info
 	w.WriteHeader(http.StatusCreated)
 }
 
 func listFarm(w http.ResponseWriter, r *http.Request) {
-	var farms = make([]*farmInfo, 0, len(farmStore))
+	var farms = make([]farmInfo, 0, len(farmStore))
 	for _, info := range farmStore {
 		farms = append(farms, info)
 	}

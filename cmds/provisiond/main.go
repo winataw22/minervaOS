@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zosv2/modules/utils"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -91,6 +92,11 @@ func main() {
 	log.Info().
 		Str("broker", msgBrokerCon).
 		Msg("starting provision module")
+
+	ctx, _ = utils.WithSignal(ctx)
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
 
 	if err := engine.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("unexpected error")

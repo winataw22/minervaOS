@@ -22,25 +22,25 @@ dhcp_zos: Running
 udev-trigger: Success
 sshd-setup: Success
 local-modprobe: Success
-networkd: Success
+networkd: Error(Exited(Pid(1592), 1))
 sshd: Running`
 	services, err := parseList(s)
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]ServiceState{
-		"ntp":            ServiceStatusRunning,
-		"telnetd":        ServiceStatusRunning,
-		"network-dhcp":   ServiceStatusSuccess,
-		"haveged":        ServiceStatusSuccess,
-		"debug-tty":      ServiceStatusRunning,
-		"routing":        ServiceStatusSuccess,
-		"udevd":          ServiceStatusRunning,
-		"dhcp_zos":       ServiceStatusRunning,
-		"udev-trigger":   ServiceStatusSuccess,
-		"sshd-setup":     ServiceStatusSuccess,
-		"local-modprobe": ServiceStatusSuccess,
-		"networkd":       ServiceStatusSuccess,
-		"sshd":           ServiceStatusRunning,
+		"ntp":            ServiceState{state: ServiceStateRunning},
+		"telnetd":        ServiceState{state: ServiceStateRunning},
+		"network-dhcp":   ServiceState{state: ServiceStateSuccess},
+		"haveged":        ServiceState{state: ServiceStateSuccess},
+		"debug-tty":      ServiceState{state: ServiceStateRunning},
+		"routing":        ServiceState{state: ServiceStateSuccess},
+		"udevd":          ServiceState{state: ServiceStateRunning},
+		"dhcp_zos":       ServiceState{state: ServiceStateRunning},
+		"udev-trigger":   ServiceState{state: ServiceStateSuccess},
+		"sshd-setup":     ServiceState{state: ServiceStateSuccess},
+		"local-modprobe": ServiceState{state: ServiceStateSuccess},
+		"networkd":       ServiceState{state: ServiceStateError, reason: "exited(pid(1592), 1)"},
+		"sshd":           ServiceState{state: ServiceStateRunning},
 	}, services)
 }
 
@@ -59,9 +59,32 @@ after:
 	assert.Equal(t, ServiceStatus{
 		Name:   "ntp",
 		Pid:    223,
-		State:  ServiceStatusRunning,
+		State:  ServiceState{state: ServiceStateRunning},
 		Target: ServiceTargetUp,
 	}, status)
+
+	assert.False(t, status.State.Exited())
+
+	s = `
+name: ntp
+pid: 223
+state: Error(exit reason)
+target: Up
+log: Ring
+after:
+  - network-dhcp: Success`
+	status, err = parseStatus(s)
+	require.NoError(t, err)
+
+	assert.Equal(t, ServiceStatus{
+		Name:   "ntp",
+		Pid:    223,
+		State:  ServiceState{state: ServiceStateError, reason: "exit reason"},
+		Target: ServiceTargetUp,
+	}, status)
+
+	assert.True(t, status.State.Exited())
+	assert.True(t, status.State.Is(ServiceStateError))
 }
 
 func TestParseService(t *testing.T) {
@@ -72,7 +95,7 @@ oneshot: false
 log: ring
 after:
  - one
- - two	
+ - two
 `)
 	var s InitService
 	err := yaml.Unmarshal(b, &s)

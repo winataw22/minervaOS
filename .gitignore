@@ -8,7 +8,7 @@ tools/bcdb_mock/bcdb_mock
 tools/tfuser/tfuser
 tools/tffarmer/tffarmer
 tools/schemac/schemac
-tools/upgradectl/upgradectl
+tools/updatectl/updatectl
 
 qemu/node*
 qemu/*.efi

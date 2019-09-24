@@ -7,6 +7,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const defaultSocketPath = "/var/run/zinit.sock"
@@ -14,31 +16,23 @@ const defaultSocketPath = "/var/run/zinit.sock"
 // Client is a client for zinit action
 // it talks to zinit directly over its unis socket
 type Client struct {
-	socket string //path to the unix socket
-	conn   net.Conn
+	conn net.Conn
+	scan *bufio.Scanner
 }
 
 // New create a new Zinit client
-func New(socket string) *Client {
+func New(socket string) (*Client, error) {
 	if socket == "" {
 		socket = defaultSocketPath
 	}
-	return &Client{socket: socket}
-}
 
-// Connect dials zinit over a unix socket
-// You must call Connect before any other action
-func (c *Client) Connect() error {
-	if c.conn != nil {
-		return fmt.Errorf("already connected")
-	}
-
-	conn, err := net.Dial("unix", c.socket)
+	conn, err := net.Dial("unix", socket)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.conn = conn
-	return nil
+
+	scan := bufio.NewScanner(conn)
+	return &Client{conn: conn, scan: scan}, nil
 }
 
 // Close closes the socket connection
@@ -74,7 +68,7 @@ func (c *Client) readResponse() (string, error) {
 	)
 
 	headers := map[string]string{}
-	scanner := bufio.NewScanner(c.conn)
+	scanner := c.scan
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
@@ -83,33 +77,38 @@ func (c *Client) readResponse() (string, error) {
 		}
 		parts := strings.SplitN(line, ":", 2)
 		headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-
 	}
+
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error while reading socket: %v", err)
+		return "", errors.Wrap(err, "error while reading socket")
 	}
 
 	count, err = strconv.ParseUint(headers["lines"], 10, 32)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "failed to parse response length: %+v", headers)
 	}
+
 	status = headers["status"]
 
-	content := ""
+	var content strings.Builder
 	for i := uint64(0); i < count; i++ {
 		if !scanner.Scan() {
 			break
 		}
-		content += scanner.Text() + "\n"
+
+		if content.Len() > 0 {
+			content.WriteByte('\n')
+		}
+		content.WriteString(scanner.Text())
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error while reading socket: %v", err)
+		return "", errors.Wrap(err, "error while reading socket")
 	}
 
 	if status == "error" {
-		return "", fmt.Errorf(string(content))
+		return "", fmt.Errorf(content.String())
 	}
 
-	return strings.TrimSpace(content), nil
+	return content.String(), nil
 }

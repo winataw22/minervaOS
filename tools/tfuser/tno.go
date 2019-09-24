@@ -182,10 +182,12 @@ func reserveNetwork(network *modules.Network) error {
 
 	for nodeID := range nodes.Iter() {
 		nodeID := nodeID.(string)
-		if err := store.Reserve(r, modules.StrIdentifier(nodeID)); err != nil {
+		id, err := store.Reserve(r, modules.StrIdentifier(nodeID))
+		if err != nil {
 			return err
 		}
-		fmt.Printf("network reservation sent for node ID %s\n", nodeID)
+
+		fmt.Printf("network reservation sent for node ID %s (%v)\n", nodeID, id)
 	}
 
 	return nil

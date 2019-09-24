@@ -45,8 +45,8 @@ func startZLF(ctx context.Context, ID string, cfg Debug) (string, error) {
 		return "", errors.Wrap(err, "failed to start zlf")
 	}
 
-	z := zinit.New("")
-	if err := z.Connect(); err != nil {
+	z, err := zinit.New("")
+	if err != nil {
 		return "", errors.Wrap(err, "fail to connect to zinit")
 	}
 	defer z.Close()
@@ -76,8 +76,8 @@ func startZLF(ctx context.Context, ID string, cfg Debug) (string, error) {
 }
 
 func stopZLF(ctx context.Context, ID string) error {
-	z := zinit.New("")
-	if err := z.Connect(); err != nil {
+	z, err := zinit.New("")
+	if err != nil {
 		return errors.Wrap(err, "fail to connect to zinit")
 	}
 	defer z.Close()

@@ -48,13 +48,13 @@ type allocation struct {
 }
 
 type node struct {
-	*types.Node
-	*capacity.Capacity
+	Node     *types.Node
+	Capacity *capacity.Capacity
 }
 
 var (
-	nodeStore  map[string]*node
-	farmStore  map[string]*farmInfo
+	nodeStore  map[string]node
+	farmStore  map[string]farmInfo
 	allocStore *allocationStore
 	provStore  *provisionStore
 )
@@ -66,8 +66,8 @@ func main() {
 
 	flag.Parse()
 
-	nodeStore = make(map[string]*node)
-	farmStore = make(map[string]*farmInfo)
+	nodeStore = make(map[string]node)
+	farmStore = make(map[string]farmInfo)
 	allocStore = &allocationStore{Allocations: make(map[string]*allocation)}
 	provStore = &provisionStore{Reservations: make([]*reservation, 0, 20)}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/threefoldtech/zosv2/modules/environment"
 	"github.com/threefoldtech/zosv2/modules/gedis"
 	"github.com/threefoldtech/zosv2/modules/identity"
+	"github.com/threefoldtech/zosv2/modules/utils"
 	"github.com/threefoldtech/zosv2/modules/version"
 )
 
@@ -99,8 +100,14 @@ func main() {
 	log.Info().
 		Str("broker", msgBrokerCon).
 		Msg("starting identity module")
-	if err := server.Run(context.Background()); err != nil {
-		log.Fatal().Err(err).Msg("server exit")
+
+	ctx, _ := utils.WithSignal(context.Background())
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		log.Fatal().Err(err).Msg("unexpected error")
 	}
 }
 

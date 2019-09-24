@@ -74,10 +74,13 @@ func cmdsProvision(c *cli.Context) error {
 	}
 
 	for _, nodeID := range nodeIDs {
-		if err := store.Reserve(r, modules.StrIdentifier(nodeID)); err != nil {
+		id, err := store.Reserve(r, modules.StrIdentifier(nodeID))
+		if err != nil {
 			return errors.Wrap(err, "failed to send reservation")
 		}
-		fmt.Printf("reservation for %v send to node %s\n", duration, nodeID)
+
+		fmt.Printf("Reservation for %v send to node %s\n", duration, nodeID)
+		fmt.Printf("Resource: %v\n", id)
 	}
 
 	return nil

@@ -2,6 +2,21 @@ set -x
 
 DEFAULT_FLIST=azmy/zos-refs_heads_master.flist
 
+FLISTFILE=/tmp/flist.name
+INFOFILE=/tmp/flist.info
+
+# helper retry function
+# the retry function never give up because the
+# bootstrap must succeed. otherwise the node
+# will not be functional. So no reason to give
+# up
+function retry() {
+    until $@; do
+        sleep 1s
+        echo "retrying: $@"
+    done
+}
+
 # bootflist reads the boot flist name from kernel cmd
 # TODO: this should probably be not allowed at somepoint to
 function bootflist() {
@@ -16,21 +31,17 @@ function bootflist() {
     echo ${DEFAULT_FLIST}
 }
 
-BOOTFLIST=https://hub.grid.tf/$(bootflist)
+FLIST=$(bootflist)
+# track which flist used for booting
+echo ${FLIST} > ${FLISTFILE}
+chmod 0400 ${FLISTFILE}
 
-echo "Bootstraping: ${BOOTFLIST}"
+BOOTFLIST=https://hub.grid.tf/${FLIST}
+BOOTFLISTINFO=https://hub.grid.tf/api/flist/${FLIST}/light
 
-# helper retry function
-# the retry function never give up because the
-# bootstrap must succeed. otherwise the node
-# will not be functional. So no reason to give
-# up
-function retry() {
-    until $@; do
-        sleep 1s
-        echo "retrying: $@"
-    done
-}
+echo "Bootstraping with: ${BOOTFLIST}"
+retry wget -O ${INFOFILE} ${BOOTFLISTINFO}
+chmod 0400 ${INFOFILE}
 
 BS=/tmp/bootstrap
 mkdir -p ${BS}
@@ -49,7 +60,7 @@ retry mountpoint root
 ## move to root
 cd root
 cp -a * /
-### filesystem is ready
+### filesystem now has all the binaries
 
 for file in $(ls etc/zinit/*.yaml); do
     file=$(basename ${file})

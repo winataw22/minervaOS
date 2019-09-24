@@ -3,6 +3,8 @@ package version
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 )
 
 /*
@@ -18,6 +20,10 @@ var (
 	// Dirty flag shows if the binary is built from a
 	// repo with uncommitted changes
 	Dirty = "{dirty}"
+)
+
+var (
+	re = regexp.MustCompile(`^Version:([^@]*)@Revision:([^\(]+)`)
 )
 
 // Version interface
@@ -59,4 +65,14 @@ func ShowAndExit(short bool) {
 	}
 
 	os.Exit(0)
+}
+
+// Parse version string
+func Parse(v string) (version string, revision string, err error) {
+	m := re.FindStringSubmatch(v)
+	if m == nil {
+		return version, revision, fmt.Errorf("invalid version string")
+	}
+
+	return strings.TrimSpace(m[1]), strings.TrimSpace(m[2]), nil
 }

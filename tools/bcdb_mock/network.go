@@ -33,7 +33,7 @@ func registerIfaces(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("network interfaces received", ifaces)
 
-	nodeStore[nodeID].Ifaces = ifaces
+	nodeStore[nodeID].Node.Ifaces = ifaces
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -47,25 +47,25 @@ func chooseExit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	farm, ok := farmStore[node.FarmID]
+	farm, ok := farmStore[node.Node.FarmID]
 	if !ok {
-		http.Error(w, fmt.Sprintf("farm id %s not found", node.FarmID), http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("farm id %s not found", node.Node.FarmID), http.StatusNotFound)
 		return
 	}
 
 	// mark the node as possible exit node
-	node.ExitNode = len(farm.ExitNodes) + 1
+	node.Node.ExitNode = len(farm.ExitNodes) + 1
 
 	// add the node id to the list of possible exit node of the farm
 	var found = false
 	for _, nodeID := range farm.ExitNodes {
-		if nodeID == node.NodeID {
+		if nodeID == node.Node.NodeID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		farm.ExitNodes = append(farm.ExitNodes, node.NodeID)
+		farm.ExitNodes = append(farm.ExitNodes, node.Node.NodeID)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -79,8 +79,8 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok = farmStore[node.FarmID]; !ok {
-		http.Error(w, fmt.Sprintf("farm id %s not found", node.FarmID), http.StatusNotFound)
+	if _, ok = farmStore[node.Node.FarmID]; !ok {
+		http.Error(w, fmt.Sprintf("farm id %s not found", node.Node.FarmID), http.StatusNotFound)
 		return
 	}
 
@@ -97,12 +97,12 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if node.PublicConfig == nil {
-		node.PublicConfig = &types.PubIface{}
+	if node.Node.PublicConfig == nil {
+		node.Node.PublicConfig = &types.PubIface{}
 	}
 
-	node.PublicConfig.Type = types.MacVlanIface //TODO: change me once we support other types
-	node.PublicConfig.Master = input.Iface
+	node.Node.PublicConfig.Type = types.MacVlanIface //TODO: change me once we support other types
+	node.Node.PublicConfig.Master = input.Iface
 	for i := range input.IPs {
 		ip, ipnet, err := net.ParseCIDR(input.IPs[i])
 		if err != nil {
@@ -112,19 +112,19 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		ipnet.IP = ip
 
 		if ip.To4() != nil {
-			node.PublicConfig.IPv4 = ipnet
+			node.Node.PublicConfig.IPv4 = ipnet
 		} else if ip.To16() != nil {
-			node.PublicConfig.IPv6 = ipnet
+			node.Node.PublicConfig.IPv6 = ipnet
 		}
 
 		gw := net.ParseIP(input.GWs[i])
 		if gw.To4() != nil {
-			node.PublicConfig.GW4 = gw
+			node.Node.PublicConfig.GW4 = gw
 		} else if gw.To16() != nil {
-			node.PublicConfig.GW6 = gw
+			node.Node.PublicConfig.GW6 = gw
 		}
 	}
-	node.PublicConfig.Version++
+	node.Node.PublicConfig.Version++
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -192,12 +192,12 @@ func getAlloc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if node.ExitNode <= 0 {
-		http.Error(w, fmt.Sprintf("node %s can't be used as exit node", node.NodeID), http.StatusBadRequest)
+	if node.Node.ExitNode <= 0 {
+		http.Error(w, fmt.Sprintf("node %s can't be used as exit node", node.Node.NodeID), http.StatusBadRequest)
 		return
 	}
 
-	if _, ok := farmStore[node.FarmID]; !ok {
+	if _, ok := farmStore[node.Node.FarmID]; !ok {
 		http.Error(w, "farm not found", http.StatusNotFound)
 		return
 	}
@@ -216,7 +216,7 @@ func getAlloc(w http.ResponseWriter, r *http.Request) {
 	}{
 		Alloc:      alloc.String(),
 		FarmAlloc:  farmAlloc.String(),
-		ExitNodeNr: uint8(node.ExitNode),
+		ExitNodeNr: uint8(node.Node.ExitNode),
 	}
 
 	w.Header().Set("Content-type", "application/json")
