@@ -1,1 +1,1 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/4c8858f6e583d4d07add44b0b725a002
+../../../../../bootstrap/etc/zinit/init/bootstrap.sh

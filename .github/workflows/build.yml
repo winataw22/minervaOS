@@ -1,1 +1,68 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/8e839936d086b17b81726701bc13c44d
+name: build
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Get dependencies
+      run: |
+        cd modules
+        make getdeps
+      env:
+        GO111MODULE: on
+
+    - name: Run tests
+      run: |
+        cd modules
+        make coverage
+      env:
+        GO111MODULE: on
+
+    - name: Send coverage
+      if: success()
+      run: |
+        cd modules
+        bash <(curl -s https://codecov.io/bash)
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Build binaries
+      run: |
+        cd cmds
+        make
+      env:
+        GO111MODULE: on
+
+    - name: Build tools
+      run: |
+        cd tools
+        make
+      env:
+        GO111MODULE: on
+
+    - name: Collecting files
+      if: success()
+      run: |
+        mkdir -p /tmp/archive/{bin,etc/zinit}
+        cp bin/* /tmp/archive/bin/
+        cp -r zinit/* /tmp/archive/etc/zinit
+
+    - uses: threefoldtech/action-publish@v1-release
+      name: Build FList
+      if: success()
+      with:
+        root: /tmp/archive
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.ref }}.tar.gz

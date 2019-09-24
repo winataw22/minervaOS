@@ -58,6 +58,10 @@ func listNodes(w http.ResponseWriter, r *http.Request) {
 	farm := r.URL.Query().Get("farm")
 
 	for _, node := range nodeStore {
+		if node.Node == nil {
+			continue
+		}
+
 		if farm != "" && node.Node.FarmID != farm {
 			continue
 		}
