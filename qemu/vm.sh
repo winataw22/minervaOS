@@ -43,11 +43,11 @@ uuid="${md5:0:8}-${md5:8:4}-${md5:12:4}-${md5:16:4}-${md5:20}"
 basemac="54:${md5:2:2}:${md5:4:2}:${md5:6:2}:${md5:8:2}:${md5:10:1}"
 
 createdisks() {
-    qemu-img create -f qcow2 $vmdir/vda.qcow2 50G
-    qemu-img create -f qcow2 $vmdir/vdb.qcow2 50G
-    qemu-img create -f qcow2 $vmdir/vdc.qcow2 50G
-    qemu-img create -f qcow2 $vmdir/vdd.qcow2 50G
-    qemu-img create -f qcow2 $vmdir/vde.qcow2 50G
+    qemu-img create -f qcow2 $vmdir/vda.qcow2 500G
+    qemu-img create -f qcow2 $vmdir/vdb.qcow2 500G
+    qemu-img create -f qcow2 $vmdir/vdc.qcow2 500G
+    qemu-img create -f qcow2 $vmdir/vdd.qcow2 500G
+    qemu-img create -f qcow2 $vmdir/vde.qcow2 500G
 
 }
 

@@ -22,8 +22,7 @@ func main() {
 		ver          bool
 	)
 
-	flag.StringVar(&tnodbURL, "tnodb", "http://172.20.0.1:8080", "BCDB connection string")
-	// flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "BCDB connection string")
+	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "BCDB connection string")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 

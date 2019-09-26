@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -22,11 +21,15 @@ const (
 	Raid10 RaidProfile = "raid10"
 )
 
-var (
-	// ErrNotEnoughSpace indicates that there is not enough space in a pool
-	// of the requested type to create the filesystem
-	ErrNotEnoughSpace = errors.New("Not enough space left in pools of this type")
-)
+// ErrNotEnoughSpace indicates that there is not enough space in a pool
+// of the requested type to create the filesystem
+type ErrNotEnoughSpace struct {
+	DeviceType DeviceType
+}
+
+func (e ErrNotEnoughSpace) Error() string {
+	return fmt.Sprintf("Not enough space left in pools of this type %s", e.DeviceType)
+}
 
 // DeviceType is the actual type of hardware that the storage device runs on,
 // i.e. SSD or HDD

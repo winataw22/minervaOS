@@ -33,7 +33,11 @@ func (c *Client) Connect(addr string) error {
 	}
 	c.pool = pool
 
-	return nil
+	con := c.pool.Get()
+	defer con.Close()
+	_, err = con.Do("PING")
+
+	return err
 }
 
 // Close releases the resources used by the client.

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -285,7 +286,7 @@ func (s *storageModule) ensureCache() error {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
 		fs, err := s.createSubvol(cacheSize, cacheLabel, modules.SSDDevice)
-		if err == modules.ErrNotEnoughSpace {
+		if errors.Is(err, modules.ErrNotEnoughSpace{}) {
 			// No space on SSD (probably no SSD in the node at all), try HDD
 			err = nil
 			fs, err = s.createSubvol(cacheSize, cacheLabel, modules.HDDDevice)
@@ -327,6 +328,7 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType modules.
 		reserved, err := s.volumes[idx].Reserved()
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to get size of pool %s", s.volumes[idx].Name())
+			continue
 		}
 
 		log.Debug().
@@ -358,5 +360,5 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType modules.
 	}
 
 	// no error but also no volume, so we didn't manage to create one
-	return nil, modules.ErrNotEnoughSpace
+	return nil, modules.ErrNotEnoughSpace{DeviceType: poolType}
 }
