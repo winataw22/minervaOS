@@ -7,9 +7,34 @@ import (
 	"net/http"
 
 	"github.com/threefoldtech/zosv2/modules/capacity/dmi"
+	"github.com/threefoldtech/zosv2/modules/gedis"
 
 	"github.com/threefoldtech/zosv2/modules"
 )
+
+// Store is an interface to the bcdb store to report capacity
+type Store interface {
+	Register(nodeID modules.Identifier, c Capacity, d dmi.DMI) error
+	Ping(nodeID modules.Identifier) error
+}
+
+// BCDBStore implements the store interface using a gedis client to BCDB
+type BCDBStore struct {
+	g *gedis.Gedis
+}
+
+// NewBCDBStore creates a BCDBStore
+func NewBCDBStore(gedis *gedis.Gedis) *BCDBStore {
+	return &BCDBStore{g: gedis}
+}
+
+// Register sends the capacity information to BCDB
+func (s *BCDBStore) Register(nodeID modules.Identifier, c Capacity, d dmi.DMI) error {
+	return s.g.UpdateTotalNodeCapacity(nodeID, c.MRU, c.CRU, c.HRU, c.SRU)
+}
+
+// Ping sends an heart-beat to BCDB
+func (s *BCDBStore) Ping(nodeID modules.Identifier) error { return nil }
 
 // HTTPStore implement the method to push capacity information to BCDB over HTTP
 type HTTPStore struct {
@@ -22,10 +47,10 @@ func NewHTTPStore(url string) *HTTPStore {
 }
 
 // Register sends the capacity information to BCDB
-func (s *HTTPStore) Register(nodeID modules.Identifier, c *Capacity, d *dmi.DMI) error {
+func (s *HTTPStore) Register(nodeID modules.Identifier, c Capacity, d dmi.DMI) error {
 	x := struct {
-		Capacity *Capacity `json:"capacity,omitempty"`
-		DMI      *dmi.DMI  `json:"dmi,omitempty"`
+		Capacity Capacity `json:"capacity,omitempty"`
+		DMI      dmi.DMI  `json:"dmi,omitempty"`
 	}{
 		Capacity: c,
 		DMI:      d,

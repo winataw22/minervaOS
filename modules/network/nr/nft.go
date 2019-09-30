@@ -12,8 +12,25 @@ func init() {
 
 var _nft = `
 flush ruleset
-# The rules in the NR are there to make sure direct communication between
-# the NRs behind exitpoints is impossible
+
+table ip nat {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+  }
+
+  chain input {
+    type nat hook input priority 100; policy accept;
+  }
+
+  chain output {
+    type nat hook output priority -100; policy accept;
+  }
+
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "public" masquerade fully-random;
+  }
+}
 
 table inet filter {
     chain base_checks {
@@ -24,6 +41,8 @@ table inet filter {
     }
   chain input {
     type filter hook input priority 0; policy accept;
+    jump base_checks
+    iifname "public" counter drop
   }
 
   chain forward {
@@ -32,7 +51,7 @@ table inet filter {
         jump base_checks
         # if not, verify if it's new and coming in from the br4-gw network
         # if it is, drop it
-        iifname "{{.Iifname}}" counter drop
+        iifname "public" counter drop
   }
 
   chain output {

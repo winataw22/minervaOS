@@ -16,7 +16,7 @@ const (
 
 var (
 	directiveRe = regexp.MustCompile(`@(\w+)\s*=\s*([^\#]+)`)
-	propertyRe  = regexp.MustCompile(`(\w+)(\*)?\s*=\s*([^\#]+)`)
+	propertyRe  = regexp.MustCompile(`(\w+)(\*){0,2}\s*=\s*([^\#]+)`)
 	typeRe      = regexp.MustCompile(`^([^\(]*)\(([^\)]+)\)\s*(?:!(.+))?$`)
 )
 
@@ -125,7 +125,6 @@ func New(r io.Reader) (schema Schema, err error) {
 			if current == nil {
 				return schema, fmt.Errorf("unexpected token [line %d]: %s", nr, line)
 			}
-
 			prop, err := property(line)
 			if err != nil {
 				return schema, fmt.Errorf("failed to parse property [line %d]: %s", nr, err)
@@ -216,6 +215,16 @@ const (
 	EnumKind
 )
 
+func (k Kind) String() string {
+	for s, i := range symbols {
+		if i == k {
+			return s
+		}
+	}
+
+	return "unknown"
+}
+
 var (
 	symbols = map[string]Kind{
 		// short symbols, they must be upper case
@@ -245,6 +254,7 @@ var (
 		"email":     EmailKind,
 		"ipport":    IPPortKind,
 		"ipaddr":    IPAddressKind,
+		"ipaddress": IPAddressKind,
 		"iprange":   IPRangeKind,
 		"date":      DateKind,
 		"time":      DateTimeKind,
@@ -256,6 +266,7 @@ var (
 		"multiline": MultilineKind,
 		"hash":      HashKind,
 		"bin":       BytesKind,
+		"bytes":     BytesKind,
 		"percent":   PercentKind,
 		"url":       URLKind,
 		"object":    ObjectKind,

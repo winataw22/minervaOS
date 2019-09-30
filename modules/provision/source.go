@@ -45,11 +45,17 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 	// after that, we only ask for the new reservations
 	lastRun := time.Time{}
 	go func() {
+		next := time.Now().Add(time.Second * 10)
 		defer close(ch)
 		for {
-			// backing off of 1 second
-			<-time.After(time.Second)
+			// make sure we wait at least 10 second between calls
+			if !time.Now().After(next) {
+				time.Sleep(time.Second)
+				continue
+			}
+
 			log.Info().Msg("check for new reservations")
+			next = time.Now().Add(time.Second * 10)
 
 			all := false
 			if (lastRun == time.Time{}) {

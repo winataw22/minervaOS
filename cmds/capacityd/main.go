@@ -4,7 +4,10 @@ import (
 	"flag"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules/capacity"
+	"github.com/threefoldtech/zosv2/modules/environment"
+	"github.com/threefoldtech/zosv2/modules/gedis"
 	"github.com/threefoldtech/zosv2/modules/stubs"
 
 	"github.com/rs/zerolog/log"
@@ -18,11 +21,9 @@ const module = "capacity"
 func main() {
 	var (
 		msgBrokerCon string
-		tnodbURL     string
 		ver          bool
 	)
 
-	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "BCDB connection string")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 
@@ -37,7 +38,10 @@ func main() {
 	}
 	storage := stubs.NewStorageModuleStub(redis)
 	identity := stubs.NewIdentityManagerStub(redis)
-	store := capacity.NewHTTPStore(tnodbURL)
+	store, err := bcdbClient()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
+	}
 
 	r := capacity.NewResourceOracle(storage)
 
@@ -60,7 +64,7 @@ func main() {
 	}
 
 	log.Info().Msg("sends capacity detail to BCDB")
-	if err := store.Register(identity.NodeID(), resources, dmi); err != nil {
+	if err := store.Register(identity.NodeID(), *resources, *dmi); err != nil {
 		log.Fatal().Err(err).Msgf("failed to write resources capacity on BCDB")
 	}
 
@@ -72,4 +76,22 @@ func main() {
 			log.Error().Err(err).Msgf("failed to send heart-beat to BCDB")
 		}
 	}
+}
+
+// instantiate the proper client based on the running mode
+func bcdbClient() (capacity.Store, error) {
+	env := environment.Get()
+
+	// use the bcdb mock for dev and test
+	if env.RunningMode == environment.RunningDev {
+		return capacity.NewHTTPStore(env.BcdbURL), nil
+	}
+
+	// use gedis for production bcdb
+	store, err := gedis.New(env.BcdbURL, env.BcdbNamespace, env.BcdbPassword)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to connect to BCDB")
+	}
+
+	return capacity.NewBCDBStore(store), nil
 }

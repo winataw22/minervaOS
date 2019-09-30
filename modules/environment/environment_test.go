@@ -13,19 +13,19 @@ import (
 // argument set or not
 func TestManager(t *testing.T) {
 	// Development mode
-	params := kernel.Params{"runmode": {"development"}}
+	params := kernel.Params{"runmode": {"dev"}}
 	value := getEnvironmentFromParams(params)
 
 	assert.Equal(t, RunningDev, value.RunningMode)
 
 	// Testing mode
-	params = kernel.Params{"runmode": {"testing"}}
+	params = kernel.Params{"runmode": {"test"}}
 	value = getEnvironmentFromParams(params)
 
 	assert.Equal(t, RunningTest, value.RunningMode)
 
 	// Main mode
-	params = kernel.Params{"runmode": {"production"}}
+	params = kernel.Params{"runmode": {"prod"}}
 	value = getEnvironmentFromParams(params)
 
 	assert.Equal(t, RunningMain, value.RunningMode)
@@ -46,7 +46,7 @@ func TestManager(t *testing.T) {
 func TestEnvironmentOverride(t *testing.T) {
 	os.Setenv("ZOS_BCDB_URL", "localhost:1234")
 
-	params := kernel.Params{"runmode": {"development"}}
+	params := kernel.Params{"runmode": {"dev"}}
 	value := getEnvironmentFromParams(params)
 
 	assert.Equal(t, value.BcdbURL, "localhost:1234")

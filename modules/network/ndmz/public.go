@@ -1,19 +1,15 @@
-package gateway
+package ndmz
 
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
-	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
-	"github.com/threefoldtech/zosv2/modules/network/types"
-
 	"github.com/containernetworking/plugins/pkg/ns"
-
-	"github.com/vishvananda/netlink"
-
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
+	"github.com/threefoldtech/zosv2/modules/network/types"
+	"github.com/vishvananda/netlink"
 )
 
 func getPublicIface() (string, error) {

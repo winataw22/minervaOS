@@ -9,6 +9,7 @@ import (
 
 	"github.com/dave/jennifer/jen"
 	"github.com/iancoleman/strcase"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -17,10 +18,13 @@ var (
 	// and then mapped here to support it.
 	goKindMap = map[Kind][2]string{
 		StringKind:    {"", "string"},
+		EmailKind:     {"", "string"},
 		IntegerKind:   {"", "int64"},
 		FloatKind:     {"", "float64"},
 		BoolKind:      {"", "bool"},
+		BytesKind:     {"", "[]byte"},
 		DateKind:      {"github.com/threefoldtech/zosv2/modules/schema", "Date"},
+		DateTimeKind:  {"github.com/threefoldtech/zosv2/modules/schema", "Date"},
 		NumericKind:   {"github.com/threefoldtech/zosv2/modules/schema", "Numeric"},
 		IPAddressKind: {"net", "IP"},
 		IPRangeKind:   {"github.com/threefoldtech/zosv2/modules/schema", "IPRange"},
@@ -30,7 +34,7 @@ var (
 
 // GenerateGolang generate type stubs for Go from schema
 func GenerateGolang(w io.Writer, pkg string, schema Schema) error {
-	g := goGenerator{enums: make(map[string]*Type)}
+	g := goGenerator{enums: make(map[string]Type)}
 	return g.Generate(w, pkg, schema)
 }
 
@@ -40,7 +44,7 @@ type goGenerator struct {
 	//and not elsewere (unlike object types for example) they need
 	//to added dynamically to this map while generating code, then
 	//processed later, to generate the corresponding type
-	enums map[string]*Type
+	enums map[string]Type
 }
 
 func (g *goGenerator) nameFromURL(u string) (string, error) {
@@ -67,7 +71,7 @@ func (g *goGenerator) Generate(w io.Writer, pkg string, schema Schema) error {
 	}
 
 	for name, typ := range g.enums {
-		if err := g.enum(j, name, typ); err != nil {
+		if err := g.enum(j, name, &typ); err != nil {
 			return err
 		}
 
@@ -79,7 +83,9 @@ func (g *goGenerator) Generate(w io.Writer, pkg string, schema Schema) error {
 
 func (g *goGenerator) enumValues(typ *Type) []string {
 	var values string
-	json.Unmarshal([]byte(typ.Default), &values)
+	if err := json.Unmarshal([]byte(typ.Default), &values); err != nil {
+		panic(fmt.Errorf("failed to parse enum values: `%s`: %s", typ.Default, err))
+	}
 	return strings.Split(values, ",")
 }
 
@@ -105,6 +111,8 @@ func (g *goGenerator) enum(j *jen.File, name string, typ *Type) error {
 				group.Case(jen.Id(n)).Block(jen.Return(jen.Lit(value)))
 			}
 		})
+
+		group.Return(jen.Lit("UNKNOWN"))
 	}).Line()
 
 	return nil
@@ -141,7 +149,7 @@ func (g *goGenerator) renderType(typ *Type) (jen.Code, error) {
 	default:
 		m, ok := goKindMap[typ.Kind]
 		if !ok {
-			return nil, fmt.Errorf("unsupported type in the go generator: %v", typ)
+			return nil, errors.Errorf("unsupported type in the go generator: %s", typ.Kind)
 		}
 
 		return jen.Qual(m[0], m[1]), nil
@@ -167,12 +175,12 @@ func (g *goGenerator) object(j *jen.File, obj *Object) error {
 				// TODO: do we need to have a fqn for the enum ObjectPropertyEnum instead?
 				enumName := structName + name
 				enumTypName := fmt.Sprintf("%sEnum", enumName)
-				g.enums[enumName] = &prop.Type
+				g.enums[enumName] = prop.Type
 				typ = jen.Id(enumTypName)
 			} else {
 				typ, err = g.renderType(&prop.Type)
 				if err != nil {
-					structErr = err
+					structErr = errors.Wrapf(err, "object(%s).property(%s)", obj.URL, name)
 					return
 				}
 			}

@@ -13,11 +13,11 @@ import (
 // watch the tnodb for update networks object
 type Watcher struct {
 	nodeID modules.Identifier
-	db     TNoDB
+	db     TNoDBUtils
 }
 
 // NewWatcher creates a new watcher for a specific node
-func NewWatcher(nodeID modules.Identifier, db TNoDB) *Watcher {
+func NewWatcher(nodeID modules.Identifier, db TNoDBUtils) *Watcher {
 	return &Watcher{
 		nodeID: nodeID,
 		db:     db,

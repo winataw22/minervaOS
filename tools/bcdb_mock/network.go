@@ -33,42 +33,35 @@ func registerIfaces(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("network interfaces received", ifaces)
 
-	nodeStore[nodeID].Node.Ifaces = ifaces
+	nodeStore[nodeID].Ifaces = ifaces
 	w.WriteHeader(http.StatusCreated)
 }
 
-func chooseExit(w http.ResponseWriter, r *http.Request) {
+func registerPorts(w http.ResponseWriter, r *http.Request) {
+
 	nodeID := mux.Vars(r)["node_id"]
-	node, ok := nodeStore[nodeID]
-	if !ok {
-		err := fmt.Sprintf("node id %s not found", nodeID)
-		log.Println(err)
-		http.Error(w, err, http.StatusNotFound)
+	if _, ok := nodeStore[nodeID]; !ok {
+		err := fmt.Errorf("node id %s not found", nodeID)
+		log.Printf("node not found %v", nodeID)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	farm, ok := farmStore[node.Node.FarmID]
-	if !ok {
-		http.Error(w, fmt.Sprintf("farm id %s not found", node.Node.FarmID), http.StatusNotFound)
+	defer r.Body.Close()
+
+	input := struct {
+		Ports []uint `json:"ports"`
+	}{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.Printf(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// mark the node as possible exit node
-	node.Node.ExitNode = len(farm.ExitNodes) + 1
+	fmt.Println("wireguard ports received", input.Ports)
 
-	// add the node id to the list of possible exit node of the farm
-	var found = false
-	for _, nodeID := range farm.ExitNodes {
-		if nodeID == node.Node.NodeID {
-			found = true
-			break
-		}
-	}
-	if !found {
-		farm.ExitNodes = append(farm.ExitNodes, node.Node.NodeID)
-	}
-
-	w.WriteHeader(http.StatusCreated)
+	nodeStore[nodeID].WGPorts = input.Ports
+	w.WriteHeader(http.StatusOK)
 }
 
 func configurePublic(w http.ResponseWriter, r *http.Request) {
@@ -79,8 +72,8 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, ok = farmStore[node.Node.FarmID]; !ok {
-		http.Error(w, fmt.Sprintf("farm id %s not found", node.Node.FarmID), http.StatusNotFound)
+	if _, ok = farmStore[node.FarmID]; !ok {
+		http.Error(w, fmt.Sprintf("farm id %s not found", node.FarmID), http.StatusNotFound)
 		return
 	}
 
@@ -97,12 +90,12 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if node.Node.PublicConfig == nil {
-		node.Node.PublicConfig = &types.PubIface{}
+	if node.PublicConfig == nil {
+		node.PublicConfig = &types.PubIface{}
 	}
 
-	node.Node.PublicConfig.Type = types.MacVlanIface //TODO: change me once we support other types
-	node.Node.PublicConfig.Master = input.Iface
+	node.PublicConfig.Type = types.MacVlanIface //TODO: change me once we support other types
+	node.PublicConfig.Master = input.Iface
 	for i := range input.IPs {
 		ip, ipnet, err := net.ParseCIDR(input.IPs[i])
 		if err != nil {
@@ -112,114 +105,19 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		ipnet.IP = ip
 
 		if ip.To4() != nil {
-			node.Node.PublicConfig.IPv4 = ipnet
+			node.PublicConfig.IPv4 = ipnet
 		} else if ip.To16() != nil {
-			node.Node.PublicConfig.IPv6 = ipnet
+			node.PublicConfig.IPv6 = ipnet
 		}
 
 		gw := net.ParseIP(input.GWs[i])
 		if gw.To4() != nil {
-			node.Node.PublicConfig.GW4 = gw
+			node.PublicConfig.GW4 = gw
 		} else if gw.To16() != nil {
-			node.Node.PublicConfig.GW6 = gw
+			node.PublicConfig.GW6 = gw
 		}
 	}
-	node.Node.PublicConfig.Version++
+	node.PublicConfig.Version++
 
 	w.WriteHeader(http.StatusCreated)
-}
-
-func registerAlloc(w http.ResponseWriter, r *http.Request) {
-	log.Println("prefix register request received")
-
-	defer r.Body.Close()
-
-	type tmp struct {
-		FarmerID string `json:"farmer_id"`
-		Prefix   string `json:"allocation"`
-	}
-	req := tmp{}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	allocStore.Lock()
-	defer allocStore.Unlock()
-	if _, ok := farmStore[req.FarmerID]; !ok {
-		http.Error(w,
-			fmt.Sprintf("farmer %s does not exist, register this farmer fist", req.FarmerID),
-			http.StatusBadRequest)
-		return
-	}
-
-	_, prefix, err := net.ParseCIDR(req.Prefix)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	allocStore.Allocations[req.FarmerID] = &allocation{
-		Allocation: prefix,
-	}
-	w.WriteHeader(http.StatusCreated)
-}
-
-func listAlloc(w http.ResponseWriter, r *http.Request) {
-	allocStore.Lock()
-	defer allocStore.Unlock()
-	allocs := make([]string, 0, len(allocStore.Allocations))
-	for _, prefix := range allocStore.Allocations {
-		allocs = append(allocs, prefix.Allocation.String())
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(allocs)
-}
-
-func getAlloc(w http.ResponseWriter, r *http.Request) {
-	nodeID, ok := mux.Vars(r)["node_id"]
-	if !ok {
-		http.Error(w, "missing node_id", http.StatusBadRequest)
-		return
-	}
-
-	node, ok := nodeStore[nodeID]
-	if !ok {
-		http.Error(w, fmt.Sprintf("node id %s not found", nodeID), http.StatusNotFound)
-		return
-	}
-
-	if node.Node.ExitNode <= 0 {
-		http.Error(w, fmt.Sprintf("node %s can't be used as exit node", node.Node.NodeID), http.StatusBadRequest)
-		return
-	}
-
-	if _, ok := farmStore[node.Node.FarmID]; !ok {
-		http.Error(w, "farm not found", http.StatusNotFound)
-		return
-	}
-
-	alloc, farmAlloc, err := requestAllocation(node.Node, allocStore)
-	if err != nil {
-		log.Printf("error during allocation request: %v\n", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	data := struct {
-		Alloc      string `json:"allocation"`
-		FarmAlloc  string `json:"farm_alloc"`
-		ExitNodeNr uint8  `json:"exit_node_nr"`
-	}{
-		Alloc:      alloc.String(),
-		FarmAlloc:  farmAlloc.String(),
-		ExitNodeNr: uint8(node.Node.ExitNode),
-	}
-
-	w.Header().Set("Content-type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(&data)
 }

@@ -17,7 +17,7 @@ import (
 
 var (
 	idStore identity.IDStore
-	db      network.TNoDB
+	db      network.TNoDBUtils
 )
 
 func main() {
@@ -126,12 +126,6 @@ You can specify multime time the ip and gw flag to configure multiple IP on the 
 	if err != nil {
 		log.Fatal().Msg(err.Error())
 	}
-}
-
-type strID string
-
-func (f strID) Identity() string {
-	return string(f)
 }
 
 func loadFarmID(seedPath string) (modules.Identifier, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/threefoldtech/zosv2/modules/stubs"
 
@@ -147,7 +148,11 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, info interface{}) error {
 	zbus := GetZBus(ctx)
 	identity := stubs.NewIdentityManagerStub(zbus)
-	result := &Result{}
+	result := &Result{
+		Type:    r.Type,
+		Created: time.Now(),
+		ID:      r.ID,
+	}
 
 	if rErr != nil {
 		log.Error().
@@ -155,10 +160,12 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 			Str("id", r.ID).
 			Msgf("failed to apply provision")
 		result.Error = rErr.Error()
+		result.State = "error" //TODO: create enum
 	} else {
 		log.Info().
 			Str("result", fmt.Sprintf("%v", info)).
 			Msgf("workload deployed")
+		result.State = "ok"
 	}
 
 	br, err := json.Marshal(info)

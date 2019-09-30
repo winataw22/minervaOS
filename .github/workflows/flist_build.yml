@@ -1,9 +1,9 @@
-name: build
+name: flist build
 on: [push]
 jobs:
 
   build:
-    name: Build
+    name: Flist build
     runs-on: ubuntu-latest
     steps:
 
@@ -16,28 +16,6 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v1
 
-    - name: Get dependencies
-      run: |
-        cd modules
-        make getdeps
-      env:
-        GO111MODULE: on
-
-    - name: Run tests
-      run: |
-        cd modules
-        make coverage
-      env:
-        GO111MODULE: on
-
-    - name: Send coverage
-      if: success()
-      run: |
-        cd modules
-        bash <(curl -s https://codecov.io/bash)
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
     - name: Build binaries
       run: |
         cd cmds
@@ -45,23 +23,15 @@ jobs:
       env:
         GO111MODULE: on
 
-    - name: Build tools
-      run: |
-        cd tools
-        make
-      env:
-        GO111MODULE: on
-
     - name: Collecting files
-      if: success()
       run: |
         mkdir -p /tmp/archive/{bin,etc/zinit}
         cp bin/* /tmp/archive/bin/
         cp -r zinit/* /tmp/archive/etc/zinit
 
-    - uses: threefoldtech/action-publish@v1-release
-      name: Build FList
+    - name: Build FList 
       if: success()
+      uses: threefoldtech/action-publish@v1-release
       with:
         root: /tmp/archive
         token: ${{ secrets.HUB_JWT }}

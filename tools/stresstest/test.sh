@@ -3,7 +3,7 @@ set -e
 
 # default fallback values
 dfarmid="CemYjciEmuvYVKDFXYaZLdGsCdLDRp4U1Xu1LPPrQNkK"
-dtnodb="https://tnodb.dev.grid.tf"
+dtnodb="https://bcdb.dev.grid.tf"
 dredis="10.4.0.250"
 
 # initializing variables
@@ -120,8 +120,7 @@ generate_zdb() {
     $tfubin generate storage zdb --size 10 --type SSD --mode user > ${schemas}/zdb-ssd-10.json
     $tfubin generate storage zdb --size 100 --type SSD --mode user > ${schemas}/zdb-ssd-100.json
     $tfubin generate storage zdb --size 200 --type SSD --mode user > ${schemas}/zdb-ssd-200.json
-
-    $tfubin generate storage zdb --size 100 --type SSD --mode user > ${schemas}/zdb-hdd-100.json
+    $tfubin generate storage zdb --size 100 --type HDD --mode user > ${schemas}/zdb-hdd-100.json
     $tfubin generate storage zdb --size 400 --type HDD --mode user > ${schemas}/zdb-hdd-400.json
 }
 

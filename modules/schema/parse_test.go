@@ -53,6 +53,31 @@ func TestProperty(t *testing.T) {
 	}
 }
 
+func TestPropertyEnum(t *testing.T) {
+	prop, err := property(`currency = "EUR,USD,TFT,AED,GBP" (E) # comment`)
+
+	if ok := assert.NoError(t, err); !ok {
+		t.Fatal()
+	}
+
+	if ok := assert.Equal(t, Property{
+		Name:    "currency",
+		Indexed: false,
+		Type: Type{
+			Default: `"EUR,USD,TFT,AED,GBP"`,
+			Kind:    EnumKind,
+		},
+	}, prop); !ok {
+		t.Error()
+	}
+
+	prop, err = property("wrong hello world # comment")
+
+	if ok := assert.Error(t, err); !ok {
+		t.Fatal()
+	}
+}
+
 func TestTypeDef(t *testing.T) {
 	cases := []struct {
 		Input  string

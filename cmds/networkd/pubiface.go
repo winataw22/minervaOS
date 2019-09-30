@@ -28,7 +28,7 @@ func watchPubIface(ctx context.Context, nodeID modules.Identifier, db network.TN
 				break
 			}
 
-			exitIface, err := db.ReadPubIface(nodeID)
+			exitIface, err := db.GetPubIface(nodeID)
 			if err != nil {
 				if err == network.ErrNoPubIface {
 					continue

@@ -3,6 +3,7 @@ package modules
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 
@@ -12,71 +13,18 @@ import (
 
 func TestNetworkUnmarshal(t *testing.T) {
 	input := `{
-		"network_id": "netid",
-		"resources": [
+		"name": "testnetworkd",
+		"net_id": "net1",
+		"ip_range": "10.0.0.0/16",
+		"net_resources": [
 			{
-				"node_id": {
-					"id": "kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=",
-					"farmer_id": "ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E=",
-					"reachability_v4": "public",
-					"reachability_v6": "public"
-				},
-				"prefix": "2a02:2788:864:1314:9eb6::/64",
-				"link_local": "fe80::9eb6:d0ff:fe97:764b/64",
-				"peers": [
-					{
-						"type": "wireguard",
-						"prefix": "2a02:2788:864:1314:9eb6::/64",
-						"connection": {
-							"ip": "2a02:2788:864:1314:9eb6::1/64",
-							"port": 1600,
-							"key": "X9A2VGvJZT/mYGMXWd4BXFskfziPLraYSgdpIGUgmm0="
-						}
-					}
-				]
+				"node_id": "HAcDwf7oCWEbn7ME1W4j3ACfsUo5kUgJqhk5MEDkbKis",
+				"subnet": "10.0.1.0/24",
+				"wg_private_key": "988c1e12dd04e5878b4cf008569f7b7163e7f3b2b619d339753c841c07dd0d6daf0b4dbc0b16e6ba29b21e7b600af76766e41e46419b05f9480e296f7934e83243680d6b7ad91a79442cfcbaf3a4898c603f15a024c2086a266fd18d",
+				"wg_public_key": "L+V9o0fNYkMVKNqsX7spBzD/9oSvxM/C7ZCZX1jLO3Q=",
+				"wg_listen_port": 6380
 			}
-		],
-		"exit_point": {
-			"node_id": "kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=",
-			"prefix": "2a02:2788:864:1314:9eb6::/64",
-			"link_local": "fe80::9eb6:d0ff:fe97:764b/64",
-			"peers": [
-				{
-					"type": "wireguard",
-					"prefix": "2a02:2788:864:1314:9eb6::/64",
-					"connection": {
-						"ip": "2a02:2788:864:1314:9eb6::1/64",
-						"port": 1600,
-						"key": "X9A2VGvJZT/mYGMXWd4BXFskfziPLraYSgdpIGUgmm0="
-					}
-				}
-			],
-			"ipv4_conf": {
-				"cidr": "192.168.0.1/24",
-				"gateway": "192.168.0.254",
-				"metric": 302,
-				"iface": "eth0",
-				"enable_nat": true
-			},
-			"ipv4_dnat": [{
-				"internal_ip": "192.168.0.1",
-				"internal_port": 80,
-				"external_ip": "172.20.0.14",
-				"external_port": 8080,
-				"protocol": "tcp"
-			}],
-			"ipv6_conf": {
-				"addr": "2a02:2788:864:1314:9eb6:d0ff:fe97:764b/64",
-				"gateway": "2a02:2788:864:1314:9eb6:d0ff:fe97:1",
-				"metric": 301,
-				"iface": "wlna0"
-			},
-			"ipv6_allow": [{
-				"ipv6_dest": "2a02:2788:864:1314::200",
-				"port"     : 8080,
-				"protocol" : "tcp"
-			}]
-		}
+		]
 	}`
 
 	r := strings.NewReader(input)
@@ -84,23 +32,74 @@ func TestNetworkUnmarshal(t *testing.T) {
 	err := json.NewDecoder(r).Decode(&network)
 	require.NoError(t, err)
 	assert := assert.New(t)
-	assert.Equal(NetID("netid"), network.NetID)
-	assert.Equal(1, len(network.Resources))
-	assert.Equal("kV3u7GJKWA7Js32LmNA5+G3A0WWnUG9h+5gnL6kr6lA=", network.Resources[0].NodeID.ID)
-	assert.Equal("ZF6jtCblLhTgAqp2jvxKkOxBgSSIlrRh1mRGiZaRr7E=", network.Resources[0].NodeID.FarmerID)
+	assert.Equal(NetID("net1"), network.NetID)
+	assert.Equal(1, len(network.NetResources))
+	assert.Equal("HAcDwf7oCWEbn7ME1W4j3ACfsUo5kUgJqhk5MEDkbKis", network.NetResources[0].NodeID)
+	assert.Equal("988c1e12dd04e5878b4cf008569f7b7163e7f3b2b619d339753c841c07dd0d6daf0b4dbc0b16e6ba29b21e7b600af76766e41e46419b05f9480e296f7934e83243680d6b7ad91a79442cfcbaf3a4898c603f15a024c2086a266fd18d", network.NetResources[0].WGPrivateKey)
+	assert.Equal("L+V9o0fNYkMVKNqsX7spBzD/9oSvxM/C7ZCZX1jLO3Q=", network.NetResources[0].WGPublicKey)
+	assert.Equal("10.0.1.0/24", network.NetResources[0].Subnet.String())
+
 }
 
 func TestEncodeDecode(t *testing.T) {
-	t.Skip()
 	network := &Network{
 		NetID: NetID("test"),
+		IPRange: &net.IPNet{
+			IP:   net.ParseIP("10.0.0.0"),
+			Mask: net.CIDRMask(16, 32),
+		},
+		NetResources: []NetResource{
+			{
+				NodeID: "node1",
+				Subnet: &net.IPNet{
+					IP:   net.ParseIP("10.0.1.0"),
+					Mask: net.CIDRMask(24, 32),
+				},
+				Peers: []Peer{
+					{
+						Subnet: &net.IPNet{
+							IP:   net.ParseIP("10.0.2.0"),
+							Mask: net.CIDRMask(24, 32),
+						},
+						Endpoint:    "172.20.0.90:6380",
+						WGPublicKey: "pubkey",
+						AllowedIPs: []net.IPNet{
+							{
+								IP:   net.ParseIP("10.0.1.0"),
+								Mask: net.CIDRMask(24, 32),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	b, err := json.Marshal(network)
 	require.NoError(t, err)
 	fmt.Println(string(b))
 
-	decoded := Network{}
-	err = json.Unmarshal(b, &decoded)
+	decoded := &Network{}
+	err = json.Unmarshal(b, decoded)
 	require.NoError(t, err)
-	assert.Equal(t, network, decoded)
+	assert.Equal(t, network.Name, decoded.Name)
+	assert.Equal(t, network.IPRange.String(), decoded.IPRange.String())
+	assert.Equal(t, network.NetID, decoded.NetID)
+	require.Equal(t, len(network.NetResources), len(decoded.NetResources))
+
+	eNR := network.NetResources[0]
+	aNR := decoded.NetResources[0]
+	assert.Equal(t, eNR.NodeID, aNR.NodeID)
+	assert.Equal(t, eNR.Subnet.String(), aNR.Subnet.String())
+	assert.Equal(t, eNR.WGPrivateKey, aNR.WGPrivateKey)
+	assert.Equal(t, eNR.WGPublicKey, aNR.WGPublicKey)
+	assert.Equal(t, eNR.WGListenPort, aNR.WGListenPort)
+	require.Equal(t, len(eNR.Peers), len(aNR.Peers))
+
+	ePeer := eNR.Peers[0]
+	aPeer := aNR.Peers[0]
+
+	assert.Equal(t, ePeer.Subnet.String(), aPeer.Subnet.String())
+	assert.Equal(t, ePeer.Endpoint, aPeer.Endpoint)
+	assert.Equal(t, ePeer.AllowedIPs, aPeer.AllowedIPs)
+	assert.Equal(t, ePeer.WGPublicKey, aPeer.WGPublicKey)
 }

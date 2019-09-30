@@ -6,6 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+	"github.com/threefoldtech/zosv2/modules/environment"
+	"github.com/threefoldtech/zosv2/modules/gedis"
+
 	"github.com/threefoldtech/zosv2/modules/stubs"
 	"github.com/threefoldtech/zosv2/modules/utils"
 
@@ -22,8 +26,6 @@ func main() {
 
 	var (
 		msgBrokerCon string
-		resURL       string
-		tnodbURL     string
 		storageDir   string
 		debug        bool
 		ver          bool
@@ -31,8 +33,6 @@ func main() {
 
 	flag.StringVar(&storageDir, "root", "/var/cache/modules/provisiond", "root path of the module")
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
-	flag.StringVar(&tnodbURL, "tnodb", "https://tnodb.dev.grid.tf", "address of tenant network object database")
-	flag.StringVar(&resURL, "url", "https://tnodb.dev.grid.tf", "URL of the reservation server to poll from")
 	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 
@@ -47,10 +47,6 @@ func main() {
 
 	flag.Parse()
 
-	if resURL == "" {
-		log.Fatal().Msg("reservation URL cannot be empty")
-	}
-
 	if err := os.MkdirAll(storageDir, 0770); err != nil {
 		log.Fatal().Err(err).Msg("failed to create cache directory")
 	}
@@ -64,7 +60,10 @@ func main() {
 	nodeID := identity.NodeID()
 
 	// to get reservation from tnodb
-	remoteStore := provision.NewHTTPStore(resURL)
+	remoteStore, err := bcdbClient()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to instantiate BCDB client")
+	}
 	// to store reservation locally on the node
 	localStore, err := provision.NewFSStore(filepath.Join(storageDir, "reservations"))
 	if err != nil {
@@ -76,7 +75,6 @@ func main() {
 	// create context and add middlewares
 	ctx := context.Background()
 	ctx = provision.WithZBus(ctx, client)
-	ctx = provision.WithTnoDB(ctx, tnodbURL)
 	ctx = provision.WithOwnerCache(ctx, ownerCache)
 	ctx = provision.WithZDBMapping(ctx, &provision.ZDBMapping{})
 
@@ -101,4 +99,27 @@ func main() {
 	if err := engine.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("unexpected error")
 	}
+}
+
+type store interface {
+	provision.ReservationGetter
+	provision.ReservationPoller
+	provision.Feedbacker
+}
+
+// instantiate the proper client based on the running mode
+func bcdbClient() (store, error) {
+	env := environment.Get()
+
+	// use the bcdb mock for dev and test
+	if env.RunningMode == environment.RunningDev {
+		return provision.NewHTTPStore(env.BcdbURL), nil
+	}
+
+	// use gedis for production bcdb
+	store, err := gedis.New(env.BcdbURL, env.BcdbNamespace, env.BcdbPassword)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to connect to BCDB")
+	}
+	return store, nil
 }

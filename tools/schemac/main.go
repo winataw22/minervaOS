@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/threefoldtech/zosv2/modules/schema"
 )
@@ -21,7 +22,7 @@ func handle(file, pkg, dir string) error {
 	if err != nil {
 		return err
 	}
-	out := path.Base(fd.Name())
+	out := strings.TrimSuffix(path.Base(fd.Name()), path.Ext(fd.Name()))
 	w, err := os.Create(path.Join(dir, fmt.Sprintf("%s.go", out)))
 	if err != nil {
 		return err

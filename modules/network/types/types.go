@@ -217,4 +217,5 @@ type Node struct {
 
 	PublicConfig *PubIface `json:"public_config"`
 	ExitNode     int       `json:"exit_node"`
+	WGPorts      []uint    `json:"wg_ports"`
 }

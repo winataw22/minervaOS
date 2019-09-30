@@ -21,8 +21,9 @@ func networkProvision(ctx context.Context, reservation *Reservation) (interface{
 
 	mgr := stubs.NewNetworkerStub(GetZBus(ctx))
 	log.Debug().Str("network", fmt.Sprintf("%+v", network)).Msg("provision network")
+	log.Debug().Str("nr", fmt.Sprintf("%+v", network.NetResources[0])).Msg("provision network")
 
-	_, err := mgr.ApplyNetResource(*network)
+	_, err := mgr.CreateNR(*network)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create network resource for network %s", network.NetID)
 	}
@@ -38,7 +39,7 @@ func networkDecommission(ctx context.Context, reservation *Reservation) error {
 		return errors.Wrap(err, "failed to unmarshal network from reservation")
 	}
 
-	if err := mgr.DeleteNetResource(*network); err != nil {
+	if err := mgr.DeleteNR(*network); err != nil {
 		return errors.Wrap(err, "failed to delete network resource")
 	}
 	return nil

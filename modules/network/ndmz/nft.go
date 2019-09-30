@@ -1,4 +1,4 @@
-package gateway
+package ndmz
 
 import (
 	"text/template"
@@ -13,10 +13,9 @@ func init() {
 var _nft = `
 flush ruleset
 
-# until kernel 5.2, we use ip nat
 table ip nat {
   chain prerouting {
-    type nat hook prerouting priority -100; policy accept;
+    type nat hook prerouting priority dstnat; policy accept;
   }
 
   chain input {
@@ -28,18 +27,33 @@ table ip nat {
   }
 
   chain postrouting {
-    type nat hook postrouting priority 100; policy accept;
-    ip saddr 10.0.0.0/8 masquerade fully-random
+    type nat hook postrouting priority srcnat; policy accept;
+    oifname "public" masquerade fully-random;
   }
 }
-# future placeholder
+
 table inet filter {
+
+  chain base_checks {
+    # allow established/related connections
+    ct state {established, related} accept
+    # early drop of invalid connections
+    ct state invalid drop
+  }
+  
   chain input {
     type filter hook input priority 0; policy accept;
+    jump base_checks
+    iifname "public" counter drop
   }
 
   chain forward {
     type filter hook forward priority 0; policy accept;
+    # is there already an existing stream? (outgoing)
+    jump base_checks
+    # if not, verify if it's new and coming in from the br4-gw network
+    # if it is, drop it
+    iifname "public" counter drop
   }
 
   chain output {

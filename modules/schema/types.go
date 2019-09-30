@@ -49,14 +49,28 @@ type Date struct{ time.Time }
 
 // UnmarshalJSON method
 func (d *Date) UnmarshalJSON(bytes []byte) error {
-	var in string
-	if err := json.Unmarshal(bytes, &in); err != nil {
+	var inI interface{}
+	if err := json.Unmarshal(bytes, &inI); err != nil {
 		return err
+	}
+
+	var in string
+	switch v := inI.(type) {
+	case int64:
+		d.Time = time.Unix(v, 0)
+		return nil
+	case float64:
+		d.Time = time.Unix(int64(v), 0)
+		return nil
+	case string:
+		in = v
+	default:
+		return fmt.Errorf("unknown date format: %T(%s)", v, string(bytes))
 	}
 
 	m := dateRe.FindStringSubmatch(in)
 	if m == nil {
-		return fmt.Errorf("invalid date string %s", in)
+		return fmt.Errorf("invalid date string '%s'", in)
 	}
 
 	first := m[1]
@@ -91,8 +105,6 @@ func (d *Date) UnmarshalJSON(bytes []byte) error {
 		min = "0"
 	}
 
-	fmt.Println(year, month, day, hour, min)
-
 	var values []int
 	for _, str := range []string{year, month, day, hour, min} {
 		value, err := strconv.Atoi(str)
@@ -117,7 +129,10 @@ func (d *Date) UnmarshalJSON(bytes []byte) error {
 
 // MarshalJSON formats a text
 func (d Date) MarshalJSON() ([]byte, error) {
-	return []byte(d.Format("02/01/2006 15:04")), nil
+	if d.Time.IsZero() {
+		return []byte(`""`), nil
+	}
+	return []byte(fmt.Sprintf(`"%s"`, d.Format("02/01/2006 15:04"))), nil
 }
 
 // IPRange type
@@ -134,9 +149,13 @@ func (i *IPRange) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// MarshalText dumps iprange as a string
-func (i *IPRange) MarshalText() ([]byte, error) {
-	return []byte(i.String()), nil
+// MarshalJSON dumps iprange as a string
+func (i IPRange) MarshalJSON() ([]byte, error) {
+	if len(i.IPNet.IP) == 0 {
+		return []byte(`""`), nil
+	}
+	v := fmt.Sprint("\"", i.String(), "\"")
+	return []byte(v), nil
 }
 
 func (i IPRange) String() string {

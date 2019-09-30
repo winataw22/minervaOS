@@ -9,6 +9,7 @@ require (
 	github.com/rs/zerolog v1.15.0
 	github.com/threefoldtech/zbus v0.0.0-20190711124326-09379d5f12e0
 	github.com/threefoldtech/zosv2/modules v0.0.0-20190614135932-35b94bfa4dbe
+	github.com/vishvananda/netlink v1.0.0
 )
 
 replace github.com/threefoldtech/zosv2/modules => ../../modules/

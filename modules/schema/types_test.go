@@ -71,3 +71,35 @@ func TestParseIPRange(t *testing.T) {
 		})
 	}
 }
+
+func TestDumpIPRange(t *testing.T) {
+	mustParse := func(in string) IPRange {
+		_, ipNet, err := net.ParseCIDR(in)
+		if err != nil {
+			panic(err)
+		}
+		return IPRange{*ipNet}
+	}
+
+	cases := []struct {
+		Input  IPRange
+		Output string
+	}{
+		{IPRange{}, `""`},
+		{mustParse("192.168.1.0/24"), `"192.168.1.0/24"`},
+		{mustParse("2001:db8::/32"), `"2001:db8::/32"`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Output, func(t *testing.T) {
+			out, err := json.Marshal(c.Input)
+			if ok := assert.NoError(t, err); !ok {
+				t.Fatal()
+			}
+
+			if ok := assert.Equal(t, c.Output, string(out)); !ok {
+				t.Error()
+			}
+		})
+	}
+}

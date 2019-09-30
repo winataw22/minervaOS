@@ -12,4 +12,7 @@ kernel:
 	ln -sf zosv2.efi zos.efi
 
 start:
-	bash vm.sh -n node1 -c "runmode=development farmer_id=$(FARMERID)"
+	bash vm.sh -n node1 -c "runmode=dev farmer_id=$(FARMERID)"
+
+test:
+	bash vm.sh -n node1 -c "runmode=test farmer_id=$(FARMERID)"

@@ -2,89 +2,93 @@ package nr
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/containernetworking/plugins/pkg/ip"
+	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 
-	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network/bridge"
-	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/namespace"
 	"github.com/threefoldtech/zosv2/modules/network/nft"
 	"github.com/threefoldtech/zosv2/modules/network/wireguard"
 	"github.com/vishvananda/netlink"
-	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-
-	zosip "github.com/threefoldtech/zosv2/modules/network/ip"
 )
 
 // NetResource holds the logic to configure an network resource
 type NetResource struct {
-	resource       *modules.NetResource
-	exit           *modules.NetResource
-	networkID      modules.NetID
-	publicPrefixes []string
-	allocNr        int8
-	nibble         *zosip.Nibble
-
-	privateKey wgtypes.Key
+	id modules.NetID
+	// local network resources
+	resource *modules.NetResource
 }
 
 // New creates a new NetResource object
-func New(nodeID string, network *modules.Network, privateKey wgtypes.Key) (*NetResource, error) {
-	var err error
+func New(networkID modules.NetID, netResource *modules.NetResource) (*NetResource, error) {
+
 	nr := &NetResource{
-		networkID:      network.NetID,
-		allocNr:        network.AllocationNR,
-		privateKey:     privateKey,
-		publicPrefixes: publicPrefixes(network.Resources),
-	}
-
-	nr.resource, err = ResourceByNodeID(nodeID, network.Resources)
-	if err != nil {
-		return nil, err
-	}
-
-	nr.exit, err = exitResource(network.Resources)
-	if err != nil {
-		return nil, err
-	}
-	nr.nibble, err = zosip.NewNibble(nr.resource.Prefix, nr.allocNr)
-	if err != nil {
-		return nil, err
+		id:       networkID,
+		resource: netResource,
 	}
 
 	return nr, nil
 }
 
-// Nibble returns the nibble object of the Network Resource
-func (nr *NetResource) Nibble() *zosip.Nibble {
-	return nr.nibble
+func (nr *NetResource) String() string {
+	b, err := json.Marshal(nr.resource)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
 
-// IsExit returns the exitNode number and true if this network resource holds
-// the exit point of the network
-// otherwise it returns 0 and false
-func (nr *NetResource) IsExit() (int, bool) {
-	return nr.resource.ExitPoint, nr.resource.ExitPoint > 0
+// ID returns the network ID in which the NetResource is defined
+func (nr *NetResource) ID() string {
+	return string(nr.id)
 }
 
-// NamespaceName returns the name of the network resource namespace
-func (nr *NetResource) NamespaceName() string {
-	return nr.nibble.NamespaceName()
+// BridgeName returns the name of the bridge to create for the network
+// resource in the host network namespace
+func (nr *NetResource) BridgeName() (string, error) {
+	name := fmt.Sprintf("br-%s", nr.id)
+	if len(name) > 15 {
+		return "", errors.Errorf("bridge namespace too long %s", name)
+	}
+	return name, nil
+}
+
+// Namespace returns the name of the network namespace to create for the network resource
+func (nr *NetResource) Namespace() (string, error) {
+	name := fmt.Sprintf("net-%s", nr.id)
+	if len(name) > 15 {
+		return "", errors.Errorf("network namespace too long %s", name)
+	}
+	return name, nil
+}
+
+// WGName returns the name of the wireguard interface to create for the network resource
+func (nr *NetResource) WGName() (string, error) {
+	wgName := fmt.Sprintf("wg-%s", nr.id)
+	if len(wgName) > 15 {
+		return "", errors.Errorf("network namespace too long %s", wgName)
+	}
+	return wgName, nil
 }
 
 // Create setup the basic components of the network resource
 // network namespace, bridge, wireguard interface and veth pair
 func (nr *NetResource) Create(pubNS ns.NetNS) error {
+	log.Debug().Str("nr", nr.String()).Msg("create network resource")
+
 	if err := nr.createBridge(); err != nil {
 		return err
 	}
@@ -97,7 +101,6 @@ func (nr *NetResource) Create(pubNS ns.NetNS) error {
 	if err := nr.createWireguard(pubNS); err != nil {
 		return err
 	}
-
 	if err := nr.applyFirewall(); err != nil {
 		return err
 	}
@@ -105,9 +108,20 @@ func (nr *NetResource) Create(pubNS ns.NetNS) error {
 	return nil
 }
 
-// Configure sets the routes and IP addresses on the
+func wgIP(subnet *net.IPNet) *net.IPNet {
+	// example: 10.3.1.0 -> 10.255.3.1
+	a := subnet.IP[len(subnet.IP)-3]
+	b := subnet.IP[len(subnet.IP)-2]
+
+	return &net.IPNet{
+		IP:   net.IPv4(0x64, 0x40, a, b),
+		Mask: net.CIDRMask(16, 32),
+	}
+}
+
+// ConfigureWG sets the routes and IP addresses on the
 // wireguard interface of the network resources
-func (nr *NetResource) Configure() error {
+func (nr *NetResource) ConfigureWG(privateKey string) error {
 	routes, err := nr.routes()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate routes for wireguard")
@@ -118,7 +132,10 @@ func (nr *NetResource) Configure() error {
 		return errors.Wrap(err, "failed to wireguard peer configuration")
 	}
 
-	nsName := nr.nibble.NamespaceName()
+	nsName, err := nr.Namespace()
+	if err != nil {
+		return err
+	}
 	netNS, err := namespace.GetByName(nsName)
 	if err != nil {
 		return fmt.Errorf("network namespace %s does not exits", nsName)
@@ -126,17 +143,17 @@ func (nr *NetResource) Configure() error {
 
 	var handler = func(_ ns.NetNS) error {
 
-		wg, err := wireguard.GetByName(nr.nibble.WGName())
+		wgName, err := nr.WGName()
 		if err != nil {
-			return errors.Wrapf(err, "failed to get wireguard interface %s", nr.nibble.WGName())
+			return err
 		}
 
-		localPeer, err := PeerByPrefix(nr.resource.Prefix.String(), nr.resource.Peers)
+		wg, err := wireguard.GetByName(wgName)
 		if err != nil {
-			return fmt.Errorf("not peer found for local network resource: %s", err)
+			return errors.Wrapf(err, "failed to get wireguard interface %s", wgName)
 		}
 
-		if err = wg.Configure(nr.privateKey.String(), int(localPeer.Connection.Port), wgPeers); err != nil {
+		if err = wg.Configure(privateKey, int(nr.resource.WGListenPort), wgPeers); err != nil {
 			return errors.Wrap(err, "failed to configure wireguard interface")
 		}
 
@@ -150,11 +167,8 @@ func (nr *NetResource) Configure() error {
 		}
 
 		newAddrs := mapset.NewSet()
-		newAddrs.Add(nr.resource.LinkLocal.String())
-		//TODO: move this hack into nibble method
-		ipnet := nr.nibble.WGAllowedIP4()
-		ipnet.Mask = net.CIDRMask(16, 32)
-		newAddrs.Add(ipnet.String())
+		newAddrs.Add(wgIP(nr.resource.Subnet).String())
+
 		toRemove := curAddrs.Difference(newAddrs)
 		toAdd := newAddrs.Difference(curAddrs)
 
@@ -197,8 +211,14 @@ func (nr *NetResource) Configure() error {
 
 // Delete removes all the interfaces and namespaces created by the Create method
 func (nr *NetResource) Delete() error {
-	netnsName := nr.nibble.NamespaceName()
-	bridgeName := nr.nibble.BridgeName()
+	netnsName, err := nr.Namespace()
+	if err != nil {
+		return err
+	}
+	bridgeName, err := nr.BridgeName()
+	if err != nil {
+		return err
+	}
 
 	if bridge.Exists(bridgeName) {
 		if err := bridge.Delete(bridgeName); err != nil {
@@ -228,158 +248,58 @@ func (nr *NetResource) Delete() error {
 }
 
 func (nr *NetResource) routes() ([]*netlink.Route, error) {
-	routes := make([]*netlink.Route, 0, len(nr.publicPrefixes))
+	routes := make([]*netlink.Route, 0, len(nr.resource.Peers))
+
+	wgIP := wgIP(nr.resource.Subnet)
 
 	for _, peer := range nr.resource.Peers {
 
-		prefixStr := peer.Prefix.String()
-		if peer.Type != modules.ConnTypeWireguard || // wireguard is the only supported connection type at the moment
-			prefixStr == nr.resource.Prefix.String() { // skip myself
-			continue
-		}
-
-		nibble, err := zosip.NewNibble(peer.Prefix, nr.allocNr)
-		if err != nil {
-			return nil, err
-		}
-
 		routes = append(routes, &netlink.Route{
-			Dst: peer.Prefix,
-			Gw:  net.ParseIP(fmt.Sprintf("fe80::%s", nibble.Hex())),
+			Dst: peer.Subnet,
+			Gw:  wgIP.IP,
 		})
-
-		//TODO: move this hack into nibble method
-		ipnet := nibble.NRLocalIP4()
-		ipnet.IP[15] = 0x00
-		routes = append(routes, &netlink.Route{
-			Dst: ipnet,
-			Gw:  nibble.WGIP4RT().IP,
-		})
-
-		if prefixStr == nr.exit.Prefix.String() { //special configuration for exit point
-			// add default ipv6 route to the exit node
-			routes = append(routes, nibble.RouteIPv6Exit())
-			// add ipv4 route to the exit node
-			routes = append(routes, nibble.RouteIPv4Exit())
-			// add default ipv4 route to the exit node
-			routes = append(routes, nibble.RouteIPv4DefaultExit())
-		}
 	}
 
 	return routes, nil
 }
 
 func (nr *NetResource) wgPeers() ([]*wireguard.Peer, error) {
-	exitPeer, err := PeerByPrefix(nr.exit.Prefix.String(), nr.resource.Peers)
-	if err != nil {
-		return nil, err
-	}
 
-	wgPeers := make([]*wireguard.Peer, 0, len(nr.publicPrefixes)+1)
+	wgPeers := make([]*wireguard.Peer, 0, len(nr.resource.Peers)+1)
 
 	for _, peer := range nr.resource.Peers {
-		prefixStr := peer.Prefix.String()
-		if peer.Type != modules.ConnTypeWireguard || // wireguard is the only supported connection type at the moment
-			prefixStr == nr.resource.Prefix.String() { // skip myself
-			continue
+
+		allowedIPs := make([]string, 0, len(peer.AllowedIPs))
+		for _, ip := range peer.AllowedIPs {
+			allowedIPs = append(allowedIPs, ip.String())
 		}
 
-		nibble, err := zosip.NewNibble(peer.Prefix, nr.allocNr)
-		if err != nil {
-			return nil, err
+		wgPeer := &wireguard.Peer{
+			PublicKey:  string(peer.WGPublicKey),
+			AllowedIPs: allowedIPs,
+			Endpoint:   peer.Endpoint,
 		}
 
-		if prefixStr != nr.exit.Prefix.String() {
-			wgPeer := &wireguard.Peer{
-				PublicKey: peer.Connection.Key,
-				AllowedIPs: []string{
-					nibble.WGAllowedIP6().String(),
-					nibble.WGAllowedIP4().String(),
-					nibble.WGAllowedIP4Net().String(),
-					peer.Prefix.String(),
-				},
-			}
-
-			if isIn(peer.Prefix.String(), nr.publicPrefixes) {
-				wgPeer.Endpoint = zosip.WGEndpoint(peer)
-			}
-
-			log.Info().Str("peer prefix", peer.Prefix.String()).Msg("generate wireguard configuration for peer")
-			wgPeers = append(wgPeers, wgPeer)
-
-		} else { //special configuration for exit peer
-			// add wg peer config to the exit node
-			allowedIPs := zosip.WGExitPeerAllowIPs()
-			wgPeers = append(wgPeers, &wireguard.Peer{
-				PublicKey: exitPeer.Connection.Key,
-				Endpoint:  zosip.WGEndpoint(exitPeer),
-				AllowedIPs: []string{
-					allowedIPs[0].String(),
-					allowedIPs[1].String(),
-				},
-			})
-		}
+		log.Info().Str("peer prefix", peer.Subnet.String()).Msg("generate wireguard configuration for peer")
+		wgPeers = append(wgPeers, wgPeer)
 	}
 
 	return wgPeers, nil
 }
 
-// GWTNRoutesIPv6 returns the routes to set in the gateway network namespace
-// to be abe to reach a network resource
-func (nr *NetResource) GWTNRoutesIPv6() ([]*netlink.Route, error) {
-	routes := make([]*netlink.Route, 0)
-
-	for _, peer := range nr.resource.Peers {
-		routes = append(routes, &netlink.Route{
-			Dst: peer.Prefix,
-			Gw:  nr.nibble.EPPubLL().IP,
-		})
-	}
-
-	return routes, nil
-}
-
-// GWTNRoutesIPv4 returns the routes to set in the gateway network namespace
-// to be abe to reach a network resource
-func (nr *NetResource) GWTNRoutesIPv4() ([]*netlink.Route, error) {
-	routes := make([]*netlink.Route, 0)
-
-	for _, peer := range nr.resource.Peers {
-		peerNibble, err := zosip.NewNibble(peer.Prefix, nr.allocNr)
-		if err != nil {
-			return nil, err
-		}
-
-		//IPv4 routing
-		ipnet := peerNibble.WGIP4RT()
-		ipnet.Mask = net.CIDRMask(32, 32)
-		routes = append(routes, &netlink.Route{
-			Dst: ipnet,
-			Gw:  nr.nibble.EPPubIP4R().IP,
-		})
-		// IPv4 wiregard host routing
-		ipnet = peerNibble.NRLocalIP4()
-		ipnet.IP[15] = 0x00
-
-		routes = append(routes, &netlink.Route{
-			Dst: ipnet,
-			Gw:  nr.nibble.EPPubIP4R().IP,
-		})
-	}
-
-	return routes, nil
-}
-
 func (nr *NetResource) createNetNS() error {
-	netnsName := nr.nibble.NamespaceName()
+	name, err := nr.Namespace()
+	if err != nil {
+		return err
+	}
 
-	if namespace.Exists(netnsName) {
+	if namespace.Exists(name) {
 		return nil
 	}
 
-	log.Info().Str("namespace", netnsName).Msg("Create namespace")
+	log.Info().Str("namespace", name).Msg("Create namespace")
 
-	netNS, err := namespace.Create(netnsName)
+	netNS, err := namespace.Create(name)
 	if err != nil {
 		return err
 	}
@@ -392,9 +312,15 @@ func (nr *NetResource) createNetNS() error {
 // the host side of the veth pair is attach to the bridge of the network resource
 func (nr *NetResource) createVethPair() error {
 
-	nsName := nr.nibble.NamespaceName()
-	vethName := nr.nibble.NRLocalName()
-	bridgeName := nr.nibble.BridgeName()
+	nsName, err := nr.Namespace()
+	vethName, err := ifaceutil.RandomName("nr-")
+	if err != nil {
+		return err
+	}
+	bridgeName, err := nr.BridgeName()
+	if err != nil {
+		return err
+	}
 
 	// check if the veth already exists
 	if _, err := netlink.LinkByName(vethName); err == nil {
@@ -444,12 +370,13 @@ func (nr *NetResource) createVethPair() error {
 			return err
 		}
 
-		for _, ipnet := range []*net.IPNet{nr.resource.Prefix, nr.nibble.NRLocalIP4()} {
-			log.Info().Str("addr", ipnet.String()).Msg("set address on veth interface")
-			addr := &netlink.Addr{IPNet: ipnet, Label: ""}
-			if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
-				return err
-			}
+		ipnet := nr.resource.Subnet
+		ipnet.IP[len(ipnet.IP)-1] = 0x01
+		log.Info().Str("addr", ipnet.String()).Msg("set address on veth interface")
+
+		addr := &netlink.Addr{IPNet: ipnet, Label: ""}
+		if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
+			return err
 		}
 
 		return nil
@@ -476,13 +403,19 @@ func (nr *NetResource) createVethPair() error {
 		Str("bridge", bridgeName).
 		Msg("attach veth to bridge")
 
-	return bridge.AttachNic(hostVeth, brLink)
+	if err := bridge.AttachNic(hostVeth, brLink); err != nil {
+		return errors.Wrapf(err, "failed to attach veth %s to bridge %s", vethName, bridgeName)
+	}
+	return nil
 }
 
 // createBridge creates a bridge in the host namespace
 // this bridge is used to connect containers from the name network
 func (nr *NetResource) createBridge() error {
-	name := nr.nibble.BridgeName()
+	name, err := nr.BridgeName()
+	if err != nil {
+		return err
+	}
 
 	if bridge.Exists(name) {
 		return nil
@@ -490,7 +423,7 @@ func (nr *NetResource) createBridge() error {
 
 	log.Info().Str("bridge", name).Msg("Create bridge")
 
-	_, err := bridge.New(name)
+	_, err = bridge.New(name)
 	if err != nil {
 		return err
 	}
@@ -505,8 +438,16 @@ func (nr *NetResource) createBridge() error {
 // if a public namespace handle (pubNetNS) is not nil, the interface is created
 // inside the public namespace and then moved inside the network resource namespace
 func (nr *NetResource) createWireguard(pubNetNS ns.NetNS) error {
-	wgName := nr.nibble.WGName()
-	nsName := nr.nibble.NamespaceName()
+	wgName, err := nr.WGName()
+	if err != nil {
+		return err
+	}
+
+	nsName, err := nr.Namespace()
+	if err != nil {
+		return err
+	}
+
 	nrNetNS, err := namespace.GetByName(nsName)
 	if err != nil {
 		return err
@@ -565,60 +506,19 @@ func (nr *NetResource) createWireguard(pubNetNS ns.NetNS) error {
 }
 
 func (nr *NetResource) applyFirewall() error {
-	netnsName := nr.nibble.NamespaceName()
-
-	data := struct {
-		Iifname string
-	}{
-		nr.nibble.EP4PubName(),
+	nsName, err := nr.Namespace()
+	if err != nil {
+		return err
 	}
-	buf := bytes.Buffer{}
 
-	if err := fwTmpl.Execute(&buf, data); err != nil {
+	buf := bytes.Buffer{}
+	if err := fwTmpl.Execute(&buf, nil); err != nil {
 		return errors.Wrap(err, "failed to build nft rule set")
 	}
 
-	if err := nft.Apply(&buf, netnsName); err != nil {
+	if err := nft.Apply(&buf, nsName); err != nil {
 		return errors.Wrap(err, "failed to apply nft rule set")
 	}
 
 	return nil
-}
-
-func isIn(target string, l []string) bool {
-	for _, x := range l {
-		if target == x {
-			return true
-		}
-	}
-	return false
-}
-
-func exitResource(r []*modules.NetResource) (*modules.NetResource, error) {
-	for _, res := range r {
-		if res.ExitPoint > 0 {
-			return res, nil
-		}
-	}
-	return nil, fmt.Errorf("not net resource with exit flag enabled found")
-}
-
-func publicPrefixes(resources []*modules.NetResource) []string {
-	output := []string{}
-	for _, res := range resources {
-		if isPublic(res.NodeID) {
-			output = append(output, res.Prefix.String())
-		}
-	}
-	return output
-}
-
-func isPublic(nodeID *modules.NodeID) bool {
-	return nodeID.ReachabilityV6 == modules.ReachabilityV6Public ||
-		nodeID.ReachabilityV4 == modules.ReachabilityV4Public
-}
-
-func isHidden(nodeID *modules.NodeID) bool {
-	return nodeID.ReachabilityV6 == modules.ReachabilityV6ULA ||
-		nodeID.ReachabilityV4 == modules.ReachabilityV4Hidden
 }

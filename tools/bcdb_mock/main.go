@@ -12,10 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/threefoldtech/zosv2/modules/capacity"
-
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/threefoldtech/zosv2/modules/capacity"
 	"github.com/threefoldtech/zosv2/modules/network/types"
 	"github.com/threefoldtech/zosv2/modules/provision"
 )
@@ -28,6 +27,7 @@ type farmInfo struct {
 
 type reservation struct {
 	Reservation *provision.Reservation `json:"reservation"`
+	Result      *provision.Result      `json:"result"`
 	Deleted     bool                   `json:"deleted"`
 	NodeID      string                 `json:"node_id"`
 }
@@ -85,8 +85,9 @@ func main() {
 	router.HandleFunc("/nodes", registerNode).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}", nodeDetail).Methods("GET")
 	router.HandleFunc("/nodes/{node_id}/interfaces", registerIfaces).Methods("POST")
+	router.HandleFunc("/nodes/{node_id}/ports", registerPorts).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}/configure_public", configurePublic).Methods("POST")
-	router.HandleFunc("/nodes/{node_id}/select_exit", chooseExit).Methods("POST")
+	// router.HandleFunc("/nodes/{node_id}/select_exit", chooseExit).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}/capacity", registerCapacity).Methods("POST")
 	router.HandleFunc("/nodes", listNodes).Methods("GET")
 
@@ -94,9 +95,9 @@ func main() {
 	router.HandleFunc("/farms", listFarm).Methods("GET")
 	router.HandleFunc("/farms/{farm_id}", getFarm).Methods("GET")
 
-	router.HandleFunc("/allocations", registerAlloc).Methods("POST")
-	router.HandleFunc("/allocations", listAlloc).Methods("GET")
-	router.HandleFunc("/allocations/{node_id}", getAlloc).Methods("GET")
+	// router.HandleFunc("/allocations", registerAlloc).Methods("POST")
+	// router.HandleFunc("/allocations", listAlloc).Methods("GET")
+	// router.HandleFunc("/allocations/{node_id}", getAlloc).Methods("GET")
 
 	router.HandleFunc("/reservations/{node_id}", reserve).Methods("POST")
 	router.HandleFunc("/reservations/{node_id}/poll", pollReservations).Methods("GET")

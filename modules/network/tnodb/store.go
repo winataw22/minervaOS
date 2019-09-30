@@ -7,17 +7,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/network"
 
-	"github.com/rs/zerolog/log"
-
-	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
 	"github.com/threefoldtech/zosv2/modules/network/types"
-	"github.com/vishvananda/netlink"
 )
 
 type httpTNoDB struct {
@@ -25,7 +20,7 @@ type httpTNoDB struct {
 }
 
 // NewHTTPTNoDB create an a client to a TNoDB reachable over HTTP
-func NewHTTPTNoDB(url string) network.TNoDB {
+func NewHTTPTNoDB(url string) network.TNoDBUtils {
 	return &httpTNoDB{baseURL: url}
 }
 
@@ -99,19 +94,19 @@ func (s *httpTNoDB) RequestAllocation(farm modules.Identifier) (*net.IPNet, *net
 	return alloc, farmAlloc, data.ExitNodeNr, nil
 }
 
-func (s *httpTNoDB) GetFarm(farm modules.Identifier) (network.Farm, error) {
-	f := network.Farm{}
+func (s *httpTNoDB) GetFarm(farm modules.Identifier) (*network.Farm, error) {
+	var f network.Farm
 
 	url := fmt.Sprintf("%s/farms/%s", s.baseURL, farm.Identity())
 	resp, err := http.Get(url)
 	if err != nil {
-		return f, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	err = json.NewDecoder(resp.Body).Decode(&f)
 
-	return f, err
+	return &f, err
 }
 
 func (s *httpTNoDB) GetNode(nodeID modules.Identifier) (*types.Node, error) {
@@ -140,55 +135,10 @@ func (s *httpTNoDB) GetNode(nodeID modules.Identifier) (*types.Node, error) {
 	return node, nil
 }
 
-func (s *httpTNoDB) PublishInterfaces(local modules.Identifier) error {
-	output := []*types.IfaceInfo{}
-
-	links, err := netlink.LinkList()
-	if err != nil {
-		log.Error().Err(err).Msgf("failed to list interfaces")
-		return err
-	}
-
-	for _, link := range ifaceutil.LinkFilter(links, []string{"device", "bridge"}) {
-
-		if err := netlink.LinkSetUp(link); err != nil {
-			log.Info().Str("interface", link.Attrs().Name).Msg("failed to bring interface up")
-			continue
-		}
-
-		if !ifaceutil.IsVirtEth(link.Attrs().Name) && !ifaceutil.IsPluggedTimeout(link.Attrs().Name, time.Second*5) {
-			log.Info().Str("interface", link.Attrs().Name).Msg("interface is not plugged in, skipping")
-			continue
-		}
-
-		_, gw, err := ifaceutil.HasDefaultGW(link)
-		if err != nil {
-			return err
-		}
-
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-		if err != nil {
-			return err
-		}
-
-		info := &types.IfaceInfo{
-			Name:  link.Attrs().Name,
-			Addrs: make([]*net.IPNet, len(addrs)),
-		}
-		for i, addr := range addrs {
-			info.Addrs[i] = addr.IPNet
-		}
-
-		if gw != nil {
-			info.Gateway = append(info.Gateway, gw)
-		}
-
-		output = append(output, info)
-	}
-
+func (s *httpTNoDB) PublishInterfaces(local modules.Identifier, ifaces []types.IfaceInfo) error {
 	url := fmt.Sprintf("%s/nodes/%s/interfaces", s.baseURL, local.Identity())
 	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(output); err != nil {
+	if err := json.NewEncoder(buf).Encode(ifaces); err != nil {
 		return err
 	}
 
@@ -205,28 +155,37 @@ func (s *httpTNoDB) PublishInterfaces(local modules.Identifier) error {
 	return nil
 }
 
-func (s *httpTNoDB) ConfigurePublicIface(node modules.Identifier, ips []*net.IPNet, gws []net.IP, iface string) error {
+func (s *httpTNoDB) PublishWGPort(nodeID modules.Identifier, ports []uint) error {
+	url := fmt.Sprintf("%s/nodes/%s/ports", s.baseURL, nodeID.Identity())
+
 	output := struct {
-		Iface string          `json:"iface"`
-		IPs   []string        `json:"ips"`
-		GWs   []string        `json:"gateways"`
-		Type  types.IfaceType `json:"iface_type"`
+		Ports []uint `json:"ports"`
 	}{
-		Iface: iface,
-		IPs:   make([]string, len(ips)),
-		GWs:   make([]string, len(gws)),
-		Type:  types.MacVlanIface, //TODO: allow to chose type of connection
+		Ports: ports,
+	}
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(output); err != nil {
+		return err
 	}
 
-	for i := range ips {
-		output.IPs[i] = ips[i].String()
-		output.GWs[i] = gws[i].String()
+	resp, err := http.Post(url, "application/json", buf)
+	if err != nil {
+		return err
 	}
 
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("wrong response status received: %s", resp.Status)
+	}
+
+	return nil
+}
+
+func (s *httpTNoDB) SetPublicIface(node modules.Identifier, pub *types.PubIface) error {
 	url := fmt.Sprintf("%s/nodes/%s/configure_public", s.baseURL, node.Identity())
 
 	buf := &bytes.Buffer{}
-	if err := json.NewEncoder(buf).Encode(output); err != nil {
+	if err := json.NewEncoder(buf).Encode(pub); err != nil {
 		return err
 	}
 
@@ -256,7 +215,7 @@ func (s *httpTNoDB) SelectExitNode(node modules.Identifier) error {
 	return nil
 }
 
-func (s *httpTNoDB) ReadPubIface(node modules.Identifier) (*types.PubIface, error) {
+func (s *httpTNoDB) GetPubIface(node modules.Identifier) (*types.PubIface, error) {
 
 	iface := &struct {
 		PublicConfig *types.PubIface `json:"public_config"`

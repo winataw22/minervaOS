@@ -142,6 +142,79 @@ gender = "male,female,others" (E)
 	// 	case PersonGenderOthers:
 	// 		return "others"
 	// 	}
+	//	return "UNKNOWN"
+	// }
+}
+
+func ExampleGenerateGolang_enums2() {
+	const input = `
+
+@url = tfgrid.node.resource.price.1
+cru = (F)
+
+mru = (F)
+hru = (F)
+sru = (F)
+nru = (F)
+currency = "EUR,USD,TFT,AED,GBP" (E)
+	`
+
+	schema, err := New(strings.NewReader(input))
+	if err != nil {
+		panic(err)
+	}
+
+	if err := GenerateGolang(os.Stdout, "test", schema); err != nil {
+		panic(err)
+	}
+
+	// Output:
+	// package test
+	//
+	// import "encoding/json"
+	//
+	// type TfgridNodeResourcePrice1 struct {
+	// 	Cru      float64                              `json:"cru"`
+	// 	Mru      float64                              `json:"mru"`
+	// 	Hru      float64                              `json:"hru"`
+	// 	Sru      float64                              `json:"sru"`
+	// 	Nru      float64                              `json:"nru"`
+	// 	Currency TfgridNodeResourcePrice1CurrencyEnum `json:"currency"`
+	// }
+	//
+	// func NewTfgridNodeResourcePrice1() (TfgridNodeResourcePrice1, error) {
+	// 	const value = "{}"
+	// 	var object TfgridNodeResourcePrice1
+	// 	if err := json.Unmarshal([]byte(value), &object); err != nil {
+	// 		return object, err
+	// 	}
+	// 	return object, nil
+	// }
+	//
+	// type TfgridNodeResourcePrice1CurrencyEnum uint8
+	//
+	// const (
+	// 	TfgridNodeResourcePrice1CurrencyEUR TfgridNodeResourcePrice1CurrencyEnum = iota
+	// 	TfgridNodeResourcePrice1CurrencyUSD
+	// 	TfgridNodeResourcePrice1CurrencyTFT
+	// 	TfgridNodeResourcePrice1CurrencyAED
+	// 	TfgridNodeResourcePrice1CurrencyGBP
+	// )
+	//
+	// func (e TfgridNodeResourcePrice1CurrencyEnum) String() string {
+	// 	switch e {
+	// 	case TfgridNodeResourcePrice1CurrencyEUR:
+	// 		return "EUR"
+	// 	case TfgridNodeResourcePrice1CurrencyUSD:
+	// 		return "USD"
+	// 	case TfgridNodeResourcePrice1CurrencyTFT:
+	// 		return "TFT"
+	// 	case TfgridNodeResourcePrice1CurrencyAED:
+	// 		return "AED"
+	// 	case TfgridNodeResourcePrice1CurrencyGBP:
+	// 		return "GBP"
+	// 	}
+	// 	return "UNKNOWN"
 	// }
 }
 

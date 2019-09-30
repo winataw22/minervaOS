@@ -24,29 +24,30 @@ type RunningMode string
 
 // Possible running mode of a node
 const (
-	RunningDev  RunningMode = "development"
-	RunningTest RunningMode = "testing"
-	RunningMain RunningMode = "production"
+	RunningDev  RunningMode = "dev"
+	RunningTest RunningMode = "test"
+	RunningMain RunningMode = "prod"
 )
 
 var (
 	envDev = Environment{
 		RunningMode: RunningDev,
-		BcdbURL:     "https://tnodb.dev.grid.tf",
+		BcdbURL:     "https://bcdb.dev.grid.tf",
 		// ProvisionTimeout:  60,
 		// ProvisionInterval: 10,
 	}
 
 	envTest = Environment{
-		RunningMode: RunningTest,
-		BcdbURL:     "https://tnodb.test.grid.tf",
+		RunningMode:   RunningTest,
+		BcdbURL:       "tcp://bcdb.test.grid.tf:8901",
+		BcdbNamespace: "default",
 		// ProvisionTimeout:  120,
 		// ProvisionInterval: 10,
 	}
 
 	envProd = Environment{
 		RunningMode:   RunningMain,
-		BcdbURL:       "tcp://172.20.0.1:8010", //TODO: change once BCDB is online
+		BcdbURL:       "tcp://172.17.0.2:8901", //TODO: change once BCDB is online
 		BcdbNamespace: "default",
 		// ProvisionTimeout:  240,
 		// ProvisionInterval: 20,
@@ -65,7 +66,7 @@ func getEnvironmentFromParams(params kernel.Params) Environment {
 
 	runmode, found := params.Get("runmode")
 	if !found {
-		// Fallback to default development mode
+		// Fallback to default production mode
 		runmode = make([]string, 1)
 		runmode[0] = string(RunningMain)
 	}

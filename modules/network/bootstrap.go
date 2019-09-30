@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/threefoldtech/zosv2/modules/network/dhcp"
+
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -84,7 +86,7 @@ func Bootstrap() error {
 		}
 
 		log.Info().Str("interface", device.Name).Msg("start dhcp probing")
-		valid, err := dhcpProbe(br.Name)
+		valid, err := dhcp.Probe(br.Name)
 		if err != nil {
 			log.Warn().Err(err).Str("device", device.Name).Msg("dhcp probing unexpected error")
 			if err := bridge.DetachNic(br); err != nil {

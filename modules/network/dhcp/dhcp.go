@@ -1,4 +1,4 @@
-package network
+package dhcp
 
 import (
 	"os/exec"
@@ -9,11 +9,11 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// DHCPProbe will do a dhcp request on the interface inf
+// Probe will do a dhcp request on the interface inf
 // if the interface gets a lease from the dhcp server, dhcpProbe return true and a nil error
 // if something unexpected happens a non nil error is return
 // if the interface didn't receive an lease, false and a nil error is returns
-func dhcpProbe(inf string) (bool, error) {
+func Probe(inf string) (bool, error) {
 	link, err := netlink.LinkByName(inf)
 	if err != nil {
 		return false, err

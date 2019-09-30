@@ -1,0 +1,53 @@
+name: test
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Get dependencies
+      run: |
+        cd modules
+        make getdeps
+      env:
+        GO111MODULE: on
+
+    - name: Run tests
+      run: |
+        cd modules
+        make coverage
+      env:
+        GO111MODULE: on
+
+    - name: Send coverage
+      if: success()
+      run: |
+        cd modules
+        bash <(curl -s https://codecov.io/bash)
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Build binaries
+      run: |
+        cd cmds
+        make
+      env:
+        GO111MODULE: on
+
+    - name: Build tools
+      run: |
+        cd tools
+        make
+      env:
+        GO111MODULE: on

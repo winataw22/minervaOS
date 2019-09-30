@@ -38,9 +38,9 @@ func (s *NetworkerStub) Addrs(arg0 string, arg1 string) (ret0 [][]uint8, ret1 er
 	return
 }
 
-func (s *NetworkerStub) ApplyNetResource(arg0 modules.Network) (ret0 string, ret1 error) {
+func (s *NetworkerStub) CreateNR(arg0 modules.Network) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "ApplyNetResource", args...)
+	result, err := s.client.Request(s.module, s.object, "CreateNR", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -54,9 +54,9 @@ func (s *NetworkerStub) ApplyNetResource(arg0 modules.Network) (ret0 string, ret
 	return
 }
 
-func (s *NetworkerStub) DeleteNetResource(arg0 modules.Network) (ret0 error) {
+func (s *NetworkerStub) DeleteNR(arg0 modules.Network) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "DeleteNetResource", args...)
+	result, err := s.client.Request(s.module, s.object, "DeleteNR", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -67,8 +67,8 @@ func (s *NetworkerStub) DeleteNetResource(arg0 modules.Network) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 string, arg1 modules.NetID) (ret0 modules.Member, ret1 error) {
-	args := []interface{}{arg0, arg1}
+func (s *NetworkerStub) Join(arg0 modules.NetID, arg1 string, arg2 []string) (ret0 modules.Member, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "Join", args...)
 	if err != nil {
 		panic(err)

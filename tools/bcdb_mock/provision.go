@@ -124,10 +124,17 @@ func getReservation(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("content-type", "application/json")
 
+	obj := struct {
+		Reservation *provision.Reservation `json:"reservation"`
+		Result      *provision.Result      `json:"result"`
+	}{}
+
 	for _, r := range provStore.Reservations {
 		if r.Reservation.ID == id {
 			w.WriteHeader(http.StatusOK)
-			if err := json.NewEncoder(w).Encode(r.Reservation); err != nil {
+			obj.Reservation = r.Reservation
+			obj.Result = r.Result
+			if err := json.NewEncoder(w).Encode(obj); err != nil {
 				log.Printf("error during json encoding of reservation: %v", err)
 			}
 			return
@@ -164,7 +171,7 @@ func reservationResult(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	rsvt.Reservation.Result = result
+	rsvt.Result = result
 
 	w.WriteHeader(http.StatusOK)
 }
