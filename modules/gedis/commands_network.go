@@ -1,10 +1,9 @@
 package gedis
 
 import (
-	"fmt"
-
 	"github.com/threefoldtech/zosv2/modules"
 	"github.com/threefoldtech/zosv2/modules/gedis/types/directory"
+	"github.com/threefoldtech/zosv2/modules/network"
 	"github.com/threefoldtech/zosv2/modules/network/types"
 	"github.com/threefoldtech/zosv2/modules/schema"
 )
@@ -50,7 +49,7 @@ func (g *Gedis) GetPubIface(node modules.Identifier) (*types.PubIface, error) {
 	}
 
 	if object.PublicConfig == nil {
-		return nil, fmt.Errorf("public config not set")
+		return nil, network.ErrNoPubIface
 	}
 
 	return object.PublicConfig, nil

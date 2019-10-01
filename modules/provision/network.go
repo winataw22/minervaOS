@@ -1,9 +1,12 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/jbenet/go-base58"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -19,6 +22,8 @@ func networkProvision(ctx context.Context, reservation *Reservation) (interface{
 		return nil, errors.Wrap(err, "failed to unmarshal network from reservation")
 	}
 
+	network.NetID = networkID(reservation.User, network.Name)
+
 	mgr := stubs.NewNetworkerStub(GetZBus(ctx))
 	log.Debug().Str("network", fmt.Sprintf("%+v", network)).Msg("provision network")
 	log.Debug().Str("nr", fmt.Sprintf("%+v", network.NetResources[0])).Msg("provision network")
@@ -27,6 +32,7 @@ func networkProvision(ctx context.Context, reservation *Reservation) (interface{
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create network resource for network %s", network.NetID)
 	}
+
 	// nothing to return to BCDB
 	return nil, nil
 }
@@ -39,8 +45,18 @@ func networkDecommission(ctx context.Context, reservation *Reservation) error {
 		return errors.Wrap(err, "failed to unmarshal network from reservation")
 	}
 
+	network.NetID = networkID(reservation.User, network.Name)
+
 	if err := mgr.DeleteNR(*network); err != nil {
 		return errors.Wrap(err, "failed to delete network resource")
 	}
 	return nil
+}
+
+func networkID(userID, name string) modules.NetID {
+	buf := bytes.Buffer{}
+	buf.WriteString(userID)
+	buf.WriteString(name)
+	b := base58.Encode(buf.Bytes())[:13]
+	return modules.NetID(string(b))
 }

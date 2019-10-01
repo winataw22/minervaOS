@@ -59,7 +59,7 @@ func (nr *NetResource) ID() string {
 // BridgeName returns the name of the bridge to create for the network
 // resource in the host network namespace
 func (nr *NetResource) BridgeName() (string, error) {
-	name := fmt.Sprintf("br-%s", nr.id)
+	name := fmt.Sprintf("b-%s", nr.id)
 	if len(name) > 15 {
 		return "", errors.Errorf("bridge namespace too long %s", name)
 	}
@@ -68,7 +68,7 @@ func (nr *NetResource) BridgeName() (string, error) {
 
 // Namespace returns the name of the network namespace to create for the network resource
 func (nr *NetResource) Namespace() (string, error) {
-	name := fmt.Sprintf("net-%s", nr.id)
+	name := fmt.Sprintf("n-%s", nr.id)
 	if len(name) > 15 {
 		return "", errors.Errorf("network namespace too long %s", name)
 	}
@@ -77,7 +77,7 @@ func (nr *NetResource) Namespace() (string, error) {
 
 // WGName returns the name of the wireguard interface to create for the network resource
 func (nr *NetResource) WGName() (string, error) {
-	wgName := fmt.Sprintf("wg-%s", nr.id)
+	wgName := fmt.Sprintf("w-%s", nr.id)
 	if len(wgName) > 15 {
 		return "", errors.Errorf("network namespace too long %s", wgName)
 	}

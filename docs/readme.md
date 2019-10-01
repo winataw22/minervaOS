@@ -1,6 +1,8 @@
 # Table Of Content
 
-- Modules
+![architecture](../assets/0-OS_v2_architecture.png)
+
+- Documentation for each modules:
   - [Container](container/readme.md)
   - [Flist](flist/readme.md)
   - [Identity](identity/readme.md)
@@ -10,4 +12,5 @@
   - [Upgrade](upgrade/readme.md)
 
 - Developer tools
- - [tfuser](tfuser/readme.md)
+  - [development environment](../qemu)
+  - [tfuser](tfuser/readme.md)

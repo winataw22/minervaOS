@@ -1,0 +1,12 @@
+@startuml
+start
+:power on node;
+repeat
+:mount boot flist;
+:copy files to node root;
+:reconfigure services;
+:restart services;
+repeat while (new flist version?) is (yes)
+ -> power off;
+stop
+@enduml

@@ -217,7 +217,7 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 	}
 
 	vethNR := "public"
-	vethDMZ := fmt.Sprintf("nr-%s", nr.ID())
+	vethDMZ := fmt.Sprintf("n-%s", nr.ID())
 
 	if !ifaceutil.Exists(vethDMZ, nil) || !ifaceutil.Exists(vethNR, nrNS) {
 		log.Debug().

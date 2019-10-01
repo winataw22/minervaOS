@@ -166,6 +166,11 @@ func nodeFromSchema(node directory.TfgridNode2) types.Node {
 		}(),
 		PublicConfig: func() *types.PubIface {
 			cfg := node.PublicConfig
+			// This is a dirty hack because jsx schema cannot
+			// differentiate between an embed object not set or with default value
+			if cfg.Master == "" {
+				return nil
+			}
 			pub := types.PubIface{
 				Master:  cfg.Master,
 				Type:    types.IfaceType(cfg.Type.String()),

@@ -67,10 +67,17 @@ func main() {
 		log.Fatal().Err(err).Msg("fail to read farmer id from kernel parameters")
 	}
 
+	env := environment.Get()
+
 	nodeID := manager.NodeID()
 	log.Info().
 		Str("identity", nodeID.Identity()).
 		Msg("node identity loaded")
+
+	log.Info().
+		Bool("orphan", env.Orphan).
+		Str("farmer_id", env.FarmerID).
+		Msg("farmer identified")
 
 	// Node registration can happen in the background.
 	go func() {

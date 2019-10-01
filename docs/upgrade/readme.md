@@ -5,103 +5,93 @@
 Upgrade is an autonomous module and is not reachable over zbus.
 
 ## Home Directory
-upgrade keeps some data in the following locations
-| directory | path|
-|----|---|
-| root| `/var/cache/modules/upgrade`|
-
+Upgraded does not have a home directory, although it can keep track of some files under /tmp. The reason that those files
+are kept in a tmpfs filesystem, and not persisted on disk is that they are only needed during the runtime. On reboot new
+files will be written. More on that later
 
 ## zinit unit
 
 Upgrade module depends on network and flist module. This is because is requires network connection to check for new update and the flist module to download the upgrade flist on the node.
 
+
 ## Philosophy
 
 0-OS is meant to be a black box no one can access. While this provide some nice security features it also makes it harder to manage. Specially when it comes to update/upgrade.
 
-Since 0-OS is meant to be driven by some blockchain transaction, the version of the software running on 0-OS could also be driven by a consensus of technical people agreeing on a new version to deploy.
+Hence, zos only trust few sources for upgrade packages. When the node boots up it checks the sources for the latest release and make sure all the local binaries are up-to-date before continuing the booting. The flist source must be rock-solid secured, that's another topic for different documentation.
 
-Once a new version of a component is ready, a multisig transaction is created by the 0-OS team and X number of person needs to sign the transaction to approve the deployment of the new version.
+The run mode defines which flist the node is going to use to boot. Run mode can be specified by passing `runmode=<mode>` to the kernel boot params. Currently we have those different run modes.
 
-Using a blockchain as a source for upgrade gives us the ability to create different version of the grid. Version matching the different network of the blockchain:
+- dev: ephemeral network only setup to develop and test new features. Can be created and reset at anytime
+- test: Mostly stable features that need to be tested at scale, allow preview and test of new features. Always the latest and greatest. This network can be reset sometimes, but should be relatively stable.
+- prod: Released of stable version. Used to run the real grid with real money. Cannot be reset ever. Only stable and battle tested feature reach this level.
 
-- Dev: ephemeral network only setup to develop and test new features. Can be created and reset at anytime
-- Test: Mostly stable feature that needs to be tested at scale, allow preview and test of new features. Always the latest greatest. This network can be reset sometimes, but should be relatively stable.
-- Main: Released of stable version. Used to run the real grid with real money. Cannot be reset ever. Only stable and battle tested feature reach this level.
 
-Since the upgrade will be triggered by a transaction on the blockchain, building a network of node using the same version is as simple as just pointing which network of the blockchain to watch.
+## Booting a new node
+The base image for zos contains a very small subset of tools, plus the boot program. Standing alone, the image is not really useful. On boot and
+after initial start of the system, the boot program kicks in and it does the following:
+- Detect the boot flist that the node must use to fully start. The default is hard-coded into the image, but this can be overridden by the `flist=` kernel param. The `flist=` kernel param can get deprecated without a warning, since it's a development flag.
+- The bootstrap, will then mount this flist using 0-fs, this of course requires a working connection to the internet. Hence bootstrap is configured to wait for the `internet` service.
+- The flist information (name, and version) is saved under `/tmp/flist.name` and `/tmp/flist.info`.
+- The bootstrap makes sure to copy all files in the flist to the proper locations under the system rootfs, this include `zinit` config files.
+- Then zinit is asked to monitor new installed services, zinit takes care of those services and make sure they are properly working at all times.
+- Bootstrap, umounts the flist, cleans up before it exits.
+- Boot process continues.
 
-The upgrade transaction should contains a description and signature of all the new component to install. This allow to ensure the binaries installed on the node are an exact copy of what as been announced on the blockchain.
+## Runtime upgrade of a node
+Once the node is up and running, upgraded takes over and it does the following:
+- It loads the boot info files `/tmp/flist.name` and `/tmp/flist.info`
+- If the `flist.name` file does **not** exist, `upgraded` will assume the node is booted with other means than an flist (for example overlay). In that case, upgraded will log this, and disable live upgrade of the node.
+- If the `flist.name` file exists, the flist will be monitored on the `https://hub.grid.tf` for changes. Any change in the version will initiate a life upgrade routine.
+- Once the flist change is detected, upgraded will mount the flist, make sure upgraded is running the latest version. If not, upgraded will update itself first before continuing.
+- services that will need update will be gracefully stopped.
+- `upgraded` will then make sure to update all services from the flist, and config files. and restart the services properly.
+- services are started again after all binaries has been copied
 
-0-OS could even periodically verify that all the running modules are not corrupted or modified by comparing the hash of the binary to the content of the blockchain.
 
 ## Technical
 
 0-OS is designed to provide maximum uptime for its workload, rebooting a node should never be required to upgrade any of its component (except when we push a kernel upgrade).
 
-The only way to get code onto a 0-OS is using flist. An upgrade flist will be composed of the new binary to install and in some case a migration script.
+![flow](../../assets/0-OS-upgrade.png)
 
-![upgrade flow](../../assets/0-OS_upgrade_flow.png)
-
-### Flist upgrade layout
+### Flist layout
 
 The files in the upgrade flist needs to be located in the filesystem tree at the same destination they would need to be in 0-OS. This allow the upgrade code to stays simple and only does a copy from the flist to the root filesystem of the node.
 
-Some hooks scripts will be executed during the upgrade flow if there are present in the flist. These files needs to be executable, be located at the root of the flist and named:
-
-- pre-copy
-- post-copy
-- migrate
-- post-start
+Booting a new node, or updating a node uses the same flist. Hence, a boot flist must container all required services for node operation.
 
 Example:
 
 0-OS filesystem:
 
 ```
-root
-├── bin
-    ├── containerd
-    └── runc
+/etc/zinit/identityd.yaml
+/etc/zinit/networkd.yaml
+/etc/zinit/contd.yaml
+/etc/zinit/init/node-ready.sh
+/etc/zinit/init
+/etc/zinit/redis.yaml
+/etc/zinit/storaged.yaml
+/etc/zinit/flistd.yaml
+/etc/zinit/readme.md
+/etc/zinit/internet.yaml
+/etc/zinit/upgraded.yaml
+/etc/zinit/containerd.yaml
+/etc/zinit/boot.yaml
+/etc/zinit/provisiond.yaml
+/etc/zinit/node-ready.yaml
+/etc/zinit
+/etc
+/bin/zlf
+/bin/provisiond
+/bin/flistd
+/bin/upgraded
+/bin/contd
+/bin/identityd
+/bin/capacityd
+/bin/storaged
+/bin/networkd
+/bin/internet
+/bin
 ```
-
-upgrade flist:
-
-```
-root
-├── bin
-│   ├── containerd
-│   └── flist_module_0.2.0
-├── etc
-|   └── containerd
-|       └── config.toml
-├── migrate
-├── post-copy
-├── post-start
-└── pre-copy
-```
-
-After upgrade:
-
-```
-root
-├── bin
-│   ├── containerd
-│   ├── flist_module_0.2.0
-│   └── runc
-└── etc
-    └── containerd
-        └── config.toml
-```
-
-### Upgrade watcher
-
-This component is going to be responsible to watch new upgrade being publish on the blockchain. He's also going to be the one driving the upgrade. Its responsibilities will be:
-
-- watch upgrade publication
-- schedule upgrade
-  - it always needs to aim for a minimal to no downtime if possible.
-  - if some downtime is required, arrange to make it during a low traffic hour to impact as less as possible the users.
-- in the event of the cache being corrupted, it will need to re-downloads all the component requires to run the workload present on the node. Some workload might still required previous version of some component, so during re-population of the cache it needs to make sure to grab all the versions required.
-
-In practice the actual upgrade watcher doesn't have the logic to schedule upgrade yet. It will directly apply the upgrade as soon as it finds it. This will be improved in combing versions

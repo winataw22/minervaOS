@@ -51,6 +51,14 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create cache directory")
 	}
 
+	env := environment.Get()
+
+	if env.Orphan {
+		// disable providiond on this node
+		// we don't have a valid farmer id set
+		log.Fatal().Msg("orphan node, we won't provision anything at all")
+	}
+
 	client, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
