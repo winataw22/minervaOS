@@ -7,10 +7,10 @@ package main
 // 	"strings"
 // 	"text/template"
 
-// 	"github.com/threefoldtech/zosv2/modules"
+// 	"github.com/threefoldtech/zos/pkg"
 // )
 
-// func genWGQuick(network *modules.Network, userID string, wgPrivateKey string) (string, error) {
+// func genWGQuick(network *pkg.Network, userID string, wgPrivateKey string) (string, error) {
 
 // 	type Peer struct {
 // 		Key        string
@@ -92,7 +92,7 @@ package main
 // {{if .Peer.Endpoint}}Endpoint = {{.Peer.Endpoint}}{{end}}
 // `
 
-// func getNetRes(nrs []*modules.NetResource, id string) *modules.NetResource {
+// func getNetRes(nrs []*pkg.NetResource, id string) *pkg.NetResource {
 // 	for _, nr := range nrs {
 // 		if nr.NodeID.ID == id {
 // 			return nr
@@ -101,7 +101,7 @@ package main
 // 	return nil
 // }
 
-// func getExitNetRes(nrs []*modules.NetResource) *modules.NetResource {
+// func getExitNetRes(nrs []*pkg.NetResource) *pkg.NetResource {
 // 	for _, nr := range nrs {
 // 		if nr.ExitPoint > 0 {
 // 			return nr
@@ -110,7 +110,7 @@ package main
 // 	return nil
 // }
 
-// func getPeer(peers []*modules.Peer, prefix string) *modules.Peer {
+// func getPeer(peers []*pkg.Peer, prefix string) *pkg.Peer {
 // 	for _, p := range peers {
 // 		if p.Prefix.String() == prefix {
 // 			return p
@@ -119,7 +119,7 @@ package main
 // 	return nil
 // }
 
-// func endpoint(peer *modules.Peer) string {
+// func endpoint(peer *pkg.Peer) string {
 // 	var endpoint string
 // 	if peer.Connection.IP.To16() != nil {
 // 		endpoint = fmt.Sprintf("[%s]:%d", peer.Connection.IP.String(), peer.Connection.Port)

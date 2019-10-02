@@ -5,15 +5,15 @@ import (
 	"flag"
 	"os"
 
-	"github.com/threefoldtech/zosv2/modules/stubs"
-	"github.com/threefoldtech/zosv2/modules/utils"
+	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/pkg/utils"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zosv2/modules/flist"
-	"github.com/threefoldtech/zosv2/modules/version"
+	"github.com/threefoldtech/zos/pkg/flist"
+	"github.com/threefoldtech/zos/pkg/version"
 )
 
 const module = "flist"

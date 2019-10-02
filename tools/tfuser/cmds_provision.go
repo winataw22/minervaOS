@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/identity"
-	"github.com/threefoldtech/zosv2/modules/provision"
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/identity"
+	"github.com/threefoldtech/zos/pkg/provision"
 
 	"github.com/urfave/cli"
 )
@@ -74,7 +74,7 @@ func cmdsProvision(c *cli.Context) error {
 	}
 
 	for _, nodeID := range nodeIDs {
-		id, err := store.Reserve(r, modules.StrIdentifier(nodeID))
+		id, err := client.Reserve(r, pkg.StrIdentifier(nodeID))
 		if err != nil {
 			return errors.Wrap(err, "failed to send reservation")
 		}

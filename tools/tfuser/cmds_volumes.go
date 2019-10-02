@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zos/pkg"
 
-	"github.com/threefoldtech/zosv2/modules/provision"
+	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/urfave/cli"
 )
 
@@ -14,7 +14,7 @@ func generateVolume(c *cli.Context) error {
 	s := c.Uint64("size")
 	t := strings.ToUpper(c.String("type"))
 
-	if t != modules.HDDDevice && t != modules.SSDDevice {
+	if t != pkg.HDDDevice && t != pkg.SSDDevice {
 		return fmt.Errorf("volume type can only HHD or SSD")
 	}
 

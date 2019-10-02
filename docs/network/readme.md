@@ -52,7 +52,7 @@ So. Let's have some abbreviations settled first:
   A Node is a computer with CPU, Memory, Disks (or SSD's, NVMe) connected to _A_ network that has Internet access. (i.e. it can reach www.google.com, just like you on your phone, at home)  
   That Node will, once it has received an IP address (IPv4 or IPv6), register itself when it's new, or confirm it's identity and it's online-ness (for lack of a better word).
 
-  - #### TNo : Tenant Network object. [The gory details here](https://github.com/threefoldtech/zosv2/blob/master/modules/network.go)  
+  - #### TNo : Tenant Network object. [The gory details here](https://github.com/threefoldtech/zos/blob/master/modules/network.go)  
   TL;DR: The Network Description.  
   We named it so, because it is a datastructure that describes the __whole__ network a user can request (or setup).  
   That network is a virtualized overlay network.  

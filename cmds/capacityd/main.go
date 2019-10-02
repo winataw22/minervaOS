@@ -5,15 +5,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zosv2/modules/capacity"
-	"github.com/threefoldtech/zosv2/modules/environment"
-	"github.com/threefoldtech/zosv2/modules/gedis"
-	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zos/pkg/capacity"
+	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/gedis"
+	"github.com/threefoldtech/zos/pkg/stubs"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zosv2/modules/version"
+	"github.com/threefoldtech/zos/pkg/version"
 )
 
 const module = "capacity"

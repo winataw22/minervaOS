@@ -18,14 +18,14 @@ jobs:
 
     - name: Get dependencies
       run: |
-        cd modules
+        cd pkg
         make getdeps
       env:
         GO111MODULE: on
 
     - name: Run tests
       run: |
-        cd modules
+        cd pkg
         make coverage
       env:
         GO111MODULE: on
@@ -33,7 +33,7 @@ jobs:
     - name: Send coverage
       if: success()
       run: |
-        cd modules
+        cd pkg
         bash <(curl -s https://codecov.io/bash)
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

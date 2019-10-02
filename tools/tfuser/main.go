@@ -1,21 +1,26 @@
 package main
 
 import (
-	"github.com/threefoldtech/zosv2/modules/provision"
+	"fmt"
+	"net/url"
+
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gedis"
+
+	"github.com/threefoldtech/zos/pkg/provision"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"os"
 
-	"github.com/threefoldtech/zosv2/modules/network"
-	"github.com/threefoldtech/zosv2/modules/network/tnodb"
+	"github.com/threefoldtech/zos/pkg/network"
+	"github.com/threefoldtech/zos/pkg/network/tnodb"
 	"github.com/urfave/cli"
 )
 
 var (
-	db    network.TNoDBUtils
-	store *provision.HTTPStore
+	client clientIface
 )
 
 func main() {
@@ -31,17 +36,10 @@ func main() {
 		},
 
 		cli.StringFlag{
-			Name:   "tnodb, u",
-			Usage:  "URL of the TNODB",
-			Value:  "https://tnodb.dev.grid.tf",
-			EnvVar: "TNODB_URL",
-		},
-
-		cli.StringFlag{
-			Name:   "provision, p",
-			Usage:  "URL of the provision store",
-			Value:  "https://tnodb.dev.grid.tf",
-			EnvVar: "PROVISION_URL",
+			Name:   "bcdb, u",
+			Usage:  "URL of the BCDB",
+			Value:  "https://bcdb.dev.grid.tf",
+			EnvVar: "BCDB_URL",
 		},
 	}
 	app.Before = func(c *cli.Context) error {
@@ -51,8 +49,11 @@ func main() {
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-		db = tnodb.NewHTTPTNoDB(c.String("tnodb"))
-		store = provision.NewHTTPStore(c.String("provision"))
+		var err error
+		client, err = getClient(c.String("bcdb"))
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}
@@ -81,172 +82,162 @@ func main() {
 					also used to read the network schema before modifying it`,
 				},
 			},
-			// Subcommands: []cli.Command{
-			// 	{
-			// 		Name:  "network",
-			// 		Usage: "Manage private networks",
-			// 		Subcommands: []cli.Command{
-			// 			{
-			// 				Name:  "create",
-			// 				Usage: "create a new user network",
-			// 				Flags: []cli.Flag{
-			// 					cli.StringFlag{
-			// 						Name:  "node",
-			// 						Usage: "node ID of the exit node to use for this network",
-			// 					},
-			// 				},
-			// 				Action: cmdCreateNetwork,
-			// 			},
-			// 			{
-			// 				Name:  "add-node",
-			// 				Usage: "add a node to a existing network",
-			// 				Flags: []cli.Flag{
-			// 					cli.StringSliceFlag{
-			// 						Name:  "node",
-			// 						Usage: "node ID of the node where to install this network, you can specify multiple time this flag",
-			// 					},
-			// 				},
-			// 				Action: cmdsAddNode,
-			// 			},
-			// 			{
-			// 				Name:  "remove-node",
-			// 				Usage: "prints the wg-quick configuration file for a certain user in the network",
-			// 				Flags: []cli.Flag{
-			// 					cli.StringFlag{
-			// 						Name:  "node",
-			// 						Usage: "node ID to remove from the network",
-			// 					},
-			// 				},
-			// 				Action: cmdsRemoveNode,
-			// 			},
-			// 			{
-			// 				Name:  "add-user",
-			// 				Usage: "prints the wg-quick configuration file for a certain user in the network",
-			// 				Flags: []cli.Flag{
-			// 					cli.StringFlag{
-			// 						Name:  "user",
-			// 						Usage: "user ID",
-			// 					},
-			// 				},
-			// 				Action: cmdsAddUser,
-			// 			},
-			// 			{
-			// 				Name:  "wg",
-			// 				Usage: "add a user to a private network. Use this command if you want to be able to connect to a network from your own computer",
-			// 				Flags: []cli.Flag{
-			// 					cli.StringFlag{
-			// 						Name:  "user",
-			// 						Usage: "user ID, if not specified, a user ID will be generated automatically",
-			// 					},
-			// 					cli.StringFlag{
-			// 						Name:  "key",
-			// 						Usage: "private key. this is usually given by the 'user' command",
-			// 					},
-			// 				},
-			// 				Action: cmdsWGQuick,
-			// 			},
-			// 		},
-			// 	},
-			// 	{
-			// 		Name:  "container",
-			// 		Usage: "Generate container provisioning schema",
-			// 		Flags: []cli.Flag{
-			// 			cli.StringFlag{
-			// 				Name:  "flist",
-			// 				Usage: "URL to the flist",
-			// 			},
-			// 			cli.StringFlag{
-			// 				Name:  "storage",
-			// 				Usage: "URL to the flist storage backend",
-			// 			},
-			// 			cli.StringFlag{
-			// 				Name:  "entrypoint",
-			// 				Usage: "optional entrypoint. If specified it overwrites the entrypoint from the flist",
-			// 			},
-			// 			cli.BoolFlag{
-			// 				Name:  "corex",
-			// 				Usage: "enable coreX",
-			// 			},
-			// 			cli.StringFlag{
-			// 				Name:  "network",
-			// 				Usage: "network ID the container needs to be part of",
-			// 			},
-			// 			cli.StringSliceFlag{
-			// 				Name:  "mounts",
-			// 				Usage: "list of volume to mount into the container",
-			// 			},
-			// 			cli.StringSliceFlag{
-			// 				Name:  "envs",
-			// 				Usage: "environment variable to set into the container",
-			// 			},
-			// 		},
-			// 		Action: generateContainer,
-			// 	},
-			// 	{
-			// 		Name:  "storage",
-			// 		Usage: "Generate volumes and 0-db namespace provisioning schema",
-			// 		Subcommands: []cli.Command{
-			// 			{
-			// 				Name:    "volume",
-			// 				Aliases: []string{"vol"},
-			// 				Flags: []cli.Flag{
-			// 					cli.Uint64Flag{
-			// 						Name:  "size, s",
-			// 						Usage: "Size of the volume in GiB",
-			// 						Value: 1,
-			// 					},
-			// 					cli.StringFlag{
-			// 						Name:  "type, t",
-			// 						Usage: "Type of disk to use, HHD or SSD",
-			// 					},
-			// 				},
-			// 				Action: generateVolume,
-			// 			},
-			// 			{
-			// 				Name:  "zdb",
-			// 				Usage: "reserve a 0-db namespace",
-			// 				Flags: []cli.Flag{
-			// 					cli.Uint64Flag{
-			// 						Name:  "size, s",
-			// 						Usage: "Size of the volume in GiB",
-			// 						Value: 1,
-			// 					},
-			// 					cli.StringFlag{
-			// 						Name:  "type, t",
-			// 						Usage: "Type of disk to use, HHD or SSD",
-			// 					},
-			// 					cli.StringFlag{
-			// 						Name:  "mode, m",
-			// 						Usage: "0-DB mode (user, seq)",
-			// 					},
-			// 					cli.StringFlag{
-			// 						Name:  "password, p",
-			// 						Usage: "optional password",
-			// 					},
-			// 					cli.BoolFlag{
-			// 						Name:  "public",
-			// 						Usage: "TODO",
-			// 					},
-			// 				},
-			// 				Action: generateZDB,
-			// 			},
-			// 		},
-			// 	},
-			// 	{
-			// 		Name:  "debug",
-			// 		Usage: "Enable debug mode on a node. In this mode the forward its logs to the specified redis endpoint",
-			// 		Flags: []cli.Flag{
-			// 			cli.StringFlag{
-			// 				Name: "endpoint",
-			// 			},
-			// 			cli.StringFlag{
-			// 				Name:  "channel",
-			// 				Usage: "name of the redis pubsub channel to use, if empty the node will push to {nodeID}-logs",
-			// 			},
-			// 		},
-			// 		Action: generateDebug,
-			// 	},
-			// },
+			Subcommands: []cli.Command{
+				{
+					Name:  "network",
+					Usage: "Manage private networks",
+					Subcommands: []cli.Command{
+						{
+							Name:  "create",
+							Usage: "create a new user network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "name",
+									Usage: "name of your network",
+								},
+								cli.StringFlag{
+									Name:  "cidr",
+									Usage: "private ip range to use in the network",
+								},
+							},
+							Action: cmdCreateNetwork,
+						},
+						{
+							Name:  "add-node",
+							Usage: "add a node to a existing network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "node",
+									Usage: "node ID of the node to add to the network",
+								},
+								cli.StringFlag{
+									Name:  "subnet",
+									Usage: "subnet to use on this node. The subnet needs to be included in the IP range of the network",
+								},
+								cli.UintFlag{
+									Name:  "port",
+									Usage: "Wireguar port to use. if not specified, tfuser will automatically check BCDB for free fort to use",
+								},
+							},
+							Action: cmdsAddNode,
+						},
+						{
+							Name:  "remove-node",
+							Usage: "prints the wg-quick configuration file for a certain user in the network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "node",
+									Usage: "node ID to remove from the network",
+								},
+							},
+							Action: cmdsRemoveNode,
+						},
+					},
+				},
+				{
+					Name:  "container",
+					Usage: "Generate container provisioning schema",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "flist",
+							Usage: "URL to the flist",
+						},
+						cli.StringFlag{
+							Name:  "storage",
+							Usage: "URL to the flist storage backend",
+						},
+						cli.StringFlag{
+							Name:  "entrypoint",
+							Usage: "optional entrypoint. If specified it overwrites the entrypoint from the flist",
+						},
+						cli.BoolFlag{
+							Name:  "corex",
+							Usage: "enable coreX",
+						},
+						cli.StringFlag{
+							Name:  "network",
+							Usage: "network ID the container needs to be part of",
+						},
+						cli.StringSliceFlag{
+							Name:  "mounts",
+							Usage: "list of volume to mount into the container",
+						},
+						cli.StringSliceFlag{
+							Name:  "envs",
+							Usage: "environment variable to set into the container",
+						},
+						cli.StringFlag{
+							Name:  "ip",
+							Usage: "ip address to assign to the container",
+						},
+					},
+					Action: generateContainer,
+				},
+				{
+					Name:  "storage",
+					Usage: "Generate volumes and 0-db namespace provisioning schema",
+					Subcommands: []cli.Command{
+						{
+							Name:    "volume",
+							Aliases: []string{"vol"},
+							Flags: []cli.Flag{
+								cli.Uint64Flag{
+									Name:  "size, s",
+									Usage: "Size of the volume in GiB",
+									Value: 1,
+								},
+								cli.StringFlag{
+									Name:  "type, t",
+									Usage: "Type of disk to use, HHD or SSD",
+								},
+							},
+							Action: generateVolume,
+						},
+						{
+							Name:  "zdb",
+							Usage: "reserve a 0-db namespace",
+							Flags: []cli.Flag{
+								cli.Uint64Flag{
+									Name:  "size, s",
+									Usage: "Size of the volume in GiB",
+									Value: 1,
+								},
+								cli.StringFlag{
+									Name:  "type, t",
+									Usage: "Type of disk to use, HHD or SSD",
+								},
+								cli.StringFlag{
+									Name:  "mode, m",
+									Usage: "0-DB mode (user, seq)",
+								},
+								cli.StringFlag{
+									Name:  "password, p",
+									Usage: "optional password",
+								},
+								cli.BoolFlag{
+									Name:  "public",
+									Usage: "TODO",
+								},
+							},
+							Action: generateZDB,
+						},
+					},
+				},
+				{
+					Name:  "debug",
+					Usage: "Enable debug mode on a node. In this mode the forward its logs to the specified redis endpoint",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name: "endpoint",
+						},
+						cli.StringFlag{
+							Name:  "channel",
+							Usage: "name of the redis pubsub channel to use, if empty the node will push to {nodeID}-logs",
+						},
+					},
+					Action: generateDebug,
+				},
+			},
 		},
 		{
 			Name:  "provision",
@@ -278,5 +269,41 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal().Msg(err.Error())
+	}
+}
+
+type reserver interface {
+	Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string, error)
+}
+type clientIface interface {
+	network.TNoDB
+	reserver
+}
+
+func getClient(addr string) (clientIface, error) {
+	type client struct {
+		network.TNoDB
+		reserver
+	}
+
+	u, err := url.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	switch u.Scheme {
+	case "http", "https":
+		return client{
+			tnodb.NewHTTPTNoDB(addr),
+			provision.NewHTTPStore(addr),
+		}, nil
+	case "tcp":
+		c, err := gedis.New(addr, "default", "")
+		return client{
+			c,
+			c,
+		}, err
+	default:
+		return nil, fmt.Errorf("unsupported address scheme for BCDB: %s", u.Scheme)
 	}
 }

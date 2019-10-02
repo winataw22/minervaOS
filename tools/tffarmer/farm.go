@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/urfave/cli"
 )
 
@@ -14,7 +14,7 @@ func registerFarm(c *cli.Context) error {
 		return fmt.Errorf("A farm name needs to be specified")
 	}
 
-	var farmID modules.Identifier
+	var farmID pkg.Identifier
 	var err error
 	seedPath := c.String("seed")
 	if seedPath != "" {

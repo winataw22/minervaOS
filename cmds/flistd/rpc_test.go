@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zosv2/modules"
-	"github.com/threefoldtech/zosv2/modules/flist"
-	"github.com/threefoldtech/zosv2/modules/flist/mock"
-	"github.com/threefoldtech/zosv2/modules/stubs"
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/flist"
+	"github.com/threefoldtech/zos/pkg/flist/mock"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 var (
@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func testFlistModule(t *testing.T) (modules.Flister, func()) {
+func testFlistModule(t *testing.T) (pkg.Flister, func()) {
 	root, err := ioutil.TempDir("", "flist_root")
 	require.NoError(t, err)
 
@@ -38,7 +38,7 @@ func testFlistModule(t *testing.T) (modules.Flister, func()) {
 	return flist.New(root, &mock.StorageMock{}), cleanup
 }
 
-func testPrepareRPC(t *testing.T) (modules.Flister, func()) {
+func testPrepareRPC(t *testing.T) (pkg.Flister, func()) {
 	const redisAddr = "tcp://localhost:6379"
 
 	f, cleanup := testFlistModule(t)

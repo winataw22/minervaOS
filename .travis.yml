@@ -8,16 +8,13 @@ env:
 
 
 install:
-- pushd modules && make getdeps && popd
+- pushd pkg && make getdeps && popd
 
 script:
-- pushd modules && make verifiers && popd
-- pushd modules && make coverage && popd
+- pushd pkg && make verifiers && popd
+- pushd pkg && make coverage && popd
 - pushd cmds && make && popd
 - pushd tools && make && popd
-
-after_success:
-- pushd modules && bash <(curl -s https://codecov.io/bash)
 
 go:
 - '1.13'

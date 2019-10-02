@@ -11,11 +11,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/threefoldtech/zosv2/modules/network"
-	"github.com/threefoldtech/zosv2/modules/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network"
+	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 
-	"github.com/threefoldtech/zosv2/modules/version"
-	"github.com/threefoldtech/zosv2/modules/zinit"
+	"github.com/threefoldtech/zos/pkg/version"
+	"github.com/threefoldtech/zos/pkg/zinit"
 )
 
 func main() {

@@ -40,8 +40,8 @@ exact code change can help focus discussions, so the choice is up to you.
 
 ## Setting up a development environment
 
-Check out the [documentation](https://github.com/threefoldtech/zosv2/tree/master/docs) learn about the code
-base and setting up your [development environment](https://github.com/threefoldtech/zosv2/blob/master/qemu/README.md).
+Check out the [documentation](https://github.com/threefoldtech/zos/tree/master/docs) learn about the code
+base and setting up your [development environment](https://github.com/threefoldtech/zos/blob/master/qemu/README.md).
 
 ## Pull requests
 
@@ -74,7 +74,7 @@ pull requests.
 
 ## Issues
 
-[GitHub issues](https://github.com/threefoldtech/zosv2/issues/new) can be used to report bugs or submit feature requests.
+[GitHub issues](https://github.com/threefoldtech/zos/issues/new) can be used to report bugs or submit feature requests.
 
 When reporting a bug please include the following key pieces of information:
 

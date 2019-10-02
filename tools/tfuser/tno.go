@@ -11,18 +11,18 @@ package main
 // 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
 // 	"github.com/google/uuid"
-// 	"github.com/threefoldtech/zosv2/modules"
-// 	"github.com/threefoldtech/zosv2/modules/network/types"
-// 	"github.com/threefoldtech/zosv2/modules/provision"
-// 	"github.com/threefoldtech/zosv2/modules/tno"
+// 	"github.com/threefoldtech/zos/pkg"
+// 	"github.com/threefoldtech/zos/pkg/network/types"
+// 	"github.com/threefoldtech/zos/pkg/provision"
+// 	"github.com/threefoldtech/zos/pkg/tno"
 // )
 
-// func createNetwork(nodeID string) (*modules.Network, error) {
+// func createNetwork(nodeID string) (*pkg.Network, error) {
 // 	if nodeID == "" {
 // 		return nil, fmt.Errorf("exit node ID must be specified")
 // 	}
 
-// 	node, err := db.GetNode(modules.StrIdentifier(nodeID))
+// 	node, err := db.GetNode(pkg.StrIdentifier(nodeID))
 // 	if err != nil {
 // 		return nil, errors.Wrap(err, "failed to get node detail from BCDB")
 // 	}
@@ -36,7 +36,7 @@ package main
 // 		return nil, err
 // 	}
 
-// 	allocation, farmAlloc, exitNodeNr, err := db.RequestAllocation(modules.StrIdentifier(node.NodeID))
+// 	allocation, farmAlloc, exitNodeNr, err := db.RequestAllocation(pkg.StrIdentifier(node.NodeID))
 // 	if err != nil {
 // 		return nil, errors.Wrapf(err, "failed to request a new allocation")
 // 	}
@@ -46,7 +46,7 @@ package main
 // 		return nil, err
 // 	}
 
-// 	network := &modules.Network{}
+// 	network := &pkg.Network{}
 // 	err = tno.Configure(network, []tno.Opts{
 // 		tno.GenerateID(),
 // 		tno.ConfigurePrefixZero(farmAlloc),
@@ -76,12 +76,12 @@ package main
 // 	return nil, fmt.Errorf("no public address found")
 // }
 
-// func addNode(nw *modules.Network, nodeID string) (*modules.Network, error) {
+// func addNode(nw *pkg.Network, nodeID string) (*pkg.Network, error) {
 // 	if len(nw.Resources) <= 0 {
 // 		return nil, fmt.Errorf("cannot add a node to network without exit node")
 // 	}
 
-// 	farm, err := db.GetNode(modules.StrIdentifier(nodeID))
+// 	farm, err := db.GetNode(pkg.StrIdentifier(nodeID))
 // 	if err != nil {
 // 		return nil, err
 // 	}
@@ -95,7 +95,7 @@ package main
 // 		pubIface *types.PubIface
 // 		ip       net.IP
 // 	)
-// 	pubIface, err = db.ReadPubIface(modules.StrIdentifier(nodeID))
+// 	pubIface, err = db.ReadPubIface(pkg.StrIdentifier(nodeID))
 // 	if err != nil {
 // 		ip = nil
 // 	} else {
@@ -119,13 +119,13 @@ package main
 // 	return nw, nil
 // }
 
-// func addUser(network *modules.Network, userID string) (*modules.Network, string, error) {
+// func addUser(network *pkg.Network, userID string) (*pkg.Network, string, error) {
 // 	if len(network.Resources) <= 0 {
 // 		return nil, "", fmt.Errorf("cannot add a node to network without exit node")
 // 	}
 
 // 	farmID := network.Resources[0].NodeID.FarmerID
-// 	allocation, _, _, err := db.RequestAllocation(modules.StrIdentifier(farmID))
+// 	allocation, _, _, err := db.RequestAllocation(pkg.StrIdentifier(farmID))
 // 	if err != nil {
 // 		return nil, "", err
 // 	}
@@ -147,7 +147,7 @@ package main
 // 	return network, key.String(), nil
 // }
 
-// func removeNode(network *modules.Network, nodeID string) (*modules.Network, error) {
+// func removeNode(network *pkg.Network, nodeID string) (*pkg.Network, error) {
 // 	err := tno.Configure(network, []tno.Opts{
 // 		tno.RemoveNode(nodeID),
 // 	})
@@ -159,7 +159,7 @@ package main
 // 	return network, nil
 // }
 
-// func reserveNetwork(network *modules.Network) error {
+// func reserveNetwork(network *pkg.Network) error {
 // 	raw, err := json.Marshal(network)
 // 	if err != nil {
 // 		return err
@@ -182,7 +182,7 @@ package main
 
 // 	for nodeID := range nodes.Iter() {
 // 		nodeID := nodeID.(string)
-// 		id, err := store.Reserve(r, modules.StrIdentifier(nodeID))
+// 		id, err := store.Reserve(r, pkg.StrIdentifier(nodeID))
 // 		if err != nil {
 // 			return err
 // 		}

@@ -1,167 +1,244 @@
 package main
 
-// import (
-// 	"encoding/json"
-// 	"fmt"
-// 	"os"
+import (
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"net"
+	"os"
+	"time"
 
-// 	"github.com/threefoldtech/zosv2/modules/provision"
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/crypto"
+	"github.com/threefoldtech/zos/pkg/provision"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
-// 	"github.com/pkg/errors"
-// 	"github.com/threefoldtech/zosv2/modules"
-// 	"github.com/urfave/cli"
-// )
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+)
 
-// func cmdCreateNetwork(c *cli.Context) error {
-// 	network, err := createNetwork(c.String("node"))
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to create network schema")
-// 	}
+func init() {
+	rand.Seed(int64(time.Now().Nanosecond()))
+}
 
-// 	r, err := embed(network, provision.NetworkReservation)
-// 	if err != nil {
-// 		return err
-// 	}
+func cmdCreateNetwork(c *cli.Context) error {
+	name := c.String("name")
+	if name == "" {
+		return fmt.Errorf("network name cannot be empty")
+	}
+	ipRange := c.String("cidr")
+	if ipRange == "" {
+		return fmt.Errorf("ip range cannot be empty")
+	}
+	_, ipnet, err := net.ParseCIDR(ipRange)
+	if err != nil {
+		errors.Wrap(err, "invalid ip range")
+	}
 
-// 	return output(c.GlobalString("schema"), r)
-// }
+	network := &pkg.Network{
+		Name:         name,
+		IPRange:      ipnet,
+		NetResources: []pkg.NetResource{},
+	}
 
-// func cmdsAddNode(c *cli.Context) error {
-// 	var (
-// 		network = &modules.Network{}
-// 		schema  = c.GlobalString("schema")
-// 		err     error
-// 	)
+	r, err := embed(network, provision.NetworkReservation)
+	if err != nil {
+		return err
+	}
 
-// 	network, err = loadNetwork(schema)
-// 	if err != nil {
-// 		return err
-// 	}
+	return output(c.GlobalString("schema"), r)
+}
 
-// 	for _, nodeID := range c.StringSlice("node") {
-// 		network, err = addNode(network, nodeID)
-// 		if err != nil {
-// 			return errors.Wrap(err, "failed to add the node into the network object")
-// 		}
-// 	}
+func cmdsAddNode(c *cli.Context) error {
+	var (
+		network = &pkg.Network{}
+		schema  = c.GlobalString("schema")
+		err     error
 
-// 	r, err := embed(network, provision.NetworkReservation)
-// 	if err != nil {
-// 		return err
-// 	}
+		nodeID = c.String("node")
+		subnet = c.String("subnet")
+		port   = c.Uint("port")
+	)
 
-// 	return output(schema, r)
-// }
-// func cmdsAddUser(c *cli.Context) error {
-// 	var (
-// 		network    = &modules.Network{}
-// 		schema     = c.GlobalString("schema")
-// 		userID     = c.String("user")
-// 		privateKey string
-// 		err        error
-// 	)
+	network, err = loadNetwork(schema)
+	if err != nil {
+		return err
+	}
 
-// 	if userID == "" {
-// 		return fmt.Errorf("user ID cannot be empty. generate an identity using the `id` command")
-// 	}
+	if nodeID == "" {
+		return fmt.Errorf("nodeID cannot be empty")
+	}
 
-// 	network, err = loadNetwork(schema)
-// 	if err != nil {
-// 		return err
-// 	}
+	if subnet == "" {
+		return fmt.Errorf("subnet cannot be empty")
+	}
+	fmt.Println("subnet", subnet)
+	_, ipnet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return errors.Wrap(err, "invalid subnet")
+	}
 
-// 	network, privateKey, err = addUser(network, userID)
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to add the node into the network object")
-// 	}
+	if port == 0 {
+		port, err = pickPort(nodeID)
+		if err != nil {
+			return errors.Wrap(err, "failed to pick wireguard port")
+		}
+	}
 
-// 	r, err := embed(network, provision.NetworkReservation)
-// 	if err != nil {
-// 		return err
-// 	}
+	privateKey, err := wgtypes.GeneratePrivateKey()
+	if err != nil {
+		return errors.Wrap(err, "error during wireguard key generation")
+	}
+	sk := privateKey.String()
 
-// 	fmt.Printf("wireguard private key: %s\n", privateKey)
-// 	fmt.Printf("save this key somewhere, you will need it to generate the wg-quick configuration file with the `wg` command\n")
+	pk, err := crypto.KeyFromID(pkg.StrIdentifier(nodeID))
+	if err != nil {
+		return errors.Wrap(err, "failed to parse nodeID")
+	}
 
-// 	return output(schema, r)
-// }
+	encrypted, err := crypto.Encrypt([]byte(sk), pk)
+	if err != nil {
+		return errors.Wrap(err, "failed to encrypt private key")
+	}
 
-// func cmdsWGQuick(c *cli.Context) error {
-// 	var (
-// 		network    = &modules.Network{}
-// 		schema     = c.GlobalString("schema")
-// 		userID     = c.String("user")
-// 		privateKey = c.String("key")
-// 		err        error
-// 	)
+	nr := pkg.NetResource{
+		NodeID:       nodeID,
+		Subnet:       ipnet,
+		WGListenPort: uint16(port),
+		WGPublicKey:  privateKey.PublicKey().String(),
+		WGPrivateKey: hex.EncodeToString(encrypted),
+	}
 
-// 	if privateKey == "" {
-// 		return fmt.Errorf("private key cannot be empty")
-// 	}
+	network.NetResources = append(network.NetResources, nr)
 
-// 	network, err = loadNetwork(schema)
-// 	if err != nil {
-// 		return err
-// 	}
+	for i, nr := range network.NetResources {
+		network.NetResources[i].Peers = generatePeers(nr.NodeID, *network)
+	}
 
-// 	out, err := genWGQuick(network, userID, privateKey)
-// 	if err != nil {
-// 		return err
-// 	}
+	r, err := embed(network, provision.NetworkReservation)
+	if err != nil {
+		return err
+	}
 
-// 	fmt.Println(out)
-// 	return nil
-// }
+	return output(schema, r)
+}
 
-// func cmdsRemoveNode(c *cli.Context) error {
-// 	var (
-// 		network = &modules.Network{}
-// 		schema  = c.GlobalString("schema")
-// 		nodeID  = c.String("node")
-// 		err     error
-// 	)
+func cmdsRemoveNode(c *cli.Context) error {
+	var (
+		network = &pkg.Network{}
+		schema  = c.GlobalString("schema")
+		nodeID  = c.String("node")
+		err     error
+	)
 
-// 	if nodeID == "" {
-// 		return fmt.Errorf("node ID cannot be empty")
-// 	}
+	if nodeID == "" {
+		return fmt.Errorf("node ID cannot be empty")
+	}
 
-// 	network, err = loadNetwork(schema)
-// 	if err != nil {
-// 		return err
-// 	}
+	network, err = loadNetwork(schema)
+	if err != nil {
+		return err
+	}
 
-// 	network, err = removeNode(network, nodeID)
-// 	if err != nil {
-// 		return errors.Wrapf(err, "failed to remove node %s from the network object", nodeID)
-// 	}
+	for i, nr := range network.NetResources {
+		if nr.NodeID == nodeID {
+			network.NetResources = append(network.NetResources[:i], network.NetResources[i+1:]...)
+			break
+		}
+	}
 
-// 	r, err := embed(network, provision.NetworkReservation)
-// 	if err != nil {
-// 		return err
-// 	}
+	// we don't remove the peer from the other network resource
+	// while this is dirty wireguard doesn't really care
+	raw, err := json.Marshal(network)
+	if err != nil {
+		return err
+	}
 
-// 	return output(schema, r)
-// }
+	r := &provision.Reservation{
+		Type: provision.NetworkReservation,
+		Data: raw,
+	}
+	// r, err := embed(network, provision.NetworkReservation)
+	// if err != nil {
+	// 	return err
+	// }
 
-// func loadNetwork(name string) (network *modules.Network, err error) {
-// 	network = &modules.Network{}
+	return output(schema, r)
+}
 
-// 	if name == "" {
-// 		return nil, fmt.Errorf("schema name cannot be empty")
-// 	}
-// 	f, err := os.Open(name)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer f.Close()
+func loadNetwork(name string) (network *pkg.Network, err error) {
+	network = &pkg.Network{}
 
-// 	r := &provision.Reservation{}
-// 	if err := json.NewDecoder(f).Decode(r); err != nil {
-// 		return nil, errors.Wrapf(err, "failed to decode json encoded reservation at %s", name)
-// 	}
+	if name == "" {
+		return nil, fmt.Errorf("schema name cannot be empty")
+	}
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-// 	if err := json.Unmarshal(r.Data, network); err != nil {
-// 		return nil, errors.Wrapf(err, "failed to decode json encoded network at %s", name)
-// 	}
-// 	return network, nil
-// }
+	r := &provision.Reservation{}
+	if err := json.NewDecoder(f).Decode(r); err != nil {
+		return nil, errors.Wrapf(err, "failed to decode json encoded reservation at %s", name)
+	}
+
+	if err := json.Unmarshal(r.Data, network); err != nil {
+		return nil, errors.Wrapf(err, "failed to decode json encoded network at %s", name)
+	}
+	return network, nil
+}
+
+func pickPort(nodeID string) (uint, error) {
+	node, err := client.GetNode(pkg.StrIdentifier(nodeID))
+	if err != nil {
+		return 0, err
+	}
+
+	p := uint(rand.Intn(6000) + 2000)
+
+	for isIn(node.WGPorts, p) {
+		p = uint(rand.Intn(6000) + 2000)
+	}
+	return p, nil
+}
+
+func isIn(l []uint, i uint) bool {
+	for _, x := range l {
+		if i == x {
+			return true
+		}
+	}
+	return false
+}
+
+func generatePeers(nodeID string, n pkg.Network) []pkg.Peer {
+	peers := make([]pkg.Peer, 0, len(n.NetResources))
+	for _, nr := range n.NetResources {
+		if nr.NodeID == nodeID {
+			continue
+		}
+
+		allowedIPs := make([]net.IPNet, 2)
+		allowedIPs[0] = *nr.Subnet
+		allowedIPs[1] = *wgIP(nr.Subnet)
+
+		peers = append(peers, pkg.Peer{
+			WGPublicKey: nr.WGPublicKey,
+			AllowedIPs:  allowedIPs,
+		})
+	}
+	return peers
+}
+
+func wgIP(subnet *net.IPNet) *net.IPNet {
+	// example: 10.3.1.0 -> 100.64.3.1
+	a := subnet.IP[len(subnet.IP)-3]
+	b := subnet.IP[len(subnet.IP)-2]
+
+	return &net.IPNet{
+		IP:   net.IPv4(0x64, 0x40, a, b),
+		Mask: net.CIDRMask(32, 32),
+	}
+}

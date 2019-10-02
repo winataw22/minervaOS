@@ -8,7 +8,7 @@ The purpose of this document is to discuss how zos should do the following:
 
 ## Current status is
 - We have a single 0-OS image that is updated manually by triggering a new build whenever we feel like it
-- The live-upgrading is done using upgraded ([see doc](https://github.com/threefoldtech/zosv2/tree/master/docs/upgrade)) and we have a development version of the "upgrade server" at https://versions.dev.grid.tf. This server list all the available version and detail of the flist to use to apply the upgrade
+- The live-upgrading is done using upgraded ([see doc](https://github.com/threefoldtech/zos/tree/master/docs/upgrade)) and we have a development version of the "upgrade server" at https://versions.dev.grid.tf. This server list all the available version and detail of the flist to use to apply the upgrade
 
 Now with what we have at the moment there is already multiple issues:
 1. there is no synchronization between the version publish for upgraded and the 0-OS images

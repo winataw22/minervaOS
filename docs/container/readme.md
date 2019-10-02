@@ -37,7 +37,7 @@ after:
 ## Interface
 
 ```go
-package modules
+package pkg
 
 // ContainerID type
 type ContainerID string

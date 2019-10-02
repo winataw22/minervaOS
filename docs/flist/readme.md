@@ -24,7 +24,7 @@ The flist module itself doesn't contain the logic to understand the flist format
 
 Its only job is to download the flist, prepare the isolation of all the data and then starts 0-fs with the proper arguments
 
-## Public interface [![GoDoc](https://godoc.org/github.com/threefoldtech/zosv2/modules/flist?status.svg)](https://godoc.org/github.com/threefoldtech/zosv2/modules/flist)
+## Public interface [![GoDoc](https://godoc.org/github.com/threefoldtech/zos/pkg/flist?status.svg)](https://godoc.org/github.com/threefoldtech/zos/pkg/flist)
 
 ```go
 type Flister interface {
@@ -41,7 +41,7 @@ type Flister interface {
 
 The zinit unit file of the module specify the command line,  test command, and the order where the services need to be booted.
 
-Flist module depends on the storage and network modules.
+Flist module depends on the storage and network pkg.
 This is because he needs connectivity to download flist and data and he needs storage to be able to cache the data once downloaded.
 
 Flist doesn't do anything special on the system except creating a bunch of directory it will use during its lifetime

@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zos/pkg"
 
-	"github.com/threefoldtech/zosv2/modules/provision"
+	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/urfave/cli"
 )
 
@@ -18,11 +18,11 @@ func generateZDB(c *cli.Context) error {
 		public   = c.Bool("Public")
 	)
 
-	if disktype != modules.HDDDevice && disktype != modules.SSDDevice {
+	if disktype != pkg.HDDDevice && disktype != pkg.SSDDevice {
 		return fmt.Errorf("volume type can only 'HHD' or 'SSD'")
 	}
 
-	if mode != modules.ZDBModeSeq && mode != modules.ZDBModeUser {
+	if mode != pkg.ZDBModeSeq && mode != pkg.ZDBModeUser {
 		return fmt.Errorf("mode can only 'user' or 'seq'")
 	}
 
@@ -32,8 +32,8 @@ func generateZDB(c *cli.Context) error {
 
 	zdb := provision.ZDB{
 		Size:     size,
-		DiskType: modules.DeviceType(disktype),
-		Mode:     modules.ZDBMode(mode),
+		DiskType: pkg.DeviceType(disktype),
+		Mode:     pkg.ZDBMode(mode),
 		Password: password,
 		Public:   public,
 	}

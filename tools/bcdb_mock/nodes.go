@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/threefoldtech/zosv2/modules/capacity"
-	"github.com/threefoldtech/zosv2/modules/capacity/dmi"
-	"github.com/threefoldtech/zosv2/modules/network/types"
+	"github.com/threefoldtech/zos/pkg/capacity"
+	"github.com/threefoldtech/zos/pkg/capacity/dmi"
+	"github.com/threefoldtech/zos/pkg/network/types"
 )
 
 func registerNode(w http.ResponseWriter, r *http.Request) {

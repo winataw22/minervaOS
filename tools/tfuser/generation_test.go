@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/threefoldtech/zosv2/modules"
+	"github.com/threefoldtech/zos/pkg"
 )
 
 func mustParseCIDR(cidr string) *net.IPNet {
@@ -18,11 +18,11 @@ func mustParseCIDR(cidr string) *net.IPNet {
 	return ipnet
 }
 
-var peers = []*modules.Peer{
+var peers = []*pkg.Peer{
 	{
-		Type:   modules.ConnTypeWireguard,
+		Type:   pkg.ConnTypeWireguard,
 		Prefix: mustParseCIDR("2a02:1802:5e:ff02::/64"),
-		Connection: modules.Wireguard{
+		Connection: pkg.Wireguard{
 			IP:         net.ParseIP("2001:1:1:1::1"),
 			Port:       1601,
 			Key:        "MAX+6SN7sw5GedMEUcHMbPiaiA0OFKGfa86+O9Pc014=",
@@ -30,9 +30,9 @@ var peers = []*modules.Peer{
 		},
 	},
 	{
-		Type:   modules.ConnTypeWireguard,
+		Type:   pkg.ConnTypeWireguard,
 		Prefix: mustParseCIDR("2a02:1802:5e:cc02::/64"),
-		Connection: modules.Wireguard{
+		Connection: pkg.Wireguard{
 			IP:         net.ParseIP("2001:1:1:2::1"),
 			Port:       1602,
 			Key:        "XhxfA3tJG9VwMRiLGdyVmPb2B+u54lUsJRik4D8Cv2Q=",
@@ -40,9 +40,9 @@ var peers = []*modules.Peer{
 		},
 	},
 	{
-		Type:   modules.ConnTypeWireguard,
+		Type:   pkg.ConnTypeWireguard,
 		Prefix: mustParseCIDR("2a02:1802:5e:aaaa::/64"),
-		Connection: modules.Wireguard{
+		Connection: pkg.Wireguard{
 			IP:         net.ParseIP("2001:3:3:3::3"),
 			Port:       1603,
 			Key:        "QaaAugFQYVs7Hr/FnPUNZ2aWem/tnRB1IZ2lhnBt6Gg=",
@@ -51,11 +51,11 @@ var peers = []*modules.Peer{
 	},
 }
 
-var node1 = &modules.NetResource{
-	NodeID: &modules.NodeID{
+var node1 = &pkg.NetResource{
+	NodeID: &pkg.NodeID{
 		ID:             "qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3",
-		ReachabilityV4: modules.ReachabilityV4Public,
-		ReachabilityV6: modules.ReachabilityV6Public,
+		ReachabilityV4: pkg.ReachabilityV4Public,
+		ReachabilityV6: pkg.ReachabilityV6Public,
 	},
 	Prefix:    mustParseCIDR("2a02:1802:5e:ff02::/64"),
 	LinkLocal: mustParseCIDR("fe80::ff02/64"),
@@ -63,35 +63,35 @@ var node1 = &modules.NetResource{
 	ExitPoint: 1,
 }
 
-var node2 = &modules.NetResource{
-	NodeID: &modules.NodeID{
+var node2 = &pkg.NetResource{
+	NodeID: &pkg.NodeID{
 		ID:             "DLFF6CAshvyhCrpyTHq1dMd6QP6kFyhrVGegTgudk6xk",
-		ReachabilityV4: modules.ReachabilityV4Hidden,
-		ReachabilityV6: modules.ReachabilityV6ULA,
+		ReachabilityV4: pkg.ReachabilityV4Hidden,
+		ReachabilityV6: pkg.ReachabilityV6ULA,
 	},
 	Prefix:    mustParseCIDR("2a02:1802:5e:cc02::/64"),
 	LinkLocal: mustParseCIDR("fe80::cc02/64"),
 	Peers:     peers,
 }
 
-var node3 = &modules.NetResource{
-	NodeID: &modules.NodeID{
+var node3 = &pkg.NetResource{
+	NodeID: &pkg.NodeID{
 		ID:             "37zg5cmfHQdMmzcqdBR7YFRCQZqA35wdEChk7ccR4tNM",
-		ReachabilityV4: modules.ReachabilityV4Public,
-		ReachabilityV6: modules.ReachabilityV6Public,
+		ReachabilityV4: pkg.ReachabilityV4Public,
+		ReachabilityV6: pkg.ReachabilityV6Public,
 	},
 	Prefix:    mustParseCIDR("2a02:1802:5e:aaaa::/64"),
 	LinkLocal: mustParseCIDR("fe80::aaaa/64"),
 	Peers:     peers,
 }
 
-var testNetwork = &modules.Network{
+var testNetwork = &pkg.Network{
 	NetID: "net1",
-	Resources: []*modules.NetResource{
+	Resources: []*pkg.NetResource{
 		node1, node2, node3,
 	},
 	PrefixZero: mustParseCIDR("2a02:1802:5e:0000::/64"),
-	Exit:       &modules.ExitPoint{},
+	Exit:       &pkg.ExitPoint{},
 }
 
 func TestGenWGQuick(t *testing.T) {
