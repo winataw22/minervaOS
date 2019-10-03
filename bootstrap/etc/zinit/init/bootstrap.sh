@@ -40,16 +40,16 @@ default_param() {
 runmode=$(default_param runmode prod)
 
 # set default production flist
-flist=azmy/zos:production:latest.flist
+flist=tf-zos/zos:production:latest.flist
 
 case "${runmode}" in
     prod)
     ;;
     dev)
-        flist=azmy/zos:development:latest.flist
+        flist=tf-zos/zos:development:latest.flist
     ;;
     test)
-        flist=azmy/zos:testing:latest.flist
+        flist=tf-zos/zos:testing:latest.flist
     ;;
     *)
         echo "Invalid run mode '${runmode}'. fall back to production"
