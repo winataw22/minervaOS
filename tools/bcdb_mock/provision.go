@@ -28,6 +28,12 @@ func reserve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := provision.Verify(res); err != nil {
+		errmsg := fmt.Sprintf("reservation signature invalid: %s", err.Error())
+		http.Error(w, errmsg, http.StatusBadRequest)
+		return
+	}
+
 	provStore.Lock()
 	defer provStore.Unlock()
 

@@ -136,7 +136,7 @@ func (w *Wireguard) Configure(privateKey string, listentPort int, peers []*Peer)
 		return errors.Wrap(err, "failed to configure wireguard interface")
 	}
 
-	if err := netlink.LinkSetUp(w); err != nil {
+	if err := netlink.LinkSetUp(w); err != nil && !os.IsExist(err) {
 		return errors.Wrapf(err, "failed to bring wireguard interface %s up", w.Attrs().Name)
 	}
 	return nil

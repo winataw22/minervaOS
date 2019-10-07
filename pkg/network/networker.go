@@ -147,7 +147,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []strin
 		return join, err
 	}
 
-	netRes, err := nr.New(networkdID, localNR)
+	netRes, err := nr.New(networkdID, localNR, network.IPRange)
 	if err != nil {
 		return join, errors.Wrap(err, "failed to load network resource")
 	}
@@ -241,12 +241,12 @@ func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
 // CreateNR implements pkg.Networker interface
 func (n *networker) CreateNR(network pkg.Network) (string, error) {
 	var err error
+	var nodeID = n.identity.NodeID().Identity()
 
-	// TODO: fix me
-	// if err := validateNetwork(&network); err != nil {
-	// 	log.Error().Err(err).Msg("network object format invalid")
-	// 	return "", err
-	// }
+	if err := validateNetwork(&network); err != nil {
+		log.Error().Err(err).Msg("network object format invalid")
+		return "", err
+	}
 
 	b, err := json.Marshal(network)
 	if err != nil {
@@ -256,12 +256,8 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		Str("network", string(b)).
 		Msg("create NR")
 
-	netNR, err := ResourceByNodeID(n.identity.NodeID().Identity(), network.NetResources)
+	netNR, err := ResourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
-		return "", err
-	}
-
-	if err := n.reservePort(netNR.WGListenPort); err != nil {
 		return "", err
 	}
 
@@ -270,7 +266,31 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to extract private key from network object")
 	}
 
-	netr, err := nr.New(network.NetID, netNR)
+	// check if there is a reserved wireguard port for this NR already
+	// or if we need to update it
+	storedNet, err := n.networkOf(string(network.NetID))
+
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+
+	if err == nil {
+		storedNR, err := ResourceByNodeID(nodeID, storedNet.NetResources)
+		if err != nil {
+			return "", err
+		}
+		if netNR.WGListenPort != storedNR.WGListenPort {
+			if err := n.releasePort(storedNR.WGListenPort); err != nil {
+				return "", err
+			}
+		}
+	} else if os.IsNotExist(err) {
+		if err := n.reservePort(netNR.WGListenPort); err != nil {
+			return "", err
+		}
+	}
+
+	netr, err := nr.New(network.NetID, netNR, network.IPRange)
 	if err != nil {
 		return "", err
 	}
@@ -368,7 +388,7 @@ func (n *networker) DeleteNR(network pkg.Network) error {
 		return err
 	}
 
-	nr, err := nr.New(network.NetID, netNR)
+	nr, err := nr.New(network.NetID, netNR, network.IPRange)
 	if err != nil {
 		return errors.Wrap(err, "failed to load network resource")
 	}

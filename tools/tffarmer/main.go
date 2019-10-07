@@ -46,7 +46,7 @@ func main() {
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-		url := c.String("tnodb")
+		url := c.String("bcdb")
 		idStore = identity.NewHTTPIDStore(url)
 		db = tnodb.NewHTTPTNoDB(url)
 

@@ -30,14 +30,16 @@ type NetResource struct {
 	id pkg.NetID
 	// local network resources
 	resource *pkg.NetResource
+	ipRange  *net.IPNet
 }
 
 // New creates a new NetResource object
-func New(networkID pkg.NetID, netResource *pkg.NetResource) (*NetResource, error) {
+func New(networkID pkg.NetID, netResource *pkg.NetResource, ipRange *net.IPNet) (*NetResource, error) {
 
 	nr := &NetResource{
 		id:       networkID,
 		resource: netResource,
+		ipRange:  ipRange,
 	}
 
 	return nr, nil
@@ -248,17 +250,20 @@ func (nr *NetResource) Delete() error {
 }
 
 func (nr *NetResource) routes() ([]*netlink.Route, error) {
-	routes := make([]*netlink.Route, 0, len(nr.resource.Peers))
+	routes := make([]*netlink.Route, 0, len(nr.resource.Peers)+1)
 
 	wgIP := wgIP(nr.resource.Subnet)
 
 	for _, peer := range nr.resource.Peers {
-
 		routes = append(routes, &netlink.Route{
 			Dst: peer.Subnet,
 			Gw:  wgIP.IP,
 		})
 	}
+
+	routes = append(routes, &netlink.Route{
+		Dst: nr.ipRange,
+	})
 
 	return routes, nil
 }

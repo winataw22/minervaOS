@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -77,47 +76,20 @@ func configurePublic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	input := struct {
-		Iface string   `json:"iface"`
-		IPs   []string `json:"ips"`
-		GWs   []string `json:"gateways"`
-		// Type todo allow to chose type of connection
-	}{}
+	version := 0
+	if node.PublicConfig != nil {
+		version = node.PublicConfig.Version
+	}
+	node.PublicConfig = &types.PubIface{}
 
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(node.PublicConfig); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if node.PublicConfig == nil {
-		node.PublicConfig = &types.PubIface{}
-	}
-
 	node.PublicConfig.Type = types.MacVlanIface //TODO: change me once we support other types
-	node.PublicConfig.Master = input.Iface
-	for i := range input.IPs {
-		ip, ipnet, err := net.ParseCIDR(input.IPs[i])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		ipnet.IP = ip
-
-		if ip.To4() != nil {
-			node.PublicConfig.IPv4 = ipnet
-		} else if ip.To16() != nil {
-			node.PublicConfig.IPv6 = ipnet
-		}
-
-		gw := net.ParseIP(input.GWs[i])
-		if gw.To4() != nil {
-			node.PublicConfig.GW4 = gw
-		} else if gw.To16() != nil {
-			node.PublicConfig.GW6 = gw
-		}
-	}
-	node.PublicConfig.Version++
+	node.PublicConfig.Version = version + 1
 
 	w.WriteHeader(http.StatusCreated)
 }
