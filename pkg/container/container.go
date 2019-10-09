@@ -2,7 +2,9 @@ package container
 
 import (
 	"context"
-	"errors"
+
+	"github.com/pkg/errors"
+
 	"fmt"
 	"os"
 	"path"
@@ -17,7 +19,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/google/shlex"
@@ -30,11 +31,11 @@ const (
 
 var (
 	ignoreMntTypes = map[string]struct{}{
-		"proc":   struct{}{},
-		"tmpfs":  struct{}{},
-		"devpts": struct{}{},
-		"mqueue": struct{}{},
-		"sysfs":  struct{}{},
+		"proc":   {},
+		"tmpfs":  {},
+		"devpts": {},
+		"mqueue": {},
+		"sysfs":  {},
 	}
 )
 
@@ -60,79 +61,6 @@ func New(root string, containerd string) pkg.ContainerModule {
 	}
 }
 
-// withNetworkNamespace set the named network namespace to use for the container
-func withNetworkNamespace(name string) oci.SpecOpts {
-	return oci.WithLinuxNamespace(
-		specs.LinuxNamespace{
-			Type: specs.NetworkNamespace,
-			Path: path.Join("/var/run/netns", name),
-		},
-	)
-}
-
-func withHooks(hooks specs.Hooks) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, spec *oci.Spec) error {
-		spec.Hooks = &hooks
-		return nil
-	}
-}
-
-func capsContain(caps []string, s string) bool {
-	for _, c := range caps {
-		if c == s {
-			return true
-		}
-	}
-	return false
-}
-
-func withAddedCapabilities(caps []string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
-		// setCapabilities(s)
-		for _, c := range caps {
-			for _, cl := range []*[]string{
-				&s.Process.Capabilities.Bounding,
-				&s.Process.Capabilities.Effective,
-				&s.Process.Capabilities.Permitted,
-				&s.Process.Capabilities.Inheritable,
-			} {
-				if !capsContain(*cl, c) {
-					*cl = append(*cl, c)
-				}
-			}
-		}
-		return nil
-	}
-}
-
-func (c *containerModule) ensureNamespace(ctx context.Context, client *containerd.Client, namespace string) error {
-	service := client.NamespaceService()
-	namespaces, err := service.List(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, ns := range namespaces {
-		if ns == namespace {
-			return nil
-		}
-	}
-
-	return service.Create(ctx, namespace, nil)
-}
-
-func removeRunMount() oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
-		for i, mount := range s.Mounts {
-			if mount.Destination == "/run" {
-				s.Mounts = append(s.Mounts[:i], s.Mounts[i+1:]...)
-				break
-			}
-		}
-		return nil
-	}
-}
-
 // Run creates and starts a container
 // THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID, err error) {
@@ -155,6 +83,10 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 
 	if data.RootFS == "" {
 		return id, ErrEmptyRootFS
+	}
+
+	if err := setResolvConf(data.RootFS); err != nil {
+		return id, errors.Wrap(err, "failed to set resolv.conf")
 	}
 
 	if data.Interactive {

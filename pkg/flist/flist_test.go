@@ -1,112 +1,202 @@
 package flist
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/flist/mock"
 )
 
-func testFlistModule(t *testing.T) (pkg.Flister, func()) {
+var (
+	templ = template.Must(template.New("script").Parse(`
+echo $PPID > {{.pid}}
+echo "mount ready" > {{.log}}
+`))
+)
+
+// StorageMock is a mock object of the storage modules
+type StorageMock struct {
+	mock.Mock
+}
+
+// CreateFilesystem create filesystem mock
+func (s *StorageMock) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (string, error) {
+	args := s.Called(name, size, poolType)
+	return args.String(0), args.Error(1)
+}
+
+// ReleaseFilesystem releases filesystem mock
+func (s *StorageMock) ReleaseFilesystem(name string) error {
+	args := s.Called(name)
+	return args.Error(0)
+}
+
+// Path implements the pkg.StorageModules interfaces
+func (s *StorageMock) Path(name string) (path string, err error) {
+	args := s.Called(name)
+	return args.String(0), args.Error(1)
+}
+
+type testCommander struct {
+	*testing.T
+	m map[string]string
+}
+
+func (t *testCommander) args(args ...string) (map[string]string, []string) {
+	var lk string
+	v := make(map[string]string)
+	var r []string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			lk = strings.TrimPrefix(arg, "-")
+			v[lk] = ""
+			continue
+		}
+
+		//if no -, then it must be a value.
+		//so if lk is set, update, otherwise append to r
+		if len(lk) > 0 {
+			v[lk] = arg
+			lk = ""
+		} else {
+			r = append(r, arg)
+		}
+	}
+
+	t.m = v
+	return v, r
+}
+
+func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
+	if name != "g8ufs" {
+		t.Fatal("invalid command name, expected 'g8ufs'")
+	}
+
+	m, _ := t.args(args...)
+	var script bytes.Buffer
+	err := templ.Execute(&script, map[string]string{
+		"pid": m["pid"],
+		"log": m["log"],
+	})
+
+	require.NoError(t.T, err)
+
+	return exec.Command("sh", "-c", script.String())
+}
+
+func TestCommander(t *testing.T) {
+	cmder := testCommander{T: t}
+
+	m, r := cmder.args("-pid", "pid-file", "-log", "log-file", "remaining")
+
+	require.Equal(t, []string{"remaining"}, r)
+	require.Equal(t, map[string]string{
+		"pid": "pid-file",
+		"log": "log-file",
+	}, m)
+}
+
+/**
+* TestMount tests that the module actually call the underlying modules an binaries
+* with the correct arguments. It's mocked in a way that does not actually mount
+* an flist, but emulate the call of the g8ufs binary.
+* The method also validate that storage module is called as expected
+ */
+func TestMountUnmount(t *testing.T) {
+	cmder := &testCommander{T: t}
+	strg := &StorageMock{}
+
 	root, err := ioutil.TempDir("", "flist_root")
 	require.NoError(t, err)
 
-	cleanup := func() {
-		os.RemoveAll(root)
-	}
+	defer os.RemoveAll(root)
 
-	return New(root, &mock.StorageMock{}), cleanup
-}
-func TestMountUmount(t *testing.T) {
-	require := require.New(t)
-	assert := assert.New(t)
-	f, cleanup := testFlistModule(t)
-	defer cleanup()
+	flister := newFlister(root, strg, cmder)
 
-	path, err := f.Mount("https://hub.grid.tf/zaibon/ubuntu_bionic.flist", "")
-	require.NoError(err)
+	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
+		Return("/my/backend", nil)
 
-	// check file are accessible
-	assert.NotEqual("", path)
-	infos, err := ioutil.ReadDir(path)
-	require.NoError(err)
-	assert.True(len(infos) > 0)
+	mnt, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
 
-	// check pid file exsists
-	dir, name := filepath.Split(path)
-	dir, _ = filepath.Split(dir[:len(dir)-1])
-	pidPath := filepath.Join(dir, "pid", name) + ".pid"
-	_, err = os.Stat(pidPath)
-	assert.NoError(err)
+	require.NoError(t, err)
 
-	// try to unmount other part of the filesystem
-	err = f.Umount("/mnt/media/disk1")
-	assert.Error(err)
+	// Trick flister into thinking that 0-fs has exited
+	os.Remove(cmder.m["pid"])
+	strg.On("ReleaseFilesystem", filepath.Base(mnt)).Return(nil)
 
-	err = f.Umount(path)
-	assert.NoError(err)
-
-	// check pid file is gone after unmount
-	_, err = os.Stat(pidPath)
-	assert.Error(err)
-	assert.True(os.IsNotExist(err))
+	err = flister.Umount(mnt)
+	require.NoError(t, err)
 }
 
 func TestIsolation(t *testing.T) {
 	require := require.New(t)
-	assert := assert.New(t)
-	f, cleanup := testFlistModule(t)
-	defer cleanup()
 
-	path1, err := f.Mount("https://hub.grid.tf/zaibon/ubuntu_bionic.flist", "")
+	cmder := &testCommander{T: t}
+	strg := &StorageMock{}
+
+	root, err := ioutil.TempDir("", "flist_root")
 	require.NoError(err)
 
-	path2, err := f.Mount("https://hub.grid.tf/zaibon/ubuntu_bionic.flist", "")
+	defer os.RemoveAll(root)
+
+	flister := newFlister(root, strg, cmder)
+
+	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
+		Return("/my/backend", nil)
+
+	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
 	require.NoError(err)
+	args1 := cmder.m
 
-	defer f.Umount(path1)
-	defer f.Umount(path2)
+	path2, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
+	require.NoError(err)
+	args2 := cmder.m
 
-	t.Run("new file isolated", func(t *testing.T) {
-		err = ioutil.WriteFile(filepath.Join(path1, "newfile"), []byte("hello world"), 0660)
-		require.NoError(err)
+	require.NotEqual(path1, path2)
+	require.NotEqual(args1, args2)
 
-		_, err = os.Open(filepath.Join(path2, "newfile"))
-		assert.True(os.IsNotExist(err))
-	})
-
-	t.Run("common file isolation", func(t *testing.T) {
-		targetFile := "etc/resolv.conf"
-		content := []byte("nameserver 1.1.1.1")
-		err = ioutil.WriteFile(filepath.Join(path1, targetFile), content, 0660)
-		require.NoError(err)
-
-		b, err := ioutil.ReadFile(filepath.Join(path2, targetFile))
-		require.NoError(err)
-		assert.NotEqual(content, b)
-	})
+	// the 2 mounts since they are exactly the same flist
+	// should have same meta, and of course same cache
+	// but a different backend and pid
+	require.Equal(args1["cache"], args2["cache"])
+	require.Equal(args1["meta"], args2["meta"])
+	//TODO: the backend url is return by the storage mock, this is why this
+	// is failing.
+	// require.NotEqual(args1["backend"], args2["backend"])
+	require.NotEqual(args1["pid"], args2["pid"])
 }
 
 func TestDownloadFlist(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	x, cleanup := testFlistModule(t)
-	defer cleanup()
+	cmder := &testCommander{T: t}
+	strg := &StorageMock{}
+
+	root, err := ioutil.TempDir("", "flist_root")
+	require.NoError(err)
+
+	//defer os.RemoveAll(root)
+
+	x := newFlister(root, strg, cmder)
 
 	f, ok := x.(*flistModule)
 	require.True(ok)
-	path1, err := f.downloadFlist("https://hub.grid.tf/zaibon/ubuntu_bionic.flist")
+	path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
 	require.NoError(err)
 
 	info1, err := os.Stat(path1)
 	require.NoError(err)
 
-	path2, err := f.downloadFlist("https://hub.grid.tf/zaibon/ubuntu_bionic.flist")
+	path2, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
 	require.NoError(err)
 
 	assert.Equal(path1, path2)

@@ -382,13 +382,13 @@ var onBoardDevicesTests = []SubSection{
 	{
 		Title: "On Board Device 1 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Intel(R) HD Graphics Device",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Video",
 			},
 		},
@@ -396,91 +396,91 @@ var onBoardDevicesTests = []SubSection{
 	{
 		Title: "On Board Device 2 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Intel(R) I219-V Gigabit Network Device",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Ethernet",
 			},
 		},
 	}, {
 		Title: "On Board Device 3 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Realtek High Definition Audio Device",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Sound",
 			},
 		},
 	}, {
 		Title: "On Board Device 4 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "CIR Device",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Other",
 			},
 		},
 	}, {
 		Title: "On Board Device 5 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "SD",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Other",
 			},
 		},
 	}, {
 		Title: "On Board Device 6 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Intel Dual Band Wireless-AC 8265",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Other",
 			},
 		},
 	}, {
 		Title: "On Board Device 7 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Bluetooth",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Enabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Other",
 			},
 		},
 	}, {
 		Title: "On Board Device 8 Information",
 		Properties: map[string]PropertyData{
-			"Description": PropertyData{
+			"Description": {
 				Val: "Thunderbolt",
 			},
-			"Status": PropertyData{
+			"Status": {
 				Val: "Disabled",
 			},
-			"Type": PropertyData{
+			"Type": {
 				Val: "Other",
 			},
 		},
@@ -490,14 +490,14 @@ var onBoardDevicesTests = []SubSection{
 var oemSpecificTypeWithIndentedListItems = SubSection{
 	Title: "OEM-specific Type",
 	Properties: map[string]PropertyData{
-		"Header and Data": PropertyData{
+		"Header and Data": {
 			Val: "",
 			Items: []string{
 				"D8 17 76 00 06 00 01 02 05 20 31 2E 33 2E 31 39",
 				"00 00 00 00 00 00 00",
 			},
 		},
-		"Strings": PropertyData{
+		"Strings": {
 			Val: "",
 			Items: []string{
 				"Chassis Firmware",
@@ -511,53 +511,53 @@ var multpleSectionsWithSameTypeStr = []SubSection{
 	{
 		Title: "Memory Device",
 		Properties: map[string]PropertyData{
-			"Array Handle":             PropertyData{Val: "0x0035"},
-			"Error Information Handle": PropertyData{Val: "Not Provided"},
-			"Total Width":              PropertyData{Val: "64 bits"},
-			"Data Width":               PropertyData{Val: "64 bits"},
-			"Size":                     PropertyData{Val: "8192 MB"},
-			"Form Factor":              PropertyData{Val: "SODIMM"},
-			"Set":                      PropertyData{Val: "None"},
-			"Locator":                  PropertyData{Val: "ChannelA-DIMM0"},
-			"Bank Locator":             PropertyData{Val: "BANK 0"},
-			"Type":                     PropertyData{Val: "DDR4"},
-			"Type Detail":              PropertyData{Val: "Synchronous Unbuffered (Unregistered)"},
-			"Speed":                    PropertyData{Val: "2400 MT/s"},
-			"Manufacturer":             PropertyData{Val: "859B"},
-			"Serial Number":            PropertyData{Val: "E0AD159C"},
-			"Asset Tag":                PropertyData{Val: "9876543210"},
-			"Part Number":              PropertyData{Val: "CT8G4SFD824A.M16FB"},
-			"Rank":                     PropertyData{Val: "2"},
-			"Configured Clock Speed":   PropertyData{Val: "2133 MT/s"},
-			"Minimum Voltage":          PropertyData{Val: "1.2 V"},
-			"Maximum Voltage":          PropertyData{Val: "1.2 V"},
-			"Configured Voltage":       PropertyData{Val: "1.2 V"},
+			"Array Handle":             {Val: "0x0035"},
+			"Error Information Handle": {Val: "Not Provided"},
+			"Total Width":              {Val: "64 bits"},
+			"Data Width":               {Val: "64 bits"},
+			"Size":                     {Val: "8192 MB"},
+			"Form Factor":              {Val: "SODIMM"},
+			"Set":                      {Val: "None"},
+			"Locator":                  {Val: "ChannelA-DIMM0"},
+			"Bank Locator":             {Val: "BANK 0"},
+			"Type":                     {Val: "DDR4"},
+			"Type Detail":              {Val: "Synchronous Unbuffered (Unregistered)"},
+			"Speed":                    {Val: "2400 MT/s"},
+			"Manufacturer":             {Val: "859B"},
+			"Serial Number":            {Val: "E0AD159C"},
+			"Asset Tag":                {Val: "9876543210"},
+			"Part Number":              {Val: "CT8G4SFD824A.M16FB"},
+			"Rank":                     {Val: "2"},
+			"Configured Clock Speed":   {Val: "2133 MT/s"},
+			"Minimum Voltage":          {Val: "1.2 V"},
+			"Maximum Voltage":          {Val: "1.2 V"},
+			"Configured Voltage":       {Val: "1.2 V"},
 		},
 	},
 	{
 		Title: "Memory Device",
 		Properties: map[string]PropertyData{
-			"Array Handle":             PropertyData{Val: "0x0035"},
-			"Error Information Handle": PropertyData{Val: "Not Provided"},
-			"Total Width":              PropertyData{Val: "64 bits"},
-			"Data Width":               PropertyData{Val: "64 bits"},
-			"Size":                     PropertyData{Val: "8192 MB"},
-			"Form Factor":              PropertyData{Val: "SODIMM"},
-			"Set":                      PropertyData{Val: "None"},
-			"Locator":                  PropertyData{Val: "ChannelB-DIMM0"},
-			"Bank Locator":             PropertyData{Val: "BANK 2"},
-			"Type":                     PropertyData{Val: "DDR4"},
-			"Type Detail":              PropertyData{Val: "Synchronous Unbuffered (Unregistered)"},
-			"Speed":                    PropertyData{Val: "2400 MT/s"},
-			"Manufacturer":             PropertyData{Val: "859B"},
-			"Serial Number":            PropertyData{Val: "E0AD159D"},
-			"Asset Tag":                PropertyData{Val: "9876543210"},
-			"Part Number":              PropertyData{Val: "CT8G4SFD824A.M16FB"},
-			"Rank":                     PropertyData{Val: "2"},
-			"Configured Clock Speed":   PropertyData{Val: "2133 MT/s"},
-			"Minimum Voltage":          PropertyData{Val: "1.2 V"},
-			"Maximum Voltage":          PropertyData{Val: "1.2 V"},
-			"Configured Voltage":       PropertyData{Val: "1.2 V"},
+			"Array Handle":             {Val: "0x0035"},
+			"Error Information Handle": {Val: "Not Provided"},
+			"Total Width":              {Val: "64 bits"},
+			"Data Width":               {Val: "64 bits"},
+			"Size":                     {Val: "8192 MB"},
+			"Form Factor":              {Val: "SODIMM"},
+			"Set":                      {Val: "None"},
+			"Locator":                  {Val: "ChannelB-DIMM0"},
+			"Bank Locator":             {Val: "BANK 2"},
+			"Type":                     {Val: "DDR4"},
+			"Type Detail":              {Val: "Synchronous Unbuffered (Unregistered)"},
+			"Speed":                    {Val: "2400 MT/s"},
+			"Manufacturer":             {Val: "859B"},
+			"Serial Number":            {Val: "E0AD159D"},
+			"Asset Tag":                {Val: "9876543210"},
+			"Part Number":              {Val: "CT8G4SFD824A.M16FB"},
+			"Rank":                     {Val: "2"},
+			"Configured Clock Speed":   {Val: "2133 MT/s"},
+			"Minimum Voltage":          {Val: "1.2 V"},
+			"Maximum Voltage":          {Val: "1.2 V"},
+			"Configured Voltage":       {Val: "1.2 V"},
 		},
 	},
 }

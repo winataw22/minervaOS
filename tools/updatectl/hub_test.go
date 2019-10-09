@@ -22,8 +22,8 @@ func newTestHub(baseURL, user, token string) (*Hub, error) {
 	}
 
 	jar.SetCookies(base, []*http.Cookie{
-		&http.Cookie{Name: "caddyoauth", Value: token},
-		&http.Cookie{Name: "active-user", Value: user},
+		{Name: "caddyoauth", Value: token},
+		{Name: "active-user", Value: user},
 	})
 
 	return &Hub{client: http.Client{Jar: jar}, base: base}, nil

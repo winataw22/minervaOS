@@ -47,7 +47,7 @@ check: test
 test: verifiers build
 	# we already ran vet separately, so safe to turn it off here
 	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
-	for pkg in $(shell go list ./... | grep -Ev "stubs|flist|provision|network|storage|gedis" ); do \
+	for pkg in $(shell go list ./... | grep -Ev "stubs|provision|network" ); do \
 		go test -v -vet=off $$pkg; \
 	done
 

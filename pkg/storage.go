@@ -37,8 +37,8 @@ type DeviceType string
 
 // Known device types
 const (
-	SSDDevice = "SSD"
-	HDDDevice = "HDD"
+	SSDDevice DeviceType = "SSD"
+	HDDDevice DeviceType = "HDD"
 )
 
 // Validate make sure profile is correct
@@ -52,7 +52,7 @@ func (p RaidProfile) Validate() error {
 
 var (
 	raidProfiles = map[RaidProfile]struct{}{
-		Single: struct{}{}, Raid1: struct{}{}, Raid10: struct{}{},
+		Single: {}, Raid1: {}, Raid10: {},
 	}
 	// DefaultPolicy value
 	DefaultPolicy = StoragePolicy{

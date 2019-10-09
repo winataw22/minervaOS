@@ -14,7 +14,7 @@ func generateVolume(c *cli.Context) error {
 	s := c.Uint64("size")
 	t := strings.ToUpper(c.String("type"))
 
-	if t != pkg.HDDDevice && t != pkg.SSDDevice {
+	if pkg.DeviceType(t) != pkg.HDDDevice && pkg.DeviceType(t) != pkg.SSDDevice {
 		return fmt.Errorf("volume type can only HHD or SSD")
 	}
 

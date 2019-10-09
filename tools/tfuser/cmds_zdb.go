@@ -18,7 +18,7 @@ func generateZDB(c *cli.Context) error {
 		public   = c.Bool("Public")
 	)
 
-	if disktype != pkg.HDDDevice && disktype != pkg.SSDDevice {
+	if pkg.DeviceType(disktype) != pkg.HDDDevice && pkg.DeviceType(disktype) != pkg.SSDDevice {
 		return fmt.Errorf("volume type can only 'HHD' or 'SSD'")
 	}
 

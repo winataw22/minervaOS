@@ -150,14 +150,9 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 		Epoch:      schema.Date{r.Created},
 	}
 
-	b, err := json.Marshal(result)
-	if err != nil {
-		return err
-	}
-
 	_, err = g.Send("workload_manager", "set_workload_result", Args{
 		"reservation_id": rID,
-		"result":         b,
+		"result":         result,
 	})
 	return err
 }

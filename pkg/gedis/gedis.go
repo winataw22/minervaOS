@@ -38,12 +38,17 @@ var (
 // Args is a helper to create map easily
 type Args map[string]interface{}
 
+// Pool is interface for a redis pool
+type Pool interface {
+	Get() redis.Conn
+	Close() error
+}
+
 // Gedis struct represent a client to a gedis server
 type Gedis struct {
-	pool      *redis.Pool
+	pool      Pool
 	namespace string
 	password  string
-	conn      redis.Conn
 }
 
 // New creates a new Gedis client
@@ -63,12 +68,6 @@ func New(address, namespace, password string) (*Gedis, error) {
 // Close closes all connection to the gedis server and stops
 // the close the connection pool
 func (g *Gedis) Close() error {
-	if g.conn != nil {
-		if err := g.conn.Close(); err != nil {
-			return err
-		}
-		g.conn = nil
-	}
 	return g.pool.Close()
 }
 

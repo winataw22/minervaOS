@@ -203,22 +203,22 @@ loaders= (LO) !jumpscale.digitalme.package.loader
 	if ok := assert.Equal(t, &Object{
 		URL: "jumpscale.digitalme.package",
 		Properties: []Property{
-			Property{Name: "name", Type: Type{
+			{Name: "name", Type: Type{
 				Default: `"UNKNOWN"`,
 				Kind:    StringKind,
 			}},
-			Property{Name: "enable", Type: Type{
+			{Name: "enable", Type: Type{
 				Default: `true`,
 				Kind:    BoolKind,
 			}},
-			Property{Name: "args", Type: Type{
+			{Name: "args", Type: Type{
 				Kind: ListKind,
 				Element: &Type{
 					Kind:      ObjectKind,
 					Reference: "jumpscale.digitalme.package.arg",
 				},
 			}},
-			Property{Name: "loaders", Type: Type{
+			{Name: "loaders", Type: Type{
 				Kind: ListKind,
 				Element: &Type{
 					Kind:      ObjectKind,
@@ -262,22 +262,22 @@ func TestNew(t *testing.T) {
 	if ok := assert.Equal(t, &Object{
 		URL: "jumpscale.digitalme.package",
 		Properties: []Property{
-			Property{Name: "name", Type: Type{
+			{Name: "name", Type: Type{
 				Default: `"UNKNOWN"`,
 				Kind:    StringKind,
 			}},
-			Property{Name: "enable", Type: Type{
+			{Name: "enable", Type: Type{
 				Default: `true`,
 				Kind:    BoolKind,
 			}},
-			Property{Name: "args", Type: Type{
+			{Name: "args", Type: Type{
 				Kind: ListKind,
 				Element: &Type{
 					Kind:      ObjectKind,
 					Reference: "jumpscale.digitalme.package.arg",
 				},
 			}},
-			Property{Name: "loaders", Type: Type{
+			{Name: "loaders", Type: Type{
 				Kind: ListKind,
 				Element: &Type{
 					Kind:      ObjectKind,
@@ -292,11 +292,11 @@ func TestNew(t *testing.T) {
 	if ok := assert.Equal(t, &Object{
 		URL: "jumpscale.digitalme.package.arg",
 		Properties: []Property{
-			Property{Name: "key", Type: Type{
+			{Name: "key", Type: Type{
 				Default: `""`,
 				Kind:    StringKind,
 			}},
-			Property{Name: "val", Type: Type{
+			{Name: "val", Type: Type{
 				Default: `""`,
 				Kind:    StringKind,
 			}},
@@ -308,13 +308,13 @@ func TestNew(t *testing.T) {
 	if ok := assert.Equal(t, &Object{
 		URL: "jumpscale.digitalme.package.loader",
 		Properties: []Property{
-			Property{Name: "giturl", Type: Type{
+			{Name: "giturl", Type: Type{
 				Kind: StringKind,
 			}},
-			Property{Name: "dest", Type: Type{
+			{Name: "dest", Type: Type{
 				Kind: StringKind,
 			}},
-			Property{Name: "enable", Type: Type{
+			{Name: "enable", Type: Type{
 				Default: "true",
 				Kind:    BoolKind,
 			}},

@@ -1,11 +1,13 @@
 package filesystem
 
 import (
+	"context"
 	"testing"
 
 	"github.com/threefoldtech/zos/pkg"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -236,4 +238,125 @@ qgroupid         rfer         excl     max_rfer     max_excl
 		MaxRfer: 1073741824,
 		MaxExcl: 0,
 	}, g)
+}
+
+func TestBtrfsList(t *testing.T) {
+	const tmp = `Label: 'pool-name'  uuid: 081717ad-77d5-488a-afd0-ab9108784f70
+Total devices 1 FS bytes used 206665822208
+devid    1 size 462713520128 used 211548110848 path /dev/sdb2
+`
+
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "filesystem", "show", "--raw", "-m", "pool-name").
+		Return([]byte(tmp), nil)
+
+	fs, err := utils.List(context.Background(), "pool-name", true)
+	require.NoError(err)
+	require.Len(fs, 1)
+}
+
+func TestBtrfsGetDiskUsage(t *testing.T) {
+	const tmp = `Data, single: total=8388608, used=65536
+System, single: total=4194304, used=16384
+Metadata, single: total=276824064, used=163840
+GlobalReserve, single: total=16777216, used=0
+	`
+
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "filesystem", "df", "--raw", "/mnt/pool").
+		Return([]byte(tmp), nil)
+
+	usage, err := utils.GetDiskUsage(context.Background(), "/mnt/pool")
+	require.NoError(err)
+
+	require.EqualValues(65536, usage.Data.Used)
+	require.EqualValues(163840, usage.Metadata.Used)
+}
+
+func TestBtrfsAddDevice(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	// pool must be mounted
+	exec.On("run", mock.Anything, "btrfs", "device", "add", "/tmp/dev1", "/tmp/root").
+		Return([]byte{}, nil)
+
+	err := utils.DeviceAdd(context.Background(), "/tmp/dev1", "/tmp/root")
+	require.NoError(err)
+}
+
+func TestBtrfsRemoveDevice(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	// pool must be mounted
+	exec.On("run", mock.Anything, "btrfs", "device", "remove", "/tmp/dev1", "/tmp/root").
+		Return([]byte{}, nil)
+
+	err := utils.DeviceRemove(context.Background(), "/tmp/dev1", "/tmp/root")
+	require.NoError(err)
+}
+
+func TestBtrfsAddVolume(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "subvolume", "create", "/tmp/root/subvol1").
+		Return([]byte{}, nil)
+
+	err := utils.SubvolumeAdd(context.Background(), "/tmp/root/subvol1")
+	require.NoError(err)
+}
+
+func TestBtrfsRemoveVolume(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "subvolume", "delete", "/tmp/root/subvol1").
+		Return([]byte{}, nil)
+
+	err := utils.SubvolumeRemove(context.Background(), "/tmp/root/subvol1")
+	require.NoError(err)
+}
+
+func TestBtrfsQGroupLimit(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "qgroup", "limit", "100", "/tmp/root/subvol1").
+		Return([]byte{}, nil)
+
+	err := utils.QGroupLimit(context.Background(), 100, "/tmp/root/subvol1")
+	require.NoError(err)
+}
+
+func TestBtrfsQGroupUnLimit(t *testing.T) {
+	require := require.New(t)
+
+	var exec TestExecuter
+	utils := newUtils(&exec)
+
+	exec.On("run", mock.Anything, "btrfs", "qgroup", "limit", "none", "/tmp/root/subvol1").
+		Return([]byte{}, nil)
+
+	err := utils.QGroupLimit(context.Background(), 0, "/tmp/root/subvol1")
+	require.NoError(err)
 }

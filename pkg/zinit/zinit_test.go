@@ -28,19 +28,19 @@ sshd: Running`
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]ServiceState{
-		"ntp":            ServiceState{state: ServiceStateRunning},
-		"telnetd":        ServiceState{state: ServiceStateRunning},
-		"network-dhcp":   ServiceState{state: ServiceStateSuccess},
-		"haveged":        ServiceState{state: ServiceStateSuccess},
-		"debug-tty":      ServiceState{state: ServiceStateRunning},
-		"routing":        ServiceState{state: ServiceStateSuccess},
-		"udevd":          ServiceState{state: ServiceStateRunning},
-		"dhcp_zos":       ServiceState{state: ServiceStateRunning},
-		"udev-trigger":   ServiceState{state: ServiceStateSuccess},
-		"sshd-setup":     ServiceState{state: ServiceStateSuccess},
-		"local-modprobe": ServiceState{state: ServiceStateSuccess},
-		"networkd":       ServiceState{state: ServiceStateError, reason: "exited(pid(1592), 1)"},
-		"sshd":           ServiceState{state: ServiceStateRunning},
+		"ntp":            {state: ServiceStateRunning},
+		"telnetd":        {state: ServiceStateRunning},
+		"network-dhcp":   {state: ServiceStateSuccess},
+		"haveged":        {state: ServiceStateSuccess},
+		"debug-tty":      {state: ServiceStateRunning},
+		"routing":        {state: ServiceStateSuccess},
+		"udevd":          {state: ServiceStateRunning},
+		"dhcp_zos":       {state: ServiceStateRunning},
+		"udev-trigger":   {state: ServiceStateSuccess},
+		"sshd-setup":     {state: ServiceStateSuccess},
+		"local-modprobe": {state: ServiceStateSuccess},
+		"networkd":       {state: ServiceStateError, reason: "exited(pid(1592), 1)"},
+		"sshd":           {state: ServiceStateRunning},
 	}, services)
 }
 

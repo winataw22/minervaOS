@@ -28,6 +28,16 @@ const (
 
 const mib = 1024 * 1024
 
+type commander interface {
+	Command(name string, arg ...string) *exec.Cmd
+}
+
+type cmd func(name string, arg ...string) *exec.Cmd
+
+func (c cmd) Command(name string, args ...string) *exec.Cmd {
+	return c(name, args...)
+}
+
 type flistModule struct {
 	// root directory where all
 	// the working file of the module will be located
@@ -41,11 +51,11 @@ type flistModule struct {
 	pid        string
 	log        string
 
-	storage pkg.VolumeAllocater
+	storage   pkg.VolumeAllocater
+	commander commander
 }
 
-// New creates a new flistModule
-func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
+func newFlister(root string, storage pkg.VolumeAllocater, commander commander) pkg.Flister {
 	if root == "" {
 		root = defaultRoot
 	}
@@ -69,8 +79,14 @@ func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
 		pid:        filepath.Join(root, "pid"),
 		log:        filepath.Join(root, "log"),
 
-		storage: storage,
+		storage:   storage,
+		commander: commander,
 	}
+}
+
+// New creates a new flistModule
+func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
+	return newFlister(root, storage, cmd(exec.Command))
 }
 
 // Mount implements the Flister.Mount interface
@@ -117,7 +133,7 @@ func (f *flistModule) Mount(url, storage string) (string, error) {
 		mountpoint,
 	}
 	sublog.Info().Strs("args", args).Msg("starting 0-fs daemon")
-	cmd := exec.Command("g8ufs", args...)
+	cmd := f.commander.Command("g8ufs", args...)
 
 	if out, err := cmd.CombinedOutput(); err != nil {
 		sublog.Err(err).Str("out", string(out)).Msg("fail to start 0-fs daemon")
@@ -161,7 +177,7 @@ func (f *flistModule) Umount(path string) error {
 	_, name := filepath.Split(path)
 	pidPath := filepath.Join(f.pid, name) + ".pid"
 	if err := waitPidFile(time.Second*2, pidPath, false); err != nil {
-		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stopped properly")
+		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stop properly")
 		return err
 	}
 

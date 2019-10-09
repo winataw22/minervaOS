@@ -3,29 +3,23 @@ package filesystem
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 )
 
-// getMountTarget returns the mount target of a device or false if the
-// device is not mounted.
-// panic, it panics if it can't read /proc/mounts
-func getMountTarget(device string) (string, bool) {
-	file, err := os.Open("/proc/mounts")
-	if err != nil {
-		panic(fmt.Errorf("failed to read /proc/mounts: %s", err))
-	}
-
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
+func getMountTarget(f io.Reader, device string) (string, bool) {
+	scanner := bufio.NewScanner(f)
 
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
+		line := strings.TrimSpace(scanner.Text())
+		if len(line) == 0 {
+			continue
+		}
+		fields := strings.Fields(line)
 		if fields[0] == device {
 			return fields[1], true
 		}
@@ -34,8 +28,22 @@ func getMountTarget(device string) (string, bool) {
 	return "", false
 }
 
-// IsPathMounted checks if a path is mounted on a disk
-func IsPathMounted(path string) bool {
+// GetMountTarget returns the mount target of a device or false if the
+// device is not mounted.
+// panic, it panics if it can't read /proc/mounts
+func GetMountTarget(device string) (string, bool) {
+	file, err := os.Open("/proc/mounts")
+	if err != nil {
+		panic(fmt.Errorf("failed to read /proc/mounts: %s", err))
+	}
+
+	defer file.Close()
+
+	return getMountTarget(file, device)
+}
+
+// IsMountPoint checks if a path is a mount point
+func IsMountPoint(path string) bool {
 	file, err := os.Open("/proc/mounts")
 	if err != nil {
 		panic(fmt.Errorf("failed to read /proc/mounts: %s", err))
@@ -61,22 +69,14 @@ func BindMount(src Volume, target string) error {
 	return syscall.Mount(src.Path(), target, src.FsType(), syscall.MS_BIND, "")
 }
 
-// seektime uses the seektime binary to try and determine the type of a disk
-// This function returns the type of the device, as reported by seektime,
-// and the elapsed time in microseconds (also reported by seektime)
-func seektime(ctx context.Context, path string) (string, uint64, error) {
-	bytes, err := run(ctx, "seektime", "-j", path)
-	if err != nil {
-		return "", 0, err
-	}
+type executer interface {
+	run(ctx context.Context, name string, args ...string) ([]byte, error)
+}
 
-	var seekTime struct {
-		Typ  string `json:"type"`
-		Time uint64 `json:"elapsed"`
-	}
+type executerFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
 
-	err = json.Unmarshal(bytes, &seekTime)
-	return seekTime.Typ, seekTime.Time, err
+func (e executerFunc) run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return e(ctx, name, args...)
 }
 
 func run(ctx context.Context, name string, args ...string) ([]byte, error) {

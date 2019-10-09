@@ -17,11 +17,11 @@ type DeviceManager interface {
 	// Devices finds all devices on a system
 	Devices(ctx context.Context) (DeviceCache, error)
 	// ByLabel finds all devices with the specified label
-	ByLabel(ctx context.Context, label string) (DeviceCache, error)
+	ByLabel(ctx context.Context, label string) ([]*Device, error)
 }
 
 // DeviceCache represents a list of cached in memory devices
-type DeviceCache []*Device
+type DeviceCache []Device
 
 // FSType type of filesystem on device
 type FSType string
@@ -40,11 +40,16 @@ type Device struct {
 	Children   []Device       `json:"children"`
 	DiskType   pkg.DeviceType `json:"-"`
 	ReadTime   uint64         `json:"-"`
+	//HasPartions is different from children, because once the
+	//devices are flattend in the device, cache, the children list is
+	//zeroed (since all devices are flat), then has partions is set to
+	//make sure the device is not altered.
+	HasPartions bool `json:"-"`
 }
 
 // Used assumes that the device is used if it has custom label or fstype or children
 func (d *Device) Used() bool {
-	return len(d.Label) != 0 || len(d.Filesystem) != 0 || len(d.Children) > 0
+	return len(d.Label) != 0 || len(d.Filesystem) != 0 || len(d.Children) > 0 || d.HasPartions
 }
 
 // lsblkDeviceManager uses the lsblk utility to scann the disk for devices, and
@@ -53,13 +58,19 @@ func (d *Device) Used() bool {
 // Found devices are cached, and the cache is only repopulated after the `Scan`
 // method is called.
 type lsblkDeviceManager struct {
+	executer
 	devices DeviceCache
 }
 
 // DefaultDeviceManager returns a default device manager implementation
 func DefaultDeviceManager(ctx context.Context) (DeviceManager, error) {
+	return defaultDeviceManager(ctx, executerFunc(run))
+}
+
+func defaultDeviceManager(ctx context.Context, exec executer) (DeviceManager, error) {
 	m := &lsblkDeviceManager{
-		devices: DeviceCache{},
+		devices:  DeviceCache{},
+		executer: exec,
 	}
 
 	err := m.scan(ctx)
@@ -71,10 +82,11 @@ func (l *lsblkDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
 	return l.devices, nil
 }
 
-func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (DeviceCache, error) {
-	var filtered DeviceCache
+func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) ([]*Device, error) {
+	var filtered []*Device
 
-	for _, device := range l.devices {
+	for idx := range l.devices {
+		device := &l.devices[idx]
 		if device.Label == label {
 			filtered = append(filtered, device)
 		}
@@ -86,7 +98,7 @@ func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (DeviceC
 func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device *Device, err error) {
 	for idx := range l.devices {
 		if l.devices[idx].Path == path {
-			return l.devices[idx], nil
+			return &l.devices[idx], nil
 		}
 	}
 
@@ -96,7 +108,7 @@ func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device *D
 
 // scan the system for disks using the `lsblk` command
 func (l *lsblkDeviceManager) scan(ctx context.Context) error {
-	bytes, err := run(ctx, "lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2,11", "--path")
+	bytes, err := l.run(ctx, "lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2,11", "--path")
 	if err != nil {
 		return err
 	}
@@ -109,70 +121,82 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) error {
 		return err
 	}
 
-	typedDevs, err := setDeviceTypes(devices.BlockDevices)
-	if err != nil {
+	devs := DeviceCache(devices.BlockDevices)
+
+	if err := l.setDeviceTypes(devs); err != nil {
 		return err
 	}
 
-	var devs DeviceCache
-
-	for idx := range typedDevs {
-		devs = append(devs, &typedDevs[idx])
-	}
-
-	l.devices = flattenDevices(devs)
+	l.devices = l.flattenDevices(devs)
 
 	return nil
 }
 
-func flattenDevices(devices DeviceCache) DeviceCache {
-	list := DeviceCache{}
-	for idx := range devices {
-		list = append(list, devices[idx])
-		if devices[idx].Children != nil {
-			childCache := DeviceCache{}
-			for jdx := range devices[idx].Children {
-				childCache = append(childCache, &devices[idx].Children[jdx])
-			}
-			list = append(list, flattenDevices(childCache)...)
-		}
+// seektime uses the seektime binary to try and determine the type of a disk
+// This function returns the type of the device, as reported by seektime,
+// and the elapsed time in microseconds (also reported by seektime)
+func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string, uint64, error) {
+	bytes, err := l.run(ctx, "seektime", "-j", path)
+	if err != nil {
+		return "", 0, err
 	}
+
+	var seekTime struct {
+		Typ  string `json:"type"`
+		Time uint64 `json:"elapsed"`
+	}
+
+	err = json.Unmarshal(bytes, &seekTime)
+	return seekTime.Typ, seekTime.Time, err
+}
+
+func (l *lsblkDeviceManager) flattenDevices(devices DeviceCache) DeviceCache {
+	var list DeviceCache
+	for _, device := range devices {
+		children := device.Children
+		device.Children = nil
+		if len(children) > 0 {
+			device.HasPartions = true
+		}
+		list = append(list, device)
+		list = append(list, l.flattenDevices(children)...)
+	}
+
 	return list
 }
 
-func setDeviceTypes(devices []Device) ([]Device, error) {
-	list := []Device{}
-	for _, d := range devices {
+func (l *lsblkDeviceManager) setDeviceTypes(devices []Device) error {
+	for idx := range devices {
+		d := &devices[idx]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		typ, rt, err := seektime(ctx, d.Path)
+		typ, rt, err := l.seektime(ctx, d.Path)
 		if err != nil {
 			// don't include errored devices in the result
 			log.Error().Msgf("Failed to get disk read time: %v", err)
-			return nil, err
+			return err
 		}
 
-		setDeviceType(&d, deviceTypeFromString(typ), rt)
-
-		list = append(list, d)
+		l.setDeviceType(d, l.deviceTypeFromString(typ), rt)
 	}
 
-	return list, nil
+	return nil
 }
 
 // setDeviceType recursively sets a device type and read time on a device and
 // all of its children
-func setDeviceType(device *Device, typ pkg.DeviceType, readTime uint64) {
+func (l *lsblkDeviceManager) setDeviceType(device *Device, typ pkg.DeviceType, readTime uint64) {
 	device.DiskType = typ
 	device.ReadTime = readTime
 
-	for _, dev := range device.Children {
-		setDeviceType(&dev, typ, readTime)
+	for idx := range device.Children {
+		dev := &device.Children[idx]
+		l.setDeviceType(dev, typ, readTime)
 	}
 }
 
-func deviceTypeFromString(typ string) pkg.DeviceType {
+func (l *lsblkDeviceManager) deviceTypeFromString(typ string) pkg.DeviceType {
 	switch typ {
 	case string(pkg.SSDDevice):
 		return pkg.SSDDevice

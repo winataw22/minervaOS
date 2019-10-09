@@ -53,6 +53,11 @@ func New() (pkg.StorageModule, error) {
 		Disks:    1,
 		MaxPools: 0,
 	})
+
+	if err == nil {
+		log.Info().Msgf("Finished initializing storage module")
+	}
+
 	return s, err
 }
 
@@ -86,7 +91,6 @@ What Initialize will do is the following:
 **/
 func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 	log.Info().Msgf("Initializing storage module")
-	defer log.Info().Msgf("Finished initializing storage module")
 
 	// Make sure we finish in 1 minute
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
@@ -172,14 +176,14 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 
 		for i := 0; i < possiblePools; i++ {
 			log.Debug().Msgf("Creating new volume %d", i)
-			poolDevices := filesystem.DeviceCache{}
+			poolDevices := []*filesystem.Device{}
 
 			for j := 0; j < int(policy.Disks); j++ {
 				log.Debug().Msgf("Grabbing device %d: %s for new volume", i*int(policy.Disks)+j, fdisks[idx][i*int(policy.Disks)+j].Path)
-				poolDevices = append(poolDevices, fdisks[idx][i*int(policy.Disks)+j])
+				poolDevices = append(poolDevices, &fdisks[idx][i*int(policy.Disks)+j])
 			}
 
-			pool, err := fs.Create(ctx, uuid.New().String(), poolDevices, policy.Raid)
+			pool, err := fs.Create(ctx, uuid.New().String(), policy.Raid, poolDevices...)
 			if err != nil {
 				return err
 			}
@@ -297,7 +301,7 @@ func (s *storageModule) ensureCache() error {
 		cacheFs = fs
 	}
 
-	if !filesystem.IsPathMounted(cacheTarget) {
+	if !filesystem.IsMountPoint(cacheTarget) {
 		log.Debug().Msgf("Mounting cache partition in %s", cacheTarget)
 		return filesystem.BindMount(cacheFs, cacheTarget)
 	}
