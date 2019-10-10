@@ -188,9 +188,15 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 
 	container := stubs.NewContainerModuleStub(client)
 	flist := stubs.NewFlisterStub(client)
+	networkMgr := stubs.NewNetworkerStub(client)
 
 	tenantNS := fmt.Sprintf("ns%s", reservation.User)
 	containerID := pkg.ContainerID(reservation.ID)
+
+	var config Container
+	if err := json.Unmarshal(reservation.Data, &config); err != nil {
+		return err
+	}
 
 	info, err := container.Inspect(tenantNS, containerID)
 	if err != nil {
@@ -211,6 +217,11 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 
 	if err := flist.Umount(rootFS); err != nil {
 		return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
+	}
+
+	netID := networkID(reservation.User, string(config.Network.NetwokID))
+	if err := networkMgr.Leave(netID, string(containerID)); err != nil {
+		return errors.Wrap(err, "failed to delete container network namespace")
 	}
 
 	return nil
