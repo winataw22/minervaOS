@@ -9,4 +9,3 @@ after:
   - node-ready
   - storaged
   - internet
-  - identityd

@@ -66,8 +66,8 @@ func configPublic(c *cli.Context) error {
 
 	if err := db.SetPublicIface(pkg.StrIdentifier(node), &types.PubIface{
 		Master: iface,
-		IPv4:   nv4,
-		IPv6:   nv6,
+		IPv4:   types.NewIPNet(nv4),
+		IPv6:   types.NewIPNet(nv6),
 		GW4:    gw4,
 		GW6:    gw6,
 	}); err != nil {

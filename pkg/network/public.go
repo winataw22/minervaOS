@@ -65,7 +65,7 @@ func CreatePublicNS(iface *types.PubIface) error {
 		Str("pub iface", fmt.Sprintf("%+v", pubIface)).
 		Msg("configure public interface inside public namespace")
 
-	if iface.IPv6 != nil && iface.GW6 != nil {
+	if !iface.IPv6.Nil() && iface.GW6 != nil {
 		routes = append(routes, &netlink.Route{
 			Dst: &net.IPNet{
 				IP:   net.ParseIP("::"),
@@ -74,9 +74,9 @@ func CreatePublicNS(iface *types.PubIface) error {
 			Gw:        iface.GW6,
 			LinkIndex: pubIface.Attrs().Index,
 		})
-		ips = append(ips, iface.IPv6)
+		ips = append(ips, &iface.IPv6.IPNet)
 	}
-	if iface.IPv4 != nil && iface.GW4 != nil {
+	if !iface.IPv4.Nil() && iface.GW4 != nil {
 		routes = append(routes, &netlink.Route{
 			Dst: &net.IPNet{
 				IP:   net.ParseIP("0.0.0.0"),
@@ -85,7 +85,7 @@ func CreatePublicNS(iface *types.PubIface) error {
 			Gw:        iface.GW4,
 			LinkIndex: pubIface.Attrs().Index,
 		})
-		ips = append(ips, iface.IPv4)
+		ips = append(ips, &iface.IPv4.IPNet)
 	}
 
 	if len(ips) <= 0 || len(routes) <= 0 {

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"net"
 	"os"
 	"time"
 
@@ -141,10 +140,10 @@ func getLocalInterfaces() ([]types.IfaceInfo, error) {
 
 		info := types.IfaceInfo{
 			Name:  link.Attrs().Name,
-			Addrs: make([]*net.IPNet, len(addrs)),
+			Addrs: make([]types.IPNet, len(addrs)),
 		}
 		for i, addr := range addrs {
-			info.Addrs[i] = addr.IPNet
+			info.Addrs[i] = types.NewIPNet(addr.IPNet)
 		}
 
 		if gw != nil {

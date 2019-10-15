@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"strconv"
 
 	"github.com/jbenet/go-base58"
@@ -142,10 +141,10 @@ func infFromSchema(inf directory.TfgridNodeIface1) types.IfaceInfo {
 	return types.IfaceInfo{
 		Name:    inf.Name,
 		Gateway: inf.Gateway,
-		Addrs: func() []*net.IPNet {
-			var r []*net.IPNet
+		Addrs: func() []types.IPNet {
+			var r []types.IPNet
 			for _, addr := range inf.Addrs {
-				r = append(r, &addr.IPNet)
+				r = append(r, types.NewIPNetFromSchema(addr))
 			}
 			return r
 		}(),
@@ -174,8 +173,8 @@ func nodeFromSchema(node directory.TfgridNode2) types.Node {
 			pub := types.PubIface{
 				Master:  cfg.Master,
 				Type:    types.IfaceType(cfg.Type.String()),
-				IPv4:    &cfg.Ipv4.IPNet,
-				IPv6:    &cfg.Ipv6.IPNet,
+				IPv4:    types.NewIPNetFromSchema(cfg.Ipv4),
+				IPv6:    types.NewIPNetFromSchema(cfg.Ipv6),
 				GW4:     cfg.Gw4,
 				GW6:     cfg.Gw6,
 				Version: int(cfg.Version),

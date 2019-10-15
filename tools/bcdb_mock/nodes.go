@@ -17,19 +17,22 @@ func registerNode(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	n := &types.Node{}
+	n := node{}
 	if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("node registered: %+v\n", n)
+
 	i, ok := nodeStore[n.NodeID]
 	if !ok || i.Node == nil {
-		nodeStore[n.NodeID] = &node{Node: n}
+		nodeStore[n.NodeID] = &n
 
 	} else {
 		i.NodeID = n.NodeID
 		i.FarmID = n.FarmID
+		i.Version = n.Version
 	}
 
 	w.WriteHeader(http.StatusCreated)

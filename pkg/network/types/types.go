@@ -1,9 +1,10 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
+
+	"github.com/threefoldtech/zos/pkg/schema"
 )
 
 // IfaceType define the different public interface supported
@@ -20,76 +21,9 @@ const (
 // that the node will publish publicly
 // this is used to be able to configure public side of a node
 type IfaceInfo struct {
-	Name    string       `json:"name"`
-	Addrs   []*net.IPNet `json:"addrs"`
-	Gateway []net.IP     `json:"gateway"`
-}
-
-// MarshalJSON implements encoding/json.Unmarshaler
-func (i *IfaceInfo) MarshalJSON() ([]byte, error) {
-	tmp := struct {
-		Name    string   `json:"name"`
-		Addrs   []string `json:"addrs"`
-		Gateway []string `json:"gateway"`
-	}{
-		Name:    i.Name,
-		Addrs:   make([]string, 0, len(i.Addrs)),
-		Gateway: make([]string, 0, len(i.Gateway)),
-	}
-	for _, addr := range i.Addrs {
-		if addr == nil {
-			continue
-		}
-		tmp.Addrs = append(tmp.Addrs, addr.String())
-	}
-	for _, gw := range i.Gateway {
-		if gw == nil {
-			continue
-		}
-		tmp.Gateway = append(tmp.Gateway, gw.String())
-	}
-
-	return json.Marshal(tmp)
-}
-
-// UnmarshalJSON implements encoding/json.Unmarshaler
-func (i *IfaceInfo) UnmarshalJSON(b []byte) (err error) {
-	tmp := struct {
-		Name    string   `json:"name"`
-		Addrs   []string `json:"addrs"`
-		Gateway []string `json:"gateway"`
-	}{}
-
-	if err := json.Unmarshal(b, &tmp); err != nil {
-		return err
-	}
-
-	*i = IfaceInfo{
-		Name:    tmp.Name,
-		Addrs:   make([]*net.IPNet, 0, len(tmp.Addrs)),
-		Gateway: make([]net.IP, 0, len(tmp.Gateway)),
-	}
-	i.Name = tmp.Name
-	for _, addr := range tmp.Addrs {
-		if addr == "" {
-			continue
-		}
-		ip, ipnet, err := net.ParseCIDR(addr)
-		if err != nil {
-			return err
-		}
-		ipnet.IP = ip
-		i.Addrs = append(i.Addrs, ipnet)
-	}
-	for _, gw := range tmp.Gateway {
-		if gw == "" {
-			continue
-		}
-		ip := net.ParseIP(gw)
-		i.Gateway = append(i.Gateway, ip)
-	}
-
-	return nil
+	Name    string   `json:"name"`
+	Addrs   []IPNet  `json:"addrs"`
+	Gateway []net.IP `json:"gateway"`
 }
 
 // DefaultIP return the IP address of the interface that has a default gateway configured
@@ -123,89 +57,13 @@ type PubIface struct {
 	Vlan int16     `json:"vlan"`
 	// Macvlan net.HardwareAddr
 
-	IPv4 *net.IPNet `json:"ip_v4"`
-	IPv6 *net.IPNet `json:"ip_v6"`
+	IPv4 IPNet `json:"ip_v4"`
+	IPv6 IPNet `json:"ip_v6"`
 
 	GW4 net.IP `json:"gw4"`
 	GW6 net.IP `json:"gw6"`
 
 	Version int `json:"version"`
-}
-
-// MarshalJSON implements encoding/json.Unmarshaler
-func (p *PubIface) MarshalJSON() ([]byte, error) {
-	tmp := struct {
-		Master  string `json:"master"`
-		Type    string `json:"iface_type"`
-		Vlan    int16  `json:"vlan"`
-		IPv4    string `json:"ip_v4"`
-		IPv6    string `json:"ip_v6"`
-		GW4     string `json:"gw4"`
-		GW6     string `json:"gw6"`
-		Version int    `json:"version"`
-	}{
-		Master:  p.Master,
-		Type:    string(p.Type),
-		Vlan:    p.Vlan,
-		Version: p.Version,
-	}
-	if p.IPv4 != nil {
-		tmp.IPv4 = p.IPv4.String()
-	}
-	if p.IPv6 != nil {
-		tmp.IPv6 = p.IPv6.String()
-	}
-	if p.GW4 != nil {
-		tmp.GW4 = p.GW4.String()
-	}
-	if p.GW6 != nil {
-		tmp.GW6 = p.GW6.String()
-	}
-
-	return json.Marshal(tmp)
-}
-
-// UnmarshalJSON implements encoding/json.Unmarshaler
-func (p *PubIface) UnmarshalJSON(b []byte) (err error) {
-	tmp := struct {
-		Master  string `json:"master"`
-		Type    string `json:"iface_type"`
-		Vlan    int16  `json:"vlan"`
-		IPv4    string `json:"ip_v4"`
-		IPv6    string `json:"ip_v6"`
-		GW4     string `json:"gw4"`
-		GW6     string `json:"gw6"`
-		Version int    `json:"version"`
-	}{}
-
-	if err := json.Unmarshal(b, &tmp); err != nil {
-		return err
-	}
-
-	*p = PubIface{}
-	p.Master = tmp.Master
-	p.Type = IfaceType(tmp.Type)
-	p.Vlan = tmp.Vlan
-	if tmp.IPv4 != "" {
-		ip, ipnet, err := net.ParseCIDR(tmp.IPv4)
-		if err != nil {
-			return err
-		}
-		ipnet.IP = ip
-		p.IPv4 = ipnet
-	}
-	if tmp.IPv6 != "" {
-		ip, ipnet, err := net.ParseCIDR(tmp.IPv6)
-		if err != nil {
-			return err
-		}
-		ipnet.IP = ip
-		p.IPv6 = ipnet
-	}
-	p.GW4 = net.ParseIP(tmp.GW4)
-	p.GW6 = net.ParseIP(tmp.GW6)
-	p.Version = tmp.Version
-	return nil
 }
 
 // Node is the public information about a node
@@ -218,4 +76,77 @@ type Node struct {
 	PublicConfig *PubIface `json:"public_config"`
 	ExitNode     int       `json:"exit_node"`
 	WGPorts      []uint    `json:"wg_ports"`
+}
+
+// IPNet type
+type IPNet struct{ net.IPNet }
+
+// NewIPNet creates a new IPNet from net.IPNet
+func NewIPNet(n *net.IPNet) IPNet {
+	return IPNet{IPNet: *n}
+}
+
+// NewIPNetFromSchema creates an IPNet from schema.IPRange
+func NewIPNetFromSchema(n schema.IPRange) IPNet {
+	return IPNet{n.IPNet}
+}
+
+// ParseIPNet parse iprange
+func ParseIPNet(txt string) (r IPNet, err error) {
+	if len(txt) == 0 {
+		//empty ip net value
+		return r, nil
+	}
+	//fmt.Println("parsing: ", string(text))
+	ip, net, err := net.ParseCIDR(txt)
+	if err != nil {
+		return r, err
+	}
+
+	net.IP = ip
+	r.IPNet = *net
+	return
+}
+
+// MustParseIPNet prases iprange, panics if invalid
+func MustParseIPNet(txt string) IPNet {
+	r, err := ParseIPNet(txt)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
+
+// UnmarshalText loads IPRange from string
+func (i *IPNet) UnmarshalText(text []byte) error {
+	v, err := ParseIPNet(string(text))
+	if err != nil {
+		return err
+	}
+
+	i.IPNet = v.IPNet
+	return nil
+}
+
+// MarshalJSON dumps iprange as a string
+func (i IPNet) MarshalJSON() ([]byte, error) {
+	if len(i.IPNet.IP) == 0 {
+		return []byte(`""`), nil
+	}
+	v := fmt.Sprint("\"", i.String(), "\"")
+	return []byte(v), nil
+}
+
+func (i IPNet) String() string {
+	return i.IPNet.String()
+}
+
+// Nil returns true if IPNet is not set
+func (i *IPNet) Nil() bool {
+	return i.IP == nil && i.Mask == nil
+}
+
+// ToSchema creates a schema IPRange from IPNet
+func (i *IPNet) ToSchema() schema.IPRange {
+	return schema.IPRange{IPNet: i.IPNet}
 }

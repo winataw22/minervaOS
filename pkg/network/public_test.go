@@ -13,10 +13,10 @@ func TestCreatePublicNS(t *testing.T) {
 	iface := &types.PubIface{
 		Master: "zos0",
 		Type:   types.MacVlanIface,
-		IPv6: &net.IPNet{
+		IPv6: types.IPNet{net.IPNet{
 			IP:   net.ParseIP("2a02:1802:5e:ff02::100"),
 			Mask: net.CIDRMask(64, 128),
-		},
+		}},
 		GW6: net.ParseIP("fe80::1"),
 	}
 

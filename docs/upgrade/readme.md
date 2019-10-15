@@ -2,7 +2,21 @@
 
 ## Zbus
 
-Upgrade is an autonomous module and is not reachable over zbus.
+Upgrade module is available on zbus over the following channel
+
+| module | object | version |
+|--------|--------|---------|
+|upgrade   |[upgrade](#public-interface)| 0.0.1
+
+## Public interface [![GoDoc](https://godoc.org/github.com/threefoldtech/zos/pkg/flist?status.svg)](https://godoc.org/github.com/threefoldtech/zos/pkg/upgrade#Upgrader.Version)
+
+```go
+type UpgradeModule interface {
+	// version return the current version 0-OS is running
+	Version() (semver.Version, error)
+}
+```
+
 
 ## Home Directory
 Upgraded does not have a home directory, although it can keep track of some files under /tmp. The reason that those files

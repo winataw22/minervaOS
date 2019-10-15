@@ -35,7 +35,7 @@ func TestLocalStore(t *testing.T) {
 			args: args{
 				r: &Reservation{
 					ID:       "r-1",
-					Created:  time.Now().Add(-time.Minute).Round(time.Second),
+					Created:  time.Now().UTC().Add(-time.Minute).Round(time.Second),
 					Duration: time.Second * 10,
 				},
 			},

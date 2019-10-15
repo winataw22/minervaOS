@@ -22,7 +22,7 @@ const (
 
 const (
 	// gigabyte to byte conversion
-	gigabyte = 1024 * 1024 * 1024
+	gigabyte uint64 = 1024 * 1024 * 1024
 )
 
 // Volume defines a mount point
@@ -39,20 +39,21 @@ type VolumeResult struct {
 	ID string `json:"volume_id"`
 }
 
-// VolumeProvision is entry point to provision a volume
-func volumeProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
+func volumeProvisionImpl(ctx context.Context, reservation *Reservation) (VolumeResult, error) {
 	client := GetZBus(ctx)
 	var config Volume
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
-		return nil, err
+		return VolumeResult{}, err
 	}
 
 	storageClient := stubs.NewStorageModuleStub(client)
 
-	path, err := storageClient.Path(reservation.ID)
+	_, err := storageClient.Path(reservation.ID)
 	if err == nil {
 		log.Info().Str("id", reservation.ID).Msg("volume already deployed")
-		return path, nil
+		return VolumeResult{
+			ID: reservation.ID,
+		}, nil
 	}
 
 	_, err = storageClient.CreateFilesystem(reservation.ID, config.Size*gigabyte, pkg.DeviceType(config.Type))
@@ -60,6 +61,11 @@ func volumeProvision(ctx context.Context, reservation *Reservation) (interface{}
 	return VolumeResult{
 		ID: reservation.ID,
 	}, err
+}
+
+// VolumeProvision is entry point to provision a volume
+func volumeProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
+	return volumeProvisionImpl(ctx, reservation)
 }
 
 func volumeDecommission(ctx context.Context, reservation *Reservation) error {

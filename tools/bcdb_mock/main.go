@@ -50,6 +50,7 @@ type allocation struct {
 type node struct {
 	*types.Node
 	capacity.Capacity
+	Version string `json:"version"`
 }
 
 var (

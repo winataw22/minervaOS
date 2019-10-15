@@ -21,14 +21,14 @@ func TestNetworkPublishInterfaces(t *testing.T) {
 	}
 
 	id := pkg.StrIdentifier("node-1")
-	r := schema.MustParseIPRange("192.168.1.2/24")
+	r := types.MustParseIPNet("192.168.1.2/24")
 	args := Args{
 		"node_id": id,
 		"ifaces": []directory.TfgridNodeIface1{
 			{
 				Name: "eth0",
 				Addrs: []schema.IPRange{
-					r,
+					r.ToSchema(),
 				},
 				Gateway: []net.IP{
 					net.ParseIP("192.168.1.1"),
@@ -41,10 +41,8 @@ func TestNetworkPublishInterfaces(t *testing.T) {
 		Return(nil, nil)
 
 	inf := types.IfaceInfo{
-		Name: "eth0",
-		Addrs: []*net.IPNet{
-			&r.IPNet,
-		},
+		Name:    "eth0",
+		Addrs:   []types.IPNet{r},
 		Gateway: []net.IP{net.ParseIP("192.168.1.1")},
 	}
 	err := gedis.PublishInterfaces(id, []types.IfaceInfo{inf})
@@ -62,12 +60,12 @@ func TestNetworkSetPublicIface(t *testing.T) {
 	}
 
 	id := pkg.StrIdentifier("node-1")
-	r := schema.MustParseIPRange("192.168.1.2/24")
+	r := types.MustParseIPNet("192.168.1.2/24")
 	args := Args{
 		"node_id": id,
 		"public": directory.TfgridNodePublicIface1{
 			Master: "eth0",
-			Ipv4:   r,
+			Ipv4:   r.ToSchema(),
 			Gw4:    net.ParseIP("192.168.1.1"),
 		},
 	}
@@ -78,7 +76,7 @@ func TestNetworkSetPublicIface(t *testing.T) {
 	err := gedis.SetPublicIface(id, &types.PubIface{
 		Master: "eth0",
 		Type:   types.MacVlanIface,
-		IPv4:   &r.IPNet,
+		IPv4:   r,
 		GW4:    net.ParseIP("192.168.1.1"),
 	})
 

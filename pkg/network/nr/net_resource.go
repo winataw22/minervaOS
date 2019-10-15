@@ -169,7 +169,7 @@ func (nr *NetResource) ConfigureWG(privateKey string) error {
 		}
 
 		newAddrs := mapset.NewSet()
-		newAddrs.Add(wgIP(nr.resource.Subnet).String())
+		newAddrs.Add(wgIP(&nr.resource.Subnet.IPNet).String())
 
 		toRemove := curAddrs.Difference(newAddrs)
 		toAdd := newAddrs.Difference(curAddrs)
@@ -252,11 +252,11 @@ func (nr *NetResource) Delete() error {
 func (nr *NetResource) routes() ([]*netlink.Route, error) {
 	routes := make([]*netlink.Route, 0, len(nr.resource.Peers)+1)
 
-	wgIP := wgIP(nr.resource.Subnet)
+	wgIP := wgIP(&nr.resource.Subnet.IPNet)
 
 	for _, peer := range nr.resource.Peers {
 		routes = append(routes, &netlink.Route{
-			Dst: peer.Subnet,
+			Dst: &peer.Subnet.IPNet,
 			Gw:  wgIP.IP,
 		})
 	}
@@ -379,7 +379,7 @@ func (nr *NetResource) createVethPair() error {
 		ipnet.IP[len(ipnet.IP)-1] = 0x01
 		log.Info().Str("addr", ipnet.String()).Msg("set address on veth interface")
 
-		addr := &netlink.Addr{IPNet: ipnet, Label: ""}
+		addr := &netlink.Addr{IPNet: &ipnet.IPNet, Label: ""}
 		if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
 			return err
 		}

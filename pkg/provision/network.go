@@ -16,10 +16,10 @@ import (
 )
 
 // networkProvision is entry point to provision a network
-func networkProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
+func networkProvisionImpl(ctx context.Context, reservation *Reservation) error {
 	network := &pkg.Network{}
 	if err := json.Unmarshal(reservation.Data, network); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal network from reservation")
+		return errors.Wrap(err, "failed to unmarshal network from reservation")
 	}
 
 	network.NetID = networkID(reservation.User, network.Name)
@@ -30,11 +30,14 @@ func networkProvision(ctx context.Context, reservation *Reservation) (interface{
 
 	_, err := mgr.CreateNR(*network)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create network resource for network %s", network.NetID)
+		return errors.Wrapf(err, "failed to create network resource for network %s", network.NetID)
 	}
 
-	// nothing to return to BCDB
-	return nil, nil
+	return nil
+}
+
+func networkProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
+	return nil, networkProvisionImpl(ctx, reservation)
 }
 
 func networkDecommission(ctx context.Context, reservation *Reservation) error {
@@ -57,6 +60,9 @@ func networkID(userID, name string) pkg.NetID {
 	buf := bytes.Buffer{}
 	buf.WriteString(userID)
 	buf.WriteString(name)
-	b := base58.Encode(buf.Bytes())[:13]
+	b := base58.Encode(buf.Bytes())
+	if len(b) > 13 {
+		b = b[:13]
+	}
 	return pkg.NetID(string(b))
 }

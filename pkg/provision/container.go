@@ -54,8 +54,12 @@ type ContainerResult struct {
 	IPv4 string `json:"ipv4"`
 }
 
-// ContainerProvision is entry point to container reservation
 func containerProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
+	return containerProvisionImpl(ctx, reservation)
+}
+
+// ContainerProvision is entry point to container reservation
+func containerProvisionImpl(ctx context.Context, reservation *Reservation) (ContainerResult, error) {
 	client := GetZBus(ctx)
 	cache := GetOwnerCache(ctx)
 
@@ -70,16 +74,20 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 	_, err := containerClient.Inspect(tenantNS, pkg.ContainerID(containerID))
 	if err == nil {
 		log.Info().Str("id", containerID).Msg("container already deployed")
-		return containerID, nil
+		return ContainerResult{
+			ID: containerID,
+			//IMPORTANT
+			//TODO: set IPv4 and IPv6 here
+		}, nil
 	}
 
 	var config Container
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
-		return nil, err
+		return ContainerResult{}, err
 	}
 
 	if err := validateContainerConfig(config); err != nil {
-		return nil, errors.Wrap(err, "container provision schema not valid")
+		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
 
 	netID := networkID(reservation.User, string(config.Network.NetwokID))
@@ -97,7 +105,7 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 
 	join, err := networkMgr.Join(netID, containerID, ips)
 	if err != nil {
-		return nil, err
+		return ContainerResult{}, err
 	}
 
 	// TODO: Push IP back to bcdb
@@ -110,7 +118,7 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
 	mnt, err := flistClient.Mount(config.FList, config.FlistStorage)
 	if err != nil {
-		return nil, err
+		return ContainerResult{}, err
 	}
 
 	var env []string
@@ -123,23 +131,23 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 
 		owner, err := cache.OwnerOf(mount.VolumeID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
+			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
 		}
 
 		if owner != reservation.User {
-			return nil, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, reservation.User)
+			return ContainerResult{}, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, reservation.User)
 		}
 
 		// we make sure that mountpoint in config doesn't have relative parts
 		mountpoint := path.Join("/", mount.Mountpoint)
 
 		if err := os.MkdirAll(path.Join(mnt, mountpoint), 0755); err != nil {
-			return nil, err
+			return ContainerResult{}, err
 		}
 
 		source, err := storageClient.Path(mount.VolumeID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
+			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
 		}
 
 		mounts = append(
@@ -172,7 +180,7 @@ func containerProvision(ctx context.Context, reservation *Reservation) (interfac
 			log.Error().Err(err).Str("path", mnt).Msgf("failed to unmount")
 		}
 
-		return nil, err
+		return ContainerResult{}, err
 	}
 
 	log.Info().Msgf("container created with id: '%s'", id)

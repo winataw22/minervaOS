@@ -17,7 +17,7 @@ func (g *Gedis) getLocalInterfaces(ifaces []types.IfaceInfo) []directory.TfgridN
 				Addrs: func() []schema.IPRange {
 					var o []schema.IPRange
 					for _, r := range iface.Addrs {
-						o = append(o, schema.IPRange{IPNet: *r})
+						o = append(o, r.ToSchema())
 					}
 					return o
 				}(),
@@ -63,13 +63,13 @@ func (g *Gedis) SetPublicIface(node pkg.Identifier, pub *types.PubIface) error {
 		Version: int64(pub.Version),
 	}
 
-	if pub.IPv4 != nil {
-		public.Ipv4 = schema.IPRange{IPNet: *pub.IPv4}
+	if !pub.IPv4.Nil() {
+		public.Ipv4 = pub.IPv4.ToSchema()
 		public.Gw4 = pub.GW4
 	}
 
-	if pub.IPv6 != nil {
-		public.Ipv6 = schema.IPRange{IPNet: *pub.IPv6}
+	if !pub.IPv6.Nil() {
+		public.Ipv6 = pub.IPv6.ToSchema()
 		public.Gw6 = pub.GW6
 	}
 

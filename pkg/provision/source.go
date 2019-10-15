@@ -10,10 +10,18 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 )
 
-type httpSource struct {
-	store  ReservationPoller
-	nodeID string
+type pollSource struct {
+	store    ReservationPoller
+	nodeID   string
+	maxSleep time.Duration
 }
+
+var (
+	// ErrPollEOS can be returned by a reservation poll to
+	// notify the caller that it has reached end of stream
+	// and next calls will not return any more data.
+	ErrPollEOS = fmt.Errorf("end of stream")
+)
 
 // ReservationPoller define the interface to implement
 // to poll the BCDB for new reservation
@@ -24,18 +32,19 @@ type ReservationPoller interface {
 	Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*Reservation, error)
 }
 
-// HTTPSource does a long poll on address to get new and to be deleted
+// PollSource does a long poll on address to get new and to be deleted
 // reservations. the server should only return unique reservations
 // stall the connection as long as possible if no new reservations
 // are available.
-func HTTPSource(store ReservationPoller, nodeID pkg.Identifier) ReservationSource {
-	return &httpSource{
-		store:  store,
-		nodeID: nodeID.Identity(),
+func PollSource(store ReservationPoller, nodeID pkg.Identifier) ReservationSource {
+	return &pollSource{
+		store:    store,
+		nodeID:   nodeID.Identity(),
+		maxSleep: 10 * time.Second,
 	}
 }
 
-func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
+func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 	log.Info().Msg("start reservation http source")
 	ch := make(chan *Reservation)
 
@@ -43,31 +52,22 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 	// ever made to this know, to make sure we provision
 	// everything at boot
 	// after that, we only ask for the new reservations
-	lastRun := time.Time{}
+	all := true
 	go func() {
-		next := time.Now().Add(time.Second * 10)
+		next := time.Now()
 		defer close(ch)
 		for {
-			// make sure we wait at least 10 second between calls
-			if !time.Now().After(next) {
-				time.Sleep(time.Second)
-				continue
-			}
+			time.Sleep(next.Sub(time.Now()))
+			since := next
+			next = time.Now().Add(s.maxSleep)
 
-			log.Info().Msg("check for new reservations")
-			next = time.Now().Add(time.Second * 10)
-
-			all := false
-			if (lastRun == time.Time{}) {
-				all = true
-			}
-
-			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), all, lastRun)
-			if err != nil {
+			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), all, since)
+			if err != nil && err != ErrPollEOS {
 				log.Error().Err(err).Msg("failed to get reservation")
 				time.Sleep(time.Second * 20)
 			}
-			lastRun = time.Now()
+
+			all = false
 
 			select {
 			case <-ctx.Done():
@@ -76,6 +76,10 @@ func (s *httpSource) Reservations(ctx context.Context) <-chan *Reservation {
 				for _, r := range res {
 					ch <- r
 				}
+			}
+
+			if err == ErrPollEOS {
+				return
 			}
 		}
 	}()

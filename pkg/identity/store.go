@@ -25,17 +25,17 @@ func NewHTTPIDStore(url string) IDStore {
 	return &httpIDStore{baseURL: url}
 }
 
-type nodeRegisterReq struct {
-	NodeID string `json:"node_id"`
-	FarmID string `json:"farm_id"`
-}
-
 // RegisterNode implements the IDStore interface
 func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.Identifier, version string) (string, error) {
 	buf := bytes.Buffer{}
-	err := json.NewEncoder(&buf).Encode(nodeRegisterReq{
-		NodeID: node.Identity(),
-		FarmID: farm.Identity(),
+	err := json.NewEncoder(&buf).Encode(struct {
+		NodeID  string `json:"node_id"`
+		FarmID  string `json:"farm_id"`
+		Version string `json:"version"`
+	}{
+		NodeID:  node.Identity(),
+		FarmID:  farm.Identity(),
+		Version: version,
 	})
 	if err != nil {
 		return "", err

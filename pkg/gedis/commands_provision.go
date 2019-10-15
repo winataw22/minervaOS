@@ -202,7 +202,7 @@ func networkReservation(i interface{}) types.TfgridReservationNetwork1 {
 	n := i.(pkg.Network)
 	network := types.TfgridReservationNetwork1{
 		Name:             n.Name,
-		Iprange:          schema.IPRange{IPNet: *n.IPRange},
+		Iprange:          n.IPRange.ToSchema(),
 		WorkloadID:       1,
 		NetworkResources: make([]types.TfgridNetworkNetResource1, len(n.NetResources)),
 	}
@@ -210,7 +210,7 @@ func networkReservation(i interface{}) types.TfgridReservationNetwork1 {
 	for i, nr := range n.NetResources {
 		network.NetworkResources[i] = types.TfgridNetworkNetResource1{
 			NodeID:                       nr.NodeID,
-			IPRange:                      schema.IPRange{IPNet: *nr.Subnet},
+			IPRange:                      nr.Subnet.ToSchema(),
 			WireguardPrivateKeyEncrypted: nr.WGPrivateKey,
 			WireguardPublicKey:           nr.WGPublicKey,
 			Peers:                        make([]types.WireguardPeer1, len(nr.Peers)),

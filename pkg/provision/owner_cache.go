@@ -12,15 +12,15 @@ type ReservationGetter interface {
 	Get(id string) (*Reservation, error)
 }
 
-// OwnerCache allows to get the user ID of owner of a reservation
-type OwnerCache struct {
+// ownerCache allows to get the user ID of owner of a reservation
+type ownerCache struct {
 	local  ReservationGetter
 	remote ReservationGetter
 }
 
 // NewCache returns a new initialized reservation cache
-func NewCache(local, remote ReservationGetter) *OwnerCache {
-	return &OwnerCache{
+func NewCache(local, remote ReservationGetter) OwnerCache {
+	return &ownerCache{
 		local:  local,
 		remote: remote,
 	}
@@ -28,7 +28,7 @@ func NewCache(local, remote ReservationGetter) *OwnerCache {
 
 // OwnerOf return the userID of the creator of the reservation
 // identified by reservationID
-func (c *OwnerCache) OwnerOf(reservationID string) (string, error) {
+func (c *ownerCache) OwnerOf(reservationID string) (string, error) {
 	var (
 		r   *Reservation
 		err error

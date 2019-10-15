@@ -85,8 +85,8 @@ func (u *Upgrader) Name() string {
 	return strings.TrimSpace(string(data))
 }
 
-// Current always returns current version of flist
-func (u *Upgrader) Current() (semver.Version, error) {
+// Version always returns curent version of flist
+func (u *Upgrader) Version() (semver.Version, error) {
 	info, err := LoadInfo(infoFile)
 	if err != nil {
 		return semver.Version{}, errors.Wrap(err, "failed to load flist info")
@@ -106,7 +106,7 @@ func (u *Upgrader) Upgrade() error {
 		return errors.Wrap(err, "failed to get remote flist info")
 	}
 
-	current, err := u.Current()
+	current, err := u.Version()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to detect current version. Update to latest anyway")
 	}
