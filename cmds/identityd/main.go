@@ -34,9 +34,8 @@ const (
 )
 
 const (
-	module       = "identityd"
-	identityRoot = "/var/cache/modules/identityd"
-	seedName     = "seed.txt"
+	module   = "identityd"
+	seedName = "seed.txt"
 )
 
 // setup is a sanity check function, the whole purpose of this
@@ -77,13 +76,17 @@ func SafeUpgrade(upgrader *upgrade.Upgrader) error {
 func main() {
 	var (
 		broker   string
+		root     string
 		interval int
 		ver      bool
+		debug    bool
 	)
 
+	flag.StringVar(&root, "root", "/var/cache/modules/identityd", "root working directory of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.IntVar(&interval, "interval", 600, "interval in seconds between update checks, default to 600")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
+	flag.BoolVar(&debug, "d", false, "when set, no self update is done before upgradeing")
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
@@ -97,43 +100,25 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to zinit")
 	}
 
-	zbusClient, err := zbus.NewRedisClient(broker)
+	cl, err := zbus.NewRedisClient(broker)
 	if err != nil {
 		log.Error().Err(err).Msg("fail to connect to broker")
 		return
 	}
 
-	flister := stubs.NewFlisterStub(zbusClient)
+	flister := stubs.NewFlisterStub(cl)
 
 	upgrader := upgrade.Upgrader{
-		FLister: flister,
-		Zinit:   zinit,
+		FLister:      flister,
+		Zinit:        zinit,
+		NoSelfUpdate: debug,
 	}
 
 	bootMethod := upgrade.DetectBootMethod()
 
-	if bootMethod == upgrade.BootMethodFList {
-
-		// 1. Do upgrade to latest version
-		if err := SafeUpgrade(&upgrader); err == upgrade.ErrRestartNeeded {
-			log.Info().Msg("restarting upgraded")
-			return
-		} else if err != nil {
-			log.Fatal().Err(err).Msg("upgrade failed")
-		}
-
-		// recover procedure to make sure upgrade always has what it needs
-		// to work
-		if err := setup(zinit); err != nil {
-			log.Fatal().Err(err).Msg("upgraded setup failed")
-		}
-	} else {
-		log.Info().Msg("not booted with an flist. life upgrade is not supported")
-	}
-
 	// 2. Register the node to BCDB
 	// at this point we are running latest version
-	idMgr, err := identityMgr(identityRoot)
+	idMgr, err := identityMgr(root)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create identity manager")
 	}
@@ -143,15 +128,18 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create identity client")
 	}
 
-	var version string
+	var current string
 	if bootMethod == upgrade.BootMethodFList {
 		v, err := upgrader.Version()
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to read current version")
+			//NOTE: this is set to error intentionally (not fatal)
+			//this will cause version to be 0.0.0 and will force an
+			//immediate update of the flist to latest
+			log.Error().Err(err).Msg("failed to read current version")
 		}
-		version = v.String()
+		current = v.String()
 	} else {
-		version = "not booted from flist"
+		current = "not booted from flist"
 	}
 
 	nodeID := idMgr.NodeID()
@@ -160,11 +148,16 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to read farm ID")
 	}
 
-	f := func() error {
-		return registerNode(nodeID, farmID, version, idStore)
+	register := func(v string) error {
+		return registerNode(nodeID, farmID, v, idStore)
 	}
-	if err := backoff.Retry(f, backoff.NewExponentialBackOff()); err == nil {
-		log.Info().Msg("node registered successfully")
+
+	if err := backoff.Retry(func() error {
+		return register(current)
+	}, backoff.NewExponentialBackOff()); err != nil {
+		log.Error().Err(err).Msg("failed to register node")
+	} else {
+		log.Info().Str("version", current).Msg("node registered successfully")
 	}
 
 	// 3. start zbus server to serve identity interface
@@ -172,7 +165,8 @@ func main() {
 	if err != nil {
 		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)
 	}
-	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, &idMgr)
+
+	server.Register(zbus.ObjectID{Name: "manager", Version: "0.0.1"}, idMgr)
 
 	ctx, cancel := utils.WithSignal(context.Background())
 	// register the cancel function with defer if the process stops because of a update
@@ -188,39 +182,51 @@ func main() {
 		log.Info().Msg("shutting down")
 	})
 
-	// 4. Start watcher for new version
 	if bootMethod != upgrade.BootMethodFList {
+		log.Info().Msg("node is not booted from an flist. upgrade is not supported")
 		<-ctx.Done()
-	} else {
-		log.Info().Msg("start upgrade daemon")
-		ticker := time.NewTicker(time.Second * time.Duration(interval))
+		return
+	}
 
-		for {
-			err := SafeUpgrade(&upgrader)
-			if err == upgrade.ErrRestartNeeded {
-				log.Info().Msg("restarting upgraded")
-				return
-			} else if err != nil {
-				//TODO: crash or continue!
-				log.Error().Err(err).Msg("upgrade failed")
+	// 4. Start watcher for new version
+	log.Info().Msg("start upgrade daemon")
+	ticker := time.NewTicker(time.Second * time.Duration(interval))
+	defer ticker.Stop()
+
+	for {
+		err := SafeUpgrade(&upgrader)
+		if err == upgrade.ErrRestartNeeded {
+			log.Info().Msg("restarting upgraded")
+			return
+		} else if err != nil {
+			//TODO: crash or continue!
+			log.Error().Err(err).Msg("upgrade failed")
+		}
+
+		version, err := upgrader.Version()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to read current version")
+		}
+
+		if version.String() != current {
+			log.Info().Str("version", version.String()).Msg("new version")
+
+			if err := backoff.Retry(func() error {
+				return register(version.String())
+			}, backoff.NewExponentialBackOff()); err != nil {
+				log.Error().Err(err).Msg("failed to register node")
+			} else {
+				log.Info().Str("version", version.String()).Msg("node registered successfully")
 			}
 
-			version, err := upgrader.Version()
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to read current version")
-			}
+			current = version.String()
+		}
 
-			log.Info().Str("version", version.String()).Msg("new version installed")
-
-			if _, err = idStore.RegisterNode(nodeID, farmID, version.String()); err != nil {
-				log.Error().Err(err).Msg("fail to register node identity")
-			}
-
-			select {
-			case <-ticker.C:
-			case <-ctx.Done():
-				break
-			}
+		select {
+		case <-ticker.C:
+			log.Debug().Msg("checking for updates")
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -270,7 +276,6 @@ func registerNode(nodeID, farmID pkg.Identifier, version string, store identity.
 
 	_, err := store.RegisterNode(nodeID, farmID, version)
 	if err != nil {
-		log.Error().Err(err).Msg("fail to register node identity")
 		return err
 	}
 	return nil

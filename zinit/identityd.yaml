@@ -1,4 +1,4 @@
-exec: upgraded
+exec: identityd
 after:
   - boot
   - flistd

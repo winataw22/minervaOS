@@ -34,6 +34,8 @@ type Container struct {
 	RootFS string
 	// Env env variables to container in format {'KEY=VALUE', 'KEY2=VALUE2'}
 	Env []string
+	// WorkingDir of the entrypoint command
+	WorkingDir string
 	// Network network info for container
 	Network NetworkInfo
 	// Mounts extra mounts for container

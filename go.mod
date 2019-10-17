@@ -3,6 +3,7 @@ module github.com/threefoldtech/zos
 go 1.13
 
 require (
+	github.com/BurntSushi/toml v0.3.1
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/alexflint/go-filemutex v0.0.0-20171028004239-d358565f3c3f

@@ -2,14 +2,13 @@ package container
 
 import (
 	"context"
-	"os"
-	"path"
-	"path/filepath"
 
-	"github.com/containerd/containerd"
+	"path"
+
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // withNetworkNamespace set the named network namespace to use for the container
@@ -57,22 +56,6 @@ func withAddedCapabilities(caps []string) oci.SpecOpts {
 	}
 }
 
-func (c *containerModule) ensureNamespace(ctx context.Context, client *containerd.Client, namespace string) error {
-	service := client.NamespaceService()
-	namespaces, err := service.List(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, ns := range namespaces {
-		if ns == namespace {
-			return nil
-		}
-	}
-
-	return service.Create(ctx, namespace, nil)
-}
-
 func removeRunMount() oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 		for i, mount := range s.Mounts {
@@ -83,30 +66,4 @@ func removeRunMount() oci.SpecOpts {
 		}
 		return nil
 	}
-}
-
-func setResolvConf(root string) error {
-	const tmp = "nameserver 1.1.1.1\nnameserver 1.0.0.1\n2606:4700:4700::1111\nnameserver 2606:4700:4700::1001\n"
-
-	path := filepath.Join(root, "etc/resolv.conf")
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 644)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	defer f.Close()
-
-	if os.IsNotExist(err) {
-		_, err = f.WriteString(tmp)
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	if info.Size() == 0 {
-		_, err = f.WriteString(tmp)
-	}
-	return err
 }

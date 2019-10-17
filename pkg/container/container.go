@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 
+	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 
 	"fmt"
@@ -62,12 +63,7 @@ func New(root string, containerd string) pkg.ContainerModule {
 }
 
 // Run creates and starts a container
-// THIS IS A WIP Create action and it's not fully implemented atm
 func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID, err error) {
-	log.Info().
-		Str("namesapce", ns).
-		Str("data", fmt.Sprintf("%+v", data)).
-		Msgf("create new container")
 	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -85,8 +81,8 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		return id, ErrEmptyRootFS
 	}
 
-	if err := setResolvConf(data.RootFS); err != nil {
-		return id, errors.Wrap(err, "failed to set resolv.conf")
+	if err := applyStartup(&data, filepath.Join(data.RootFS, ".startup.toml")); err != nil {
+		errors.Wrap(err, "error updating environment variable from startup file")
 	}
 
 	if data.Interactive {
@@ -113,8 +109,14 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		oci.WithRootFSPath(data.RootFS),
 		oci.WithProcessArgs(args...),
 		oci.WithEnv(data.Env),
+		oci.WithHostResolvconf,
 		removeRunMount(),
 	}
+
+	if data.WorkingDir != "" {
+		opts = append(opts, oci.WithProcessCwd(data.WorkingDir))
+	}
+
 	if data.Interactive {
 		opts = append(
 			opts,
@@ -152,6 +154,11 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		)
 	}
 
+	log.Info().
+		Str("namespace", ns).
+		Str("data", fmt.Sprintf("%+v", data)).
+		Msgf("create new container")
+
 	container, err := client.NewContainer(
 		ctx,
 		data.Name,
@@ -166,6 +173,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		return id, err
 	}
 	log.Info().Msgf("args %+v", spec.Process.Args)
+	log.Info().Msgf("env %+v", spec.Process.Env)
 	log.Info().Msgf("root %+v", spec.Root)
 	for _, linxNS := range spec.Linux.Namespaces {
 		log.Info().Msgf("namespace %+v", linxNS.Type)
@@ -297,4 +305,47 @@ func (c *containerModule) Delete(ns string, id pkg.ContainerID) error {
 	}
 
 	return container.Delete(ctx)
+}
+
+func (c *containerModule) ensureNamespace(ctx context.Context, client *containerd.Client, namespace string) error {
+	service := client.NamespaceService()
+	namespaces, err := service.List(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, ns := range namespaces {
+		if ns == namespace {
+			return nil
+		}
+	}
+
+	return service.Create(ctx, namespace, nil)
+}
+
+func applyStartup(data *pkg.Container, path string) error {
+	f, err := os.Open(path)
+	if err == nil {
+		defer f.Close()
+		log.Info().Msg("startup file found")
+
+		startup := startup{}
+		if _, err := toml.DecodeReader(f, &startup); err != nil {
+			return err
+		}
+
+		entry, ok := startup.Entries["entry"]
+		if !ok {
+			return nil
+		}
+
+		data.Env = mergeEnvs(entry.Envs(), data.Env)
+		if data.Entrypoint == "" && entry.Entrypoint() != "" {
+			data.Entrypoint = entry.Entrypoint()
+		}
+		if data.WorkingDir == "" && entry.WorkingDir() != "" {
+			data.WorkingDir = entry.WorkingDir()
+		}
+	}
+	return nil
 }

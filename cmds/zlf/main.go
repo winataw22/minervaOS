@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/go-redis/redis"
 	"io"
 	"net"
 	"strings"
+
+	"github.com/go-redis/redis"
+	"github.com/rs/zerolog/log"
 )
 
 func reader(c io.Reader, r *redis.Client, channel string) {
@@ -19,9 +21,8 @@ func reader(c io.Reader, r *redis.Client, channel string) {
 
 		logline := strings.TrimSpace(string(buf[0:n]))
 
-		// println(">> ", logline)
 		if r.Publish(channel, logline).Err() != nil {
-			panic(err)
+			log.Fatal().Err(err).Msg("error while publishing log line")
 		}
 	}
 }
@@ -39,7 +40,7 @@ func main() {
 	// connect to local logs
 	c, err := net.Dial("unix", *lUnix)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal().Err(err).Msg("cannot dial server")
 	}
 
 	fmt.Printf("[+] connecting redis: %s:%d\n", *rHost, *rPort)
@@ -52,7 +53,7 @@ func main() {
 	})
 
 	if _, err := client.Ping().Result(); err != nil {
-		panic(err.Error())
+		log.Fatal().Err(err).Msg("cannot ping server")
 	}
 
 	fmt.Printf("[+] forwarding logs to channel: %s\n", *rChan)
