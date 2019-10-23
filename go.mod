@@ -33,14 +33,17 @@ require (
 	github.com/shirou/gopsutil v2.18.12+incompatible
 	github.com/stretchr/testify v1.3.0
 	github.com/tcnksm/go-input v0.0.0-20180404061846-548a7d7a8ee8
-	github.com/threefoldtech/zbus v0.0.0-20190711124326-09379d5f12e0
+	github.com/threefoldtech/zbus v0.1.1
 	github.com/threefoldtech/zosv2/modules v0.0.0-20191001184911-b6d8bc81a7f0
 	github.com/urfave/cli v1.22.1
 	github.com/vishvananda/netlink v1.0.0
+	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
 	golang.org/x/crypto v0.0.0-20190829043050-9756ffdc2472
+	golang.org/x/net v0.0.0-20191021144547-ec77196f6094 // indirect
 	golang.org/x/sys v0.0.0-20190804053845-51ab0e2deafa
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20190607034155-226bf4e412cd
+	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.24.0 // indirect
 	gopkg.in/yaml.v2 v2.2.4
 )
