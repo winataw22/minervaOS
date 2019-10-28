@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
+
+	"github.com/threefoldtech/zos/pkg/geoip"
+
 	"github.com/threefoldtech/zos/pkg"
 )
 
 // IDStore is the interface defining the
 // client side of an identity store
 type IDStore interface {
-	RegisterNode(node pkg.Identifier, farm pkg.Identifier, version string) (string, error)
+	RegisterNode(node pkg.Identifier, farm pkg.Identifier, version string, loc geoip.Location) (string, error)
 	RegisterFarm(farm pkg.Identifier, name string, email string, wallet []string) (string, error)
 }
 
@@ -26,16 +30,19 @@ func NewHTTPIDStore(url string) IDStore {
 }
 
 // RegisterNode implements the IDStore interface
-func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.Identifier, version string) (string, error) {
+func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.Identifier, version string, loc geoip.Location) (string, error) {
 	buf := bytes.Buffer{}
-	err := json.NewEncoder(&buf).Encode(struct {
-		NodeID  string `json:"node_id"`
-		FarmID  string `json:"farm_id"`
-		Version string `json:"version"`
-	}{
-		NodeID:  node.Identity(),
-		FarmID:  farm.Identity(),
-		Version: version,
+	err := json.NewEncoder(&buf).Encode(directory.TfgridNode2{
+		NodeID:    node.Identity(),
+		FarmID:    farm.Identity(),
+		OsVersion: version,
+		Location: directory.TfgridLocation1{
+			City:      loc.City,
+			Country:   loc.Country,
+			Continent: loc.Continent,
+			Latitude:  loc.Latitude,
+			Longitude: loc.Longitute,
+		},
 	})
 	if err != nil {
 		return "", err
@@ -53,7 +60,7 @@ func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.Identifier, ver
 }
 
 type farmRegisterReq struct {
-	ID   string `json:"farm_id"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 

@@ -2,7 +2,12 @@ package main
 
 import (
 	"flag"
+	"os"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	"github.com/cenkalti/backoff/v3"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/capacity"
@@ -31,6 +36,8 @@ func main() {
 	if ver {
 		version.ShowAndExit(false)
 	}
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	redis, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
@@ -68,13 +75,33 @@ func main() {
 		log.Fatal().Err(err).Msgf("failed to write resources capacity on BCDB")
 	}
 
-	for {
-		<-time.After(time.Minute * 10)
+	sendUptime := func() error {
+		uptime, err := r.Uptime()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to read uptime")
+			return err
+		}
 
 		log.Info().Msg("send heart-beat to BCDB")
-		if err := store.Ping(identity.NodeID()); err != nil {
+		if err := store.Ping(identity.NodeID(), uptime); err != nil {
 			log.Error().Err(err).Msgf("failed to send heart-beat to BCDB")
+			return err
 		}
+		return nil
+	}
+	if err := sendUptime(); err != nil {
+		log.Fatal().Err(err).Send()
+	}
+
+	for {
+		next := time.Now().Add(time.Minute * 10)
+
+		if time.Now().After(next) {
+			backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
+			continue
+		}
+
+		time.Sleep(time.Minute)
 	}
 }
 

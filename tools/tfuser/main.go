@@ -38,7 +38,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "bcdb, u",
 			Usage:  "URL of the BCDB",
-			Value:  "https://bcdb.dev.grid.tf",
+			Value:  "https://explorer.devnet.grid.tf",
 			EnvVar: "BCDB_URL",
 		},
 	}

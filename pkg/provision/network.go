@@ -26,7 +26,6 @@ func networkProvisionImpl(ctx context.Context, reservation *Reservation) error {
 
 	mgr := stubs.NewNetworkerStub(GetZBus(ctx))
 	log.Debug().Str("network", fmt.Sprintf("%+v", network)).Msg("provision network")
-	log.Debug().Str("nr", fmt.Sprintf("%+v", network.NetResources[0])).Msg("provision network")
 
 	_, err := mgr.CreateNR(*network)
 	if err != nil {

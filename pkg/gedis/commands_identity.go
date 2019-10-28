@@ -8,15 +8,13 @@ import (
 
 	"github.com/jbenet/go-base58"
 
-	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/geoip"
-
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/types"
 
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/geoip"
 )
 
 //
@@ -24,12 +22,7 @@ import (
 //
 
 //RegisterNode implements pkg.IdentityManager interface
-func (g *Gedis) RegisterNode(nodeID, farmID pkg.Identifier, version string) (string, error) {
-
-	l, err := geoip.Fetch()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get location of the node")
-	}
+func (g *Gedis) RegisterNode(nodeID, farmID pkg.Identifier, version string, location geoip.Location) (string, error) {
 
 	pk := base58.Decode(nodeID.Identity())
 
@@ -40,11 +33,11 @@ func (g *Gedis) RegisterNode(nodeID, farmID pkg.Identifier, version string) (str
 			OsVersion:    version,
 			PublicKeyHex: hex.EncodeToString(pk),
 			Location: directory.TfgridLocation1{
-				Longitude: l.Longitute,
-				Latitude:  l.Latitude,
-				Continent: l.Continent,
-				Country:   l.Country,
-				City:      l.City,
+				Longitude: location.Longitute,
+				Latitude:  location.Latitude,
+				Continent: location.Continent,
+				Country:   location.Country,
+				City:      location.City,
 			},
 		},
 	}))
@@ -165,9 +158,7 @@ func nodeFromSchema(node directory.TfgridNode2) types.Node {
 		}(),
 		PublicConfig: func() *types.PubIface {
 			cfg := node.PublicConfig
-			// This is a dirty hack because jsx schema cannot
-			// differentiate between an embed object not set or with default value
-			if cfg.Master == "" {
+			if cfg == nil || cfg.Master == "" {
 				return nil
 			}
 			pub := types.PubIface{
@@ -182,12 +173,7 @@ func nodeFromSchema(node directory.TfgridNode2) types.Node {
 
 			return &pub
 		}(),
-		ExitNode: func() int {
-			if node.ExitNode {
-				return 1
-			}
-			return 0
-		}(),
+		WGPorts: node.WGPorts,
 	}
 }
 

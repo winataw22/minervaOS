@@ -20,6 +20,8 @@ func (k Params) Exists(key string) bool {
 
 // Get returns the values link to a key and a boolean
 // boolean if true when the key exists in the params or false otherwise
+// a nil list, and a true will be returned if the `key` is set in kernel params, but with
+// no associated value
 func (k Params) Get(key string) ([]string, bool) {
 	v, ok := k[key]
 	return v, ok

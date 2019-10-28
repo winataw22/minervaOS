@@ -1,6 +1,7 @@
 package capacity
 
 import (
+	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 )
@@ -50,4 +51,13 @@ func (r *ResourceOracle) Total() (c *Capacity, err error) {
 // DMI run and parse dmidecode commands
 func (r *ResourceOracle) DMI() (*dmi.DMI, error) {
 	return dmi.Decode()
+}
+
+// Uptime returns the uptime of the node
+func (r *ResourceOracle) Uptime() (uint64, error) {
+	info, err := host.Info()
+	if err != nil {
+		return 0, err
+	}
+	return info.Uptime, nil
 }

@@ -78,6 +78,7 @@ func TestRegisterNode(t *testing.T) {
 		pkg.StrIdentifier("node-1"),
 		pkg.StrIdentifier("farm-1"),
 		"v1.1.0",
+		l,
 	)
 
 	require.NoError(err)
@@ -155,7 +156,7 @@ func TestGetFarm(t *testing.T) {
 
 	conn.On("Do", "default.farms.get", mustMarshal(t, args)).
 		Return(mustMarshal(t, directory.TfgridFarm1{
-			ID:   100,
+			ID:   "100",
 			Name: "farm-1",
 		}), nil)
 
@@ -184,8 +185,8 @@ func TestListFarm(t *testing.T) {
 
 	conn.On("Do", "default.farms.list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{"farms": []directory.TfgridFarm1{
-			{ID: 1, Name: "farm-1"},
-			{ID: 2, Name: "farm-2"},
+			{ID: "1", Name: "farm-1"},
+			{ID: "2", Name: "farm-2"},
 		}}), nil)
 
 	nodes, err := gedis.ListFarm("eg", "cairo")

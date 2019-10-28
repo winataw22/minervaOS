@@ -1,8 +1,9 @@
 package directory
 
 import (
-	schema "github.com/threefoldtech/zos/pkg/schema"
 	"net"
+
+	schema "github.com/threefoldtech/zos/pkg/schema"
 )
 
 //TfgridNode2 jsx schema
@@ -20,8 +21,8 @@ type TfgridNode2 struct {
 	ReservedResources TfgridNodeResourceAmount1 `json:"reserved_resources"`
 	Proofs            []TfgridNodeProof1        `json:"proofs"`
 	Ifaces            []TfgridNodeIface1        `json:"ifaces"`
-	PublicConfig      TfgridNodePublicIface1    `json:"public_config"`
-	ExitNode          bool                      `json:"exit_node"`
+	PublicConfig      *TfgridNodePublicIface1   `json:"public_config,omitemtpy"`
+	WGPorts           []uint                    `json:"wg_ports"`
 	Approved          bool                      `json:"approved"`
 	PublicKeyHex      string                    `json:"public_key_hex"`
 }

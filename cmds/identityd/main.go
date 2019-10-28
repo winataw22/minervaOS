@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gedis"
+	"github.com/threefoldtech/zos/pkg/geoip"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"
@@ -95,6 +96,10 @@ func main() {
 		version.ShowAndExit(false)
 	}
 
+	if err := os.MkdirAll(root, 0750); err != nil {
+		log.Fatal().Err(err).Str("root", root).Msg("failed to create root directory")
+	}
+
 	zinit, err := zinit.New(zinitSocket)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to zinit")
@@ -148,8 +153,13 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to read farm ID")
 	}
 
+	loc, err := geoip.Fetch()
+	if err != nil {
+		log.Fatal().Err(err).Msg("fetch location")
+	}
+
 	register := func(v string) error {
-		return registerNode(nodeID, farmID, v, idStore)
+		return registerNode(nodeID, farmID, v, idStore, loc)
 	}
 
 	if err := backoff.Retry(func() error {
@@ -271,10 +281,10 @@ func bcdbClient() (identity.IDStore, error) {
 	return store, nil
 }
 
-func registerNode(nodeID, farmID pkg.Identifier, version string, store identity.IDStore) error {
+func registerNode(nodeID, farmID pkg.Identifier, version string, store identity.IDStore, loc geoip.Location) error {
 	log.Info().Str("version", version).Msg("start registration of the node")
 
-	_, err := store.RegisterNode(nodeID, farmID, version)
+	_, err := store.RegisterNode(nodeID, farmID, version, loc)
 	if err != nil {
 		return err
 	}

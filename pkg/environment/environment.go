@@ -33,22 +33,22 @@ const (
 
 	// Orphanage is the default farmid where nodes are registered
 	// if no farmid were specified on the kernel command line
-	OrphanageDev  string = "FBresPWUedSi5rBdfhVEr969dCinfq2GpBSdjiM6UrAb"
-	OrphanageTest string = "FBresPWUedSi5rBdfhVEr969dCinfq2GpBSdjiM6UrAb"
-	OrphanageMain string = "undefined-yet"
+	OrphanageDev  string = "orphan"
+	OrphanageTest string = "orphan"
+	OrphanageMain string = "orphan"
 )
 
 var (
 	envDev = Environment{
 		RunningMode: RunningDev,
-		BcdbURL:     "https://bcdb.dev.grid.tf",
+		BcdbURL:     "https://explorer.devnet.grid.tf",
 		// ProvisionTimeout:  60,
 		// ProvisionInterval: 10,
 	}
 
 	envTest = Environment{
 		RunningMode:   RunningTest,
-		BcdbURL:       "tcp://bcdb.test.grid.tf:8901",
+		BcdbURL:       "tcp://explorer.testnet.grid.tf:8901",
 		BcdbNamespace: "default",
 		// ProvisionTimeout:  120,
 		// ProvisionInterval: 10,
@@ -74,10 +74,9 @@ func getEnvironmentFromParams(params kernel.Params) Environment {
 	var env Environment
 
 	runmode, found := params.Get("runmode")
-	if !found {
+	if !found || len(runmode) < 1 {
 		// Fallback to default production mode
-		runmode = make([]string, 1)
-		runmode[0] = string(RunningMain)
+		runmode = []string{string(RunningMain)}
 	}
 
 	switch RunningMode(runmode[0]) {
@@ -91,8 +90,16 @@ func getEnvironmentFromParams(params kernel.Params) Environment {
 		env = envProd
 	}
 
+	if RunningMode(runmode[0]) == RunningDev {
+		//allow override of the bcdb url in dev mode
+		bcdb, found := params.Get("bcdb")
+		if found && len(bcdb) >= 1 {
+			env.BcdbURL = bcdb[0]
+		}
+	}
+
 	farmerID, found := params.Get("farmer_id")
-	if !found || farmerID[0] == "" {
+	if !found || len(farmerID) < 1 || farmerID[0] == "" {
 		// fmt.Println("Warning: no valid farmer_id found in kernel parameter, fallback to orphanage")
 		env.Orphan = true
 

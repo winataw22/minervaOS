@@ -15,7 +15,7 @@ import (
 // Store is an interface to the bcdb store to report capacity
 type Store interface {
 	Register(nodeID pkg.Identifier, c Capacity, d dmi.DMI) error
-	Ping(nodeID pkg.Identifier) error
+	Ping(nodeID pkg.Identifier, uptime uint64) error
 }
 
 // BCDBStore implements the store interface using a gedis client to BCDB
@@ -34,7 +34,9 @@ func (s *BCDBStore) Register(nodeID pkg.Identifier, c Capacity, d dmi.DMI) error
 }
 
 // Ping sends an heart-beat to BCDB
-func (s *BCDBStore) Ping(nodeID pkg.Identifier) error { return nil }
+func (s *BCDBStore) Ping(nodeID pkg.Identifier, uptime uint64) error {
+	return s.g.UptimeUpdate(nodeID, uptime)
+}
 
 // HTTPStore implement the method to push capacity information to BCDB over HTTP
 type HTTPStore struct {
@@ -74,4 +76,25 @@ func (s *HTTPStore) Register(nodeID pkg.Identifier, c Capacity, d dmi.DMI) error
 }
 
 // Ping sends an heart-beat to BCDB
-func (s *HTTPStore) Ping(nodeID pkg.Identifier) error { return nil }
+func (s *HTTPStore) Ping(nodeID pkg.Identifier, uptime uint64) error {
+	x := struct {
+		Uptime uint64 `json:"uptime"`
+	}{uptime}
+
+	buf := bytes.Buffer{}
+	err := json.NewEncoder(&buf).Encode(x)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf(s.baseURL+"/nodes/%s/uptime", nodeID.Identity())
+	resp, err := http.Post(url, "application/json", &buf)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("wrong response status code received: %v", resp.Status)
+	}
+
+	return nil
+}

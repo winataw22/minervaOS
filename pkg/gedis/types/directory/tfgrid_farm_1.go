@@ -1,12 +1,8 @@
 package directory
 
-import (
-	schema "github.com/threefoldtech/zos/pkg/schema"
-)
-
 //TfgridFarm1 jsx schema
 type TfgridFarm1 struct {
-	ID              int64                      `json:"id,omitempty"`
+	ID              string                     `json:"id"`
 	ThreebotID      string                     `json:"threebot_id"`
 	IyoOrganization string                     `json:"iyo_organization"`
 	Name            string                     `json:"name"`
@@ -14,7 +10,6 @@ type TfgridFarm1 struct {
 	Location        TfgridLocation1            `json:"location"`
 	Email           string                     `json:"email"`
 	ResourcePrices  []TfgridNodeResourcePrice1 `json:"resource_prices"`
-	PrefixZero      schema.IPRange             `json:"prefix_zero"`
 }
 
 //TfgridNodeResourcePrice1 jsx schema

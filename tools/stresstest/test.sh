@@ -3,7 +3,7 @@ set -e
 
 # default fallback values
 dfarmid="CemYjciEmuvYVKDFXYaZLdGsCdLDRp4U1Xu1LPPrQNkK"
-dtnodb="https://bcdb.dev.grid.tf"
+dtnodb="https://explorer.devnet.grid.tf"
 dredis="10.4.0.250"
 
 # initializing variables

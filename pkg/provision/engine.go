@@ -146,6 +146,8 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 }
 
 func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, info interface{}) error {
+	log.Debug().Str("id", r.ID).Msg("sending reply for reservation")
+
 	zbus := GetZBus(ctx)
 	identity := stubs.NewIdentityManagerStub(zbus)
 	result := &Result{
