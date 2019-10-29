@@ -17,7 +17,7 @@ import (
 
 // Network struct
 type Network struct {
-	NetwokID pkg.NetID `json:"network_id"`
+	NetworkID pkg.NetID `json:"network_id"`
 	// IP to give to the container
 	IPs []net.IP `json:"ips"`
 }
@@ -90,7 +90,7 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
 
-	netID := networkID(reservation.User, string(config.Network.NetwokID))
+	netID := networkID(reservation.User, string(config.Network.NetworkID))
 	log.Debug().
 		Str("network-id", string(netID)).
 		Str("config", fmt.Sprintf("%+v", config)).
@@ -227,7 +227,7 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 		return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
 	}
 
-	netID := networkID(reservation.User, string(config.Network.NetwokID))
+	netID := networkID(reservation.User, string(config.Network.NetworkID))
 	if err := networkMgr.Leave(netID, string(containerID)); err != nil {
 		return errors.Wrap(err, "failed to delete container network namespace")
 	}
@@ -236,7 +236,7 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 }
 
 func validateContainerConfig(config Container) error {
-	if config.Network.NetwokID == "" {
+	if config.Network.NetworkID == "" {
 		return fmt.Errorf("network ID cannot be empty")
 	}
 

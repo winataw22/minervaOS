@@ -1,0 +1,83 @@
+name: Release (testing)
+on:
+  push:
+    # Matching on any tags which is not a production release
+    # Matching:
+    #  - v1.0.0-beta5
+    #  - v1.0.1-rc3
+    #  - v2.1.4-hotfix-87
+    #
+    # Ignoring:
+    #  - v1.0.0
+    #  - v1.1.0
+    #  - v2.1.13
+    tags:
+      - 'v*-*'
+
+jobs:
+  build:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Build binaries
+      run: |
+        cd cmds
+        make
+      env:
+        GO111MODULE: on
+
+    - name: Collecting files
+      run: |
+        mkdir -p ${{ github.workspace }}/archive/{bin,etc/zinit}
+        cp bin/* ${{ github.workspace }}/archive/bin/
+        cp -r zinit/* ${{ github.workspace }}/archive/etc/zinit
+
+    - name: Uploading flist (${{ github.sha }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: publish
+        user: tf-autobuilder
+        root: archive
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.sha }}.flist
+
+    - name: Promote flist (${{ github.ref }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: promote
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: tf-autobuilder/zos-${{ github.sha }}.flist
+        target: zos-${{ github.ref }}.flist
+
+    - name: Symlink flist (development)
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: symlink
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.ref }}.flist
+        target: zos:development:latest.flist
+    
+    - name: Symlink flist (testing)
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: symlink
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.ref }}.flist
+        target: zos:testing:latest.flist
+

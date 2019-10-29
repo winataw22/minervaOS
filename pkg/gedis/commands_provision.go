@@ -3,7 +3,6 @@ package gedis
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/threefoldtech/zos/pkg/schema"
@@ -78,7 +77,7 @@ func (g *Gedis) Get(id string) (*provision.Reservation, error) {
 		return nil, err
 	}
 
-	return reservationFromSchema(workload), nil
+	return reservationFromSchema(workload)
 }
 
 // Poll implements provision.ReservationPoller
@@ -108,7 +107,11 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*provi
 
 	reservations := make([]*provision.Reservation, len(out.Workloads))
 	for i, w := range out.Workloads {
-		reservations[i] = reservationFromSchema(w)
+		r, err := reservationFromSchema(w)
+		if err != nil {
+			return nil, err
+		}
+		reservations[i] = r
 	}
 
 	return reservations, nil
@@ -116,10 +119,7 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*provi
 
 // Feedback implements provision.Feedbacker
 func (g *Gedis) Feedback(id string, r *provision.Result) error {
-	rID, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return err
-	}
+
 	var rType types.TfgridReservationResult1CategoryEnum
 	switch r.Type {
 	case provision.VolumeReservation:
@@ -142,7 +142,7 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 
 	result := types.TfgridReservationResult1{
 		Category:   rType,
-		WorkloadID: rID,
+		WorkloadID: id,
 		DataJSON:   string(r.Data),
 		Signature:  r.Signature,
 		State:      rState,
@@ -150,8 +150,8 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 		Epoch:      schema.Date{r.Created},
 	}
 
-	_, err = g.Send("workload_manager", "set_workload_result", Args{
-		"reservation_id": rID,
+	_, err := g.Send("workload_manager", "set_workload_result", Args{
+		"reservation_id": id,
 		"result":         result,
 	})
 	return err
@@ -160,8 +160,8 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 // Deleted implements provision.Feedbacker
 func (g *Gedis) Deleted(id string) error { return nil }
 
-func reservationFromSchema(w types.TfgridReservationWorkload1) *provision.Reservation {
-	return &provision.Reservation{
+func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reservation, error) {
+	reservation := &provision.Reservation{
 		ID:        w.WorkloadID,
 		User:      w.User,
 		Type:      provision.ReservationType(w.Type.String()),
@@ -170,6 +170,65 @@ func reservationFromSchema(w types.TfgridReservationWorkload1) *provision.Reserv
 		Signature: []byte(w.Signature),
 		Data:      w.Workload,
 	}
+
+	var (
+		data interface{}
+		err  error
+	)
+
+	// convert the workload description from jsx schema to zos types
+	switch reservation.Type {
+	case provision.ZDBReservation:
+		tmp := types.TfgridReservationZdb1{}
+		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
+			return nil, err
+		}
+
+		data, err = tmp.ToProvisionType()
+		if err != nil {
+			return nil, err
+		}
+
+	case provision.VolumeReservation:
+		tmp := types.TfgridReservationVolume1{}
+		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
+			return nil, err
+		}
+
+		data, err = tmp.ToProvisionType()
+		if err != nil {
+			return nil, err
+		}
+
+	case provision.NetworkReservation:
+		tmp := types.TfgridReservationNetwork1{}
+		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
+			return nil, err
+		}
+
+		data, err = tmp.ToProvisionType()
+		if err != nil {
+			return nil, err
+		}
+
+	case provision.ContainerReservation:
+		tmp := types.TfgridReservationContainer1{}
+		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
+			return nil, err
+		}
+
+		data, err = tmp.ToProvisionType()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	reservation.Data, err = json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return reservation, nil
 }
 
 func workloadFromRaw(s json.RawMessage, t provision.ReservationType) (interface{}, error) {
@@ -182,7 +241,7 @@ func workloadFromRaw(s json.RawMessage, t provision.ReservationType) (interface{
 	case provision.VolumeReservation:
 		v := provision.Volume{}
 		err := json.Unmarshal([]byte(s), &v)
-		return v, err
+		return nil, err
 
 	case provision.NetworkReservation:
 		n := pkg.Network{}
@@ -243,7 +302,7 @@ func containerReservation(i interface{}, nodeID string) types.TfgridReservationC
 		Volumes:     make([]types.TfgridReservationContainerMount1, len(c.Mounts)),
 		NetworkConnection: []types.TfgridReservationNetworkConnection1{
 			{
-				NetworkID: string(c.Network.NetwokID),
+				NetworkID: string(c.Network.NetworkID),
 				Ipaddress: c.Network.IPs[0],
 			},
 		},

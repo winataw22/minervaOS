@@ -1,0 +1,89 @@
+name: Release (development)
+on: 
+  push:
+    branches: 
+    - master
+
+jobs:
+  build:
+    name: Build and upload
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Build binaries
+      run: |
+        cd cmds
+        make
+      env:
+        GO111MODULE: on
+
+    - name: Collecting files
+      run: |
+        mkdir -p ${{ github.workspace }}/archive/{bin,etc/zinit}
+        cp bin/* ${{ github.workspace }}/archive/bin/
+        cp -r zinit/* ${{ github.workspace }}/archive/etc/zinit
+
+    - name: Publish flist (${{ github.sha }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: publish
+        user: tf-autobuilder
+        root: archive
+        token: ${{ secrets.HUB_JWT }}
+        name: zos-${{ github.sha }}.flist
+
+    - name: Set name of the development build
+      id: setname
+      run: |
+        echo "::set-output name=build::zos-$(date +%y%m%d.%H%M%S.0)-dev.flist"
+
+    - name: Promote flist (${{ github.sha }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: promote
+        user: tf-zos
+        root: archive
+        token: ${{ secrets.HUB_JWT }}
+        name: tf-autobuilder/zos-${{ github.sha }}.flist
+        target: ${{ steps.setname.outputs.build }}
+
+    - name: Readlink of current development build
+      if: success()
+      id: readlink
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: readlink
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: tf-zos/zos:development:latest.flist
+
+    - name: Delete current build
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: delete
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: ${{ steps.readlink.outputs.linkpoint }}
+ 
+    - name: Symlink flist (development)
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        action: symlink
+        user: tf-zos
+        token: ${{ secrets.HUB_JWT }}
+        name: ${{ steps.setname.outputs.build }}
+        target: zos:development:latest.flist
+

@@ -45,7 +45,7 @@ Container provision schema
 ```go
 // Network struct
 type Network struct {
-	NetwokID string `json:"network_id"`
+	NetworkID string `json:"network_id"`
 }
 ```
 
