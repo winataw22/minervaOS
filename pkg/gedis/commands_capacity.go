@@ -1,16 +1,1 @@
-package gedis
-
-import (
-	"github.com/threefoldtech/zos/pkg"
-)
-
-//UptimeUpdate send the uptime of the node to BCDB
-func (g *Gedis) UptimeUpdate(nodeID pkg.Identifier, uptime uint64) error {
-
-	_, err := g.Send("nodes", "uptime_update", Args{
-		"node_id": nodeID.Identity(),
-		"uptime":  uptime,
-	})
-
-	return err
-}
+/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/92749198ea6ce76ed454a69544a6e42c

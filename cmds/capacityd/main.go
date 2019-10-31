@@ -70,8 +70,13 @@ func main() {
 		log.Fatal().Err(err).Msgf("failed to read DMI information from hardware")
 	}
 
+	disks, err := r.Disks()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to read smartctl information from disks")
+	}
+
 	log.Info().Msg("sends capacity detail to BCDB")
-	if err := store.Register(identity.NodeID(), *resources, *dmi); err != nil {
+	if err := store.Register(identity.NodeID(), *resources, *dmi, disks); err != nil {
 		log.Fatal().Err(err).Msgf("failed to write resources capacity on BCDB")
 	}
 
