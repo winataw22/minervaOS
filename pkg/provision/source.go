@@ -27,9 +27,10 @@ var (
 // to poll the BCDB for new reservation
 type ReservationPoller interface {
 	// Poll ask the store to send us reservation for a specific node ID
-	// if all is true, the store sends all the reservation every registered for the node ID
-	// otherwise it just sends reservation not pulled yet.
-	Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*Reservation, error)
+	// from is the used as a filter to which reservation to use as
+	// reservation.ID > from. So a client to the Poll method should make
+	// sure to call it with the last (MAX) reservation ID he receieved.
+	Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error)
 }
 
 // PollSource does a long poll on address to get new and to be deleted
@@ -52,28 +53,34 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 	// ever made to this know, to make sure we provision
 	// everything at boot
 	// after that, we only ask for the new reservations
-	all := true
 	go func() {
-		next := time.Now()
 		defer close(ch)
+		var from uint64
+		last := time.Now()
 		for {
-			time.Sleep(next.Sub(time.Now()))
-			since := next
-			next = time.Now().Add(s.maxSleep)
+			now := time.Now()
+			time.Sleep(last.Sub(now))
+			last = now.Add(s.maxSleep)
 
-			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), all, since)
+			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), from)
 			if err != nil && err != ErrPollEOS {
 				log.Error().Err(err).Msg("failed to get reservation")
-				time.Sleep(time.Second * 20)
+				continue
 			}
-
-			all = false
 
 			select {
 			case <-ctx.Done():
 				return
 			default:
 				for _, r := range res {
+					next, _, err := r.SplitID()
+					if err != nil {
+						log.Warn().Err(err).Str("id", r.ID).Msg("skipping reservation")
+						continue
+					}
+					if next > from {
+						from = next
+					}
 					ch <- r
 				}
 			}

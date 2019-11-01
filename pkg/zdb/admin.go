@@ -3,7 +3,7 @@ package zdb
 import (
 	"fmt"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // CreateNamespace creates a new namespace. Only admin can do this.

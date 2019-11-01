@@ -36,34 +36,29 @@ func (s *reservationsStore) reserve(w http.ResponseWriter, r *http.Request) {
 
 func (s *reservationsStore) poll(w http.ResponseWriter, r *http.Request) {
 	nodeID := mux.Vars(r)["node_id"]
-	var since time.Time
-	sinceStr := r.URL.Query().Get("since")
-	if sinceStr == "" {
-		// if since is not specificed, send all reservation since last hour
-		since = time.Now().Add(-time.Hour)
-	} else {
-		timestamp, err := strconv.ParseInt(sinceStr, 10, 64)
+
+	var (
+		from = uint64(0)
+		err  error
+	)
+	fromStr := r.URL.Query().Get("from")
+	if fromStr != "" {
+		from, err = strconv.ParseUint(fromStr, 10, 64)
 		if err != nil {
 			http.Error(w, "since query argument format not valid", http.StatusBadRequest)
 			return
 		}
-		since = time.Unix(timestamp, 0)
-	}
-
-	all, err := strconv.ParseBool(r.URL.Query().Get("all"))
-	if err != nil {
-		all = false
 	}
 
 	output := []*provision.Reservation{}
-	if all {
+	if from == 0 {
 		// just get all reservation for this nodeID
-		output = s.GetReservations(nodeID, all, since)
+		output = s.GetReservations(nodeID, from)
 	} else {
 		// otherwise start long polling
 		timeout := time.Now().Add(time.Second * 20)
 		for {
-			output = s.GetReservations(nodeID, all, since)
+			output = s.GetReservations(nodeID, from)
 			if len(output) > 0 {
 				break
 			}

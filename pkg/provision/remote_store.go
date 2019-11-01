@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
@@ -51,22 +50,18 @@ func (s *HTTPStore) Reserve(r *Reservation, nodeID pkg.Identifier) (string, erro
 	return resource, nil
 }
 
-// Poll retrieves reservations from BCDB. If all is true, it returns all the reservations
-// for this node.
-// otherwise it returns only the reservation never sent yet or the reservation that needs to be deleted
-// and do long polling
-func (s *HTTPStore) Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*Reservation, error) {
+// Poll retrieves reservations from BCDB. from acts like a cursor, first call should use
+// 0  to retrieve everything. Next calls should use the last (MAX) ID of the previous poll.
+// Note that from is a reservation ID not a workload ID. so user the Reservation.SplitID() method
+// to get the reservation part.
+func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
 	u, err := url.Parse(fmt.Sprintf("%s/reservations/%s/poll", s.baseURL, nodeID.Identity()))
 	if err != nil {
 		return nil, err
 	}
 	q := u.Query()
-	if all {
-		q.Add("all", "true")
-	}
-	if since.Unix() > 0 {
-		q.Add("since", fmt.Sprintf("%d", since.Unix()))
-	}
+	q.Add("from", fmt.Sprintf("%d", from))
+
 	u.RawQuery = q.Encode()
 
 	log.Info().Str("url", u.String()).Msg("fetching")

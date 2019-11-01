@@ -56,62 +56,62 @@ func TestProvisionPoll(t *testing.T) {
 	}
 
 	node := pkg.StrIdentifier("node-1")
-	time := time.Now()
 
 	args := Args{
 		"node_id": node.Identity(),
-		"epoch":   time.Unix(),
+		"from":    0,
 	}
 
-	workloadVol := `{"workload_id": 10, "type": 0, "size": 100}`
-	workloadZdb := `{"workload_id": 10, "mode": 0, "size": 100}`
+	workloadVol := `{"workload_id": 1, "type": 0, "size": 100}`
+	workloadZdb := `{"workload_id": 1, "mode": 0, "size": 100}`
 
 	conn.On("Do", "default.workload_manager.workloads_list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{
 			"workloads": []types.TfgridReservationWorkload1{
 				{
-					WorkloadID: "1",
+					WorkloadID: "1-1",
 					Type:       types.TfgridReservationWorkload1TypeVolume,
 					Workload:   json.RawMessage(workloadVol),
 				},
 				{
-					WorkloadID: "2",
+					WorkloadID: "2-1",
 					Type:       types.TfgridReservationWorkload1TypeZdb,
 					Workload:   json.RawMessage(workloadZdb),
 				},
 			},
 		}), nil)
 
-	reservations, err := gedis.Poll(node, false, time) //setting false to true will force epoch to 0
+	reservations, err := gedis.Poll(node, 0) //setting false to true will force epoch to 0
 
 	require.NoError(err)
 	require.Len(reservations, 2)
+	require.Equal(reservations[0].ID, "1-1")
 	require.Equal(reservations[0].Type, provision.VolumeReservation)
 	require.Equal(reservations[1].Type, provision.ZDBReservation)
 	conn.AssertCalled(t, "Close")
 
 	args = Args{
 		"node_id": node.Identity(),
-		"epoch":   0,
+		"from":    10,
 	}
 
 	conn.On("Do", "default.workload_manager.workloads_list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{
 			"workloads": []types.TfgridReservationWorkload1{
 				{
-					WorkloadID: "1",
+					WorkloadID: "1-1",
 					Type:       types.TfgridReservationWorkload1TypeVolume,
 					Workload:   json.RawMessage(workloadVol),
 				},
 				{
-					WorkloadID: "2",
+					WorkloadID: "2-1",
 					Type:       types.TfgridReservationWorkload1TypeZdb,
 					Workload:   json.RawMessage(workloadZdb),
 				},
 			},
 		}), nil)
 
-	reservations, err = gedis.Poll(node, true, time)
+	reservations, err = gedis.Poll(node, 10)
 
 	require.NoError(err)
 	require.Len(reservations, 2)

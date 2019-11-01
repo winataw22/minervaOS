@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/versioned"
 )
 
@@ -53,6 +56,24 @@ type Reservation struct {
 	// This flag is set to true when a reservation needs to be deleted
 	// before its expiration time
 	ToDelete bool `json:"to_delete"`
+}
+
+//SplitID gets the reservation part and the workload part from a full reservation ID
+func (r *Reservation) SplitID() (reservation uint64, workload uint64, err error) {
+	parts := strings.SplitN(r.ID, "-", 2)
+	if len(parts) != 2 {
+		return reservation, workload, fmt.Errorf("invalid reservation id format (wront length)")
+	}
+	reservation, err = strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return reservation, workload, errors.Wrap(err, "invalid reservation id format (reservation part)")
+	}
+	workload, err = strconv.ParseUint(parts[1], 10, 64)
+	if err != nil {
+		return reservation, workload, errors.Wrap(err, "invalid reservation id format (workload part)")
+	}
+
+	return
 }
 
 // Expired returns a boolean depending if the reservation

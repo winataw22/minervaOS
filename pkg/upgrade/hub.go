@@ -116,7 +116,9 @@ func (b *flistInfo) extractVersion(name string) (ver semver.Version, err error) 
 	// <name>:<version>.flist
 	parts := strings.Split(name, ":")
 	last := parts[len(parts)-1]
-	return semver.Parse(strings.TrimSuffix(last, ".flist"))
+	last = strings.TrimPrefix(last, "v")
+	last = strings.TrimSuffix(last, ".flist")
+	return semver.Parse(last)
 }
 
 // Version returns the version of the flist

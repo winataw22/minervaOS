@@ -14,8 +14,8 @@ type TestPollSource struct {
 	mock.Mock
 }
 
-func (s *TestPollSource) Poll(nodeID pkg.Identifier, all bool, since time.Time) ([]*Reservation, error) {
-	returns := s.Called(nodeID, all, since)
+func (s *TestPollSource) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
+	returns := s.Called(nodeID, from)
 	return returns.Get(0).([]*Reservation), returns.Error(1)
 }
 
@@ -27,10 +27,10 @@ func TestHTTPReservationSource(t *testing.T) {
 	source := PollSource(&store, nodeID)
 	chn := source.Reservations(context.Background())
 
-	store.On("Poll", nodeID, true, mock.Anything).
+	store.On("Poll", nodeID, uint64(0)).
 		Return([]*Reservation{
-			&Reservation{ID: "res-1"},
-			&Reservation{ID: "res-2"},
+			&Reservation{ID: "1-1"},
+			&Reservation{ID: "1-2"},
 		}, ErrPollEOS)
 
 	reservations := []*Reservation{}
@@ -39,8 +39,8 @@ func TestHTTPReservationSource(t *testing.T) {
 	}
 
 	require.Len(reservations, 2)
-	require.Equal("res-1", reservations[0].ID)
-	require.Equal("res-2", reservations[1].ID)
+	require.Equal("1-1", reservations[0].ID)
+	require.Equal("1-2", reservations[1].ID)
 }
 
 func TestHTTPReservationSourceMultiple(t *testing.T) {
@@ -55,16 +55,16 @@ func TestHTTPReservationSourceMultiple(t *testing.T) {
 
 	chn := source.Reservations(context.Background())
 
-	store.On("Poll", nodeID, true, mock.Anything).
+	store.On("Poll", nodeID, uint64(0)).
 		Return([]*Reservation{
-			&Reservation{ID: "res-1"},
-			&Reservation{ID: "res-2"},
+			&Reservation{ID: "1-1"},
+			&Reservation{ID: "2-1"},
 		}, nil) // return nil error so it tries again
 
-	store.On("Poll", nodeID, false, mock.Anything).
+	store.On("Poll", nodeID, uint64(2)).
 		Return([]*Reservation{
-			&Reservation{ID: "res-3"},
-			&Reservation{ID: "res-4"},
+			&Reservation{ID: "3-1"},
+			&Reservation{ID: "4-1"},
 		}, ErrPollEOS)
 
 	reservations := []*Reservation{}
@@ -73,8 +73,8 @@ func TestHTTPReservationSourceMultiple(t *testing.T) {
 	}
 
 	require.Len(reservations, 4)
-	require.Equal("res-1", reservations[0].ID)
-	require.Equal("res-2", reservations[1].ID)
-	require.Equal("res-3", reservations[2].ID)
-	require.Equal("res-4", reservations[3].ID)
+	require.Equal("1-1", reservations[0].ID)
+	require.Equal("2-1", reservations[1].ID)
+	require.Equal("3-1", reservations[2].ID)
+	require.Equal("4-1", reservations[3].ID)
 }

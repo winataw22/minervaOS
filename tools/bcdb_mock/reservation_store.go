@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/threefoldtech/zos/pkg/provision"
 )
@@ -80,7 +79,7 @@ func (s *reservationsStore) Get(ID string) (*reservation, error) {
 func (s *reservationsStore) Add(nodeID string, res *provision.Reservation) error {
 	s.m.Lock()
 	defer s.m.Unlock()
-	res.ID = fmt.Sprintf("r-%d", len(s.Reservations))
+	res.ID = fmt.Sprintf("%d-1", len(s.Reservations))
 	s.Reservations = append(s.Reservations, &reservation{
 		NodeID:      nodeID,
 		Reservation: res,
@@ -88,7 +87,7 @@ func (s *reservationsStore) Add(nodeID string, res *provision.Reservation) error
 	return nil
 }
 
-func (s *reservationsStore) GetReservations(nodeID string, all bool, since time.Time) []*provision.Reservation {
+func (s *reservationsStore) GetReservations(nodeID string, from uint64) []*provision.Reservation {
 	output := []*provision.Reservation{}
 
 	s.m.RLock()
@@ -100,8 +99,13 @@ func (s *reservationsStore) GetReservations(nodeID string, all bool, since time.
 			continue
 		}
 
-		if all ||
-			(!r.Reservation.Expired() && since.Before(r.Reservation.Created)) ||
+		resID, _, err := r.Reservation.SplitID()
+		if err != nil {
+			continue
+		}
+
+		if from == 0 ||
+			(!r.Reservation.Expired() && resID > from) ||
 			(r.Reservation.ToDelete && !r.Deleted) {
 			output = append(output, r.Reservation)
 		}
