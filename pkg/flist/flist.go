@@ -162,11 +162,6 @@ func (f *flistModule) Mount(url, storage string) (string, error) {
 		return "", err
 	}
 
-	// workaround until https://github.com/threefoldtech/zos/issues/330 is fixed
-	if err := os.Chmod(mountpoint, 0755); err != nil {
-		return "", err
-	}
-
 	return mountpoint, nil
 }
 

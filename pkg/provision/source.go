@@ -28,7 +28,7 @@ var (
 type ReservationPoller interface {
 	// Poll ask the store to send us reservation for a specific node ID
 	// from is the used as a filter to which reservation to use as
-	// reservation.ID > from. So a client to the Poll method should make
+	// reservation.ID >= from. So a client to the Poll method should make
 	// sure to call it with the last (MAX) reservation ID he receieved.
 	Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error)
 }
@@ -55,14 +55,13 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 	// after that, we only ask for the new reservations
 	go func() {
 		defer close(ch)
-		var from uint64
-		last := time.Now()
+		var next uint64
+		on := time.Now()
 		for {
-			now := time.Now()
-			time.Sleep(last.Sub(now))
-			last = now.Add(s.maxSleep)
+			time.Sleep(time.Until(on))
+			on = time.Now().Add(s.maxSleep)
 
-			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), from)
+			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), next)
 			if err != nil && err != ErrPollEOS {
 				log.Error().Err(err).Msg("failed to get reservation")
 				continue
@@ -73,13 +72,13 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 				return
 			default:
 				for _, r := range res {
-					next, _, err := r.SplitID()
+					current, _, err := r.SplitID()
 					if err != nil {
 						log.Warn().Err(err).Str("id", r.ID).Msg("skipping reservation")
 						continue
 					}
-					if next > from {
-						from = next
+					if current >= next {
+						next = current + 1
 					}
 					ch <- r
 				}

@@ -51,7 +51,7 @@ func (s *HTTPStore) Reserve(r *Reservation, nodeID pkg.Identifier) (string, erro
 }
 
 // Poll retrieves reservations from BCDB. from acts like a cursor, first call should use
-// 0  to retrieve everything. Next calls should use the last (MAX) ID of the previous poll.
+// 0  to retrieve everything. Next calls should use the last+1 ID of the previous poll.
 // Note that from is a reservation ID not a workload ID. so user the Reservation.SplitID() method
 // to get the reservation part.
 func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {

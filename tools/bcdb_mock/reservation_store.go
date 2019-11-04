@@ -105,7 +105,7 @@ func (s *reservationsStore) GetReservations(nodeID string, from uint64) []*provi
 		}
 
 		if from == 0 ||
-			(!r.Reservation.Expired() && resID > from) ||
+			(!r.Reservation.Expired() && resID >= from) ||
 			(r.Reservation.ToDelete && !r.Deleted) {
 			output = append(output, r.Reservation)
 		}
