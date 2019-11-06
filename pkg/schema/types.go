@@ -135,6 +135,11 @@ func (d *Date) UnmarshalJSON(bytes []byte) error {
 
 // MarshalJSON formats a text
 func (d Date) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`%d`, d.Unix())), nil
+}
+
+// String implements stringer interface
+func (d Date) String() ([]byte, error) {
 	if d.Time.IsZero() {
 		return []byte(`""`), nil
 	}

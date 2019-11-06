@@ -98,15 +98,11 @@ func main() {
 		log.Fatal().Err(err).Send()
 	}
 
-	for {
-		next := time.Now().Add(time.Minute * 10)
+	tick := time.NewTicker(time.Minute * 10)
+	defer tick.Stop()
 
-		if time.Now().After(next) {
-			backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
-			continue
-		}
-
-		time.Sleep(time.Minute)
+	for range tick.C {
+		backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
 	}
 }
 

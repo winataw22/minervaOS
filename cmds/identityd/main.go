@@ -286,6 +286,7 @@ func registerNode(nodeID, farmID pkg.Identifier, version string, store identity.
 
 	_, err := store.RegisterNode(nodeID, farmID, version, loc)
 	if err != nil {
+		log.Error().Err(err).Send()
 		return err
 	}
 	return nil
