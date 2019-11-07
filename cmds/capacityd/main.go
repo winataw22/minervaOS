@@ -108,7 +108,10 @@ func main() {
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (capacity.Store, error) {
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse node environment")
+	}
 
 	// use the bcdb mock for dev and test
 	if env.RunningMode == environment.RunningDev {

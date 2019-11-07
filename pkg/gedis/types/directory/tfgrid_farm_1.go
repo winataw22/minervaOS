@@ -2,8 +2,8 @@ package directory
 
 //TfgridFarm1 jsx schema
 type TfgridFarm1 struct {
-	ID              string                     `json:"id"`
-	ThreebotID      string                     `json:"threebot_id"`
+	ID              uint64                     `json:"id"`
+	ThreebotID      uint64                     `json:"threebot_id"`
 	IyoOrganization string                     `json:"iyo_organization"`
 	Name            string                     `json:"name"`
 	WalletAddresses []string                   `json:"wallet_addresses"`

@@ -51,7 +51,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create cache directory")
 	}
 
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to parse node environment")
+	}
 
 	if env.Orphan {
 		// disable providiond on this node
@@ -117,7 +120,10 @@ type store interface {
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (store, error) {
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse node environment")
+	}
 
 	// use the bcdb mock for dev and test
 	if env.RunningMode == environment.RunningDev {

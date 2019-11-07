@@ -249,7 +249,10 @@ func identityMgr(root string) (pkg.IdentityManager, error) {
 		return nil, err
 	}
 
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse node environment")
+	}
 
 	nodeID := manager.NodeID()
 	log.Info().
@@ -258,7 +261,7 @@ func identityMgr(root string) (pkg.IdentityManager, error) {
 
 	log.Info().
 		Bool("orphan", env.Orphan).
-		Str("farmer_id", env.FarmerID).
+		Uint64("farmer_id", uint64(env.FarmerID)).
 		Msg("farmer identified")
 
 	return manager, nil
@@ -266,7 +269,10 @@ func identityMgr(root string) (pkg.IdentityManager, error) {
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (identity.IDStore, error) {
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse node environment")
+	}
 
 	// use the bcdb mock for dev and test
 	if env.RunningMode == environment.RunningDev {
@@ -281,7 +287,7 @@ func bcdbClient() (identity.IDStore, error) {
 	return store, nil
 }
 
-func registerNode(nodeID, farmID pkg.Identifier, version string, store identity.IDStore, loc geoip.Location) error {
+func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, store identity.IDStore, loc geoip.Location) error {
 	log.Info().Str("version", version).Msg("start registration of the node")
 
 	_, err := store.RegisterNode(nodeID, farmID, version, loc)

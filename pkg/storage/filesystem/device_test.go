@@ -40,7 +40,7 @@ func TestDeviceManagerScan(t *testing.T) {
 	exec.On("run", mock.Anything, "seektime", "-j", "/tmp/dev2").
 		Return([]byte(`{"type": "HDD", "elapsed": 5000}`), nil)
 
-	mgr, err := defaultDeviceManager(ctx, &exec)
+	mgr := defaultDeviceManager(ctx, &exec)
 	require.NoError(err)
 
 	cached, err := mgr.Devices(ctx)

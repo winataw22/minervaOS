@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 )
@@ -18,6 +19,15 @@ type DeviceManager interface {
 	Devices(ctx context.Context) (DeviceCache, error)
 	// ByLabel finds all devices with the specified label
 	ByLabel(ctx context.Context, label string) ([]*Device, error)
+	// Raw returns the devices as represented in the kernel
+	// without using the internal cache, nor flattened
+	Raw(ctx context.Context) (DeviceCache, error)
+	// Reset returns a "clean" instace of the device manager
+	// The implementation must take care to clean any caching
+	// or other in-memory states and starting fresh. It's called
+	// by some routines to make sure a listing of devices will
+	// always return the real state of the system.
+	Reset() DeviceManager
 }
 
 // DeviceCache represents a list of cached in memory devices
@@ -59,34 +69,46 @@ func (d *Device) Used() bool {
 // method is called.
 type lsblkDeviceManager struct {
 	executer
-	devices DeviceCache
+	cache DeviceCache
 }
 
 // DefaultDeviceManager returns a default device manager implementation
-func DefaultDeviceManager(ctx context.Context) (DeviceManager, error) {
+func DefaultDeviceManager(ctx context.Context) DeviceManager {
 	return defaultDeviceManager(ctx, executerFunc(run))
 }
 
-func defaultDeviceManager(ctx context.Context, exec executer) (DeviceManager, error) {
+func defaultDeviceManager(ctx context.Context, exec executer) DeviceManager {
 	m := &lsblkDeviceManager{
-		devices:  DeviceCache{},
 		executer: exec,
 	}
 
-	err := m.scan(ctx)
-	return m, err
+	return m
+}
+
+func (l *lsblkDeviceManager) Reset() DeviceManager {
+	return &lsblkDeviceManager{executer: l.executer}
 }
 
 // Devices gets available block devices
 func (l *lsblkDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
-	return l.devices, nil
+	devices, err := l.scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return devices, nil
 }
 
 func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) ([]*Device, error) {
+	devices, err := l.scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var filtered []*Device
 
-	for idx := range l.devices {
-		device := &l.devices[idx]
+	for idx := range devices {
+		device := &devices[idx]
 		if device.Label == label {
 			filtered = append(filtered, device)
 		}
@@ -96,9 +118,14 @@ func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) ([]*Devi
 }
 
 func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device *Device, err error) {
-	for idx := range l.devices {
-		if l.devices[idx].Path == path {
-			return &l.devices[idx], nil
+	devices, err := l.scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx := range devices {
+		if devices[idx].Path == path {
+			return &devices[idx], nil
 		}
 	}
 
@@ -106,11 +133,10 @@ func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device *D
 
 }
 
-// scan the system for disks using the `lsblk` command
-func (l *lsblkDeviceManager) scan(ctx context.Context) error {
+func (l *lsblkDeviceManager) Raw(ctx context.Context) (DeviceCache, error) {
 	bytes, err := l.run(ctx, "lsblk", "--json", "--output-all", "--bytes", "--exclude", "1,2,11", "--path")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var devices struct {
@@ -118,18 +144,29 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) error {
 	}
 
 	if err := json.Unmarshal(bytes, &devices); err != nil {
-		return err
+		return nil, err
 	}
 
-	devs := DeviceCache(devices.BlockDevices)
+	return DeviceCache(devices.BlockDevices), nil
+}
+
+// scan the system for disks using the `lsblk` command
+func (l *lsblkDeviceManager) scan(ctx context.Context) (DeviceCache, error) {
+	if l.cache != nil {
+		return l.cache, nil
+	}
+
+	devs, err := l.Raw(ctx)
+	if err != nil {
+		errors.Wrap(err, "failed to scan devices")
+	}
 
 	if err := l.setDeviceTypes(devs); err != nil {
-		return err
+		return nil, err
 	}
 
-	l.devices = l.flattenDevices(devs)
-
-	return nil
+	l.cache = l.flattenDevices(devs)
+	return l.cache, nil
 }
 
 // seektime uses the seektime binary to try and determine the type of a disk

@@ -54,7 +54,7 @@ func (s *IdentityManagerStub) Encrypt(arg0 []uint8) (ret0 []uint8, ret1 error) {
 	return
 }
 
-func (s *IdentityManagerStub) FarmID() (ret0 pkg.StrIdentifier, ret1 error) {
+func (s *IdentityManagerStub) FarmID() (ret0 pkg.FarmID, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.Request(s.module, s.object, "FarmID", args...)
 	if err != nil {

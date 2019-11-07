@@ -10,8 +10,8 @@ func httpError(w http.ResponseWriter, err error, code int) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(struct {
-		Error error
+		Error string
 	}{
-		Error: err,
+		Error: err.Error(),
 	})
 }

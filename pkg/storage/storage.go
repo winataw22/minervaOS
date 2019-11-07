@@ -37,7 +37,9 @@ func New() (pkg.StorageModule, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	m, err := filesystem.DefaultDeviceManager(ctx)
+	m := filesystem.DefaultDeviceManager(ctx)
+
+	m, err := filesystem.Migrate(context.Background(), m)
 	if err != nil {
 		return nil, err
 	}

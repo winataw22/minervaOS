@@ -15,6 +15,10 @@ type TestDeviceManager struct {
 	devices DeviceCache
 }
 
+func (m *TestDeviceManager) Reset() DeviceManager {
+	return m
+}
+
 func (m *TestDeviceManager) Device(ctx context.Context, path string) (*Device, error) {
 	for idx := range m.devices {
 		loop := &m.devices[idx]
@@ -38,6 +42,10 @@ func (m *TestDeviceManager) ByLabel(ctx context.Context, label string) ([]*Devic
 }
 
 func (m *TestDeviceManager) Devices(ctx context.Context) (DeviceCache, error) {
+	return m.devices, nil
+}
+
+func (m *TestDeviceManager) Raw(ctx context.Context) (DeviceCache, error) {
 	return m.devices, nil
 }
 

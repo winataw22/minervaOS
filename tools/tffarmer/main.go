@@ -63,9 +63,9 @@ func main() {
 					Category:  "identity",
 					ArgsUsage: "farm_name",
 					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "seed",
-							Usage: "path to the farmer seed. Specify this if you already have a seed generated for your farm",
+						cli.Uint64Flag{
+							Name:  "tid",
+							Usage: "threebot id",
 						},
 					},
 					Action: registerFarm,

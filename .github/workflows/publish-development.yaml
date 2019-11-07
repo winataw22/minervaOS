@@ -45,7 +45,7 @@ jobs:
     - name: Set name of the development build
       id: setname
       run: |
-        echo "::set-output name=build::zos:v$(date +%y%m%d.%H%M%S.0)-dev.flist"
+        echo "::set-output name=build::zos:v$(date +%y%m%d.%-H%M%S.0)-dev.flist"
 
     - name: Promote flist (${{ github.sha }})
       if: success()

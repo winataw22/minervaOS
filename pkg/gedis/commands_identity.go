@@ -22,14 +22,14 @@ import (
 //
 
 //RegisterNode implements pkg.IdentityManager interface
-func (g *Gedis) RegisterNode(nodeID, farmID pkg.Identifier, version string, location geoip.Location) (string, error) {
+func (g *Gedis) RegisterNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, location geoip.Location) (string, error) {
 
 	pk := base58.Decode(nodeID.Identity())
 
 	resp, err := Bytes(g.Send("nodes", "add", Args{
 		"node": directory.TfgridNode2{
 			NodeID:       nodeID.Identity(),
-			FarmID:       farmID.Identity(),
+			FarmID:       uint64(farmID),
 			OsVersion:    version,
 			PublicKeyHex: hex.EncodeToString(pk),
 			Location: directory.TfgridLocation1{
@@ -57,9 +57,9 @@ func (g *Gedis) RegisterNode(nodeID, farmID pkg.Identifier, version string, loca
 }
 
 // ListNode implements pkg.IdentityManager interface
-func (g *Gedis) ListNode(farmID pkg.Identifier, country string, city string) ([]types.Node, error) {
+func (g *Gedis) ListNode(farmID pkg.FarmID, country string, city string) ([]types.Node, error) {
 	resp, err := Bytes(g.Send("nodes", "list", Args{
-		"farm_id": farmID.Identity(),
+		"farm_id": farmID,
 		"country": country,
 		"city":    city,
 	}))
@@ -85,10 +85,10 @@ func (g *Gedis) ListNode(farmID pkg.Identifier, country string, city string) ([]
 }
 
 //RegisterFarm implements pkg.IdentityManager interface
-func (g *Gedis) RegisterFarm(farm pkg.Identifier, name string, email string, wallet []string) (string, error) {
+func (g *Gedis) RegisterFarm(tid uint64, name string, email string, wallet []string) (pkg.FarmID, error) {
 	resp, err := Bytes(g.Send("farms", "register", Args{
 		"farm": directory.TfgridFarm1{
-			ThreebotID:      farm.Identity(),
+			ThreebotID:      tid,
 			Name:            name,
 			Email:           email,
 			WalletAddresses: wallet,
@@ -96,7 +96,7 @@ func (g *Gedis) RegisterFarm(farm pkg.Identifier, name string, email string, wal
 	}))
 
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
 	var out struct {
@@ -104,10 +104,15 @@ func (g *Gedis) RegisterFarm(farm pkg.Identifier, name string, email string, wal
 	}
 
 	if err := json.Unmarshal(resp, &out); err != nil {
-		return "", err
+		return 0, err
 	}
 
-	return out.FarmID.String(), nil
+	id, err := out.FarmID.Int64()
+	if err != nil {
+		return 0, err
+	}
+
+	return pkg.FarmID(id), nil
 }
 
 //GetNode implements pkg.IdentityManager interface

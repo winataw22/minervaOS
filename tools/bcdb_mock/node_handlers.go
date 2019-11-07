@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/threefoldtech/zos/pkg/capacity"
 
@@ -52,7 +53,20 @@ func (s *nodeStore) nodeDetail(w http.ResponseWriter, r *http.Request) {
 
 func (s *nodeStore) listNodes(w http.ResponseWriter, r *http.Request) {
 	nodes := s.List()
-	farm := r.URL.Query().Get("farm")
+	sFarm := r.URL.Query().Get("farm")
+
+	var (
+		farm uint64
+		err  error
+	)
+
+	if sFarm != "" {
+		farm, err = strconv.ParseUint(sFarm, 10, 64)
+		if err != nil {
+			httpError(w, err, http.StatusBadRequest)
+			return
+		}
+	}
 
 	for i, node := range nodes {
 		if node == nil {
@@ -60,7 +74,7 @@ func (s *nodeStore) listNodes(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if farm != "" && node.FarmID != farm {
+		if farm != 0 && uint64(node.FarmID) != farm {
 			nodes = append(nodes[:i], nodes[i+1:]...)
 			continue
 		}
@@ -73,7 +87,20 @@ func (s *nodeStore) listNodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *nodeStore) cockpitListNodes(w http.ResponseWriter, r *http.Request) {
 	nodes := s.List()
-	farm := r.URL.Query().Get("farm")
+	sFarm := r.URL.Query().Get("farm")
+
+	var (
+		farm uint64
+		err  error
+	)
+
+	if sFarm != "" {
+		farm, err = strconv.ParseUint(sFarm, 10, 64)
+		if err != nil {
+			httpError(w, err, http.StatusBadRequest)
+			return
+		}
+	}
 
 	for i, node := range nodes {
 		if node == nil {
@@ -81,11 +108,15 @@ func (s *nodeStore) cockpitListNodes(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if farm != "" && node.FarmID != farm {
+		if farm != 0 && uint64(node.FarmID) != farm {
 			nodes = append(nodes[:i], nodes[i+1:]...)
 			continue
 		}
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(nodes)
 
 	x := struct {
 		Node []*directory.TfgridNode2 `json:"nodes"`

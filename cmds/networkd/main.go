@@ -203,7 +203,10 @@ func startServer(ctx context.Context, broker string, networker pkg.Networker) er
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (network.TNoDB, error) {
-	env := environment.Get()
+	env, err := environment.Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse node environment")
+	}
 
 	// use the bcdb mock for dev and test
 	if env.RunningMode == environment.RunningDev {
