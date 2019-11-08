@@ -114,10 +114,6 @@ func (s *nodeStore) cockpitListNodes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(nodes)
-
 	x := struct {
 		Node []*directory.TfgridNode2 `json:"nodes"`
 	}{nodes}

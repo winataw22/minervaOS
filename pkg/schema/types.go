@@ -135,6 +135,9 @@ func (d *Date) UnmarshalJSON(bytes []byte) error {
 
 // MarshalJSON formats a text
 func (d Date) MarshalJSON() ([]byte, error) {
+	if d.Time.IsZero() {
+		return []byte(`0`), nil
+	}
 	return []byte(fmt.Sprintf(`%d`, d.Unix())), nil
 }
 

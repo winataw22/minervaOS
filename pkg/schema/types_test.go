@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,6 +36,21 @@ func TestParseDate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDateNil(t *testing.T) {
+	var d Date
+
+	b, err := json.Marshal(d)
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte(`0`), b)
+
+	d = Date{Time: time.Unix(500, 0)}
+	b, err = json.Marshal(d)
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte(`500`), b)
 }
 
 func TestParseIPRange(t *testing.T) {
