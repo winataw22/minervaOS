@@ -166,7 +166,7 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 	client.On("Request", "flist", zbus.ObjectID{Name: "flist", Version: "0.0.1"},
 		"Mount",
 		"https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development.flist",
-		"").Return("/path/to/volume", nil)
+		"", pkg.ReadOnlyMountOptions).Return("/path/to/volume", nil)
 
 	client.On("Request", "network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
 		"ZDBPrepare").Return("net-ns", nil)

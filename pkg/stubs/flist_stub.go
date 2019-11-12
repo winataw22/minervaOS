@@ -1,6 +1,9 @@
 package stubs
 
-import zbus "github.com/threefoldtech/zbus"
+import (
+	zbus "github.com/threefoldtech/zbus"
+	pkg "github.com/threefoldtech/zos/pkg"
+)
 
 type FlisterStub struct {
 	client zbus.Client
@@ -19,8 +22,8 @@ func NewFlisterStub(client zbus.Client) *FlisterStub {
 	}
 }
 
-func (s *FlisterStub) Mount(arg0 string, arg1 string) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1}
+func (s *FlisterStub) Mount(arg0 string, arg1 string, arg2 pkg.MountOptions) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "Mount", args...)
 	if err != nil {
 		panic(err)

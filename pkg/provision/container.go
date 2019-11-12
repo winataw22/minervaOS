@@ -116,7 +116,7 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		Msg("assigned an IP")
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
-	mnt, err := flistClient.Mount(config.FList, config.FlistStorage)
+	mnt, err := flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
 	if err != nil {
 		return ContainerResult{}, err
 	}

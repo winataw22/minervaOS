@@ -57,9 +57,10 @@ var (
 		// ProvisionInterval: 10,
 	}
 
+	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode:   RunningMain,
-		BcdbURL:       "tcp://172.17.0.2:8901", //TODO: change once BCDB is online
+		BcdbURL:       "tcp://explorer.testnet.grid.tf:8901",
 		BcdbNamespace: "default",
 		// ProvisionTimeout:  240,
 		// ProvisionInterval: 20,

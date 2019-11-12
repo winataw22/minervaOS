@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/flist"
 	"github.com/threefoldtech/zos/pkg/identity"
 
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -23,7 +24,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
 	"github.com/threefoldtech/zos/pkg/utils"
 	"github.com/threefoldtech/zos/pkg/version"
@@ -45,7 +45,7 @@ const (
 // for example, in case of upgraded crash after it already stopped all
 // the services for upgrade.
 func setup(zinit *zinit.Client) error {
-	for _, required := range []string{"redis", "flistd"} {
+	for _, required := range []string{"redis"} {
 		if err := zinit.StartWait(5*time.Second, required); err != nil {
 			return err
 		}
@@ -105,13 +105,9 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to zinit")
 	}
 
-	cl, err := zbus.NewRedisClient(broker)
-	if err != nil {
-		log.Error().Err(err).Msg("fail to connect to broker")
-		return
-	}
-
-	flister := stubs.NewFlisterStub(cl)
+	// with volume allocation is set to nil this flister can be
+	// only used for RO mounts. Otherwise it will panic
+	flister := flist.New(root, nil)
 
 	upgrader := upgrade.Upgrader{
 		FLister:      flister,

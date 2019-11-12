@@ -220,7 +220,7 @@ func createZdbContainer(ctx context.Context, name string, mode pkg.ZDBMode, volu
 	)
 
 	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
-	rootFS, err := flist.Mount(zdbFlistURL, "")
+	rootFS, err := flist.Mount(zdbFlistURL, "", pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return nil, err
 	}

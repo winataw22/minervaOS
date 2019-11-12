@@ -12,6 +12,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/network"
 
+	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
 	"github.com/threefoldtech/zos/pkg/network/types"
 )
 
@@ -217,10 +218,6 @@ func (s *httpTNoDB) SelectExitNode(node pkg.Identifier) error {
 
 func (s *httpTNoDB) GetPubIface(node pkg.Identifier) (*types.PubIface, error) {
 
-	iface := &struct {
-		PublicConfig *types.PubIface `json:"public_config"`
-	}{}
-
 	url := fmt.Sprintf("%s/nodes/%s", s.baseURL, node.Identity())
 	resp, err := http.Get(url)
 	if err != nil {
@@ -236,6 +233,9 @@ func (s *httpTNoDB) GetPubIface(node pkg.Identifier) (*types.PubIface, error) {
 		return nil, fmt.Errorf("wrong response status: %v", resp.Status)
 	}
 
+	iface := struct {
+		PublicConfig *directory.TfgridNodePublicIface1 `json:"public_config,omitempty"`
+	}{}
 	if err := json.NewDecoder(resp.Body).Decode(&iface); err != nil {
 		return nil, err
 	}
@@ -244,7 +244,16 @@ func (s *httpTNoDB) GetPubIface(node pkg.Identifier) (*types.PubIface, error) {
 		return nil, network.ErrNoPubIface
 	}
 
-	return iface.PublicConfig, nil
+	return &types.PubIface{
+		Master: iface.PublicConfig.Master,
+		// Vlan:   iface.PublicConfig.Vlan, // doesn't seems to exists in gedis types
+		Type:    types.IfaceType(iface.PublicConfig.Type.String()),
+		GW4:     iface.PublicConfig.Gw4,
+		GW6:     iface.PublicConfig.Gw6,
+		IPv4:    types.NewIPNetFromSchema(iface.PublicConfig.Ipv4),
+		IPv6:    types.NewIPNetFromSchema(iface.PublicConfig.Ipv6),
+		Version: int(iface.PublicConfig.Version),
+	}, nil
 }
 
 func (s *httpTNoDB) GetNetwork(netid pkg.NetID) (*pkg.Network, error) {

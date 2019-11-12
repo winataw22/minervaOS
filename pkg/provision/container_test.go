@@ -110,7 +110,7 @@ func TestContainerProvisionNew(t *testing.T) {
 	client.On("Request",
 		"flist", zbus.ObjectID{Name: "flist", Version: "0.0.1"},
 		"Mount",
-		container.FList, container.FlistStorage).
+		container.FList, container.FlistStorage, pkg.DefaultMountOptions).
 		Return("/tmp/root", nil)
 
 	// once root is mounted, a final call to contd to run the container
@@ -206,7 +206,7 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 	client.On("Request",
 		"flist", zbus.ObjectID{Name: "flist", Version: "0.0.1"},
 		"Mount",
-		container.FList, container.FlistStorage).
+		container.FList, container.FlistStorage, pkg.DefaultMountOptions).
 		Return("/tmp/root", nil)
 
 	// once root is mounted, a final call to contd to run the container

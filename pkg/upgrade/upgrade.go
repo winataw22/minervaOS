@@ -308,7 +308,7 @@ func (u *Upgrader) uninstall() error {
 func (u *Upgrader) applyUpgrade(version semver.Version, info flistInfo) error {
 	log.Info().Str("flist", u.Name()).Str("version", version.String()).Msg("start applying upgrade")
 
-	flistRoot, err := u.FLister.Mount(u.hub.MountURL(u.Name()), u.hub.StorageURL())
+	flistRoot, err := u.FLister.Mount(u.hub.MountURL(u.Name()), u.hub.StorageURL(), pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return err
 	}

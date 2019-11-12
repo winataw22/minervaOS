@@ -4,6 +4,7 @@
 
 - Documentation about version:
   - [Release workflow](release/readme.md)
+  - [Migration to V2](migration/readme.md)
 
 - Documentation for each modules:
   - [Container](container/readme.md)

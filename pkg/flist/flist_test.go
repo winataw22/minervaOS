@@ -125,7 +125,7 @@ func TestMountUnmount(t *testing.T) {
 	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
 		Return("/my/backend", nil)
 
-	mnt, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
+	mnt, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
 
 	require.NoError(t, err)
 
@@ -153,11 +153,11 @@ func TestIsolation(t *testing.T) {
 	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
 		Return("/my/backend", nil)
 
-	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
+	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
 	require.NoError(err)
 	args1 := cmder.m
 
-	path2, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "")
+	path2, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
 	require.NoError(err)
 	args2 := cmder.m
 

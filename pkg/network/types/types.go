@@ -53,12 +53,12 @@ type PubIface struct {
 	Master string `json:"master"`
 	// Type define if we need to use
 	// the Vlan field or the MacVlan
-	Type IfaceType `json:"iface_type"`
+	Type IfaceType `json:"type"`
 	Vlan int16     `json:"vlan"`
 	// Macvlan net.HardwareAddr
 
-	IPv4 IPNet `json:"ip_v4"`
-	IPv6 IPNet `json:"ip_v6"`
+	IPv4 IPNet `json:"ipv4"`
+	IPv6 IPNet `json:"ipv6"`
 
 	GW4 net.IP `json:"gw4"`
 	GW6 net.IP `json:"gw6"`
