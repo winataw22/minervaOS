@@ -56,6 +56,39 @@ type Reservation struct {
 	// This flag is set to true when a reservation needs to be deleted
 	// before its expiration time
 	ToDelete bool `json:"to_delete"`
+
+	// Tag object is mainly used for debugging.
+	Tag Tag `json:"-"`
+}
+
+// AppendTag appends tags
+func AppendTag(t, n Tag) Tag {
+	if t == nil {
+		t = Tag{}
+	}
+
+	for k, v := range n {
+		t[k] = v
+	}
+
+	return t
+}
+
+// Tag is custom tag to mark certain reservations
+type Tag map[string]string
+
+func (t Tag) String() string {
+	var builder strings.Builder
+	for k, v := range t {
+		if builder.Len() != 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(k)
+		builder.WriteString(": ")
+		builder.WriteString(v)
+	}
+
+	return builder.String()
 }
 
 //SplitID gets the reservation part and the workload part from a full reservation ID

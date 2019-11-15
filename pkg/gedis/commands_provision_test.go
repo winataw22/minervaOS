@@ -59,7 +59,7 @@ func TestProvisionPoll(t *testing.T) {
 
 	args := Args{
 		"node_id": node.Identity(),
-		"from":    0,
+		"cursor":  0,
 	}
 
 	workloadVol := `{"workload_id": 1, "type": 0, "size": 100}`
@@ -92,7 +92,7 @@ func TestProvisionPoll(t *testing.T) {
 
 	args = Args{
 		"node_id": node.Identity(),
-		"from":    10,
+		"cursor":  10,
 	}
 
 	conn.On("Do", "default.workload_manager.workloads_list", mustMarshal(t, args)).
@@ -140,7 +140,7 @@ func TestProvisionFeedback(t *testing.T) {
 	}
 
 	args := Args{
-		"reservation_id": "101",
+		"global_workload_id": "101",
 		"result": types.TfgridReservationResult1{
 			Category:   types.TfgridReservationResult1CategoryContainer,
 			WorkloadID: "101",

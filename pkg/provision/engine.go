@@ -72,6 +72,7 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 				Str("id", string(reservation.ID)).
 				Str("type", string(reservation.Type)).
 				Str("duration", fmt.Sprintf("%v", reservation.Duration)).
+				Str("tag", reservation.Tag.String()).
 				Logger()
 
 			if reservation.Expired() || reservation.ToDelete {

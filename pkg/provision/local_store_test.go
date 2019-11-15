@@ -37,6 +37,7 @@ func TestLocalStore(t *testing.T) {
 					ID:       "r-1",
 					Created:  time.Now().UTC().Add(-time.Minute).Round(time.Second),
 					Duration: time.Second * 10,
+					Tag:      Tag{"source": "FSStore"},
 				},
 			},
 		},

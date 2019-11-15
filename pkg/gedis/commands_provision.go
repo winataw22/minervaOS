@@ -88,7 +88,7 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 
 	result, err := Bytes(g.Send("workload_manager", "workloads_list", Args{
 		"node_id": nodeID.Identity(),
-		"from":    from,
+		"cursor":  from,
 	}))
 
 	if err != nil {
@@ -149,8 +149,8 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 	}
 
 	_, err := g.Send("workload_manager", "set_workload_result", Args{
-		"reservation_id": id,
-		"result":         result,
+		"global_workload_id": id,
+		"result":             result,
 	})
 	return err
 }
@@ -167,6 +167,7 @@ func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reser
 		Duration:  time.Duration(w.Duration) * time.Second,
 		Signature: []byte(w.Signature),
 		Data:      w.Workload,
+		Tag:       provision.Tag{"source": "BCDB"},
 	}
 
 	var (

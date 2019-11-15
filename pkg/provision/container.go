@@ -153,10 +153,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		mounts = append(
 			mounts,
 			pkg.MountInfo{
-				Source:  source,
-				Target:  mountpoint,
-				Type:    "none",
-				Options: []string{"bind"},
+				Source: source,
+				Target: mountpoint,
 			},
 		)
 	}

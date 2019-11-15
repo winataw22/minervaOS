@@ -9,6 +9,7 @@ import (
 //TfgridNode2 jsx schema
 type TfgridNode2 struct {
 	NodeID            string                    `json:"node_id"`
+	NodeIDv1          string                    `json:"node_id_v1"`
 	FarmID            uint64                    `json:"farm_id"`
 	OsVersion         string                    `json:"os_version"`
 	Created           schema.Date               `json:"created"`

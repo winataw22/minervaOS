@@ -85,6 +85,9 @@ func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, er
 	if err := json.NewDecoder(resp.Body).Decode(&reservations); err != nil {
 		return nil, err
 	}
+	for _, r := range reservations {
+		r.Tag = Tag{"source": "HTTPStore"}
+	}
 	return reservations, nil
 }
 
@@ -107,7 +110,7 @@ func (s *HTTPStore) Get(id string) (*Reservation, error) {
 	if err := json.NewDecoder(resp.Body).Decode(r); err != nil {
 		return r, err
 	}
-
+	r.Tag = Tag{"source": "HTTPSource"}
 	return r, nil
 }
 

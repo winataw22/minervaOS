@@ -20,10 +20,8 @@ type NetworkInfo struct {
 
 // MountInfo defines a mount point
 type MountInfo struct {
-	Source  string   // source of the mount point on the host
-	Target  string   // target of mount inside the container
-	Type    string   // mount type
-	Options []string // mount options
+	Source string // source of the mount point on the host
+	Target string // target of mount inside the container
 }
 
 //Container creation info

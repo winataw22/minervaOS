@@ -221,10 +221,8 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 			},
 			Mounts: []pkg.MountInfo{
 				{
-					Source:  "/some/path/to/vol1",
-					Target:  "/opt",
-					Type:    "none",
-					Options: []string{"bind"},
+					Source: "/some/path/to/vol1",
+					Target: "/opt",
 				},
 			},
 		}).

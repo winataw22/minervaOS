@@ -68,10 +68,7 @@ func (s *FSStore) Remove(id string) error {
 
 	path := filepath.Join(s.root, id)
 	err := os.Remove(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
@@ -100,6 +97,7 @@ func (s *FSStore) GetExpired() ([]*Reservation, error) {
 			return nil, err
 		}
 		if r.Expired() {
+			r.Tag = Tag{"source": "FSStore"}
 			rs = append(rs, r)
 		}
 
@@ -116,12 +114,12 @@ func (s *FSStore) Get(id string) (*Reservation, error) {
 
 	path := filepath.Join(s.root, id)
 	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("reservation %s not found", id)
-		}
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("reservation %s not found", id)
+	} else if err != nil {
 		return nil, err
 	}
+
 	defer f.Close()
 	reader, err := versioned.NewReader(f)
 	if versioned.IsNotVersioned(err) {
@@ -141,7 +139,7 @@ func (s *FSStore) Get(id string) (*Reservation, error) {
 	} else {
 		return nil, fmt.Errorf("unknown reservation object version (%s)", reader.Version())
 	}
-
+	reservation.Tag = Tag{"source": "FSStore"}
 	return &reservation, nil
 }
 

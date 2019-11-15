@@ -180,16 +180,12 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 			Network: pkg.NetworkInfo{Namespace: "net-ns"},
 			Mounts: []pkg.MountInfo{
 				pkg.MountInfo{
-					Source:  "/path/to/volume",
-					Target:  "/data",
-					Type:    "none",
-					Options: []string{"bind"},
+					Source: "/path/to/volume",
+					Target: "/data",
 				},
 				pkg.MountInfo{
-					Source:  "/var/run/zdb_container-id",
-					Target:  "/socket",
-					Type:    "none",
-					Options: []string{"bind"},
+					Source: "/var/run/zdb_container-id",
+					Target: "/socket",
 				},
 			},
 			Entrypoint:  "/bin/zdb --data /data --index /data --mode seq  --listen :: --port 9900 --socket /socket/zdb.sock --dualnet",

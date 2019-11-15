@@ -81,22 +81,13 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		return id, ErrEmptyRootFS
 	}
 
-	if err := applyStartup(&data, filepath.Join(data.RootFS, ".startup.toml")); err != nil {
-		errors.Wrap(err, "error updating environment variable from startup file")
+	// we never allow any container to boot without a network namespace
+	if data.Network.Namespace == "" {
+		return "", fmt.Errorf("cannot create container without network namespace")
 	}
 
-	if data.Interactive {
-		if err := os.MkdirAll(filepath.Join(data.RootFS, "sandbox"), 0770); err != nil {
-			return id, err
-		}
-		data.Mounts = append(data.Mounts, pkg.MountInfo{
-			Source:  data.RootFS,
-			Target:  "/sandbox",
-			Type:    "bind",
-			Options: []string{"rbind"}, // mount options
-		})
-		data.RootFS = "/usr/lib/corex"
-		data.Entrypoint = "/bin/corex --ipv6 --chroot /sandbox -d 7"
+	if err := applyStartup(&data, filepath.Join(data.RootFS, ".startup.toml")); err != nil {
+		errors.Wrap(err, "error updating environment variable from startup file")
 	}
 
 	args, err := shlex.Split(data.Entrypoint)
@@ -111,6 +102,8 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		oci.WithEnv(data.Env),
 		oci.WithHostResolvconf,
 		removeRunMount(),
+		withNetworkNamespace(data.Network.Namespace),
+		withMounts(data.Mounts),
 	}
 
 	if data.WorkingDir != "" {
@@ -118,40 +111,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 	}
 
 	if data.Interactive {
-		opts = append(
-			opts,
-			withAddedCapabilities([]string{
-				"CAP_SYS_ADMIN",
-			}),
-			// in interactive mode, since we start the container
-			// from /usr/lib/corex
-			// we make it read-only
-			oci.WithReadonlyPaths([]string{"/"}),
-		)
-	}
-
-	// we never allow any container to boot without a network namespace
-	if data.Network.Namespace == "" {
-		return "", fmt.Errorf("cannot create container without network namespace")
-	}
-
-	opts = append(
-		opts,
-		withNetworkNamespace(data.Network.Namespace),
-	)
-
-	for _, mount := range data.Mounts {
-		opts = append(
-			opts,
-			oci.WithMounts([]specs.Mount{
-				{
-					Destination: mount.Target,
-					Type:        mount.Type,
-					Source:      mount.Source,
-					Options:     mount.Options,
-				},
-			}),
-		)
+		opts = append(opts, withCoreX())
 	}
 
 	log.Info().
@@ -178,6 +138,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 	for _, linxNS := range spec.Linux.Namespaces {
 		log.Info().Msgf("namespace %+v", linxNS.Type)
 	}
+	log.Info().Msgf("mounts %+v", spec.Mounts)
 
 	defer func() {
 		// if any of the next steps below fails, make sure
@@ -244,10 +205,8 @@ func (c *containerModule) Inspect(ns string, id pkg.ContainerID) (result pkg.Con
 		}
 		result.Mounts = append(result.Mounts,
 			pkg.MountInfo{
-				Source:  mount.Source,
-				Target:  mount.Destination,
-				Type:    mount.Type,
-				Options: mount.Options,
+				Source: mount.Source,
+				Target: mount.Destination,
 			},
 		)
 	}

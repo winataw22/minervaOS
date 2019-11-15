@@ -261,16 +261,12 @@ func createZdbContainer(ctx context.Context, name string, mode pkg.ZDBMode, volu
 			Network:     pkg.NetworkInfo{Namespace: netNsName},
 			Mounts: []pkg.MountInfo{
 				{
-					Source:  volumePath,
-					Target:  "/data",
-					Type:    "none",
-					Options: []string{"bind"},
+					Source: volumePath,
+					Target: "/data",
 				},
 				{
-					Source:  socketDir,
-					Target:  "/socket",
-					Type:    "none",
-					Options: []string{"bind"},
+					Source: socketDir,
+					Target: "/socket",
 				},
 			},
 		})

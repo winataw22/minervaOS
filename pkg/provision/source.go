@@ -60,6 +60,7 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 		for {
 			time.Sleep(time.Until(on))
 			on = time.Now().Add(s.maxSleep)
+			log.Debug().Uint64("next", next).Msg("Polling for reservations")
 
 			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), next)
 			if err != nil && err != ErrPollEOS {

@@ -25,22 +25,25 @@ import (
 func (g *Gedis) RegisterNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, location geoip.Location) (string, error) {
 
 	pk := base58.Decode(nodeID.Identity())
-
-	resp, err := Bytes(g.Send("nodes", "add", Args{
-		"node": directory.TfgridNode2{
-			NodeID:       nodeID.Identity(),
-			FarmID:       uint64(farmID),
-			OsVersion:    version,
-			PublicKeyHex: hex.EncodeToString(pk),
-			Location: directory.TfgridLocation1{
-				Longitude: location.Longitute,
-				Latitude:  location.Latitude,
-				Continent: location.Continent,
-				Country:   location.Country,
-				City:      location.City,
-			},
+	node := directory.TfgridNode2{
+		NodeID:       nodeID.Identity(),
+		FarmID:       uint64(farmID),
+		OsVersion:    version,
+		PublicKeyHex: hex.EncodeToString(pk),
+		Location: directory.TfgridLocation1{
+			Longitude: location.Longitute,
+			Latitude:  location.Latitude,
+			Continent: location.Continent,
+			Country:   location.Country,
+			City:      location.City,
 		},
-	}))
+	}
+	idv1, err := network.NodeIDv1()
+	if err == nil {
+		node.NodeIDv1 = idv1
+	}
+
+	resp, err := Bytes(g.Send("nodes", "add", Args{"node": node}))
 
 	if err != nil {
 		return "", err
