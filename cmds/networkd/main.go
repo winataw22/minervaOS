@@ -8,7 +8,6 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
@@ -47,8 +46,6 @@ func main() {
 	if err := network.DefaultBridgeValid(); err != nil {
 		log.Fatal().Err(err).Msg("invalid setup")
 	}
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	client, err := zbus.NewRedisClient(broker)
 	if err != nil {

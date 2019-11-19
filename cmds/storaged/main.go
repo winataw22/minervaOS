@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"os"
-
-	"github.com/rs/zerolog"
 
 	"github.com/rs/zerolog/log"
 
@@ -35,8 +32,6 @@ func main() {
 	if ver {
 		version.ShowAndExit(false)
 	}
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	storage, err := storage.New()
 	if err != nil {

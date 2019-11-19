@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gedis"
 	"github.com/threefoldtech/zos/pkg/geoip"
+	"github.com/threefoldtech/zos/pkg/stubs"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"
@@ -21,7 +23,6 @@ import (
 
 	"flag"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/upgrade"
@@ -81,6 +82,7 @@ func main() {
 		interval int
 		ver      bool
 		debug    bool
+		id       bool
 	)
 
 	flag.StringVar(&root, "root", "/var/cache/modules/identityd", "root working directory of the module")
@@ -88,12 +90,22 @@ func main() {
 	flag.IntVar(&interval, "interval", 600, "interval in seconds between update checks, default to 600")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 	flag.BoolVar(&debug, "d", false, "when set, no self update is done before upgradeing")
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	flag.BoolVar(&id, "id", false, "prints the node ID and exits")
 
 	flag.Parse()
 	if ver {
 		version.ShowAndExit(false)
+	}
+
+	if id {
+		client, err := zbus.NewRedisClient(broker)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to connect to zbus")
+		}
+		stub := stubs.NewIdentityManagerStub(client)
+		nodeID := stub.NodeID()
+		fmt.Println(nodeID)
+		os.Exit(0)
 	}
 
 	if err := os.MkdirAll(root, 0750); err != nil {

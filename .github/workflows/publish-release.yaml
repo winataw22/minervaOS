@@ -38,9 +38,7 @@ jobs:
 
     - name: Collecting files
       run: |
-        mkdir -p ${{ github.workspace }}/archive/{bin,etc/zinit}
-        cp bin/* ${{ github.workspace }}/archive/bin/
-        cp -r zinit/* ${{ github.workspace }}/archive/etc/zinit
+        scripts/collect.sh ${{ github.workspace }}/archive
 
     - name: Uploading flist (${{ github.sha }})
       if: success()

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"os"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
@@ -17,7 +16,6 @@ import (
 const module = "container"
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	var (
 		moduleRoot    string

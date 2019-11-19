@@ -22,7 +22,6 @@ import (
 )
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	var (
 		msgBrokerCon string

@@ -2,10 +2,7 @@ package main
 
 import (
 	"flag"
-	"os"
 	"time"
-
-	"github.com/rs/zerolog"
 
 	"github.com/cenkalti/backoff/v3"
 
@@ -36,8 +33,6 @@ func main() {
 	if ver {
 		version.ShowAndExit(false)
 	}
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	redis, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zos/pkg/network"
@@ -28,8 +27,6 @@ func main() {
 	if ver {
 		version.ShowAndExit(false)
 	}
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	if err := ifaceutil.SetLoUp(); err != nil {
 		return
