@@ -6,4 +6,4 @@ install: build
 	mkdir -p ${ROOT}/bin
 	cp -a etc ${ROOT}
 	cp ../bin/internet ${ROOT}/bin
-	cp ../zinit/internet.yaml ${ROOT}/etc/zinit/
+	cp ../etc/zinit/internet.yaml ${ROOT}/etc/zinit/
