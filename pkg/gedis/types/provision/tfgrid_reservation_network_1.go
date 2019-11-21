@@ -68,9 +68,10 @@ func (r TfgridNetworkNetResource1) ToProvisionType() (pkg.NetResource, error) {
 
 // WireguardPeer1 jsx Schema
 type WireguardPeer1 struct {
-	PublicKey  string   `json:"public_key"`
-	Endpoint   string   `json:"endpoint"`
-	AllowedIPs []string `json:"allowed_iprange"`
+	PublicKey  string         `json:"public_key"`
+	Endpoint   string         `json:"endpoint"`
+	AllowedIPs []string       `json:"allowed_iprange"`
+	IPRange    schema.IPRange `json:"iprange"`
 }
 
 //ToProvisionType converts WireguardPeer1 to pkg.Peer
@@ -79,6 +80,7 @@ func (p WireguardPeer1) ToProvisionType() (pkg.Peer, error) {
 		WGPublicKey: p.PublicKey,
 		Endpoint:    p.Endpoint,
 		AllowedIPs:  make([]types.IPNet, len(p.AllowedIPs)),
+		Subnet:      types.NewIPNetFromSchema(p.IPRange),
 	}
 
 	var err error

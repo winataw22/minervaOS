@@ -85,9 +85,9 @@ func TestProvisionPoll(t *testing.T) {
 
 	require.NoError(err)
 	require.Len(reservations, 2)
-	require.Equal(reservations[0].ID, "1-1")
-	require.Equal(reservations[0].Type, provision.VolumeReservation)
-	require.Equal(reservations[1].Type, provision.ZDBReservation)
+	require.Equal(reservations[0].ID, "2-1")
+	require.Equal(reservations[0].Type, provision.ZDBReservation)
+	require.Equal(reservations[1].Type, provision.VolumeReservation)
 	conn.AssertCalled(t, "Close")
 
 	args = Args{
@@ -115,8 +115,8 @@ func TestProvisionPoll(t *testing.T) {
 
 	require.NoError(err)
 	require.Len(reservations, 2)
-	require.Equal(reservations[0].Type, provision.VolumeReservation)
-	require.Equal(reservations[1].Type, provision.ZDBReservation)
+	require.Equal(reservations[0].Type, provision.ZDBReservation)
+	require.Equal(reservations[1].Type, provision.VolumeReservation)
 	conn.AssertCalled(t, "Close")
 
 }

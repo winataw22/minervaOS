@@ -3,6 +3,7 @@ package gedis
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/threefoldtech/zos/pkg/schema"
@@ -12,6 +13,16 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 )
+
+// provisionOrder is used to sort the workload type
+// in the right order for provisiond
+var provisionOrder = map[provision.ReservationType]int{
+	provision.DebugReservation:     0,
+	provision.NetworkReservation:   1,
+	provision.ZDBReservation:       2,
+	provision.VolumeReservation:    3,
+	provision.ContainerReservation: 4,
+}
 
 // Reserve provision.Reserver
 func (g *Gedis) Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string, error) {
@@ -111,6 +122,12 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 		}
 		reservations[i] = r
 	}
+
+	// sorts the primitive in the oder they need to be processed by provisiond
+	// network, zdb, volumes, container
+	sort.Slice(reservations, func(i int, j int) bool {
+		return provisionOrder[reservations[i].Type] < provisionOrder[reservations[j].Type]
+	})
 
 	return reservations, nil
 }

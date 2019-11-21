@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -35,6 +36,23 @@ func TestParseDate(t *testing.T) {
 				t.Error()
 			}
 		})
+	}
+}
+
+func TestNumericBigInt(t *testing.T) {
+	const inputValue = "1344719667586153181419716641724567886890850696275767987106294472017884974410332069524504824747437757"
+	var n Numeric
+	err := n.UnmarshalJSON([]byte(fmt.Sprintf(`"%s"`, inputValue)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bi, err := n.BigInt()
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := bi.String()
+	if inputValue != output {
+		t.Fatalf("%s != %s", inputValue, output)
 	}
 }
 
