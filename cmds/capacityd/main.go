@@ -7,6 +7,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gedis"
@@ -21,6 +22,8 @@ import (
 const module = "capacity"
 
 func main() {
+	app.Initialize()
+
 	var (
 		msgBrokerCon string
 		ver          bool

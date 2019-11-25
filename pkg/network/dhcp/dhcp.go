@@ -34,7 +34,7 @@ func Probe(inf string) (bool, error) {
 
 	defer func() {
 		if err := cmd.Process.Kill(); err != nil {
-			log.Error().Err(err).Msg("")
+			log.Error().Err(err).Send()
 		}
 
 		_ = cmd.Wait()

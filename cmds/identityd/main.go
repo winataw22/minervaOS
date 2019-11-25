@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/gedis"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -76,6 +77,8 @@ func SafeUpgrade(upgrader *upgrade.Upgrader) error {
 // 5. On update, re-register the node with new version to BCDB
 
 func main() {
+	app.Initialize()
+
 	var (
 		broker   string
 		root     string

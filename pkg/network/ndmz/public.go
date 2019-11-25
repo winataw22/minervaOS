@@ -6,7 +6,6 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/vishvananda/netlink"
@@ -30,7 +29,6 @@ func getPublicIface() (string, error) {
 			}
 
 			ifaceIndex = public.Attrs().ParentIndex
-
 			return nil
 		}); err != nil {
 			return "", err
@@ -41,21 +39,18 @@ func getPublicIface() (string, error) {
 			return "", errors.Wrapf(err, "failed to get link by index %d", ifaceIndex)
 		}
 		ifaceName = master.Attrs().Name
-
 	} else {
-		// since we are a fully public node
-		// get the name of the interface that has the default gateway
+		zos, err := netlink.LinkByName("zos")
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get zos link")
+		}
+		// find the name of the interface attached to zos bridge
 		links, err := netlink.LinkList()
 		if err != nil {
 			return "", errors.Wrap(err, "failed to list interfaces")
 		}
 		for _, link := range links {
-			has, _, err := ifaceutil.HasDefaultGW(link)
-			if err != nil {
-				return "", errors.Wrapf(err, "failed to inspect default gateway of iface %s", link.Attrs().Name)
-			}
-
-			if has {
+			if link.Attrs().MasterIndex == zos.Attrs().Index && link.Type() == "device" {
 				ifaceName = link.Attrs().Name
 				break
 			}

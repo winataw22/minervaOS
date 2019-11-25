@@ -1,0 +1,63 @@
+name: Publish Bootstrap
+on:
+  push:
+    path:
+      - 'bootstrap/bootstrap/**'
+      - '.github/workflows/publish-bootstrap.yaml'
+
+jobs:
+  bootstrap:
+    name: Building
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Prepare musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl musl-tools
+      - name: Setup toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          override: true
+      - uses: actions-rs/cargo@v1
+      - name: Build bootstrap
+        run: make release
+        working-directory: bootstrap/bootstrap
+      - name: Collecting files
+        run: |
+          mkdir -p ${{ github.workspace }}/archive/sbin/
+          cp -a bootstrap/bootstrap/target/x86_64-unknown-linux-musl/release/bootstrap ${{ github.workspace }}/archive/sbin/
+      - name: Set name of the development build
+        id: setname
+        run: |
+          echo "::set-output name=build::bootstrap-v$(date +%y%m%d.%-H%M%S.0)-dev.flist"
+      - name: Publish flist (${{ steps.setname.outputs.build }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          action: publish
+          user: tf-autobuilder
+          root: archive
+          token: ${{ secrets.HUB_JWT }}
+          name: ${{ steps.setname.outputs.build }}
+      - name: Symlink flist (development)
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          action: symlink
+          user: tf-autobuilder
+          token: ${{ secrets.HUB_JWT }}
+          name: ${{ steps.setname.outputs.build }}
+          target: bootstrap:development.flist
+      - name: Symlink flist (release)
+        if: success() && github.ref == 'refs/heads/master'
+        uses: threefoldtech/publish-flist@master
+        with:
+          action: symlink
+          user: tf-autobuilder
+          token: ${{ secrets.HUB_JWT }}
+          name: ${{ steps.setname.outputs.build }}
+          target: bootstrap:latest.flist

@@ -89,16 +89,17 @@ func HasDefaultGW(link netlink.Link) (bool, net.IP, error) {
 	}
 
 	log.Info().Msg("IP addresses found")
-	for i, addr := range addrs {
+	for _, addr := range addrs {
 		log.Info().
 			Str("interface", link.Attrs().Name).
-			IPAddr(string(i), addr.IP).Msg("")
+			IPAddr("ip", addr.IP).Send()
 	}
 
 	routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
 	if err != nil {
 		return false, nil, err
 	}
+
 	log.Info().Msg("routes found")
 	for i, route := range routes {
 		log.Info().
@@ -180,6 +181,57 @@ func Exists(name string, netNS ns.NetNS) bool {
 		exist = err == nil
 	}
 	return exist
+}
+
+// GetMAC gets the mac address from the Interface
+func GetMAC(name string, netNS ns.NetNS) (net.HardwareAddr, error) {
+	if netNS != nil {
+		var mac net.HardwareAddr
+		err := netNS.Do(func(_ ns.NetNS) error {
+			link, err := netlink.LinkByName(name)
+			if err != nil {
+				return err
+			}
+			mac = link.Attrs().HardwareAddr
+			return nil
+		})
+		return mac, err
+	}
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, err
+	}
+	return link.Attrs().HardwareAddr, nil
+}
+
+// SetMAC Sets the mac addr of an interface
+// if netNS is not nil switch in the network namespace
+// before setting
+func SetMAC(name string, mac net.HardwareAddr, netNS ns.NetNS) error {
+	if netNS != nil {
+		return netNS.Do(func(_ ns.NetNS) error {
+			link, err := netlink.LinkByName(name)
+			if err != nil {
+				return err
+			}
+			if err := netlink.LinkSetDown(link); err != nil {
+				return err
+			}
+			defer netlink.LinkSetUp(link)
+
+			return netlink.LinkSetHardwareAddr(link, mac)
+
+		})
+	}
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return err
+	}
+	if err := netlink.LinkSetDown(link); err != nil {
+		return err
+	}
+	defer netlink.LinkSetUp(link)
+	return netlink.LinkSetHardwareAddr(link, mac)
 }
 
 // Delete deletes the named interface

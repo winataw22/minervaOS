@@ -17,3 +17,4 @@
 - Developer tools
   - [Development environment](../qemu)
   - [tfuser](tfuser/readme.md)
+  - [MacOS Development environment](macdev/readme.md)

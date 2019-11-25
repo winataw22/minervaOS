@@ -1,4 +1,4 @@
-exec: sh /etc/zinit/init/bootstrap.sh
+exec: /sbin/bootstrap
 oneshot: true
 log: stdout # to see the logs on terminal
 after:

@@ -36,7 +36,7 @@ const (
 	vethBrSide = "to-gw"
 )
 
-//Create create the gateway network namespace and configure its default routes and addresses
+//Create create the NDMZ network namespace and configure its default routes and addresses
 func Create() error {
 
 	os.RemoveAll("/var/cache/modules/networkd/lease/dmz/")
@@ -70,6 +70,30 @@ func Create() error {
 		err = attachVeth(netNS)
 	}
 	if err != nil {
+		return err
+	}
+
+	// set mac address to something static to make sure we receive the same IP from a DHCP server
+	pubiface, err := getPublicIface()
+	if err != nil {
+		return err
+	}
+	mac, err := ifaceutil.GetMAC(pubiface, nil)
+	if err != nil {
+		return err
+	}
+
+	log.Debug().
+		Str("iface", pubiface).
+		Str("mac", mac.String()).
+		Msg("public iface found")
+
+	mac = ifaceutil.HardwareAddrFromInputBytes(mac[:])
+	log.Debug().
+		Str("mac", mac.String()).
+		Msg("set mac on public iface")
+
+	if err = ifaceutil.SetMAC("public", mac, netNS); err != nil {
 		return err
 	}
 
@@ -108,8 +132,11 @@ func createMacVlan(netNS ns.NetNS) error {
 }
 
 func attachVeth(netNS ns.NetNS) error {
-	vethHost := "to-dmz"
-	vethNDMZ := "public"
+
+	const (
+		vethHost = "to-dmz"
+		vethNDMZ = "public"
+	)
 
 	if !ifaceutil.Exists(vethHost, nil) || !ifaceutil.Exists(vethNDMZ, netNS) {
 		if _, _, err := ip.SetupVethWithName(vethHost, vethNDMZ, 1500, netNS); err != nil {
@@ -129,7 +156,7 @@ func attachVeth(netNS ns.NetNS) error {
 		return err
 	}
 
-	br, err := bridge.Get("zos") //TODO: use costant
+	br, err := bridge.Get("zos") //TODO: use constant
 	if err != nil {
 		return err
 	}
@@ -140,6 +167,7 @@ func attachVeth(netNS ns.NetNS) error {
 
 	return nil
 }
+
 func createRoutingBridge(netNS ns.NetNS) error {
 	if bridge.Exists(BridgeNDMZ) {
 		return nil

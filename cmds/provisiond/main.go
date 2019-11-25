@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gedis"
 
@@ -22,6 +23,7 @@ import (
 )
 
 func main() {
+	app.Initialize()
 
 	var (
 		msgBrokerCon string

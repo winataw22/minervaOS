@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 
@@ -17,6 +18,7 @@ import (
 const module = "flist"
 
 func main() {
+	app.Initialize()
 
 	var (
 		moduleRoot   string
