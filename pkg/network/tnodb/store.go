@@ -128,12 +128,12 @@ func (s *httpTNoDB) GetNode(nodeID pkg.Identifier) (*types.Node, error) {
 		return nil, fmt.Errorf("wrong response status: %v", resp.Status)
 	}
 
-	node := &types.Node{}
+	node := directory.TfgridNode2{}
 	if err := json.NewDecoder(resp.Body).Decode(&node); err != nil {
 		return nil, err
 	}
 
-	return node, nil
+	return types.NewNodeFromSchema(node), nil
 }
 
 func (s *httpTNoDB) PublishInterfaces(local pkg.Identifier, ifaces []types.IfaceInfo) error {

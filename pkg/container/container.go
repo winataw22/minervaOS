@@ -22,12 +22,18 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/restart"
 	"github.com/google/shlex"
 	"github.com/threefoldtech/zos/pkg"
 )
 
 const (
 	containerdSock = "/run/containerd/containerd.sock"
+)
+
+const (
+	defaultMemory = 256 * 1024 * 1204 // 256MiB
+	defaultCPU    = 1
 )
 
 var (
@@ -81,6 +87,13 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		return id, ErrEmptyRootFS
 	}
 
+	if data.Memory == 0 {
+		data.Memory = defaultMemory
+	}
+	if data.CPU == 0 {
+		data.CPU = defaultCPU
+	}
+
 	// we never allow any container to boot without a network namespace
 	if data.Network.Namespace == "" {
 		return "", fmt.Errorf("cannot create container without network namespace")
@@ -104,6 +117,8 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		removeRunMount(),
 		withNetworkNamespace(data.Network.Namespace),
 		withMounts(data.Mounts),
+		WithMemoryLimit(data.Memory),
+		WithCPUCount(data.CPU),
 	}
 
 	if data.WorkingDir != "" {
@@ -123,6 +138,9 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		ctx,
 		data.Name,
 		containerd.WithNewSpec(opts...),
+		// this ensure that the container/task will be restarted automatically
+		// if it gets killed for whatever reason (mostly OOM killer)
+		restart.WithStatus(containerd.Running),
 	)
 	if err != nil {
 		return id, err
@@ -233,6 +251,10 @@ func (c *containerModule) Delete(ns string, id pkg.ContainerID) error {
 	container, err := client.LoadContainer(ctx, string(id))
 	if err != nil {
 		return err
+	}
+
+	if err := container.Update(ctx, restart.WithNoRestarts); err != nil {
+		log.Warn().Err(err).Msg("failed to clear up restart task status, continuing anyways")
 	}
 
 	task, err := container.Task(ctx, nil)

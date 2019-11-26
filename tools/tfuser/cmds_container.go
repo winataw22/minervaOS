@@ -23,6 +23,11 @@ func generateContainer(c *cli.Context) error {
 		return err
 	}
 
+	cap := provision.ContainerCapacity{
+		CPU:    c.Uint("cpu"),
+		Memory: c.Uint64("memory"),
+	}
+
 	container := provision.Container{
 		FList:        c.String("flist"),
 		FlistStorage: c.String("storage"),
@@ -36,6 +41,7 @@ func generateContainer(c *cli.Context) error {
 				net.ParseIP(c.String("ip")),
 			},
 		},
+		Capacity: cap,
 	}
 
 	if err := validateContainer(container); err != nil {

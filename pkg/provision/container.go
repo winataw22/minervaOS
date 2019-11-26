@@ -44,6 +44,8 @@ type Container struct {
 	Mounts []Mount `json:"mounts"`
 	// Network network info for container
 	Network Network `json:"network"`
+	// ContainerCapacity is the amount of resource to allocate to the container
+	Capacity ContainerCapacity `json:"capacity"`
 }
 
 // ContainerResult is the information return to the BCDB
@@ -52,6 +54,14 @@ type ContainerResult struct {
 	ID   string `json:"id"`
 	IPv6 string `json:"ipv6"`
 	IPv4 string `json:"ipv4"`
+}
+
+// ContainerCapacity is the amount of resource to allocate to the container
+type ContainerCapacity struct {
+	// Number of CPU
+	CPU uint `json:"cpu"`
+	// Memory in MiB
+	Memory uint64 `json:"memory"`
 }
 
 func containerProvision(ctx context.Context, reservation *Reservation) (interface{}, error) {
@@ -170,6 +180,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			Mounts:      mounts,
 			Entrypoint:  config.Entrypoint,
 			Interactive: config.Interactive,
+			CPU:         config.Capacity.CPU,
+			Memory:      config.Capacity.Memory * 1024 * 1024,
 		},
 	)
 

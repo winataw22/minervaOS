@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
 	"github.com/threefoldtech/zos/pkg/schema"
 )
 
@@ -76,6 +77,49 @@ type Node struct {
 	PublicConfig *PubIface `json:"public_config"`
 	ExitNode     int       `json:"exit_node"`
 	WGPorts      []uint    `json:"wg_ports"`
+}
+
+// NewNodeFromSchema converts a TfgridNode2 into Node
+func NewNodeFromSchema(node directory.TfgridNode2) *Node {
+	n := &Node{
+		NodeID: node.NodeID,
+		FarmID: node.FarmID,
+
+		Ifaces: make([]*IfaceInfo, len(node.Ifaces)),
+
+		PublicConfig: nil,
+		ExitNode:     0,
+		WGPorts:      node.WGPorts,
+	}
+	if node.Ifaces != nil {
+		for i, iface := range node.Ifaces {
+			n.Ifaces[i] = &IfaceInfo{
+				Name:    iface.Name,
+				Addrs:   make([]IPNet, len(iface.Addrs)),
+				Gateway: iface.Gateway,
+			}
+
+			for y, addr := range iface.Addrs {
+				n.Ifaces[i].Addrs[y] = NewIPNetFromSchema(addr)
+			}
+		}
+	}
+	if node.PublicConfig != nil {
+		n.PublicConfig = &PubIface{
+			Master: node.PublicConfig.Master,
+			Type:   IfaceType(node.PublicConfig.Type.String()),
+			// Vlan: node.PublicConfig.
+			IPv4: NewIPNetFromSchema(node.PublicConfig.Ipv4),
+			IPv6: NewIPNetFromSchema(node.PublicConfig.Ipv6),
+
+			GW4: node.PublicConfig.Gw4,
+			GW6: node.PublicConfig.Gw6,
+
+			Version: int(node.PublicConfig.Version),
+		}
+	}
+
+	return n
 }
 
 // IPNet type

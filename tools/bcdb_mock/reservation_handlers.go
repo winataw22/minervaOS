@@ -89,7 +89,14 @@ func (s *reservationsStore) get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if err := json.NewEncoder(w).Encode(reservation.Reservation); err != nil {
+	x := struct {
+		*provision.Reservation
+		Result *provision.Result `json:"result"`
+	}{
+		Reservation: reservation.Reservation,
+		Result:      reservation.Result}
+
+	if err := json.NewEncoder(w).Encode(x); err != nil {
 		log.Printf("error during json encoding of reservation: %v", err)
 	}
 }

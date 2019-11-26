@@ -42,6 +42,10 @@ type Container struct {
 	Entrypoint string
 	// Interactivity enable Core X as PID 1 on the container
 	Interactive bool
+	// CPU count limit
+	CPU uint
+	// Memory limit in bytes
+	Memory uint64
 }
 
 // ContainerModule defines rpc interface to containerd

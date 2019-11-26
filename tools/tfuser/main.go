@@ -170,6 +170,14 @@ func main() {
 							Name:  "ip",
 							Usage: "ip address to assign to the container",
 						},
+						cli.UintFlag{
+							Name:  "cpu",
+							Usage: "limit the amount of CPU allocated to the container",
+						},
+						cli.Uint64Flag{
+							Name:  "memory",
+							Usage: "limit the amount of memory a container can allocate",
+						},
 					},
 					Action: generateContainer,
 				},

@@ -1,1 +1,69 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/f9edf6c003920a3a9a340df709f27717
+package app
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+)
+
+const (
+	colorBlack = iota + 30
+	colorRed
+	colorGreen
+	colorYellow
+	colorBlue
+	colorMagenta
+	colorCyan
+	colorWhite
+
+	colorBold     = 1
+	colorDarkGray = 90
+)
+
+// colorize returns the string s wrapped in ANSI code c, unless disabled is true.
+func colorize(s interface{}, c int) string {
+	return fmt.Sprintf("\x1b[%dm%v\x1b[0m", c, s)
+}
+
+func formatLevel(i interface{}) string {
+	var l string
+	if ll, ok := i.(string); ok {
+		switch ll {
+		case "debug":
+			l = colorize(ll, colorYellow)
+		case "info":
+			l = colorize(ll, colorGreen)
+		case "warn":
+			l = colorize(ll, colorRed)
+		case "error":
+			l = colorize(colorize(ll, colorRed), colorBold)
+		case "fatal":
+			l = colorize(colorize(ll, colorRed), colorBold)
+		case "panic":
+			l = colorize(colorize(ll, colorRed), colorBold)
+		default:
+			l = colorize("???", colorBold)
+		}
+	} else {
+		if i == nil {
+			l = colorize("???", colorBold)
+		} else {
+			l = strings.ToUpper(fmt.Sprintf("%s", i))[0:3]
+		}
+	}
+	return l
+}
+
+// Initialize Configure a zos app
+func Initialize() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		TimeFormat:  time.RFC3339,
+		Out:         os.Stdout,
+		FormatLevel: formatLevel,
+	})
+
+}
