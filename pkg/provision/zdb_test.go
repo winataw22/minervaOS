@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
@@ -208,4 +209,65 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 	// TODO: start a mock server on this address
 	require.Error(err)
 	require.True(strings.Contains(err.Error(), "/var/run/zdb_container-id"))
+}
+
+func Test_findDataVolume(t *testing.T) {
+	type args struct {
+		mounts []pkg.MountInfo
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "exists",
+			args: args{
+				mounts: []pkg.MountInfo{
+					{
+						Target: "/data",
+						Source: "/mnt/sda/subovl1",
+					},
+					{
+						Target: "/etc/resolv.conf",
+						Source: "/etc/resolv.conf",
+					},
+				},
+			},
+			want:    "subovl1",
+			wantErr: false,
+		},
+		{
+			name: "non-exists",
+			args: args{
+				mounts: []pkg.MountInfo{
+					{
+						Target: "/etc/resolv.conf",
+						Source: "/etc/resolv.conf",
+					},
+				},
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "empty",
+			args: args{
+				mounts: []pkg.MountInfo{},
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := findDataVolume(tt.args.mounts)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
 }

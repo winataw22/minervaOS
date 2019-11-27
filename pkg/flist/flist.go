@@ -2,6 +2,7 @@ package flist
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/md5"
 	"crypto/rand"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -94,6 +96,18 @@ func newFlister(root string, storage pkg.VolumeAllocater, commander commander) p
 	}
 }
 
+type options []string
+
+func (o options) Find(k string) int {
+	for i, x := range o {
+		if strings.EqualFold(x, k) {
+			return i
+		}
+	}
+
+	return -1
+}
+
 // New creates a new flistModule
 func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
 	return newFlister(root, storage, cmd(exec.Command))
@@ -169,6 +183,27 @@ func (f *flistModule) Mount(url, storage string, opts pkg.MountOptions) (string,
 	return mountpoint, nil
 }
 
+func (f *flistModule) getMountOptions(pidPath string) (options, error) {
+	pid, err := ioutil.ReadFile(pidPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open pid file: %s", pidPath)
+	}
+
+	cmdline, err := ioutil.ReadFile(path.Join("/proc", string(pid), "cmdline"))
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read mount (%s) cmdline", pidPath)
+	}
+
+	parts := bytes.Split(cmdline, []byte{0})
+
+	result := make(options, 0, len(parts))
+	for _, part := range parts {
+		result = append(result, string(part))
+	}
+
+	return result, nil
+}
+
 // Umount implements the Flister.Umount interface
 func (f *flistModule) Umount(path string) error {
 	log.Info().Str("path", path).Msg("request unmount flist")
@@ -185,11 +220,21 @@ func (f *flistModule) Umount(path string) error {
 		return fmt.Errorf("trying to unmount a directory outside of the flist module boundaries")
 	}
 
+	_, name := filepath.Split(path)
+	pidPath := filepath.Join(f.pid, name) + ".pid"
+
+	opts, err := f.getMountOptions(pidPath)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to read mount options")
+
+		//we don't return an error in case the file is gone somehow
+		//but the mount is still there. So better to fail on next call
+		//than leaking
+	}
+
 	if err := syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("fail to umount flist")
 	}
-	_, name := filepath.Split(path)
-	pidPath := filepath.Join(f.pid, name) + ".pid"
 	if err := waitPidFile(time.Second*2, pidPath, false); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stop properly")
 		return err
@@ -203,7 +248,12 @@ func (f *flistModule) Umount(path string) error {
 			return err
 		}
 	}
-	// clean up subvolume
+
+	// clean up subvolume should be done only for RW mounts.
+	if opts.Find("-ro") >= 0 {
+		return nil
+	}
+
 	if err := f.storage.ReleaseFilesystem(name); err != nil {
 		return errors.Wrap(err, "fail to clean up subvolume")
 	}

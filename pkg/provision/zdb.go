@@ -384,7 +384,10 @@ func zdbDecommission(ctx context.Context, reservation *Reservation) error {
 	if len(c.Mounts) < 1 {
 		return fmt.Errorf("no mountpoint find in 0-db container, cannot reclaim storage")
 	}
-	volume := filepath.Base(c.Mounts[0].Source)
+	volume, err := findDataVolume(c.Mounts)
+	if err != nil {
+		return err
+	}
 
 	if err := storage.Claim(volume, config.Size); err != nil {
 		return errors.Wrapf(err, "failed to reclaim storage on volume %s", volume)
@@ -412,4 +415,13 @@ func isPublic(ip net.IP) bool {
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast())
+}
+
+func findDataVolume(mounts []pkg.MountInfo) (string, error) {
+	for _, mount := range mounts {
+		if mount.Target == "/data" {
+			return filepath.Base(mount.Source), nil
+		}
+	}
+	return "", fmt.Errorf("data volume not found")
 }

@@ -67,21 +67,6 @@ func (h *hubClient) Info(flist string) (info flistInfo, err error) {
 	return info, err
 }
 
-// loadInfo get boot info set by bootstrap process
-func loadInfo(fqn string, path string) (info flistInfo, err error) {
-	info.Repository = filepath.Dir(fqn)
-	f, err := os.Open(path)
-	if err != nil {
-		return info, err
-	}
-
-	defer f.Close()
-	dec := json.NewDecoder(f)
-
-	err = dec.Decode(&info)
-	return info, err
-}
-
 // flistInfo reflects node boot information (flist + version)
 type flistInfo struct {
 	Name       string `json:"name"`

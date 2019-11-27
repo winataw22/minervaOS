@@ -56,9 +56,9 @@ func setup(zinit *zinit.Client) error {
 	return nil
 }
 
-// SafeUpgrade makes sure upgrade daemon is not interrupted
-// While
-func SafeUpgrade(upgrader *upgrade.Upgrader) error {
+// Safe makes sure function call not interrupted
+// with a signal while exection
+func Safe(fn func() error) error {
 	ch := make(chan os.Signal)
 	defer close(ch)
 	defer signal.Stop(ch)
@@ -66,7 +66,7 @@ func SafeUpgrade(upgrader *upgrade.Upgrader) error {
 	// try to upgraded to latest
 	// but mean while also make sure the daemon can not be killed by a signal
 	signal.Notify(ch)
-	return upgrader.Upgrade()
+	return fn()
 }
 
 // This daemon startup has the follow flow:
@@ -124,13 +124,9 @@ func main() {
 	// only used for RO mounts. Otherwise it will panic
 	flister := flist.New(root, nil)
 
-	upgrader := upgrade.Upgrader{
-		FLister:      flister,
-		Zinit:        zinit,
-		NoSelfUpdate: debug,
-	}
+	boot := upgrade.Boot{}
 
-	bootMethod := upgrade.DetectBootMethod()
+	bootMethod := boot.DetectBootMethod()
 
 	// 2. Register the node to BCDB
 	// at this point we are running latest version
@@ -146,7 +142,7 @@ func main() {
 
 	var current string
 	if bootMethod == upgrade.BootMethodFList {
-		v, err := upgrader.Version()
+		v, err := boot.Version()
 		if err != nil {
 			//NOTE: this is set to error intentionally (not fatal)
 			//this will cause version to be 0.0.0 and will force an
@@ -209,28 +205,61 @@ func main() {
 		return
 	}
 
+	//NOTE: code after this commit will only
+	//run if the system is booted from an flist
+
 	// 4. Start watcher for new version
 	log.Info().Msg("start upgrade daemon")
-	ticker := time.NewTicker(time.Second * time.Duration(interval))
-	defer ticker.Stop()
 
-	for {
-		err := SafeUpgrade(&upgrader)
-		if err == upgrade.ErrRestartNeeded {
-			log.Info().Msg("restarting upgraded")
-			return
-		} else if err != nil {
-			//TODO: crash or continue!
-			log.Error().Err(err).Msg("upgrade failed")
-		}
+	upgrader := upgrade.Upgrader{
+		FLister:      flister,
+		Zinit:        zinit,
+		NoSelfUpdate: debug,
+	}
 
-		version, err := upgrader.Version()
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to read current version")
-		}
+	watcher := upgrade.FListSemverWatcher{
+		FList:    boot.Name(),
+		Current:  boot.MustVersion(), //if we are here version must be valid
+		Duration: 600 * time.Second,
+	}
 
-		if version.String() != current {
-			log.Info().Str("version", version.String()).Msg("new version")
+	events, err := watcher.Watch(ctx)
+	if err != nil {
+		log.Fatal().Err(err).Str("flist", boot.Name()).Msg("failed to watch flist")
+	}
+
+	for event := range events {
+		switch event := event.(type) {
+		case *upgrade.FListEvent:
+			// new flist available
+			version, err := event.Version()
+			if err != nil {
+				log.Error().Err(err).Msg("failed to parse new version")
+				continue
+			}
+
+			from, err := boot.Current()
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to load current boot information")
+				return
+			}
+
+			err = Safe(func() error {
+				return upgrader.Upgrade(from, *event)
+			})
+
+			if err == upgrade.ErrRestartNeeded {
+				log.Info().Msg("restarting upgraded")
+				return
+			} else if err != nil {
+				//TODO: crash or continue!
+				log.Error().Err(err).Msg("upgrade failed")
+				continue
+			}
+
+			if err := boot.Set(*event); err != nil {
+				log.Error().Err(err).Msg("failed to update boot information")
+			}
 
 			if err := backoff.Retry(func() error {
 				return register(version.String())
@@ -239,15 +268,6 @@ func main() {
 			} else {
 				log.Info().Str("version", version.String()).Msg("node registered successfully")
 			}
-
-			current = version.String()
-		}
-
-		select {
-		case <-ticker.C:
-			log.Debug().Msg("checking for updates")
-		case <-ctx.Done():
-			return
 		}
 	}
 }

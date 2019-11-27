@@ -103,15 +103,9 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		errors.Wrap(err, "error updating environment variable from startup file")
 	}
 
-	args, err := shlex.Split(data.Entrypoint)
-	if err != nil || len(args) == 0 {
-		return id, fmt.Errorf("invalid entrypoint definition '%s'", data.Entrypoint)
-	}
-
 	opts := []oci.SpecOpts{
 		oci.WithDefaultSpecForPlatform("linux/amd64"),
 		oci.WithRootFSPath(data.RootFS),
-		oci.WithProcessArgs(args...),
 		oci.WithEnv(data.Env),
 		oci.WithHostResolvconf,
 		removeRunMount(),
@@ -127,6 +121,13 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 
 	if data.Interactive {
 		opts = append(opts, withCoreX())
+	} else {
+		args, err := shlex.Split(data.Entrypoint)
+		if err != nil || len(args) == 0 {
+			return id, fmt.Errorf("invalid entrypoint definition '%s'", data.Entrypoint)
+		}
+
+		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 
 	log.Info().

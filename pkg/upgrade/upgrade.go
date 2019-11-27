@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/blang/semver"
 	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -24,12 +23,6 @@ type hookType string
 
 const (
 	provisionModuleName = "provisiond"
-
-	// those values must match the values
-	// in the bootstrap process. (bootstrap.sh)
-
-	nameFile = "/tmp/flist.name"
-	infoFile = "/tmp/flist.info"
 )
 
 var (
@@ -40,35 +33,6 @@ var (
 	protected = []string{"identityd", "redis"}
 )
 
-// BootMethod defines the node boot method
-type BootMethod string
-
-const (
-	// BootMethodFList booted from an flist
-	BootMethodFList BootMethod = "flist"
-
-	// BootMethodOther booted with other methods
-	BootMethodOther BootMethod = "other"
-)
-
-// DetectBootMethod tries to detect the boot method
-// of the node
-func DetectBootMethod() BootMethod {
-	log.Info().Msg("detecting boot method")
-	_, err := os.Stat(nameFile)
-	if err != nil {
-		log.Warn().Err(err).Msg("no flist file found")
-		return BootMethodOther
-	}
-
-	// NOTE: we can add a check to see if the flist
-	// in the file is valid, but this means we need
-	// to do a call to the hub, hence the detection
-	// can be affected by the network state, or the
-	// hub state. So we return immediately
-	return BootMethodFList
-}
-
 // Upgrader is the component that is responsible
 // to keep 0-OS up to date
 type Upgrader struct {
@@ -78,59 +42,14 @@ type Upgrader struct {
 	hub          hubClient
 }
 
-// Name always return name of the boot flist. If name file
-// does not exist, an empty string is returned
-func (u *Upgrader) Name() string {
-	data, _ := ioutil.ReadFile(nameFile)
-	return strings.TrimSpace(string(data))
-}
-
-// currentInfo returns current flist information
-func (u *Upgrader) currentInfo() (flistInfo, error) {
-	name := u.Name()
-	if len(name) == 0 {
-		return flistInfo{}, fmt.Errorf("flist name is not known")
-	}
-
-	return loadInfo(name, infoFile)
-}
-
-// Version always returns curent version of flist
-func (u *Upgrader) Version() (semver.Version, error) {
-	info, err := u.currentInfo()
-	if err != nil {
-		return semver.Version{}, errors.Wrap(err, "failed to load flist info")
-	}
-
-	return info.Version()
-}
-
 // Upgrade is the method that does a full upgrade flow
 // first check if a new version is available
 // if yes, applies the upgrade
 // on a successfully update, upgrade WILL NOT RETURN
 // instead the upgraded daemon will be completely stopped
-func (u *Upgrader) Upgrade() error {
-	info, err := u.hub.Info(u.Name())
-	if err != nil {
-		return errors.Wrap(err, "failed to get remote flist info")
-	}
+func (u *Upgrader) Upgrade(from, to FListEvent) error {
+	return u.applyUpgrade(from, to)
 
-	current, err := u.Version()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to detect current version. Update to latest anyway")
-	}
-
-	latest, err := info.Version()
-	if err != nil {
-		return errors.Wrap(err, "failed to parse latest version")
-	}
-
-	if latest.GT(current) {
-		return u.applyUpgrade(latest, info)
-	}
-
-	return nil
 }
 
 func (u Upgrader) stopMultiple(timeout time.Duration, service ...string) error {
@@ -238,11 +157,8 @@ func (u *Upgrader) upgradeSelf(root string) error {
 	return ErrRestartNeeded
 }
 
-func (u *Upgrader) uninstall() error {
-	current, err := u.currentInfo()
-	if err != nil {
-		return errors.Wrap(err, "failed to get current flist info")
-	}
+func (u *Upgrader) uninstall(from FListEvent) error {
+	current := from
 
 	files, err := current.Files()
 	if err != nil {
@@ -305,10 +221,10 @@ func (u *Upgrader) uninstall() error {
 	return nil
 }
 
-func (u *Upgrader) applyUpgrade(version semver.Version, info flistInfo) error {
-	log.Info().Str("flist", u.Name()).Str("version", version.String()).Msg("start applying upgrade")
+func (u *Upgrader) applyUpgrade(from, to FListEvent) error {
+	log.Info().Str("flist", to.Fqdn()).Str("version", to.TryVersion().String()).Msg("start applying upgrade")
 
-	flistRoot, err := u.FLister.Mount(u.hub.MountURL(u.Name()), u.hub.StorageURL(), pkg.ReadOnlyMountOptions)
+	flistRoot, err := u.FLister.Mount(u.hub.MountURL(to.Fqdn()), u.hub.StorageURL(), pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return err
 	}
@@ -323,7 +239,7 @@ func (u *Upgrader) applyUpgrade(version semver.Version, info flistInfo) error {
 		return err
 	}
 
-	if err := u.uninstall(); err != nil {
+	if err := u.uninstall(from); err != nil {
 		log.Error().Err(err).Msg("failed to unistall current flist. Upgraded anyway")
 	}
 
@@ -364,10 +280,6 @@ func (u *Upgrader) applyUpgrade(version semver.Version, info flistInfo) error {
 		if err := u.Zinit.Start(name); err != nil {
 			log.Error().Err(err).Str("service", name).Msg("error on zinit start")
 		}
-	}
-
-	if err := info.Commit(infoFile); err != nil {
-		return err
 	}
 
 	return nil
