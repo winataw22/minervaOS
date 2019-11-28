@@ -87,6 +87,18 @@ func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
 	return netlink.LinkSetMaster(link, bridge)
 }
 
+// AttachNicWithMac attaches an interface to a bridge and sets
+// the MAC of the bridge to the same of the NIC
+func AttachNicWithMac(link netlink.Link, bridge *netlink.Bridge) error {
+	hwaddr := link.Attrs().HardwareAddr
+
+	err := netlink.LinkSetHardwareAddr(bridge, hwaddr)
+	if err != nil {
+		return err
+	}
+	return netlink.LinkSetMaster(link, bridge)
+}
+
 // DetachNic detaches an interface from a bridge
 func DetachNic(bridge *netlink.Bridge) error {
 	return netlink.LinkSetNoMaster(bridge)

@@ -318,25 +318,18 @@ func (nr *NetResource) createNetNS() error {
 func (nr *NetResource) createVethPair() error {
 
 	nsName, err := nr.Namespace()
-	vethName, err := ifaceutil.RandomName("nr-")
-	if err != nil {
-		return err
-	}
-	bridgeName, err := nr.BridgeName()
-	if err != nil {
-		return err
-	}
-
-	// check if the veth already exists
-	if _, err := netlink.LinkByName(vethName); err == nil {
-		return nil
-	}
+	nrVethName := fmt.Sprintf("nr-%s", nr.id[:12])
 
 	netNS, err := namespace.GetByName(nsName)
 	if err != nil {
 		return fmt.Errorf("network namespace %s does not exits", nsName)
 	}
 	defer netNS.Close()
+
+	bridgeName, err := nr.BridgeName()
+	if err != nil {
+		return err
+	}
 
 	brLink, err := bridge.Get(bridgeName)
 	if err != nil {
@@ -350,7 +343,7 @@ func (nr *NetResource) createVethPair() error {
 			return err
 		}
 
-		if _, err := netlink.LinkByName(vethName); err == nil {
+		if _, err := netlink.LinkByName(nrVethName); err == nil {
 			exists = true
 			return nil
 		}
@@ -361,16 +354,16 @@ func (nr *NetResource) createVethPair() error {
 
 		log.Info().
 			Str("namespace", nsName).
-			Str("veth", vethName).
+			Str("veth", nrVethName).
 			Msg("Create veth pair in net namespace")
 
-		hostVeth, containerVeth, err := ip.SetupVeth(vethName, 1500, hostNS)
+		hostVeth, nrVeth, err := ip.SetupVeth(nrVethName, 1500, hostNS)
 		if err != nil {
 			return err
 		}
 		hostIface = hostVeth.Name
 
-		link, err := netlink.LinkByName(containerVeth.Name)
+		link, err := netlink.LinkByName(nrVeth.Name)
 		if err != nil {
 			return err
 		}
@@ -404,12 +397,13 @@ func (nr *NetResource) createVethPair() error {
 	}
 
 	log.Info().
-		Str("veth", vethName).
+		Str("net resource veth", nrVethName).
+		Str("host veth", hostIface).
 		Str("bridge", bridgeName).
 		Msg("attach veth to bridge")
 
 	if err := bridge.AttachNic(hostVeth, brLink); err != nil {
-		return errors.Wrapf(err, "failed to attach veth %s to bridge %s", vethName, bridgeName)
+		return errors.Wrapf(err, "failed to attach veth %s to bridge %s", nrVethName, bridgeName)
 	}
 	return nil
 }
