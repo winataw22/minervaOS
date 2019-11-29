@@ -36,6 +36,22 @@ func (s *storageModule) Allocate(diskType pkg.DeviceType, size uint64, mode pkg.
 			continue
 		}
 
+		usage, err := pool.Usage()
+		if err != nil {
+			return "", "", errors.Wrapf(err, "failed to read usage of pool %s", pool.Name())
+		}
+
+		reserved, err := pool.Reserved()
+		if err != nil {
+			return "", "", errors.Wrapf(err, "failed to read reserved size of pool %s", pool.Name())
+		}
+
+		// Make sure adding this filesystem would not bring us over the disk limit
+		if reserved+size > usage.Size {
+			slog.Info().Msgf("Disk does not have enough space left to hold filesystem")
+			continue
+		}
+
 		volumes, err := pool.Volumes()
 		if err != nil {
 			return "", "", errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
@@ -48,27 +64,16 @@ func (s *storageModule) Allocate(diskType pkg.DeviceType, size uint64, mode pkg.
 				continue
 			}
 
-			usage, err := pool.Usage()
+			usage, err := volume.Usage()
 			if err != nil {
 				return "", "", errors.Wrapf(err, "failed to read usage of volume %s", volume.Name())
 			}
 
-			// skip pool with not enough space
-			reserved, err := pool.Reserved()
-			if err != nil {
-				return "", "", errors.Wrapf(err, "failed to read reserved size of pool %s", pool.Name())
-			}
-
-			// Make sure adding this filesystem would not bring us over the disk limit
-			if reserved+size > usage.Size {
-				slog.Info().Msgf("Disk does not have enough space left to hold filesystem")
-				continue
-			}
-
-			// existing volume with enough grow its limit
+			// existing volume with enough storage, grow its limit
 			if err := volume.Limit(usage.Size + size); err != nil {
 				return "", "", errors.Wrapf(err, "failed to grow limit of volume %s", volume.Name())
 			}
+
 			slog.Info().
 				Str("volume", volume.Name()).
 				Str("path", volume.Path()).
@@ -126,7 +131,13 @@ func (s *storageModule) Claim(name string, size uint64) error {
 
 	usage, err := v.Usage()
 	if err != nil {
-		return errors.Wrapf(err, "failed to read usage of volume %s", v.Name())
+		return err
+	}
+
+	// limit cannot be 0 cause 0 means not limited
+	limit := usage.Size - size
+	if limit <= 0 {
+		limit = 1
 	}
 
 	// shrink the limit

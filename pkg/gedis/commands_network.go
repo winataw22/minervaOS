@@ -33,7 +33,7 @@ func (g *Gedis) getLocalInterfaces(ifaces []types.IfaceInfo) []directory.TfgridN
 func (g *Gedis) PublishInterfaces(local pkg.Identifier, ifaces []types.IfaceInfo) error {
 	output := g.getLocalInterfaces(ifaces)
 
-	_, err := g.Send("nodes", "publish_interfaces", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "publish_interfaces", Args{
 		"node_id": local.Identity(),
 		"ifaces":  output,
 	})
@@ -73,7 +73,7 @@ func (g *Gedis) SetPublicIface(node pkg.Identifier, pub *types.PubIface) error {
 		public.Gw6 = pub.GW6
 	}
 
-	_, err := g.Send("nodes", "set_public_iface", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "set_public_iface", Args{
 		"node_id": node.Identity(),
 		"public":  public,
 	})
@@ -83,7 +83,7 @@ func (g *Gedis) SetPublicIface(node pkg.Identifier, pub *types.PubIface) error {
 
 //PublishWGPort implements network.TNoDB interface
 func (g *Gedis) PublishWGPort(node pkg.Identifier, ports []uint) error {
-	_, err := g.Send("nodes", "publish_wg_ports", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "publish_wg_ports", Args{
 		"node_id": node.Identity(),
 		"ports":   ports,
 	})

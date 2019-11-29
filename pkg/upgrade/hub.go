@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -67,15 +68,50 @@ func (h *hubClient) Info(flist string) (info flistInfo, err error) {
 	return info, err
 }
 
-// flistInfo reflects node boot information (flist + version)
-type flistInfo struct {
+func (h *hubClient) List(repo string) ([]listFListInfo, error) {
+	u, err := url.Parse(hubBaseURL)
+	if err != nil {
+		panic("invalid base url")
+	}
+
+	u.Path = filepath.Join("api", "flist", repo)
+	response, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	defer response.Body.Close()
+	defer ioutil.ReadAll(response.Body)
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get repository listing: %s", response.Status)
+	}
+
+	dec := json.NewDecoder(response.Body)
+
+	var result []listFListInfo
+	err = dec.Decode(&result)
+
+	for i := range result {
+		result[i].Repository = repo
+	}
+
+	return result, err
+}
+
+type listFListInfo struct {
 	Name       string `json:"name"`
 	Target     string `json:"target"`
 	Type       string `json:"type"`
 	Updated    uint64 `json:"updated"`
-	Hash       string `json:"hash"`
-	Size       uint64 `json:"size"`
 	Repository string `json:"-"`
+}
+
+// flistInfo reflects node boot information (flist + version)
+type flistInfo struct {
+	listFListInfo
+	Hash string `json:"hash"`
+	Size uint64 `json:"size"`
 }
 
 // fileInfo is the file of an flist
@@ -96,7 +132,11 @@ func (b *flistInfo) Commit(path string) error {
 	return enc.Encode(b)
 }
 
-func (b *flistInfo) extractVersion(name string) (ver semver.Version, err error) {
+func (b *listFListInfo) Fqdn() string {
+	return path.Join(b.Repository, b.Name)
+}
+
+func (b *listFListInfo) extractVersion(name string) (ver semver.Version, err error) {
 	// name is suppose to be as follows
 	// <name>:<version>.flist
 	parts := strings.Split(name, ":")
@@ -107,7 +147,7 @@ func (b *flistInfo) extractVersion(name string) (ver semver.Version, err error) 
 }
 
 // Version returns the version of the flist
-func (b *flistInfo) Version() (semver.Version, error) {
+func (b *listFListInfo) Version() (semver.Version, error) {
 	// computing the version is tricky because it's part of the name
 	// of the flist (or the target) depends on the type of the flist
 
@@ -119,7 +159,7 @@ func (b *flistInfo) Version() (semver.Version, error) {
 }
 
 // Absolute returns the actual flist name
-func (b *flistInfo) Absolute() string {
+func (b *listFListInfo) Absolute() string {
 	name := b.Name
 	if b.Type == "symlink" {
 		name = b.Target
@@ -129,7 +169,7 @@ func (b *flistInfo) Absolute() string {
 }
 
 // Files gets the list of the files of an flist
-func (b *flistInfo) Files() ([]fileInfo, error) {
+func (b *listFListInfo) Files() ([]fileInfo, error) {
 	flist := b.Absolute()
 	if len(flist) == 0 {
 		return nil, fmt.Errorf("invalid flist info")

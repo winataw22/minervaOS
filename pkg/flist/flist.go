@@ -235,6 +235,7 @@ func (f *flistModule) Umount(path string) error {
 	if err := syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("fail to umount flist")
 	}
+
 	if err := waitPidFile(time.Second*2, pidPath, false); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stop properly")
 		return err
@@ -349,36 +350,31 @@ func random() (string, error) {
 // else it waits for the file to be deleted
 func waitPidFile(timeout time.Duration, path string, exists bool) error {
 	const delay = time.Millisecond * 100
-	cErr := make(chan error)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				cErr <- ctx.Err()
-			default:
-				_, err := os.Stat(path)
-				if exists {
-					if err != nil {
-						time.Sleep(delay)
-						continue
-					}
-					cErr <- nil
-				} else {
-					if err == nil {
-						time.Sleep(delay)
-						continue
-					}
-					cErr <- nil
-				}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			_, err := os.Stat(path)
+			// check exist but the file is not there yet,
+			// or check NOT exist but it is still there
+			// we try again
+			if (exists && os.IsNotExist(err)) || (!exists && err == nil) {
+				break //the select statement
+			} else if err != nil && !os.IsNotExist(err) {
+				//another error that is NOT IsNotExist.
+				return err
+			} else {
+				return nil
 			}
 		}
-	}()
 
-	return <-cErr
+		<-time.After(delay)
+	}
 }
 
 func waitMountedLog(timeout time.Duration, logfile string) error {

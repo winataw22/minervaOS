@@ -50,6 +50,16 @@ jobs:
         token: ${{ secrets.HUB_JWT }}
         name: zos:${{ github.ref }}.flist
     
+    - name: Rename flist from zos-${{ github.ref }}.flist to zos:${{ github.ref }}.flist
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: rename
+        user: tf-autobuilder
+        name: zos-${{ github.ref }}.flist
+        target: zos:${{ github.ref }}.flist
+    
     - name: Symlink flist (development)
       if: success()
       uses: threefoldtech/publish-flist@master

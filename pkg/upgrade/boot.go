@@ -19,6 +19,7 @@ const (
 
 	nameFile = "/tmp/flist.name"
 	infoFile = "/tmp/flist.info"
+	binsFile = "/tmp/bins.info"
 )
 
 // BootMethod defines the node boot method
@@ -58,6 +59,29 @@ func (b Boot) DetectBootMethod() BootMethod {
 func (b *Boot) Name() string {
 	data, _ := ioutil.ReadFile(nameFile)
 	return strings.TrimSpace(string(data))
+}
+
+//CurrentBins returns a list of current binaries installed
+func (b *Boot) CurrentBins() (map[string]RepoFList, error) {
+	f, err := os.Open(binsFile)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(f)
+
+	var result map[string]RepoFList
+	err = dec.Decode(&result)
+	return result, err
+}
+
+//SetBins sets the current list of binaries in boot files
+func (b *Boot) SetBins(current map[string]RepoFList) error {
+	f, err := os.Create(binsFile)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(f)
+	return enc.Encode(current)
 }
 
 // Current returns current flist information

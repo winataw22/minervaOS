@@ -60,6 +60,10 @@ func New() (pkg.StorageModule, error) {
 		log.Info().Msgf("Finished initializing storage module")
 	}
 
+	if err := s.Maintenance(); err != nil {
+		log.Error().Err(err).Msg("storage devices maintenance failed")
+	}
+
 	return s, err
 }
 
@@ -209,6 +213,26 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 	s.volumes = append(s.volumes, newPools...)
 
 	return s.ensureCache()
+}
+
+func (s *storageModule) Maintenance() error {
+
+	for _, pool := range s.volumes {
+		log.Info().
+			Str("pool", pool.Name()).
+			Msg("start storage pool maintained")
+		if err := pool.Maintenance(); err != nil {
+			log.Error().
+				Err(err).
+				Str("pool", pool.Name()).
+				Msg("error during maintainace")
+			return err
+		}
+		log.Info().
+			Str("pool", pool.Name()).
+			Msg("finished storage pool maintained")
+	}
+	return nil
 }
 
 // CreateFilesystem with the given size in a storage pool.

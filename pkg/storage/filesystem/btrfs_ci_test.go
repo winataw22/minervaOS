@@ -162,13 +162,6 @@ func basePoolTest(t *testing.T, pool Pool) {
 		assert.Equal(t, uint64(1024*1024*1024), usage.Size)
 	})
 
-	t.Run("test subvolume list no subvolumes", func(t *testing.T) {
-		volumes, err := volume.Volumes()
-		require.NoError(t, err)
-
-		assert.Empty(t, volumes)
-	})
-
 	t.Run("test limit subvolume", func(t *testing.T) {
 		usage, err := volume.Usage()
 		require.NoError(t, err)
@@ -300,4 +293,61 @@ func TestBtrfsListCI(t *testing.T) {
 
 	ok := assert.Len(t, names, 0)
 	assert.True(t, ok, "not all pools were listed")
+}
+
+func TestCLeanUpQgroupsCI(t *testing.T) {
+	if SkipCITests {
+		t.Skip("test requires ability to create loop devices")
+	}
+
+	devices, err := SetupDevices(1)
+	require.NoError(t, err, "failed to initialize devices")
+	defer devices.Destroy()
+
+	loops := devices.Loops()
+	fs := NewBtrfs(&TestDeviceManager{loops})
+
+	names := make(map[string]struct{})
+	for idx := range loops {
+		loop := &loops[idx]
+		name := fmt.Sprintf("test-list-%d", idx)
+		names[name] = struct{}{}
+		_, err := fs.Create(context.Background(), name, pkg.Single, loop)
+		require.NoError(t, err)
+	}
+	pools, err := fs.List(context.Background(), func(p Pool) bool {
+		return strings.HasPrefix(p.Name(), "test-")
+	})
+	pool := pools[0]
+
+	_, err = pool.Mount()
+	require.NoError(t, err)
+	defer pool.UnMount()
+
+	volume, err := pool.AddVolume("vol1")
+	require.NoError(t, err)
+	t.Logf("volume ID: %v\n", volume.ID())
+
+	err = volume.Limit(256 * 1024 * 1024)
+	require.NoError(t, err)
+
+	btrfsVol, ok := volume.(*btrfsVolume)
+	require.True(t, ok, "volume should be a btrfsVolume")
+
+	qgroups, err := btrfsVol.utils.QGroupList(context.TODO(), pool.Path())
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(qgroups))
+	t.Logf("qgroups before delete: %v", qgroups)
+
+	_, ok = qgroups[fmt.Sprintf("0/%d", btrfsVol.id)]
+	assert.True(t, ok, "qgroups should contains a qgroup linked to the subvolume")
+
+	err = pool.RemoveVolume("vol1")
+	require.NoError(t, err)
+
+	qgroups, err = btrfsVol.utils.QGroupList(context.TODO(), pool.Path())
+	require.NoError(t, err)
+
+	t.Logf("remaining qgroups: %+v", qgroups)
+	assert.Equal(t, 1, len(qgroups), "qgroups should have been deleted with the subvolume")
 }

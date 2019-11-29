@@ -1,14 +1,13 @@
 package upgrade
 
-import "time"
+import (
+	"context"
+	"time"
 
-import "github.com/blang/semver"
-
-import "context"
-
-import "github.com/rs/zerolog/log"
-
-import "path"
+	"github.com/blang/semver"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+)
 
 /**
 Watcher unifies the upgrade pipeline by making sure we can watch
@@ -48,11 +47,6 @@ func (f *FListEvent) EventType() EventType {
 	return FList
 }
 
-//Fqdn return full name of the flist (with repo)
-func (f *FListEvent) Fqdn() string {
-	return path.Join(f.Repository, f.Name)
-}
-
 //TryVersion will try to parse the version from flist
 //other wise return empty version 0.0.0
 func (f *FListEvent) TryVersion() semver.Version {
@@ -71,9 +65,11 @@ type FListSemverWatcher struct {
 	client hubClient
 }
 
-// Watch an flist change in version
-func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
+var _ Watcher = &FListSemverWatcher{}
 
+// Watch an flist change in version
+// The Event returned by the channel is of concrete type FListEvent
+func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 	if w.Duration == time.Duration(0) {
 		//default delay of 5min
 		w.Duration = 600 * time.Second
@@ -126,12 +122,143 @@ func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 			}
 
 			if version.GT(w.Current) {
-				ch <- &FListEvent{
+				select {
+				case ch <- &FListEvent{
 					flistInfo: info,
+				}:
+				case <-ctx.Done():
+					return
 				}
+
 				w.Current = version
 			}
 		}
+	}()
+
+	return ch, nil
+}
+
+//RepoFList holds information of flist from a repo list operation
+type RepoFList struct {
+	listFListInfo
+}
+
+//RepoEvent is returned by the repo watcher
+type RepoEvent struct {
+	Repo  string
+	ToAdd []RepoFList
+	ToDel []RepoFList
+}
+
+//EventType returns event type
+func (e *RepoEvent) EventType() EventType {
+	return Repo
+}
+
+//FListRepoWatcher type
+type FListRepoWatcher struct {
+	Repo     string
+	Current  map[string]RepoFList
+	Duration time.Duration
+
+	client hubClient
+}
+
+func (w *FListRepoWatcher) list() (map[string]RepoFList, error) {
+	packages, err := w.client.List(w.Repo)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]RepoFList)
+	for _, pkg := range packages {
+		flist := RepoFList{pkg}
+		result[flist.Fqdn()] = flist
+	}
+
+	return result, nil
+}
+
+func (w *FListRepoWatcher) diff(packages map[string]RepoFList) (toAdd, toDel []RepoFList) {
+	for name, pkg := range packages {
+		current, ok := w.Current[name]
+		if !ok || pkg.Updated != current.Updated {
+			toAdd = append(toAdd, pkg)
+		}
+	}
+
+	for name := range w.Current {
+		current, ok := packages[name]
+		if !ok {
+			toDel = append(toDel, current)
+		}
+	}
+
+	return
+}
+
+// Watch watches a full repo for changes. Event is always of concrete type RepoEvent
+func (w *FListRepoWatcher) Watch(ctx context.Context) (<-chan Event, error) {
+	if w.Duration == time.Duration(0) {
+		//default delay of 5min
+		w.Duration = 600 * time.Second
+	}
+
+	packages, err := w.list()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get available packages")
+	}
+
+	toAdd, toDel := w.diff(packages)
+
+	ch := make(chan Event, 1)
+
+	if len(toAdd) > 0 || len(toDel) > 0 {
+		ch <- &RepoEvent{
+			Repo:  w.Repo,
+			ToAdd: toAdd,
+			ToDel: toDel,
+		}
+
+		w.Current = packages
+	}
+
+	ticker := time.NewTicker(w.Duration)
+
+	go func() {
+		defer close(ch)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				return
+			}
+
+			packages, err := w.list()
+			if err != nil {
+				log.Error().Err(err).Str("repo", w.Repo).Msg("failed to list repo flists")
+				continue
+			}
+
+			toAdd, toDel := w.diff(packages)
+
+			if len(toAdd) > 0 || len(toDel) > 0 {
+				select {
+				case ch <- &RepoEvent{
+					Repo:  w.Repo,
+					ToAdd: toAdd,
+					ToDel: toDel,
+				}:
+				case <-ctx.Done():
+					return
+				}
+
+				w.Current = packages
+			}
+		}
+
 	}()
 
 	return ch, nil

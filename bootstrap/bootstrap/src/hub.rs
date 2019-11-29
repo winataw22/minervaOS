@@ -15,19 +15,19 @@ pub struct Repo {
     name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Flist {
     #[serde(rename = "type")]
     pub kind: String,
     pub updated: u64,
-    pub size: u64,
+    #[serde(default)]
     pub md5: String,
     pub name: String,
     #[serde(default)]
     pub target: String,
 
     #[serde(skip)]
-    url: String,
+    pub url: String,
 }
 
 impl Repo {
@@ -39,6 +39,21 @@ impl Repo {
             base: String::from(HUB),
             name: String::from(name.as_ref()),
         }
+    }
+
+    pub fn list(&self) -> Result<Vec<Flist>> {
+        let url = format!("{}/api/flist/{}", self.base, self.name,);
+
+        let mut response = get(&url)?;
+        let mut info: Vec<Flist> = match response.status() {
+            StatusCode::OK => response.json()?,
+            s => bail!("failed to get flist info: {}", s),
+        };
+        for flist in info.iter_mut() {
+            flist.url = format!("{}/{}/{}", self.base, self.name, flist.name);
+        }
+
+        Ok(info)
     }
 
     pub fn get<T>(&self, flist: T) -> Result<Flist>
@@ -119,6 +134,26 @@ mod tests {
 
         assert_eq!(line[0], &flist.md5);
         let _ = std::fs::remove_file(temp);
+        Ok(())
+    }
+
+    #[test]
+    fn test_list_repo() -> Result<()> {
+        let repo = Repo::new(String::from("azmy"));
+        let lists = repo.list()?;
+
+        let mut found: Option<&Flist> = None;
+        for flist in lists.iter() {
+            if flist.name == "test.flist" {
+                found = Some(flist);
+                break;
+            }
+        }
+
+        let found = found.unwrap();
+        assert_eq!(found.name, "test.flist");
+        assert_eq!(found.url, "https://hub.grid.tf/azmy/test.flist");
+
         Ok(())
     }
 }

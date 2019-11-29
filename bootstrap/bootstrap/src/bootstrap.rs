@@ -1,6 +1,5 @@
 use super::config;
 use super::hub;
-use super::kparams;
 use super::workdir::WorkDir;
 use super::zfs::Zfs;
 use super::zinit;
@@ -9,51 +8,18 @@ use failure::Error;
 use retry;
 
 const FLIST_REPO: &str = "tf-zos";
+const BIN_REPO: &str = "tf-zos-bins";
 const FLIST_INFO_FILE: &str = "/tmp/flist.info";
 const FLIST_NAME_FILE: &str = "/tmp/flist.name";
 const WORKDIR: &str = "/tmp/bootstrap";
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
-enum RunMode {
-    Prod,
-    Test,
-    Dev,
-}
-
-fn runmode() -> Result<RunMode> {
-    let params = kparams::params()?;
-    let mode = match params.get("runmode") {
-        Some(mode) => match mode {
-            Some(mode) => match mode.as_ref() {
-                "prod" => RunMode::Prod,
-                "dev" => RunMode::Dev,
-                "test" => RunMode::Test,
-                m => {
-                    bail!("unknown runmode: {}", m);
-                }
-            },
-            None => {
-                //that's an error because runmode was
-                //provided as a kernel argumet but with no
-                //value
-                bail!("missing runmode value");
-            }
-        },
-        // runmode was not provided in cmdline
-        // so default is prod
-        None => RunMode::Prod,
-    };
-
-    Ok(mode)
-}
-
-fn boostrap_zos(mode: RunMode) -> Result<()> {
-    let flist = match mode {
-        RunMode::Prod => "zos:production:latest.flist",
-        RunMode::Dev => "zos:development:latest.flist",
-        RunMode::Test => "zos:testing:latest.flist",
+fn boostrap_zos(cfg: &config::Config) -> Result<()> {
+    let flist = match cfg.runmode {
+        config::RunMode::Prod => "zos:production:latest.flist",
+        config::RunMode::Dev => "zos:development:latest.flist",
+        config::RunMode::Test => "zos:testing:latest.flist",
     };
 
     debug!("using flist: {}/{}", FLIST_REPO, flist);
@@ -80,85 +46,14 @@ fn boostrap_zos(mode: RunMode) -> Result<()> {
     flist.write(FLIST_INFO_FILE)?;
     std::fs::write(FLIST_NAME_FILE, format!("{}/{}", FLIST_REPO, flist.name))?;
 
-    let result = retry::retry(retry::delay::Exponential::from_millis(200), || {
-        info!("download flist: {}", flist.name);
-
-        // the entire point of this match is the
-        // logging of the error.
-        match flist.download("machine.flist") {
-            Ok(ok) => Ok(ok),
-            Err(err) => {
-                error!("failed to download flist: {}", err);
-                bail!("failed to download flist: {}", err);
-            }
-        }
-    });
-
-    // I can't use the ? because error from retry
-    // is not compatible with failure::Error for
-    // some reason.
-    match result {
-        Err(err) => bail!("{:?}", err),
-        _ => (),
-    };
-
-    let fs = Zfs::mount("backend", "machine.flist", "root")?;
-    debug!("zfs started, now copying all files");
-    //copy everything to root
-    match fs.copy("/") {
-        Ok(_) => {}
-        Err(err) => bail!("failed to copy files to rootfs: {}", err),
-    };
-
-    // we need to find all yaml files under /etc/zinit to start monitoring them
-    let mut cfg = std::path::PathBuf::new();
-    cfg.push(&fs);
-    cfg.push("etc");
-    cfg.push("zinit");
-    let services = match std::fs::read_dir(&cfg) {
-        Ok(services) => services,
-        Err(err) => bail!("failed to read directory '{:?}': {}", cfg, err),
-    };
-    for service in services {
-        let service = service?;
-        let path = service.path();
-
-        if !path.is_file() {
-            continue;
-        }
-        let name = match path.file_name() {
-            Some(name) => match name.to_str() {
-                Some(name) => name,
-                None => {
-                    warn!("failed to process name: {:?}", path);
-                    continue;
-                }
-            },
-            None => continue,
-        };
-
-        match name.rfind(".yaml") {
-            None => continue,
-            Some(idx) => {
-                let service = &name[0..idx];
-                match zinit::monitor(service) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        warn!("failed to monitor service '{}': {}", service, err);
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
+    install_package(&flist)
 }
 
 /// bootstrap stage install and starts all zos daemons
-pub fn bootstrap(_: &config::Config) -> Result<()> {
-    let mode = runmode()?;
-    debug!("runmode: {:?}", mode);
+pub fn bootstrap(cfg: &config::Config) -> Result<()> {
+    debug!("runmode: {:?}", cfg.runmode);
     let result = WorkDir::run(WORKDIR, || -> Result<()> {
-        boostrap_zos(mode)?;
+        boostrap_zos(cfg)?;
         Ok(())
     })?;
 
@@ -207,16 +102,81 @@ fn update_bootstrap(debug: bool) -> Result<()> {
         Err(e) => bail!("failed to download flist: {:?}", e),
     };
 
+    // this trick here to allow overriding
+    // the current running bootstrap binary
+    let bin: Vec<String> = std::env::args().take(1).collect();
+    std::fs::rename(&bin[0], format!("{}.bak", &bin[0]))?;
+
+    install_package(&flist)
+}
+
+///install installs all binaries from the tf-zos-bins repo
+pub fn install(cfg: &config::Config) -> Result<()> {
+    let result = WorkDir::run(WORKDIR, || -> Result<()> {
+        install_packages(cfg)?;
+        Ok(())
+    })?;
+
+    result
+}
+
+fn install_packages(cfg: &config::Config) -> Result<()> {
+    let repo = match cfg.runmode {
+        config::RunMode::Prod => BIN_REPO.to_owned(),
+        config::RunMode::Dev => format!("{}.dev", BIN_REPO),
+        config::RunMode::Test => format!("{}.test", BIN_REPO),
+    };
+
+    let client = hub::Repo::new(&repo);
+    let packages = retry::retry(retry::delay::Exponential::from_millis(200), || {
+        info!("list packages in: {}", BIN_REPO);
+        //the full point of this match is the logging.
+        let packages = match client.list() {
+            Ok(info) => info,
+            Err(err) => {
+                error!("failed to list repo '{}': {}", BIN_REPO, err);
+                bail!("failed to list repo '{}': {}", BIN_REPO, err);
+            }
+        };
+
+        Ok(packages)
+    });
+
+    let packages = match packages {
+        Ok(packages) => packages,
+        Err(err) => bail!("failed to list '{}': {:?}", BIN_REPO, err),
+    };
+
+    let mut map = std::collections::HashMap::new();
+    for package in packages.iter() {
+        match install_package(package) {
+            Ok(_) => {}
+            Err(err) => warn!("failed to install package '{}': {}", package.url, err),
+        };
+
+        map.insert(format!("{}/{}", repo, package.name), package.clone());
+    }
+
+    let output = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open("/tmp/bins.info")?;
+    serde_json::to_writer(&output, &map)?;
+
+    Ok(())
+}
+
+fn install_package(flist: &hub::Flist) -> Result<()> {
     let result = retry::retry(retry::delay::Exponential::from_millis(200), || {
         info!("download flist: {}", flist.name);
 
         // the entire point of this match is the
         // logging of the error.
-        match flist.download("bootstrap.flist") {
+        match flist.download(&flist.name) {
             Ok(ok) => Ok(ok),
             Err(err) => {
-                error!("failed to download flist: {}", err);
-                bail!("failed to download flist: {}", err);
+                error!("failed to download flist '{}': {}", flist.url, err);
+                bail!("failed to download flist '{}': {}", flist.url, err);
             }
         }
     });
@@ -229,13 +189,60 @@ fn update_bootstrap(debug: bool) -> Result<()> {
         _ => (),
     };
 
-    let fs = Zfs::mount("backend", "bootstrap.flist", "root")?;
+    let fs = Zfs::mount("backend", &flist.name, "root")?;
     debug!("zfs started, now copying all files");
 
-    // this trick here to allow overriding
-    // the current running bootstrap binary
-    let bin: Vec<String> = std::env::args().take(1).collect();
-    std::fs::rename(&bin[0], format!("{}.bak", &bin[0]))?;
+    fs.copy("/")?;
 
-    fs.copy("/")
+    run_all(&fs)
+}
+
+// run_all tries to run all services from an flist.
+// it will still try to run all other services defined
+// in the list of one or more failed. Returns error only
+// if failed to read the zinit directory
+fn run_all(fs: &Zfs) -> Result<()> {
+    let mut cfg = std::path::PathBuf::new();
+    cfg.push(fs);
+    cfg.push("etc");
+    cfg.push("zinit");
+    let services = match std::fs::read_dir(&cfg) {
+        Ok(services) => services,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => bail!("failed to read directory '{:?}': {}", cfg, err),
+    };
+
+    for service in services {
+        let service = service?;
+        let path = service.path();
+
+        if !path.is_file() {
+            continue;
+        }
+        let name = match path.file_name() {
+            Some(name) => match name.to_str() {
+                Some(name) => name,
+                None => {
+                    warn!("failed to process name: {:?}", path);
+                    continue;
+                }
+            },
+            None => continue,
+        };
+
+        match name.rfind(".yaml") {
+            None => continue,
+            Some(idx) => {
+                let service = &name[0..idx];
+                match zinit::monitor(service) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        warn!("failed to monitor service '{}': {}", service, err);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

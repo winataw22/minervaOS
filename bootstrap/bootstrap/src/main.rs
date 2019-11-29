@@ -29,7 +29,17 @@ fn app() -> Result<()> {
 
     // configure available stage
     let stages: Vec<fn(cfg: &Config) -> Result<()>> = vec![
-        |cfg| -> Result<()> { bootstrap::update(cfg) },
+        // self update
+        |cfg| -> Result<()> {
+            if cfg.debug {
+                // if debug is set, do not upgrade self.
+                return Ok(());
+            }
+            bootstrap::update(cfg)
+        },
+        // install all system binaries
+        |cfg| -> Result<()> { bootstrap::install(cfg) },
+        // install and start all services
         |cfg| -> Result<()> { bootstrap::bootstrap(cfg) },
     ];
 

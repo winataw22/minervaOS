@@ -1,4 +1,0 @@
-exec: containerd
-test: ctr version
-after:
-  - node-ready

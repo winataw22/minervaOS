@@ -76,7 +76,7 @@ func main() {
 	ifaceVersion := -1
 	exitIface, err := db.GetPubIface(nodeID)
 	if err == nil {
-		if err := configurePubIface(exitIface); err != nil {
+		if err := configurePubIface(exitIface, nodeID); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
 			os.Exit(1)
 		}
@@ -91,14 +91,14 @@ func main() {
 		for {
 			select {
 			case iface := <-ch:
-				_ = configurePubIface(iface)
+				_ = configurePubIface(iface, nodeID)
 			case <-ctx.Done():
 				return
 			}
 		}
 	}(ctx, chIface)
 
-	if err := ndmz.Create(); err != nil {
+	if err := ndmz.Create(nodeID); err != nil {
 		log.Fatal().Err(err).Msgf("failed to create DMZ")
 	}
 
@@ -214,7 +214,7 @@ func bcdbClient() (network.TNoDB, error) {
 	}
 
 	// use gedis for production bcdb
-	store, err := gedis.New(env.BcdbURL, env.BcdbNamespace, env.BcdbPassword)
+	store, err := gedis.New(env.BcdbURL, env.BcdbPassword)
 	if err != nil {
 		return nil, errors.Wrap(err, "fail to connect to BCDB")
 	}

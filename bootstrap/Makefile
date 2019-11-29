@@ -6,12 +6,10 @@ install: build
 	mkdir -p ${ROOT}/etc/zinit/
 	mkdir -p ${ROOT}/bin
 	mkdir -p ${ROOT}/sbin
-	
-	# install interent 
-	cp ../etc/zinit/internet.yaml ${ROOT}/etc/zinit/
+
+	# install interent
 	cp ../bin/internet ${ROOT}/bin
-	
+
 	# install bootstrap
 	cp -a etc ${ROOT}
 	cp bootstrap/target/x86_64-unknown-linux-musl/release/bootstrap ${ROOT}/sbin/
-	

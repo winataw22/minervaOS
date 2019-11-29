@@ -174,6 +174,13 @@ func (u *BtrfsUtil) QGroupLimit(ctx context.Context, size uint64, path string) e
 	return err
 }
 
+// QGroupDestroy deletes a qgroup on a subvol
+func (u *BtrfsUtil) QGroupDestroy(ctx context.Context, id, path string) error {
+	_, err := u.run(ctx, "btrfs", "qgroup", "destroy", id, path)
+
+	return err
+}
+
 // GetDiskUsage get btrfs usage
 func (u *BtrfsUtil) GetDiskUsage(ctx context.Context, path string) (usage BtrfsDiskUsage, err error) {
 	output, err := u.run(ctx, "btrfs", "filesystem", "df", "--raw", path)

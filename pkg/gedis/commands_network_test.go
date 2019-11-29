@@ -16,8 +16,7 @@ func TestNetworkPublishInterfaces(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool:      pool,
-		namespace: "default",
+		pool: pool,
 	}
 
 	id := pkg.StrIdentifier("node-1")
@@ -37,7 +36,7 @@ func TestNetworkPublishInterfaces(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "default.nodes.publish_interfaces", mustMarshal(t, args)).
+	conn.On("Do", "tfgrid.directory.nodes.publish_interfaces", mustMarshal(t, args)).
 		Return(nil, nil)
 
 	inf := types.IfaceInfo{
@@ -55,8 +54,7 @@ func TestNetworkSetPublicIface(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool:      pool,
-		namespace: "default",
+		pool: pool,
 	}
 
 	id := pkg.StrIdentifier("node-1")
@@ -70,7 +68,7 @@ func TestNetworkSetPublicIface(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "default.nodes.set_public_iface", mustMarshal(t, args)).
+	conn.On("Do", "tfgrid.directory.nodes.set_public_iface", mustMarshal(t, args)).
 		Return(nil, nil)
 
 	err := gedis.SetPublicIface(id, &types.PubIface{
