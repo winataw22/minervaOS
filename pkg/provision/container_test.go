@@ -233,3 +233,118 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 	require.Equal("reservation-id", result.ID)
 	require.Equal("192.168.1.1", result.IPv4)
 }
+
+func TestContainerDecomissionExists(t *testing.T) {
+	require := require.New(t)
+
+	var client TestClient
+	var cache TestOwnerCache
+
+	ctx := context.Background()
+	ctx = WithZBus(ctx, &client)
+	ctx = WithOwnerCache(ctx, &cache)
+
+	// const module = "network"
+	// version := zbus.ObjectID{Name: "network", Version: "0.0.1"}
+
+	container := Container{
+		FList: "https://hub.grid.tf/thabet/redis.flist",
+		Network: Network{
+			NetworkID: pkg.NetID("net1"),
+			IPs: []net.IP{
+				net.ParseIP("192.168.1.1"),
+			},
+		},
+	}
+
+	reservation := Reservation{
+		ID:   "reservation-id",
+		User: "user",
+		Type: ContainerReservation,
+		Data: MustMarshal(t, container),
+	}
+	rootFS := "/mnt/flist_root"
+
+	// first, the decomission will inspect the container
+	client.On("Request",
+		"container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
+		"Inspect",
+		fmt.Sprintf("ns%s", reservation.User),
+		pkg.ContainerID(reservation.ID)).
+		Return(pkg.Container{Name: reservation.ID, RootFS: rootFS}, nil)
+
+	// second, the decomission will delete the container
+	client.On("Request",
+		"container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
+		"Delete",
+		fmt.Sprintf("ns%s", reservation.User),
+		pkg.ContainerID(reservation.ID)).
+		Return(nil)
+
+	// third, unmount the flist of the container
+	client.On("Request",
+		"flist", zbus.ObjectID{Name: "flist", Version: "0.0.1"},
+		"Umount",
+		rootFS).
+		Return(nil)
+
+	netID := networkID(reservation.User, string(container.Network.NetworkID))
+	// fourth, leave the container network namespace
+	client.On("Request",
+		"network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
+		"Leave",
+		netID,
+		reservation.ID).
+		Return(nil)
+
+	err := containerDecommission(ctx, &reservation)
+	require.NoError(err)
+}
+
+func TestContainerDecomissionContainerGone(t *testing.T) {
+	require := require.New(t)
+
+	var client TestClient
+	var cache TestOwnerCache
+
+	ctx := context.Background()
+	ctx = WithZBus(ctx, &client)
+	ctx = WithOwnerCache(ctx, &cache)
+
+	container := Container{
+		FList: "https://hub.grid.tf/thabet/redis.flist",
+		Network: Network{
+			NetworkID: pkg.NetID("net1"),
+			IPs: []net.IP{
+				net.ParseIP("192.168.1.1"),
+			},
+		},
+	}
+
+	reservation := Reservation{
+		ID:   "reservation-id",
+		User: "user",
+		Type: ContainerReservation,
+		Data: MustMarshal(t, container),
+	}
+
+	// first, the decomission will inspect the container
+	client.On("Request",
+		"container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
+		"Inspect",
+		fmt.Sprintf("ns%s", reservation.User),
+		pkg.ContainerID(reservation.ID)).
+		Return(nil, fmt.Errorf("container not found"))
+
+	netID := networkID(reservation.User, string(container.Network.NetworkID))
+	// fourth, leave the container network namespace
+	client.On("Request",
+		"network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
+		"Leave",
+		netID,
+		reservation.ID).
+		Return(nil)
+
+	err := containerDecommission(ctx, &reservation)
+	require.NoError(err)
+}

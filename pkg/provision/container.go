@@ -80,50 +80,24 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	tenantNS := fmt.Sprintf("ns%s", reservation.User)
 	containerID := reservation.ID
 
-	// check if workload is already deployed
-	_, err := containerClient.Inspect(tenantNS, pkg.ContainerID(containerID))
-	if err == nil {
-		log.Info().Str("id", containerID).Msg("container already deployed")
-		return ContainerResult{
-			ID: containerID,
-			//IMPORTANT
-			//TODO: set IPv4 and IPv6 here
-		}, nil
-	}
-
 	var config Container
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
 		return ContainerResult{}, err
 	}
 
+	// check if workload is already deployed
+	_, err := containerClient.Inspect(tenantNS, pkg.ContainerID(containerID))
+	if err == nil {
+		log.Info().Str("id", containerID).Msg("container already deployed")
+		return ContainerResult{
+			ID:   containerID,
+			IPv4: config.Network.IPs[0].String(),
+		}, nil
+	}
+
 	if err := validateContainerConfig(config); err != nil {
 		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
-
-	netID := networkID(reservation.User, string(config.Network.NetworkID))
-	log.Debug().
-		Str("network-id", string(netID)).
-		Str("config", fmt.Sprintf("%+v", config)).
-		Msg("deploying network")
-
-	networkMgr := stubs.NewNetworkerStub(GetZBus(ctx))
-
-	ips := make([]string, len(config.Network.IPs))
-	for i, ip := range config.Network.IPs {
-		ips[i] = ip.String()
-	}
-
-	join, err := networkMgr.Join(netID, containerID, ips)
-	if err != nil {
-		return ContainerResult{}, err
-	}
-
-	// TODO: Push IP back to bcdb
-	log.Info().
-		Str("ipv6", join.IPv6.String()).
-		Str("ipv4", join.IPv4.String()).
-		Str("container", reservation.ID).
-		Msg("assigned an IP")
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
 	mnt, err := flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
@@ -168,6 +142,31 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			},
 		)
 	}
+
+	netID := networkID(reservation.User, string(config.Network.NetworkID))
+	log.Debug().
+		Str("network-id", string(netID)).
+		Str("config", fmt.Sprintf("%+v", config)).
+		Msg("deploying network")
+
+	networkMgr := stubs.NewNetworkerStub(GetZBus(ctx))
+
+	ips := make([]string, len(config.Network.IPs))
+	for i, ip := range config.Network.IPs {
+		ips[i] = ip.String()
+	}
+
+	join, err := networkMgr.Join(netID, containerID, ips)
+	if err != nil {
+		return ContainerResult{}, err
+	}
+
+	log.Info().
+		Str("ipv6", join.IPv6.String()).
+		Str("ipv4", join.IPv4.String()).
+		Str("container", reservation.ID).
+		Msg("assigned an IP")
+
 	id, err := containerClient.Run(
 		tenantNS,
 		pkg.Container{
@@ -186,6 +185,10 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	)
 
 	if err != nil {
+		if err := networkMgr.Leave(netID, containerID); err != nil {
+			log.Error().Err(err).Msgf("failed leave containrt network namespace")
+		}
+
 		if err := flistClient.Umount(mnt); err != nil {
 			log.Error().Err(err).Str("path", mnt).Msgf("failed to unmount")
 		}
@@ -217,24 +220,25 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 	}
 
 	info, err := container.Inspect(tenantNS, containerID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to inspect container %s", containerID)
-	}
-
-	if err := container.Delete(tenantNS, containerID); err != nil {
-		return errors.Wrapf(err, "failed to delete container %s", containerID)
-	}
-
-	rootFS := info.RootFS
-	if info.Interactive {
-		rootFS, err = findRootFS(info.Mounts)
-		if err != nil {
-			return err
+	if err == nil {
+		if err := container.Delete(tenantNS, containerID); err != nil {
+			return errors.Wrapf(err, "failed to delete container %s", containerID)
 		}
-	}
 
-	if err := flist.Umount(rootFS); err != nil {
-		return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
+		rootFS := info.RootFS
+		if info.Interactive {
+			rootFS, err = findRootFS(info.Mounts)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := flist.Umount(rootFS); err != nil {
+			return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
+		}
+
+	} else {
+		log.Error().Err(err).Str("container", string(containerID)).Msg("failed to inspect container for decomission")
 	}
 
 	netID := networkID(reservation.User, string(config.Network.NetworkID))
