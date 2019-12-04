@@ -19,7 +19,8 @@ func TestProvisionGet(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	id := "id"
@@ -30,7 +31,7 @@ func TestProvisionGet(t *testing.T) {
 
 	workload := `{"workload_id": 10, "type": 0, "size": 100}`
 
-	conn.On("Do", "tfgrid.directory.workload_manager.workload_get", mustMarshal(t, args)).
+	conn.On("Do", "default.workload_manager.workload_get", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{
 			"workload_id": id,
 			"type":        types.TfgridReservationWorkload1TypeVolume,
@@ -50,7 +51,8 @@ func TestProvisionPoll(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	node := pkg.StrIdentifier("node-1")
@@ -63,7 +65,7 @@ func TestProvisionPoll(t *testing.T) {
 	workloadVol := `{"workload_id": 1, "type": 0, "size": 100}`
 	workloadZdb := `{"workload_id": 1, "mode": 0, "size": 100}`
 
-	conn.On("Do", "tfgrid.directory.workload_manager.workloads_list", mustMarshal(t, args)).
+	conn.On("Do", "default.workload_manager.workloads_list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{
 			"workloads": []types.TfgridReservationWorkload1{
 				{
@@ -93,7 +95,7 @@ func TestProvisionPoll(t *testing.T) {
 		"cursor":  10,
 	}
 
-	conn.On("Do", "tfgrid.directory.workload_manager.workloads_list", mustMarshal(t, args)).
+	conn.On("Do", "default.workload_manager.workloads_list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{
 			"workloads": []types.TfgridReservationWorkload1{
 				{
@@ -123,7 +125,8 @@ func TestProvisionFeedback(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	id := "101"
@@ -148,7 +151,7 @@ func TestProvisionFeedback(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "tfgrid.directory.workload_manager.set_workload_result", mustMarshal(t, args)).
+	conn.On("Do", "default.workload_manager.set_workload_result", mustMarshal(t, args)).
 		Return(nil, nil)
 
 	err := gedis.Feedback(id, &result)
@@ -161,7 +164,8 @@ func TestProvisionReserve(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	id := pkg.StrIdentifier("101")
@@ -197,7 +201,7 @@ func TestProvisionReserve(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "tfgrid.directory.workload_manager.reservation_register", mock.MatchedBy(func(in []byte) bool {
+	conn.On("Do", "default.workload_manager.reservation_register", mock.MatchedBy(func(in []byte) bool {
 		EqualJSON(t, mustMarshal(t, args), in)
 		return true
 	})).

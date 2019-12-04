@@ -16,7 +16,8 @@ func TestRegisterFarm(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	args := Args{
@@ -28,7 +29,7 @@ func TestRegisterFarm(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "tfgrid.directory.farms.register", mustMarshal(t, args)).
+	conn.On("Do", "default.farms.register", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{"farm_id": 123}), nil)
 
 	id, err := gedis.RegisterFarm(
@@ -47,7 +48,8 @@ func TestRegisterNode(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	l, err := geoip.Fetch()
@@ -69,7 +71,7 @@ func TestRegisterNode(t *testing.T) {
 		},
 	}
 
-	conn.On("Do", "tfgrid.directory.nodes.add", mustMarshal(t, args)).
+	conn.On("Do", "default.nodes.add", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{"node_id": "node-1"}), nil)
 
 	id, err := gedis.RegisterNode(
@@ -88,7 +90,8 @@ func TestListNode(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	args := Args{
@@ -97,7 +100,7 @@ func TestListNode(t *testing.T) {
 		"city":    "cairo",
 	}
 
-	conn.On("Do", "tfgrid.directory.nodes.list", mustMarshal(t, args)).
+	conn.On("Do", "default.nodes.list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{"nodes": []directory.TfgridNode2{
 			{NodeID: "node-1"},
 			{NodeID: "node-2"},
@@ -117,14 +120,15 @@ func TestGetNode(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	args := Args{
 		"node_id": "node-1",
 	}
 
-	conn.On("Do", "tfgrid.directory.nodes.get", mustMarshal(t, args)).
+	conn.On("Do", "default.nodes.get", mustMarshal(t, args)).
 		Return(mustMarshal(t, directory.TfgridNode2{
 			NodeID: "node-1",
 		}), nil)
@@ -142,14 +146,15 @@ func TestGetFarm(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	args := Args{
 		"farm_id": 100,
 	}
 
-	conn.On("Do", "tfgrid.directory.farms.get", mustMarshal(t, args)).
+	conn.On("Do", "default.farms.get", mustMarshal(t, args)).
 		Return(mustMarshal(t, directory.TfgridFarm1{
 			ID:   100,
 			Name: "farm-1",
@@ -169,7 +174,8 @@ func TestListFarm(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	args := Args{
@@ -177,7 +183,7 @@ func TestListFarm(t *testing.T) {
 		"city":    "cairo",
 	}
 
-	conn.On("Do", "tfgrid.directory.farms.list", mustMarshal(t, args)).
+	conn.On("Do", "default.farms.list", mustMarshal(t, args)).
 		Return(mustMarshal(t, Args{"farms": []directory.TfgridFarm1{
 			{ID: 1, Name: "farm-1"},
 			{ID: 2, Name: "farm-2"},
@@ -196,7 +202,8 @@ func TestUpdateGenericNodeCapacity(t *testing.T) {
 	require := require.New(t)
 	pool, conn := getTestPool()
 	gedis := Gedis{
-		pool: pool,
+		pool:      pool,
+		namespace: "default",
 	}
 
 	node := pkg.StrIdentifier("node-1")
@@ -212,7 +219,7 @@ func TestUpdateGenericNodeCapacity(t *testing.T) {
 	}
 
 	const captype = "total"
-	action := fmt.Sprintf("tfgrid.directory.nodes.update_%s_capacity", captype)
+	action := fmt.Sprintf("default.nodes.update_%s_capacity", captype)
 	conn.On("Do", action, mustMarshal(t, args)).
 		Return(nil, nil)
 

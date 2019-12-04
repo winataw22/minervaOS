@@ -46,20 +46,22 @@ type Pool interface {
 
 // Gedis struct represent a client to a gedis server
 type Gedis struct {
-	pool     Pool
-	password string
+	pool      Pool
+	namespace string
+	password  string
 }
 
 // New creates a new Gedis client
-func New(address, password string) (*Gedis, error) {
+func New(address, namespace, password string) (*Gedis, error) {
 	pool, err := newRedisPool(address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Gedis{
-		pool:     pool,
-		password: password,
+		pool:      pool,
+		namespace: namespace,
+		password:  password,
 	}, nil
 }
 
@@ -78,7 +80,7 @@ func (g *Gedis) Ping() (string, error) {
 }
 
 func (g *Gedis) cmd(actor, method string) string {
-	return fmt.Sprintf("%s.%s", actor, method)
+	return fmt.Sprintf("%s.%s.%s", g.namespace, actor, method)
 }
 
 func newRedisPool(address string) (*redis.Pool, error) {

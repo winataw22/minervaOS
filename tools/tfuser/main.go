@@ -272,27 +272,6 @@ func main() {
 			},
 			Action: cmdsProvision,
 		},
-		{
-			Name:  "live",
-			Usage: "show you all the reservations that are still alive",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "seed",
-					Usage:  "path to the file container the seed of the user private key",
-					EnvVar: "SEED_PATH",
-				},
-				cli.IntFlag{
-					Name:  "start",
-					Usage: "start scrapping at that reservation ID",
-				},
-				cli.IntFlag{
-					Name:  "end",
-					Usage: "end scrapping at that reservation ID",
-					Value: 500,
-				},
-			},
-			Action: cmdsLive,
-		},
 	}
 
 	err := app.Run(os.Args)
@@ -327,7 +306,7 @@ func getClient(addr string) (clientIface, error) {
 			provision.NewHTTPStore(addr),
 		}, nil
 	case "tcp":
-		c, err := gedis.New(addr, "")
+		c, err := gedis.New(addr, "default", "")
 		return client{
 			c,
 			c,
