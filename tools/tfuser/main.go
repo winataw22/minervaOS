@@ -306,7 +306,7 @@ func getClient(addr string) (clientIface, error) {
 			provision.NewHTTPStore(addr),
 		}, nil
 	case "tcp":
-		c, err := gedis.New(addr, "default", "")
+		c, err := gedis.New(addr, "")
 		return client{
 			c,
 			c,

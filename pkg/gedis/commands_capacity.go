@@ -8,7 +8,7 @@ import (
 //UptimeUpdate send the uptime of the node to BCDB
 func (g *Gedis) UptimeUpdate(nodeID pkg.Identifier, uptime uint64) error {
 
-	_, err := g.Send("nodes", "uptime_update", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "uptime_update", Args{
 		"node_id": nodeID.Identity(),
 		"uptime":  uptime,
 	})
@@ -17,7 +17,7 @@ func (g *Gedis) UptimeUpdate(nodeID pkg.Identifier, uptime uint64) error {
 }
 
 func (g *Gedis) updateGenericNodeCapacity(captype string, node pkg.Identifier, mru, cru, hru, sru uint64) error {
-	_, err := g.Send("nodes", "update_"+captype+"_capacity", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "update_"+captype+"_capacity", Args{
 		"node_id": node.Identity(),
 		"resource": directory.TfgridNodeResourceAmount1{
 			Cru: int64(cru),
@@ -47,7 +47,7 @@ func (g *Gedis) UpdateUsedNodeCapacity(node pkg.Identifier, mru, cru, hru, sru u
 
 // SendHardwareProof sends a dump of hardware and disks to BCDB
 func (g *Gedis) SendHardwareProof(node pkg.Identifier, dmi interface{}, disks interface{}) error {
-	_, err := g.Send("nodes", "add_proof", Args{
+	_, err := g.Send("tfgrid.directory.nodes", "add_proof", Args{
 		"node_id": node.Identity(),
 		"proof": map[string]interface{}{
 			"hardware": dmi,

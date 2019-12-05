@@ -14,9 +14,8 @@ import (
 type Environment struct {
 	RunningMode RunningMode
 
-	BcdbURL       string
-	BcdbNamespace string
-	BcdbPassword  string
+	BcdbURL      string
+	BcdbPassword string
 
 	FarmerID pkg.FarmID
 	Orphan   bool
@@ -50,18 +49,17 @@ var (
 	}
 
 	envTest = Environment{
-		RunningMode:   RunningTest,
-		BcdbURL:       "tcp://explorer.testnet.grid.tf:8901",
-		BcdbNamespace: "default",
+		RunningMode: RunningTest,
+		// BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
+		BcdbURL: "tcp://0.tcp.ngrok.io:14669",
 		// ProvisionTimeout:  120,
 		// ProvisionInterval: 10,
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
-		RunningMode:   RunningMain,
-		BcdbURL:       "tcp://explorer.testnet.grid.tf:8901",
-		BcdbNamespace: "default",
+		RunningMode: RunningMain,
+		BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
 		// ProvisionTimeout:  240,
 		// ProvisionInterval: 20,
 	}
@@ -130,10 +128,6 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 
 	if e := os.Getenv("ZOS_BCDB_URL"); e != "" {
 		env.BcdbURL = e
-	}
-
-	if e := os.Getenv("ZOS_BCDB_NAMESPACE"); e != "" {
-		env.BcdbNamespace = e
 	}
 
 	if e := os.Getenv("ZOS_BCDB_PASSWORD"); e != "" {

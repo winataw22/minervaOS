@@ -43,7 +43,7 @@ func (g *Gedis) RegisterNode(nodeID pkg.Identifier, farmID pkg.FarmID, version s
 		node.NodeIDv1 = idv1
 	}
 
-	resp, err := Bytes(g.Send("nodes", "add", Args{"node": node}))
+	resp, err := Bytes(g.Send("tfgrid.directory.nodes", "add", Args{"node": node}))
 
 	if err != nil {
 		return "", err
@@ -61,7 +61,7 @@ func (g *Gedis) RegisterNode(nodeID pkg.Identifier, farmID pkg.FarmID, version s
 
 // ListNode implements pkg.IdentityManager interface
 func (g *Gedis) ListNode(farmID pkg.FarmID, country string, city string) ([]types.Node, error) {
-	resp, err := Bytes(g.Send("nodes", "list", Args{
+	resp, err := Bytes(g.Send("tfgrid.directory.nodes", "list", Args{
 		"farm_id": farmID,
 		"country": country,
 		"city":    city,
@@ -89,7 +89,7 @@ func (g *Gedis) ListNode(farmID pkg.FarmID, country string, city string) ([]type
 
 //RegisterFarm implements pkg.IdentityManager interface
 func (g *Gedis) RegisterFarm(tid uint64, name string, email string, wallet []string) (pkg.FarmID, error) {
-	resp, err := Bytes(g.Send("farms", "register", Args{
+	resp, err := Bytes(g.Send("tfgrid.directory.farms", "register", Args{
 		"farm": directory.TfgridFarm1{
 			ThreebotID:      tid,
 			Name:            name,
@@ -120,7 +120,7 @@ func (g *Gedis) RegisterFarm(tid uint64, name string, email string, wallet []str
 
 //GetNode implements pkg.IdentityManager interface
 func (g *Gedis) GetNode(nodeID pkg.Identifier) (*types.Node, error) {
-	resp, err := Bytes(g.Send("nodes", "get", Args{
+	resp, err := Bytes(g.Send("tfgrid.directory.nodes", "get", Args{
 		"node_id": nodeID.Identity(),
 	}))
 
@@ -199,7 +199,7 @@ func (g *Gedis) GetFarm(farm pkg.Identifier) (*network.Farm, error) {
 		return nil, errors.Wrap(err, "invalid farm id")
 	}
 
-	resp, err := Bytes(g.Send("farms", "get", Args{
+	resp, err := Bytes(g.Send("tfgrid.directory.farms", "get", Args{
 		"farm_id": id,
 	}))
 
@@ -218,7 +218,7 @@ func (g *Gedis) GetFarm(farm pkg.Identifier) (*network.Farm, error) {
 
 //ListFarm implements pkg.IdentityManager interface
 func (g *Gedis) ListFarm(country string, city string) ([]network.Farm, error) {
-	resp, err := Bytes(g.Send("farms", "list", Args{
+	resp, err := Bytes(g.Send("tfgrid.directory.farms", "list", Args{
 		"country": country,
 		"city":    city,
 	}))

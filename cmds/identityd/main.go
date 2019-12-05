@@ -404,7 +404,7 @@ func bcdbClient() (identity.IDStore, error) {
 	}
 
 	// use gedis for production bcdb
-	store, err := gedis.New(env.BcdbURL, env.BcdbNamespace, env.BcdbPassword)
+	store, err := gedis.New(env.BcdbURL, env.BcdbPassword)
 	if err != nil {
 		return nil, errors.Wrap(err, "fail to connect to BCDB")
 	}
