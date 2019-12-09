@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 
 	"github.com/threefoldtech/zos/pkg/network/nr"
@@ -34,10 +35,12 @@ const (
 
 	vethGWSide = "ipv4-rt"
 	vethBrSide = "to-gw"
+
+	ndmzNsMACDerivationSuffix = "-ndmz"
 )
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
-func Create() error {
+func Create(nodeID pkg.Identifier) error {
 
 	os.RemoveAll("/var/cache/modules/networkd/lease/dmz/")
 
@@ -88,7 +91,7 @@ func Create() error {
 		Str("mac", mac.String()).
 		Msg("public iface found")
 
-	mac = ifaceutil.HardwareAddrFromInputBytes(mac[:])
+	mac = ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + ndmzNsMACDerivationSuffix))
 	log.Debug().
 		Str("mac", mac.String()).
 		Msg("set mac on public iface")
@@ -104,7 +107,7 @@ func Create() error {
 			return err
 		}
 		if !received {
-			return errors.Errorf("public interface in ndmz didn't not received an IP. make sure dhcp is working")
+			return errors.Errorf("public interface in ndmz did not received an IP. make sure dhcp is working")
 		}
 		return nil
 	})

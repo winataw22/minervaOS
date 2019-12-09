@@ -56,7 +56,7 @@ func watchPubIface(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB,
 	return ch
 }
 
-func configurePubIface(iface *types.PubIface) error {
+func configurePubIface(iface *types.PubIface, nodeID pkg.Identifier) error {
 	cleanup := func() error {
 		pubNs, err := namespace.GetByName(types.PublicNamespace)
 		if err != nil {
@@ -70,7 +70,7 @@ func configurePubIface(iface *types.PubIface) error {
 		return nil
 	}
 
-	if err := network.CreatePublicNS(iface); err != nil {
+	if err := network.CreatePublicNS(iface, nodeID); err != nil {
 		_ = cleanup()
 		return errors.Wrap(err, "failed to configure public namespace")
 	}
