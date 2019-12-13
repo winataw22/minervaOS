@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -238,6 +239,9 @@ func (s *storageModule) Maintenance() error {
 // CreateFilesystem with the given size in a storage pool.
 func (s *storageModule) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (string, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
+	if strings.HasPrefix(name, "zdb") {
+		return "", fmt.Errorf("invalid volume name. zdb prefix is reserved")
+	}
 
 	fs, err := s.createSubvol(size, name, poolType)
 	if err != nil {
@@ -339,25 +343,31 @@ func (s *storageModule) ensureCache() error {
 // if the requested disk type does not have a storage pool available, an error is
 // returned
 func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
-	var fs filesystem.Volume
 	var err error
 
+	type Candidate struct {
+		Pool      filesystem.Pool
+		Available uint64
+	}
+
+	var candidates []Candidate
+
 	// pick an appropriate pool
-	for idx := range s.volumes {
+	for _, pool := range s.volumes {
 		// ignore pools which don't have the right device type
-		if s.volumes[idx].Type() != poolType {
+		if pool.Type() != poolType {
 			continue
 		}
 
-		usage, err := s.volumes[idx].Usage()
+		usage, err := pool.Usage()
 		if err != nil {
 			log.Error().Msgf("Failed to get current volume usage: %v", err)
 			continue
 		}
 
-		reserved, err := s.volumes[idx].Reserved()
+		reserved, err := pool.Reserved()
 		if err != nil {
-			log.Error().Err(err).Msgf("failed to get size of pool %s", s.volumes[idx].Name())
+			log.Error().Err(err).Msgf("failed to get size of pool %s", pool.Name())
 			continue
 		}
 
@@ -365,30 +375,44 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.Devi
 			Uint64("max size", usage.Size).
 			Uint64("reserved", reserved).
 			Uint64("new size", reserved+size).
-			Msgf("usage of pool %s", s.volumes[idx].Name())
+			Msgf("usage of pool %s", pool.Name())
 		// Make sure adding this filesystem would not bring us over the disk limit
 		if reserved+size > usage.Size {
 			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
 			continue
 		}
 
-		fsn, err := s.volumes[idx].AddVolume(name)
+		candidates = append(candidates, Candidate{
+			Pool:      pool,
+			Available: usage.Size - (reserved + size), // available after new subvolume
+		})
+
+	}
+
+	if len(candidates) == 0 {
+		return nil, pkg.ErrNotEnoughSpace{DeviceType: poolType}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		// reverse sorting so most available is at beginning
+		return candidates[i].Available > candidates[j].Available
+	})
+
+	var volume filesystem.Volume
+	for _, candidate := range candidates {
+		volume, err = candidate.Pool.AddVolume(name)
 		if err != nil {
-			log.Error().Msgf("Failed to create new filesystem: %v", err)
+			log.Error().Err(err).Str("pool", candidate.Pool.Name()).Msg("failed to create new filesystem")
 			continue
 		}
-		if err = fsn.Limit(size); err != nil {
-			log.Error().Msgf("Failed to set size limit on new filesystem: %v", err)
+		if err = volume.Limit(size); err != nil {
+			candidate.Pool.RemoveVolume(volume.Name()) // try to recover
+			log.Error().Err(err).Str("volume", volume.Path()).Msg("failed to set volume size limit")
 			continue
 		}
-		fs = fsn
-		break
+
+		return volume, nil
 	}
 
-	if err != nil || fs != nil {
-		return fs, err
-	}
-
-	// no error but also no volume, so we didn't manage to create one
-	return nil, pkg.ErrNotEnoughSpace{DeviceType: poolType}
+	return nil, fmt.Errorf("failed to create subvolume, logs might have more information")
 }

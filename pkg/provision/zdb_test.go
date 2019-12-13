@@ -8,21 +8,55 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/zdb"
 )
 
-func TestZDBProvisionMappingExists(t *testing.T) {
+type zdbTestClient struct {
+	mock.Mock
+	zdb.Client
+}
+
+func (c *zdbTestClient) Connect() error {
+	return nil
+}
+
+func (c *zdbTestClient) Close() error {
+	return nil
+}
+
+func (c *zdbTestClient) CreateNamespace(name string) error {
+	return c.Called(name).Error(0)
+}
+
+func (c *zdbTestClient) NamespaceSetSize(name string, size uint64) error {
+	return c.Called(name, size).Error(0)
+}
+
+func (c *zdbTestClient) NamespaceSetPassword(name, password string) error {
+	return c.Called(name, password).Error(0)
+}
+
+func (c *zdbTestClient) NamespaceSetPublic(name string, public bool) error {
+	return c.Called(name, public).Error(0)
+}
+
+func (c *zdbTestClient) Exist(name string) (bool, error) {
+	args := c.Called(name)
+	return args.Bool(0), args.Error(1)
+}
+
+func TestZDBProvision(t *testing.T) {
 	require := require.New(t)
 
 	var client TestClient
-	var cache TestZDBCache
 	ctx := context.Background()
 	ctx = WithZBus(ctx, &client)
-	ctx = WithZDBMapping(ctx, &cache)
 
-	zdb := ZDB{
+	conf := ZDB{
 		Size:     280682,
 		Mode:     pkg.ZDBModeSeq,
 		Password: "pa$$w0rd",
@@ -34,15 +68,31 @@ func TestZDBProvisionMappingExists(t *testing.T) {
 		ID:   "reservation-id",
 		User: "user",
 		Type: ZDBReservation,
-		Data: MustMarshal(t, zdb),
+		Data: MustMarshal(t, conf),
 	}
 
-	cache.On("Get", reservation.ID).Return("container-id", true)
+	/*
+	   Request(string,zbus.ObjectID,string,string,pkg.DeviceType,uint64,pkg.ZDBMode)
+	   		0: "storage"
+	   		1: zbus.ObjectID{Name:"storage", Version:"0.0.1"}
+	   		2: "Allocate"
+	   		3: "reservation-id"
+	   		4: "SSD"
+	   		5: 0x1121a80000000
+	   		6: "seq"
+
+	*/
+	client.On("Request", "storage", zbus.ObjectID{Name: "storage", Version: "0.0.1"},
+		"Allocate", "reservation-id", conf.DiskType, conf.Size*gigabyte, conf.Mode).
+		Return(pkg.Allocation{
+			VolumeID:   "zdb-container-id",
+			VolumePath: "/tmp/volume/path",
+		}, nil)
 
 	client.On("Request", "container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
-		"Inspect", "zdb", pkg.ContainerID("container-id")).
+		"Inspect", "zdb", pkg.ContainerID("zdb-container-id")).
 		Return(pkg.Container{
-			Name: "container-id",
+			Name: "volume-id",
 			Network: pkg.NetworkInfo{
 				Namespace: "net-ns",
 			},
@@ -51,6 +101,17 @@ func TestZDBProvisionMappingExists(t *testing.T) {
 	client.On("Request", "network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
 		"Addrs",
 		"zdb0", "net-ns").Return([]net.IP{net.ParseIP("2001:cdba::3257:9652")}, nil)
+
+	var zdbClient zdbTestClient
+	zdbClient.On("Exist", reservation.ID).Return(false, nil)
+	zdbClient.On("CreateNamespace", reservation.ID).Return(nil)
+	zdbClient.On("NamespaceSetPassword", reservation.ID, conf.Password).Return(nil)
+	zdbClient.On("NamespaceSetPublic", reservation.ID, conf.Public).Return(nil)
+	zdbClient.On("NamespaceSetSize", reservation.ID, conf.Size*gigabyte).Return(nil)
+
+	zdbConnection = func(id pkg.ContainerID) zdb.Client {
+		return &zdbClient
+	}
 
 	result, err := zdbProvisionImpl(ctx, &reservation)
 
@@ -60,74 +121,12 @@ func TestZDBProvisionMappingExists(t *testing.T) {
 	require.EqualValues(zdbPort, result.Port)
 }
 
-func TestZDBProvisionNoMappingContainerExists(t *testing.T) {
-	require := require.New(t)
-
-	var client TestClient
-	var cache TestZDBCache
-	ctx := context.Background()
-	ctx = WithZBus(ctx, &client)
-	ctx = WithZDBMapping(ctx, &cache)
-
-	zdb := ZDB{
-		Size:     10,
-		Mode:     pkg.ZDBModeSeq,
-		Password: "pa$$w0rd",
-		DiskType: pkg.SSDDevice,
-		Public:   true,
-	}
-
-	reservation := Reservation{
-		ID:   "reservation-id",
-		User: "user",
-		Type: ZDBReservation,
-		Data: MustMarshal(t, zdb),
-	}
-
-	// return false on cache force creation
-	cache.On("Get", reservation.ID).Return("", false)
-
-	// it's followed by allocation request to see if there is already a
-	// zdb instance running that has enough space for the ns
-
-	client.On("Request", "storage", zbus.ObjectID{Name: "storage", Version: "0.0.1"},
-		"Allocate",
-		zdb.DiskType, zdb.Size*gigabyte, zdb.Mode,
-	).Return("container-id", "/path/to/volume", nil)
-
-	// container exists, so inspect still should return No error
-	client.On("Request", "container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
-		"Inspect", "zdb", pkg.ContainerID("container-id")).
-		Return(pkg.Container{
-			Name: "container-id",
-			Network: pkg.NetworkInfo{
-				Namespace: "net-ns",
-			},
-		}, nil)
-
-	client.On("Request", "network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
-		"Addrs",
-		"zdb0", "net-ns").Return([]net.IP{net.ParseIP("2001:cdba::3257:9652")}, nil)
-
-	_, err := zdbProvisionImpl(ctx, &reservation)
-	// unfortunately the provision will try (as last step) to dial
-	// the unix socket of the server, and then actually configure
-	// the namespace and set the limits, password, etc...
-	// for now we just handle the connection error and assume
-	// it succeeded.
-	// TODO: start a mock server on this address
-	require.Error(err)
-	require.True(strings.Contains(err.Error(), "failed to connect to 0-db at unix:///var/run/zdb_container-id/zdb.sock"))
-}
-
 func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 	require := require.New(t)
 
 	var client TestClient
-	var cache TestZDBCache
 	ctx := context.Background()
 	ctx = WithZBus(ctx, &client)
-	ctx = WithZDBMapping(ctx, &cache)
 
 	zdb := ZDB{
 		Size:     10,
@@ -145,15 +144,17 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 	}
 
 	// return false on cache force creation
-	cache.On("Get", reservation.ID).Return("", false)
 
 	// it's followed by allocation request to see if there is already a
 	// zdb instance running that has enough space for the ns
 
 	client.On("Request", "storage", zbus.ObjectID{Name: "storage", Version: "0.0.1"},
 		"Allocate",
-		zdb.DiskType, zdb.Size*gigabyte, zdb.Mode,
-	).Return("container-id", "/path/to/volume", nil)
+		reservation.ID, zdb.DiskType, zdb.Size*gigabyte, zdb.Mode,
+	).Return(pkg.Allocation{
+		VolumeID:   "container-id",
+		VolumePath: "/path/to/volume",
+	}, nil)
 
 	// container does NOT exists, so inspect still should return an error
 	client.On("Request", "container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
@@ -196,8 +197,6 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 			Interactive: false,
 		},
 	).Return(pkg.ContainerID("container-id"), nil)
-
-	cache.On("Set", reservation.ID, "container-id")
 
 	_, err := zdbProvisionImpl(ctx, &reservation)
 

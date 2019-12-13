@@ -10,38 +10,54 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Client is a connection to a 0-db
-type Client struct {
+// Client interface
+type Client interface {
+	Connect() error
+	Close() error
+	CreateNamespace(name string) error
+	Exist(name string) (bool, error)
+	DeleteNamespace(name string) error
+	Namespaces() ([]string, error)
+	NamespaceSetSize(name string, size uint64) error
+	NamespaceSetPassword(name, password string) error
+	NamespaceSetPublic(name string, public bool) error
+	DBSize() (uint64, error)
+}
+
+// clientImpl is a connection to a 0-db
+type clientImpl struct {
+	addr string
 	pool *redis.Pool
 }
 
 // New creates a client to 0-db pointed by addr
 // addr format: TODO:
-func New() *Client {
-	return &Client{}
+func New(addr string) Client {
+	return &clientImpl{
+		addr: addr,
+	}
 }
 
 // Connect dials addr and creates a pool of connection
-func (c *Client) Connect(addr string) error {
-	if c.pool != nil {
-		return fmt.Errorf("already connected")
-	}
+func (c *clientImpl) Connect() error {
+	if c.pool == nil {
+		pool, err := newRedisPool(c.addr)
+		if err != nil {
+			return errors.Wrapf(err, "failed to connect to %s", c.addr)
+		}
 
-	pool, err := newRedisPool(addr)
-	if err != nil {
-		return errors.Wrapf(err, "failed to connect to %s", addr)
+		c.pool = pool
 	}
-	c.pool = pool
 
 	con := c.pool.Get()
 	defer con.Close()
-	_, err = con.Do("PING")
+	_, err := con.Do("PING")
 
 	return err
 }
 
 // Close releases the resources used by the client.
-func (c *Client) Close() error {
+func (c *clientImpl) Close() error {
 	if c.pool == nil {
 		return nil
 	}

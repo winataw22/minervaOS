@@ -66,17 +66,3 @@ func (t *TestOwnerCache) OwnerOf(id string) (string, error) {
 	result := t.Called(id)
 	return result.String(0), result.Error(1)
 }
-
-type TestZDBCache struct {
-	mock.Mock
-}
-
-func (t *TestZDBCache) Get(namespace string) (string, bool) {
-	result := t.Called(namespace)
-	return result.String(0), result.Bool(1)
-}
-
-// Set saves the mapping between the namespace and a container ID
-func (t *TestZDBCache) Set(namespace, container string) {
-	t.Called(namespace, container)
-}

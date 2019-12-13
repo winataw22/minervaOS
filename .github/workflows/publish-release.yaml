@@ -48,7 +48,7 @@ jobs:
         user: tf-autobuilder
         root: archive
         token: ${{ secrets.HUB_JWT }}
-        name: zos:${{ github.ref }}.flist
+        name: zos-${{ github.ref }}.flist
     
     - name: Rename flist from zos-${{ github.ref }}.flist to zos:${{ github.ref }}.flist
       if: success()

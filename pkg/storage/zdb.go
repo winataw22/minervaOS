@@ -2,7 +2,7 @@ package storage
 
 import (
 	"fmt"
-	"strings"
+	"sort"
 
 	"github.com/rs/zerolog/log"
 
@@ -12,22 +12,51 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
+	"github.com/threefoldtech/zos/pkg/storage/zdbpool"
 )
+
+func (s *storageModule) Find(nsID string) (allocation pkg.Allocation, err error) {
+	for _, pool := range s.volumes {
+		volumes, err := pool.Volumes()
+		if err != nil {
+			return allocation, errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
+		}
+
+		for _, volume := range volumes {
+			// skip all non-zdb volume
+			if !filesystem.IsZDBVolume(volume) {
+				continue
+			}
+
+			zdb := zdbpool.New(volume.Path())
+
+			if !zdb.Exists(nsID) {
+				continue
+			}
+
+			// we found the namespace
+			allocation = pkg.Allocation{
+				VolumeID:   volume.Name(),
+				VolumePath: volume.Path(),
+			}
+
+			return allocation, nil
+		}
+	}
+
+	return pkg.Allocation{}, fmt.Errorf("not found")
+}
 
 // Allocate is responsible to make sure the subvolume used by a 0-db as enough storage capacity
 // of specified size, type and mode
 // it returns the volume ID and its path or an error if it couldn't allocate enough storage
-func (s *storageModule) Allocate(diskType pkg.DeviceType, size uint64, mode pkg.ZDBMode) (string, string, error) {
-	// try to find an existing zdb volume that has still enough storage available
-	// if we find it, grow the quota by the requested size
-	// if we don't, pick a new pool and create a zdb volume on it with the requested size
-	slog := log.With().
+func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint64, mode pkg.ZDBMode) (allocation pkg.Allocation, err error) {
+	log := log.With().
 		Str("type", string(diskType)).
 		Uint64("size", size).
-		// Str("mode", string(mode)). TODO: currently the mode is not used
 		Logger()
 
-	slog.Info().Msg("try to allocation space for 0-DB")
+	log.Info().Msg("try to allocation space for 0-DB")
 
 	for _, pool := range s.volumes {
 
@@ -36,116 +65,118 @@ func (s *storageModule) Allocate(diskType pkg.DeviceType, size uint64, mode pkg.
 			continue
 		}
 
-		usage, err := pool.Usage()
-		if err != nil {
-			return "", "", errors.Wrapf(err, "failed to read usage of pool %s", pool.Name())
-		}
-
-		reserved, err := pool.Reserved()
-		if err != nil {
-			return "", "", errors.Wrapf(err, "failed to read reserved size of pool %s", pool.Name())
-		}
-
-		// Make sure adding this filesystem would not bring us over the disk limit
-		if reserved+size > usage.Size {
-			slog.Info().Msgf("Disk does not have enough space left to hold filesystem")
-			continue
-		}
-
 		volumes, err := pool.Volumes()
 		if err != nil {
-			return "", "", errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
+			return allocation, errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
 		}
 
 		for _, volume := range volumes {
-
 			// skip all non-zdb volume
-			if !strings.HasPrefix(volume.Name(), zdbPoolPrefix) {
+			if !filesystem.IsZDBVolume(volume) {
 				continue
 			}
 
-			usage, err := volume.Usage()
-			if err != nil {
-				return "", "", errors.Wrapf(err, "failed to read usage of volume %s", volume.Name())
+			zdb := zdbpool.New(volume.Path())
+
+			if !zdb.Exists(nsID) {
+				continue
 			}
 
-			// existing volume with enough storage, grow its limit
-			if err := volume.Limit(usage.Size + size); err != nil {
-				return "", "", errors.Wrapf(err, "failed to grow limit of volume %s", volume.Name())
+			// we found the namespace
+			allocation = pkg.Allocation{
+				VolumeID:   volume.Name(),
+				VolumePath: volume.Path(),
 			}
 
-			slog.Info().
-				Str("volume", volume.Name()).
-				Str("path", volume.Path()).
-				Msg("space allocated")
-			return volume.Name(), volume.Path(), nil
+			return allocation, nil
 		}
 	}
 
-	name, err := genZDBPoolName()
-	if err != nil {
-		return "", "", errors.Wrap(err, "failed to generate new sub-volume name")
+	type Candidate struct {
+		filesystem.Volume
+		Free uint64
 	}
 
-	volume, err := s.createSubvol(size, name, diskType)
-	if err != nil {
-		return "", "", errors.Wrap(err, "failed to create sub-volume")
-	}
-
-	slog.Info().
-		Str("volume", volume.Name()).
-		Str("path", volume.Path()).
-		Msg("space allocated")
-	return volume.Name(), volume.Path(), nil
-}
-
-// Claim let the system claim the allocated storage used by a 0-db namespace
-func (s *storageModule) Claim(name string, size uint64) error {
-	var (
-		v   filesystem.Volume
-		err error
-	)
-
+	var candidates []Candidate
+	// okay, so this is a new allocation
+	// we search all the pools for a zdb subvolume that can
+	// hold the new namespace
 	for _, pool := range s.volumes {
+		// skip pool with wrong disk type
+		if pool.Type() != diskType {
+			continue
+		}
+
+		usage, err := pool.Usage()
+		if err != nil {
+			return allocation, errors.Wrapf(err, "failed to read usage of pool %s", pool.Name())
+		}
 
 		volumes, err := pool.Volumes()
 		if err != nil {
-			return errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
+			return allocation, errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
 		}
 
 		for _, volume := range volumes {
-			if volume.Name() == name {
-				v = volume
-				break
+			// skip all non-zdb volume
+			if !filesystem.IsZDBVolume(volume) {
+				continue
 			}
+
+			volumeUsage, err := volume.Usage()
+			if err != nil {
+				return allocation, errors.Wrapf(err, "failed to list namespaces from volume '%s'", volume.Path())
+			}
+
+			if volumeUsage.Size+size > usage.Size {
+				// not enough space on this volume
+				continue
+			}
+
+			candidates = append(
+				candidates,
+				Candidate{
+					Volume: volume,
+					Free:   usage.Size - (volumeUsage.Size + size),
+				})
+		}
+	}
+
+	var volume filesystem.Volume
+	if len(candidates) > 0 {
+		// reverse sort by free space
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].Free > candidates[j].Free
+		})
+
+		volume = candidates[0]
+	} else {
+		// no candidates, so we have to try to create a new subvolume.
+		// and start a new zdb instance
+		name, err := genZDBPoolName()
+		if err != nil {
+			return allocation, errors.Wrap(err, "failed to generate new sub-volume name")
 		}
 
-		if v != nil {
-			break
+		// we create the zdb instance with 0 (unlimited) because this subvolume is gonna
+		// be used for a new instance of ZDB.
+		volume, err = s.createSubvol(0, name, diskType)
+		if err != nil {
+			return allocation, errors.Wrap(err, "failed to create sub-volume")
 		}
 	}
 
-	if v == nil {
-		return fmt.Errorf("volume named %s not found", name)
+	zdb := zdbpool.New(volume.Path())
+
+	if err := zdb.Create(nsID, "", size); err != nil {
+		return allocation, errors.Wrapf(err, "failed to create namespace directory: '%s/%s'", volume.Path(), nsID)
 	}
 
-	usage, err := v.Usage()
-	if err != nil {
-		return err
-	}
+	return pkg.Allocation{
+		VolumeID:   volume.Name(),
+		VolumePath: volume.Path(),
+	}, nil
 
-	// limit cannot be 0 cause 0 means not limited
-	limit := usage.Size - size
-	if limit <= 0 {
-		limit = 1
-	}
-
-	// shrink the limit
-	if err := v.Limit(usage.Size - size); err != nil {
-		return errors.Wrapf(err, "failed to grow limit of volume %s", v.Name())
-	}
-
-	return nil
 }
 
 const zdbPoolPrefix = "zdb"

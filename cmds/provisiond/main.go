@@ -88,7 +88,6 @@ func main() {
 	ctx := context.Background()
 	ctx = provision.WithZBus(ctx, client)
 	ctx = provision.WithOwnerCache(ctx, ownerCache)
-	ctx = provision.WithZDBMapping(ctx, provision.NewZDBMapping())
 
 	// From here we start the real provision engine that will live
 	// for the rest of the life of the node
