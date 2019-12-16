@@ -63,14 +63,19 @@ func configPublic(c *cli.Context) error {
 	}
 
 	node := c.Args().First()
-
-	if err := db.SetPublicIface(pkg.StrIdentifier(node), &types.PubIface{
+	pubIface := &types.PubIface{
 		Master: iface,
-		IPv4:   types.NewIPNet(nv4),
-		IPv6:   types.NewIPNet(nv6),
 		GW4:    gw4,
 		GW6:    gw6,
-	}); err != nil {
+	}
+	if nv4 != nil {
+		pubIface.IPv4 = types.NewIPNet(nv4)
+	}
+	if nv6 != nil {
+		pubIface.IPv6 = types.NewIPNet(nv6)
+	}
+
+	if err := db.SetPublicIface(pkg.StrIdentifier(node), pubIface); err != nil {
 		return err
 	}
 	fmt.Printf("public interface configured on node %s\n", node)

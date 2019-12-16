@@ -56,7 +56,7 @@ func (g *Gedis) Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string
 		}
 	}
 
-	result, err := Bytes(g.Send("tfgrid.directory.workload_manager", "reservation_register", Args{
+	result, err := Bytes(g.Send("tfgrid.workloads.workload_manager", "reservation_register", Args{
 		"reservation": res,
 	}))
 
@@ -74,7 +74,7 @@ func (g *Gedis) Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string
 
 // Get implements provision.ReservationGetter
 func (g *Gedis) Get(id string) (*provision.Reservation, error) {
-	result, err := Bytes(g.Send("tfgrid.directory.workload_manager", "workload_get", Args{
+	result, err := Bytes(g.Send("tfgrid.workloads.workload_manager", "workload_get", Args{
 		"gwid": id,
 	}))
 
@@ -97,7 +97,7 @@ func (g *Gedis) Get(id string) (*provision.Reservation, error) {
 // to get the reservation part.
 func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservation, error) {
 
-	result, err := Bytes(g.Send("tfgrid.directory.workload_manager", "workloads_list", Args{
+	result, err := Bytes(g.Send("tfgrid.workloads.workload_manager", "workloads_list", Args{
 		"node_id": nodeID.Identity(),
 		"cursor":  from,
 	}))
@@ -165,7 +165,7 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 		Epoch:      schema.Date{r.Created},
 	}
 
-	_, err := g.Send("tfgrid.directory.workload_manager", "set_workload_result", Args{
+	_, err := g.Send("tfgrid.workloads.workload_manager", "set_workload_result", Args{
 		"global_workload_id": id,
 		"result":             result,
 	})
