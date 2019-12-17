@@ -173,8 +173,10 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 			ReadOnly: false,
 		}).Return("/path/to/volume", nil)
 
+	// The hw address in this mock call, is based on the VolumeID above. changing the VolumeID
+	// will require this HW address to change
 	client.On("Request", "network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
-		"ZDBPrepare").Return("net-ns", nil)
+		"ZDBPrepare", []byte{0x7e, 0xcc, 0xc3, 0x81, 0xa2, 0x2e}).Return("net-ns", nil)
 
 	client.On("Request", "container", zbus.ObjectID{Name: "container", Version: "0.0.1"},
 		"Run",

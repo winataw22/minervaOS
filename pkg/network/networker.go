@@ -184,8 +184,7 @@ func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
-func (n networker) ZDBPrepare() (string, error) {
-
+func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	netNSName, err := ifaceutil.RandomName("zdb-ns-")
 	if err != nil {
 		return "", err
@@ -212,8 +211,9 @@ func (n networker) ZDBPrepare() (string, error) {
 		return "", errors.Wrap(err, "failed to create public mac vlan interface")
 	}
 
+	log.Debug().Str("HW", hw.String()).Str("macvlan", macVlan.Name).Msg("setting hw address on link")
 	// we don't set any route or ip
-	if err := macvlan.Install(macVlan, []*net.IPNet{}, []*netlink.Route{}, netNs); err != nil {
+	if err := macvlan.Install(macVlan, hw, []*net.IPNet{}, []*netlink.Route{}, netNs); err != nil {
 		return "", err
 	}
 

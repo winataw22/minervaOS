@@ -87,8 +87,14 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 }
 
 // Install configures a macvlan interfaces created with Create method
-func Install(link *netlink.Macvlan, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
+func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
 	return netns.Do(func(_ ns.NetNS) error {
+		if hw != nil && len(hw) != 0 {
+			if err := netlink.LinkSetHardwareAddr(link, hw); err != nil {
+				return err
+			}
+		}
+
 		name := link.Attrs().Name
 
 		for _, ip := range ips {

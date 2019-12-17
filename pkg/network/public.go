@@ -25,6 +25,7 @@ func CreatePublicNS(iface *types.PubIface, nodeID pkg.Identifier) error {
 		pubNS    ns.NetNS
 		pubIface *netlink.Macvlan
 		err      error
+		mac      net.HardwareAddr
 	)
 
 	if !namespace.Exists(types.PublicNamespace) {
@@ -43,11 +44,7 @@ func CreatePublicNS(iface *types.PubIface, nodeID pkg.Identifier) error {
 			if err != nil {
 				return errors.Wrap(err, "failed to create public mac vlan interface")
 			}
-			mac := ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + publicNsMACDerivationSuffix))
-			if err = ifaceutil.SetMAC(types.PublicIface, mac, pubNS); err != nil {
-				return errors.Wrap(err, "failed to set mac address on public mac vlan interface")
-			}
-			log.Debug().Str("mac", mac.String()).Msg("Set mac address on public mac vlan interface")
+			mac = ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + publicNsMACDerivationSuffix))
 		default:
 			return fmt.Errorf("unsupported public interface type %s", iface.Type)
 		}
@@ -105,7 +102,7 @@ func CreatePublicNS(iface *types.PubIface, nodeID pkg.Identifier) error {
 		return err
 	}
 
-	if err := macvlan.Install(pubIface, ips, routes, pubNS); err != nil {
+	if err := macvlan.Install(pubIface, mac, ips, routes, pubNS); err != nil {
 		return err
 	}
 

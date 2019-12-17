@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
 	"github.com/pkg/errors"
@@ -133,6 +134,8 @@ func createZdbContainer(ctx context.Context, allocation pkg.Allocation, mode pkg
 		slog = log.With().Str("containerID", string(name)).Logger()
 	)
 
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(allocation.VolumeID))
+
 	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
 	rootFS, err := flist.Mount(zdbFlistURL, "", pkg.MountOptions{
 		Limit:    10,
@@ -153,7 +156,7 @@ func createZdbContainer(ctx context.Context, allocation pkg.Allocation, mode pkg
 	}
 
 	// create the network namespace and macvlan for the 0-db container
-	netNsName, err := network.ZDBPrepare()
+	netNsName, err := network.ZDBPrepare(hw)
 	if err != nil {
 		if err := flist.Umount(rootFS); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")

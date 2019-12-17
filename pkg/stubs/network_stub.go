@@ -96,8 +96,8 @@ func (s *NetworkerStub) Leave(arg0 pkg.NetID, arg1 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) ZDBPrepare() (ret0 string, ret1 error) {
-	args := []interface{}{}
+func (s *NetworkerStub) ZDBPrepare(arg0 []uint8) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "ZDBPrepare", args...)
 	if err != nil {
 		panic(err)

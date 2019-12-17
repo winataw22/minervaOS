@@ -38,6 +38,30 @@ func (s *StorageModuleStub) Allocate(arg0 string, arg1 pkg.DeviceType, arg2 uint
 	return
 }
 
+func (s *StorageModuleStub) BrokenDevices() (ret0 []pkg.BrokenDevice) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "BrokenDevices", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StorageModuleStub) BrokenPools() (ret0 []pkg.BrokenPool) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "BrokenPools", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 pkg.DeviceType) (ret0 string, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "CreateFilesystem", args...)
