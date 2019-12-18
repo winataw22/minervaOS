@@ -198,6 +198,12 @@ func (s *nodeStore) SetPublicConfig(nodeID string, cfg directory.TfgridNodePubli
 		return err
 	}
 
+	if node.PublicConfig == nil {
+		cfg.Version = 0
+	} else {
+		cfg.Version = node.PublicConfig.Version + 1
+	}
+
 	node.PublicConfig = &cfg
 	return nil
 }

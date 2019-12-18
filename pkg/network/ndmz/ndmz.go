@@ -8,6 +8,7 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network/types"
 
 	"github.com/threefoldtech/zos/pkg/network/nr"
 
@@ -67,42 +68,23 @@ func Create(nodeID pkg.Identifier) error {
 		return err
 	}
 
-	if namespace.Exists("public") {
-		err = createMacVlan(netNS)
-	} else {
-		err = attachVeth(netNS)
-	}
-	if err != nil {
+	if err := createMacVlan(netNS); err != nil {
 		return err
 	}
 
 	// set mac address to something static to make sure we receive the same IP from a DHCP server
-	pubiface, err := getPublicIface()
-	if err != nil {
-		return err
-	}
-	mac, err := ifaceutil.GetMAC(pubiface, nil)
-	if err != nil {
-		return err
-	}
-
-	log.Debug().
-		Str("iface", pubiface).
-		Str("mac", mac.String()).
-		Msg("public iface found")
-
-	mac = ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + ndmzNsMACDerivationSuffix))
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + ndmzNsMACDerivationSuffix))
 	log.Debug().
 		Str("mac", mac.String()).
 		Msg("set mac on public iface")
 
-	if err = ifaceutil.SetMAC("public", mac, netNS); err != nil {
+	if err = ifaceutil.SetMAC(types.PublicIface, mac, netNS); err != nil {
 		return err
 	}
 
 	err = netNS.Do(func(_ ns.NetNS) error {
 		// run DHCP to interface public in ndmz
-		received, err := dhcp.Probe("public")
+		received, err := dhcp.Probe(types.PublicIface)
 		if err != nil {
 			return err
 		}
@@ -118,53 +100,36 @@ func Create(nodeID pkg.Identifier) error {
 	return applyFirewall()
 }
 
-func createMacVlan(netNS ns.NetNS) error {
-	if !macvlan.Exists("public", netNS) {
-		pubIface, err := getPublicIface()
-		if err != nil {
-			return err
-		}
-
-		_, err = macvlan.Create("public", pubIface, netNS)
-		if err != nil {
-			return err
+// Delete deletes the NDMZ network namespace
+func Delete() error {
+	netNS, err := namespace.GetByName(netNSNDMZ)
+	if err == nil {
+		if err := namespace.Delete(netNS); err != nil {
+			return errors.Wrap(err, "failed to delete ndmz network namespace")
 		}
 	}
 
 	return nil
 }
 
-func attachVeth(netNS ns.NetNS) error {
+func createMacVlan(netNS ns.NetNS) error {
+	if !macvlan.Exists(types.PublicIface, netNS) {
 
-	const (
-		vethHost = "to-dmz"
-		vethNDMZ = "public"
-	)
+		var (
+			master netlink.Link
+			err    error
+		)
 
-	if !ifaceutil.Exists(vethHost, nil) || !ifaceutil.Exists(vethNDMZ, netNS) {
-		if _, _, err := ip.SetupVethWithName(vethHost, vethNDMZ, 1500, netNS); err != nil {
-			return errors.Wrap(err, "failed to create veth pair to connect zos bridge and ndmz bridge")
+		if namespace.Exists(types.PublicNamespace) {
+			master, err = getPublicIface()
+		} else {
+			master, err = netlink.LinkByName("zos")
 		}
-		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", vethHost), "1"); err != nil {
-			return errors.Wrapf(err, "failed to disable ip6 on interface %s", vethHost)
+		if err != nil {
+			return err
 		}
-	}
-	log.Info().
-		Str("ndmz side", vethNDMZ).
-		Str("host side", vethHost).
-		Msg("veth pair for ndmz to public zos bridge created")
 
-	lVethBr, err := netlink.LinkByName(vethHost)
-	if err != nil {
-		return err
-	}
-
-	br, err := bridge.Get("zos") //TODO: use constant
-	if err != nil {
-		return err
-	}
-
-	if err := bridge.AttachNic(lVethBr, br); err != nil {
+		_, err = macvlan.Create(types.PublicIface, master.Attrs().Name, netNS)
 		return err
 	}
 
@@ -172,13 +137,20 @@ func attachVeth(netNS ns.NetNS) error {
 }
 
 func createRoutingBridge(netNS ns.NetNS) error {
-	if bridge.Exists(BridgeNDMZ) {
+	if bridge.Exists(BridgeNDMZ) && namespace.Exists(netNSNDMZ) {
 		return nil
 	}
 
-	br, err := bridge.New(BridgeNDMZ)
-	if err != nil {
-		return err
+	var (
+		br  *netlink.Bridge
+		err error
+	)
+
+	if !bridge.Exists(BridgeNDMZ) {
+		br, err = bridge.New(BridgeNDMZ)
+		if err != nil {
+			return err
+		}
 	}
 
 	vethNDMZ := "tonrs"
@@ -317,225 +289,3 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 	}
 	return nil
 }
-
-// AddNetResource adds the routes of a network resource to the gateway network namespace
-// func (gw *NDMZ) AddNetResource(netRes *nr.NetResource) error {
-// 	log.Info().Msg("add network resource to gateway namespace")
-// 	gwNS, err := namespace.GetByName(types.GatewayNamespace)
-// 	if err != nil {
-// 		return errors.Wrap(err, "gateway namespace not found")
-// 	}
-// 	defer gwNS.Close()
-
-// 	netResNS, err := namespace.GetByName(netRes.NamespaceName())
-// 	if err != nil {
-// 		return errors.Wrapf(err, "namespace %s not found", netRes.NamespaceName())
-// 	}
-// 	defer netResNS.Close()
-
-// 	if err := gw.configNRIPv6(netRes, gwNS, netResNS); err != nil {
-// 		return err
-// 	}
-
-// 	if err := gw.configNRIPv4(netRes, gwNS, netResNS); err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
-// func (gw *NDMZ) configNRIPv6(netRes *nr.NetResource, gwNS, netResNS ns.NetNS) error {
-
-// 	epName := netRes.Nibble().EPPubName()
-// 	gwName := netRes.Nibble().GWtoEPName()
-
-// 	if !ifaceutil.Exists(epName, netResNS) || !ifaceutil.Exists(gwName, gwNS) {
-// 		log.Warn().Msg("one side of the gateway veth pair does not exists, deleting both")
-// 		if err := ifaceutil.Delete(epName, netResNS); err != nil {
-// 			return err
-// 		}
-// 		if err := ifaceutil.Delete(gwName, gwNS); err != nil {
-// 			return err
-// 		}
-
-// 		log.Info().
-// 			Str("gateway side", gwName).
-// 			Str("exit point side", epName).
-// 			Msg("create a veth pair in the host namespace and send one side into the gateway namespace")
-// 		if _, _, err := ip.SetupVethWithName(epName, gwName, 1500, gwNS); err != nil {
-// 			return errors.Wrap(err, "failed to create veth pair for gateway namespace")
-// 		}
-// 		log.Info().
-// 			Str("gwVeth", gwName).
-// 			Str("epVeth", epName).
-// 			Msg("veth pair for gateway and exit point created")
-
-// 		// send the other side inside in the exit point network resource namespace
-// 		EPLink, err := netlink.LinkByName(epName)
-// 		if err != nil {
-// 			return errors.Wrapf(err, "failed to get interface %s", epName)
-// 		}
-// 		if err = netlink.LinkSetNsFd(EPLink, int(netResNS.Fd())); err != nil {
-// 			return fmt.Errorf("failed to move interface %s to network resource netns: %v", epName, err)
-// 		}
-// 	}
-
-// 	err := gwNS.Do(func(_ ns.NetNS) error {
-// 		GWLink, err := netlink.LinkByName(gwName)
-// 		if err != nil {
-// 			return errors.Wrapf(err, "failed to get interface %s in gateway namespace", gwName)
-// 		}
-
-// 		addr := &netlink.Addr{IPNet: netRes.Nibble().GWtoEPLL(), Label: ""}
-// 		if err := netlink.AddrAdd(GWLink, addr); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-
-// 		route := netRes.Nibble().GWDefaultRoute()
-// 		route.LinkIndex = GWLink.Attrs().Index
-// 		if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-
-// 		routes, err := netRes.GWTNRoutesIPv6()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		for _, route := range routes {
-// 			route.LinkIndex = GWLink.Attrs().Index
-// 			if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
-// 				return errors.Wrapf(err, "failed to set route %s on %s", route.String(), GWLink.Attrs().Name)
-// 			}
-// 		}
-
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to configure veth pair end in gateway namespace")
-// 	}
-
-// 	// configure veth pair inside the exit point network resource namespace
-// 	err = netResNS.Do(func(_ ns.NetNS) error {
-// 		EPLink, err := netlink.LinkByName(epName)
-// 		if err != nil {
-// 			return errors.Wrapf(err, "failed to get interface %s in exit point namespace", epName)
-// 		}
-
-// 		addr := &netlink.Addr{IPNet: netRes.Nibble().EPPubLL(), Label: ""}
-// 		if err := netlink.AddrAdd(EPLink, addr); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-
-// 		if err := netlink.LinkSetUp(EPLink); err != nil {
-// 			return err
-// 		}
-
-// 		route := netRes.Nibble().NRDefaultRoute()
-// 		route.LinkIndex = EPLink.Attrs().Index
-// 		if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-// 		return nil
-// 	})
-// 	if err != nil {
-// 		return errors.Wrap(err, "failed to configure veth pair end in exit point namespace")
-// 	}
-// 	return nil
-// }
-
-// func (gw *NDMZ) configNRIPv4(netRes *nr.NetResource, gwNS, netResNS ns.NetNS) error {
-// 	ep4pubName := netRes.Nibble().EP4PubName()
-// 	br4pubName := netRes.Nibble().Br4PubName()
-
-// 	if !ifaceutil.Exists(ep4pubName, netResNS) || !ifaceutil.Exists(br4pubName, nil) {
-// 		log.Warn().Msg("one side of the gateway veth pair does not exists, deleting both")
-// 		if err := ifaceutil.Delete(ep4pubName, netResNS); err != nil {
-// 			return err
-// 		}
-// 		if err := ifaceutil.Delete(br4pubName, nil); err != nil {
-// 			return err
-// 		}
-
-// 		if _, _, err := ip.SetupVethWithName(br4pubName, ep4pubName, 1500, netResNS); err != nil {
-// 			return errors.Wrap(err, "failed to create veth pair for bridge gateway")
-// 		}
-// 		log.Info().
-// 			Str("gatway side", br4pubName).
-// 			Str("bridge side", ep4pubName).
-// 			Msg("veth pair for ipv4 gateway bridge created")
-// 	}
-
-// 	br, err := bridge.Get(BridgeNDMZ)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	lVethBr, err := netlink.LinkByName(br4pubName)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if err := bridge.AttachNic(lVethBr, br); err != nil {
-// 		return err
-// 	}
-
-// 	if err := netResNS.Do(func(_ ns.NetNS) error {
-// 		lep4pub, err := netlink.LinkByName(ep4pubName)
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", ep4pubName), "1"); err != nil {
-// 			return err
-// 		}
-
-// 		addr := &netlink.Addr{IPNet: netRes.Nibble().WGIP4()}
-// 		log.Debug().Msgf("set addr %s on %s", addr.IPNet.String(), ep4pubName)
-// 		if err := netlink.AddrAdd(lep4pub, addr); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-
-// 		if err := netlink.LinkSetUp(lep4pub); err != nil {
-// 			return err
-// 		}
-
-// 		route := &netlink.Route{
-// 			Dst: &net.IPNet{
-// 				IP:   net.ParseIP("0.0.0.0"),
-// 				Mask: net.CIDRMask(0, 32),
-// 			},
-// 			Gw:        net.ParseIP("10.1.0.1"),
-// 			LinkIndex: lep4pub.Attrs().Index,
-// 		}
-
-// 		log.Debug().Msgf("set route %s on %s %d", route.String(), ep4pubName, lep4pub.Attrs().Index)
-// 		if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
-// 			return err
-// 		}
-// 		return nil
-// 	}); err != nil {
-// 		return err
-// 	}
-
-// 	return gwNS.Do(func(_ ns.NetNS) error {
-// 		l, err := netlink.LinkByName(vethGWSide)
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		routes, err := netRes.GWTNRoutesIPv4()
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		for _, route := range routes {
-// 			route.LinkIndex = l.Attrs().Index
-// 			if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
-// 				return errors.Wrapf(err, "failed to set route %s on %s", route.String(), l.Attrs().Name)
-// 			}
-// 		}
-
-// 		// TODO: add IPv4 public IP once farmer can specify ipv4 public address in the farm management
-// 		return nil
-// 	})
-// }

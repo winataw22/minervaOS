@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -83,6 +84,10 @@ func main() {
 		ifaceVersion = exitIface.Version
 	}
 
+	if err := ndmz.Create(nodeID); err != nil {
+		log.Fatal().Err(err).Msgf("failed to create DMZ")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -91,16 +96,32 @@ func main() {
 		for {
 			select {
 			case iface := <-ch:
-				_ = configurePubIface(iface, nodeID)
+
+				// When changing public IP configuration, we need to also update how the NDMZ interfaces are plumbed together
+				// to achieve this any time a new public config is received, we first delete the NDMZ namespace
+				// create/update the public namespace and then re-create the NDMZ
+
+				log.Info().Str("config", fmt.Sprintf("%+v", iface)).Msg("public IP configuration received")
+
+				if err := ndmz.Delete(); err != nil {
+					log.Error().Err(err).Msg("error deleting ndmz during public ip configuration")
+					continue
+				}
+
+				if err = configurePubIface(iface, nodeID); err != nil {
+					log.Error().Err(err).Msg("error configuring public IP")
+					continue
+				}
+
+				if err := ndmz.Create(nodeID); err != nil {
+					log.Error().Err(err).Msg("error configuring ndmz during public ip configuration")
+					continue
+				}
 			case <-ctx.Done():
 				return
 			}
 		}
 	}(ctx, chIface)
-
-	if err := ndmz.Create(nodeID); err != nil {
-		log.Fatal().Err(err).Msgf("failed to create DMZ")
-	}
 
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Fatal().Err(err).Msg("unexpected error")

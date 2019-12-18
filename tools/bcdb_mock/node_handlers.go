@@ -191,13 +191,12 @@ func (s *nodeStore) configurePublic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := directory.TfgridNodePublicIface1{
-		Gw4:     iface.GW4,
-		Gw6:     iface.GW6,
-		Ipv4:    iface.IPv4.ToSchema(),
-		Ipv6:    iface.IPv6.ToSchema(),
-		Master:  iface.Master,
-		Type:    directory.TfgridNodePublicIface1TypeMacvlan,
-		Version: int64(iface.Version),
+		Gw4:    iface.GW4,
+		Gw6:    iface.GW6,
+		Ipv4:   iface.IPv4.ToSchema(),
+		Ipv6:   iface.IPv6.ToSchema(),
+		Master: iface.Master,
+		Type:   directory.TfgridNodePublicIface1TypeMacvlan,
 	}
 
 	nodeID := mux.Vars(r)["node_id"]

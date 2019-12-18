@@ -1,0 +1,30 @@
+name: Bootstrap Tests
+on:
+  push:
+    paths:
+      - 'bootstrap/bootstrap/**'
+      - '.github/workflows/test-bootstrap.yaml'
+jobs:
+  bootstrap:
+    name: Running Bootstrap Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+      - name: Prepare musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl musl-tools
+      - name: Setup toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          override: true
+      - uses: actions-rs/cargo@v1
+      - name: Test bootstrap
+        run: make test
+        working-directory: bootstrap/bootstrap
+      - name: Build bootstrap
+        run: make release
+        working-directory: bootstrap/bootstrap
