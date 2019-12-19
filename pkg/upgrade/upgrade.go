@@ -21,16 +21,14 @@ import (
 
 type hookType string
 
-const (
-	provisionModuleName = "provisiond"
-)
-
 var (
 	// ErrRestartNeeded is returned if upgraded requires a restart
 	ErrRestartNeeded = fmt.Errorf("restart needed")
 
 	// services that can't be uninstalled with normal procedure
 	protected = []string{"identityd", "redis"}
+
+	flistIdentityPath = "/bin/identityd"
 )
 
 // Upgrader is the component that is responsible
@@ -282,6 +280,11 @@ func (u *Upgrader) uninstall(flist listFListInfo) error {
 			continue
 		}
 
+		if file.Path == flistIdentityPath {
+			log.Debug().Str("file", file.Path).Msg("skip deleting file")
+			continue
+		}
+
 		if err := os.Remove(file.Path); err != nil {
 			log.Error().Err(err).Str("file", file.Path).Msg("failed to remove file")
 		}
@@ -332,7 +335,7 @@ func (u *Upgrader) applyUpgrade(from, to FListEvent) error {
 
 	log.Debug().Strs("services", names).Msg("new services")
 
-	if err := copyRecursive(flistRoot, "/"); err != nil {
+	if err := copyRecursive(flistRoot, "/", flistIdentityPath); err != nil {
 		return err
 	}
 
@@ -361,15 +364,15 @@ func copyRecursive(source string, destination string, skip ...string) error {
 			return err
 		}
 
-		if isIn(rel, skip) {
+		dest := filepath.Join(destination, rel)
+		if isIn(dest, skip) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
-
+			log.Debug().Str("file", dest).Msg("skipping file")
 			return nil
 		}
 
-		dest := filepath.Join(destination, rel)
 		if info.IsDir() {
 			if err := os.MkdirAll(dest, info.Mode()); err != nil {
 				return err

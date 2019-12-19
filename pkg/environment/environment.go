@@ -50,8 +50,7 @@ var (
 
 	envTest = Environment{
 		RunningMode: RunningTest,
-		// BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
-		BcdbURL: "tcp://0.tcp.ngrok.io:14669",
+		BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
 		// ProvisionTimeout:  120,
 		// ProvisionInterval: 10,
 	}

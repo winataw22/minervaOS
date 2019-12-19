@@ -188,7 +188,7 @@ func main() {
 	}()
 
 	utils.OnDone(ctx, func(_ error) {
-		log.Info().Msg("shutting down")
+		log.Info().Msg("received a termination signal")
 	})
 
 	if bootMethod != upgrade.BootMethodFList {
@@ -233,10 +233,17 @@ func debugReinstall(boot *upgrade.Boot, up *upgrade.Upgrader) {
 				continue
 			}
 
-			up.Upgrade(current, current)
+			if err := Safe(func() error {
+				return up.Upgrade(current, current)
+			}); err != nil {
+				log.Error().Err(err).Msg("reinstall failed")
+			} else {
+				log.Info().Msg("reinstall completed successfully")
+			}
 		}
 	}()
 }
+
 func upgradeLoop(
 	ctx context.Context,
 	boot *upgrade.Boot,
