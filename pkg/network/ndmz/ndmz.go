@@ -34,10 +34,9 @@ const (
 	BridgeNDMZ = "br-ndmz"
 	netNSNDMZ  = "ndmz"
 
-	vethGWSide = "ipv4-rt"
-	vethBrSide = "to-gw"
-
 	ndmzNsMACDerivationSuffix = "-ndmz"
+
+	publicIfaceName = "public"
 )
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
@@ -59,7 +58,7 @@ func Create(nodeID pkg.Identifier) error {
 		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
 			return errors.Wrapf(err, "failed to enable ipv6 forwarding in gateway namespace")
 		}
-		return nil
+		return ifaceutil.SetLoUp()
 	}); err != nil {
 		return err
 	}
@@ -214,7 +213,7 @@ func applyFirewall() error {
 	return nil
 }
 
-// AttachNR links a network resource to the DMZ
+// AttachNR links a network resource to the NDMZ
 func AttachNR(networkID string, nr *nr.NetResource) error {
 	nrNSName, err := nr.Namespace()
 	if err != nil {
@@ -226,35 +225,28 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 		return err
 	}
 
-	vethNR := "public"
-	vethDMZ := fmt.Sprintf("n-%s", nr.ID())
-
-	if !ifaceutil.Exists(vethDMZ, nil) || !ifaceutil.Exists(vethNR, nrNS) {
-		log.Debug().
-			Str("nr side", vethNR).
-			Str("dmz side", vethDMZ).
-			Msg("create veth pair to connect network resource and ndmz")
-
-		_ = ifaceutil.Delete(vethDMZ, nil)
-		_ = ifaceutil.Delete(vethNR, nrNS)
-
-		if _, _, err = ip.SetupVethWithName(vethDMZ, vethNR, 1500, nrNS); err != nil {
-			return errors.Wrap(err, "failed to create veth pair for to connect network resource and ndmz")
+	if !ifaceutil.Exists(publicIfaceName, nrNS) {
+		if _, err = macvlan.Create(publicIfaceName, BridgeNDMZ, nrNS); err != nil {
+			return err
 		}
 	}
 
-	err = nrNS.Do(func(_ ns.NetNS) error {
+	return nrNS.Do(func(_ ns.NetNS) error {
 		addr, err := allocateIPv4(networkID)
 		if err != nil {
-			return errors.Wrap(err, "ip allocation for network resource veth error")
+			return errors.Wrap(err, "ip allocation for network resource")
 		}
 
-		lvethNR, err := netlink.LinkByName((vethNR))
+		pubIface, err := netlink.LinkByName(publicIfaceName)
 		if err != nil {
 			return err
 		}
 
-		if err := netlink.AddrAdd(lvethNR, &netlink.Addr{IPNet: addr}); err != nil && !os.IsExist(err) {
+		if err := netlink.AddrAdd(pubIface, &netlink.Addr{IPNet: addr}); err != nil && !os.IsExist(err) {
+			return err
+		}
+
+		if err = netlink.LinkSetUp(pubIface); err != nil {
 			return err
 		}
 
@@ -264,28 +256,13 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 				Mask: net.CIDRMask(0, 32),
 			},
 			Gw:        net.ParseIP("100.127.0.1"),
-			LinkIndex: lvethNR.Attrs().Index,
+			LinkIndex: pubIface.Attrs().Index,
 		})
 		if err != nil && !os.IsExist(err) {
 			return err
 		}
+
 		return nil
 	})
-	if err != nil {
-		return err
-	}
 
-	lVethDMZ, err := netlink.LinkByName(vethDMZ)
-	if err != nil {
-		return err
-	}
-
-	br, err := bridge.Get(BridgeNDMZ)
-	if err != nil {
-		return err
-	}
-	if err := bridge.AttachNic(lVethDMZ, br); err != nil && !os.IsExist(err) {
-		return errors.Wrapf(err, "failed to attach veth %s to bridge %s", vethDMZ, BridgeNDMZ)
-	}
-	return nil
 }
