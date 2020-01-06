@@ -20,7 +20,6 @@ const ipv4InterfaceArpProxySysctlTemplate = "net.ipv4.conf.%s.proxy_arp"
 // master is the name of the device used as master for the macvlan interface
 // netns is network namespace where to create the macvlan
 func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error) {
-	// macvlan := &current.Interface{}
 
 	m, err := netlink.LinkByName(master)
 	if err != nil {
@@ -62,7 +61,6 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 			_ = netlink.LinkDel(mv)
 			return fmt.Errorf("failed to rename macvlan to %q: %v", name, err)
 		}
-		// macvlan.Name = name
 
 		// Re-fetch macvlan to get all properties/attributes
 		link, err := netlink.LinkByName(name)
@@ -74,8 +72,6 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 		if !ok {
 			return fmt.Errorf("link %s should be of type macvlan", name)
 		}
-		// macvlan.Mac = contMacvlan.Attrs().HardwareAddr.String()
-		// macvlan.Sandbox = netns.Path()
 
 		return nil
 	})
@@ -139,15 +135,4 @@ func GetByName(name string) (*netlink.Macvlan, error) {
 		return nil, fmt.Errorf("link %s is not a macvlan", name)
 	}
 	return macvlan, nil
-}
-
-// Exists check if a macvlan interface exists
-func Exists(name string, netNS ns.NetNS) bool {
-	exist := false
-	netNS.Do(func(_ ns.NetNS) error {
-		_, err := netlink.LinkByName(name)
-		exist = err == nil
-		return nil
-	})
-	return exist
 }

@@ -197,13 +197,17 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	defer netNs.Close()
 
 	// find which interface to use as master for the macvlan
-	pubIface := DefaultBridge
+	var pubIface string
 	if namespace.Exists(types.PublicNamespace) {
-		master, err := publicMasterIface()
+		pubIface, err = publicMasterIface()
 		if err != nil {
 			return "", errors.Wrap(err, "failed to retrieve the master interface name of the public interface")
 		}
-		pubIface = master
+	} else {
+		pubIface, err = hostIPV6Iface()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to found a valid network interface to use as parent for 0-db container")
+		}
 	}
 
 	macVlan, err := macvlan.Create(ZDBIface, pubIface, netNs)
@@ -484,27 +488,70 @@ func publicMasterIface() (string, error) {
 	}
 	defer netns.Close()
 
-	var iface string
+	var index int
 	if err := netns.Do(func(_ ns.NetNS) error {
 		pl, err := netlink.LinkByName(types.PublicIface)
 		if err != nil {
 			return err
 		}
-		index := pl.Attrs().MasterIndex
-		if index == 0 {
-			return fmt.Errorf("public iface has not master")
-		}
-		ml, err := netlink.LinkByIndex(index)
-		if err != nil {
-			return err
-		}
-		iface = ml.Attrs().Name
+		index = pl.Attrs().ParentIndex
 		return nil
 	}); err != nil {
 		return "", err
 	}
 
-	return iface, nil
+	if index == 0 {
+		return "", fmt.Errorf("public iface has not master")
+	}
+
+	ml, err := netlink.LinkByIndex(index)
+	if err != nil {
+		return "", err
+	}
+
+	return ml.Attrs().Name, nil
+}
+
+// hostIPV6Iface return the first physical interface to have an
+// ipv6 public address
+func hostIPV6Iface() (string, error) {
+
+	links, err := netlink.LinkList()
+	if err != nil {
+		return "", err
+	}
+
+	for _, link := range ifaceutil.LinkFilter(links, []string{"device"}) {
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
+		if err != nil {
+			return "", err
+		}
+
+		for _, addr := range addrs {
+			if addr.IP.IsGlobalUnicast() {
+				return link.Attrs().Name, nil
+			}
+		}
+	}
+
+	// not found on host interfaces, check on zos bridge
+	link, err := netlink.LinkByName("zos")
+	if err != nil {
+		return "", err
+	}
+
+	addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		if addr.IP.IsGlobalUnicast() {
+			return link.Attrs().Name, nil
+		}
+	}
+
+	return "", fmt.Errorf("no interface found with ipv6")
 }
 
 // createNetNS create a network namespace and set lo interface up
