@@ -25,7 +25,7 @@ var provisionOrder = map[provision.ReservationType]int{
 }
 
 // Reserve provision.Reserver
-func (g *Gedis) Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string, error) {
+func (g *Gedis) Reserve(r *provision.Reservation) (string, error) {
 	res := types.TfgridReservation1{
 		DataReservation: types.TfgridReservationData1{},
 		// CustomerTid:     r.User, //TODO: wrong type.
@@ -35,20 +35,19 @@ func (g *Gedis) Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string
 	if err != nil {
 		return "", err
 	}
-	nID := nodeID.Identity()
 
 	switch r.Type {
 	case provision.ContainerReservation:
 		res.DataReservation.Containers = []types.TfgridReservationContainer1{
-			containerReservation(w, nID),
+			containerReservation(w, r.NodeID),
 		}
 	case provision.VolumeReservation:
 		res.DataReservation.Volumes = []types.TfgridReservationVolume1{
-			volumeReservation(w, nID),
+			volumeReservation(w, r.NodeID),
 		}
 	case provision.ZDBReservation:
 		res.DataReservation.Zdbs = []types.TfgridReservationZdb1{
-			zdbReservation(w, nID),
+			zdbReservation(w, r.NodeID),
 		}
 	case provision.NetworkReservation:
 		res.DataReservation.Networks = []types.TfgridReservationNetwork1{
@@ -200,7 +199,7 @@ func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reser
 			return nil, err
 		}
 
-		data, err = tmp.ToProvisionType()
+		data, reservation.NodeID, err = tmp.ToProvisionType()
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +210,7 @@ func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reser
 			return nil, err
 		}
 
-		data, err = tmp.ToProvisionType()
+		data, reservation.NodeID, err = tmp.ToProvisionType()
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +232,7 @@ func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reser
 			return nil, err
 		}
 
-		data, err = tmp.ToProvisionType()
+		data, reservation.NodeID, err = tmp.ToProvisionType()
 		if err != nil {
 			return nil, err
 		}

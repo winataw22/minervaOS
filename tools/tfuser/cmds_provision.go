@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/pkg/provision"
 
@@ -61,26 +60,27 @@ func cmdsProvision(c *cli.Context) error {
 
 	r.Duration = duration
 	r.Created = time.Now()
-
 	// set the user ID into the reservation schema
 	r.User = keypair.Identity()
 
-	if err := r.Sign(keypair.PrivateKey); err != nil {
-		return errors.Wrap(err, "failed to sign the reservation")
-	}
-
-	if err := output(path, r); err != nil {
-		return errors.Wrapf(err, "failed to write provision schema to %s after signature", path)
-	}
-
 	for _, nodeID := range nodeIDs {
-		id, err := client.Reserve(r, pkg.StrIdentifier(nodeID))
+		r.NodeID = nodeID
+
+		if err := r.Sign(keypair.PrivateKey); err != nil {
+			return errors.Wrap(err, "failed to sign the reservation")
+		}
+
+		id, err := client.Reserve(r)
 		if err != nil {
 			return errors.Wrap(err, "failed to send reservation")
 		}
 
-		fmt.Printf("Reservation for %v send to node %s\n", duration, nodeID)
+		fmt.Printf("Reservation for %v send to node %s\n", duration, r.NodeID)
 		fmt.Printf("Resource: %v\n", id)
+	}
+
+	if err := output(path, r); err != nil {
+		return errors.Wrapf(err, "failed to write provision schema to %s after signature", path)
 	}
 
 	return nil

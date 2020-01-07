@@ -140,7 +140,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				NetworkConnection: tt.fields.NetworkConnection,
 				StatsAggregator:   tt.fields.StatsAggregator,
 			}
-			got, err := c.ToProvisionType()
+			got, _, err := c.ToProvisionType()
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)
@@ -204,7 +204,7 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 				Type:            tt.fields.Type,
 				StatsAggregator: tt.fields.StatsAggregator,
 			}
-			got, err := v.ToProvisionType()
+			got, _, err := v.ToProvisionType()
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)
@@ -308,7 +308,7 @@ func TestTfgridReservationZdb1_ToProvisionType(t *testing.T) {
 				DiskType:      tt.fields.DiskType,
 				Public:        tt.fields.Public,
 			}
-			got, err := z.ToProvisionType()
+			got, _, err := z.ToProvisionType()
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)

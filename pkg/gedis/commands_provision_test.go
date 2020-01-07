@@ -164,8 +164,8 @@ func TestProvisionReserve(t *testing.T) {
 		pool: pool,
 	}
 
-	id := pkg.StrIdentifier("101")
 	reservation := provision.Reservation{
+		NodeID:  "101",
 		Type:    provision.ContainerReservation,
 		ID:      "10",
 		Created: time.Now(),
@@ -205,7 +205,7 @@ func TestProvisionReserve(t *testing.T) {
 			"id": 10,
 		}), nil)
 
-	result, err := gedis.Reserve(&reservation, id)
+	result, err := gedis.Reserve(&reservation)
 
 	require.NoError(err)
 	require.Equal("10", result)

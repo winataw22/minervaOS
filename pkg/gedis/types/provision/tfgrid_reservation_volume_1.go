@@ -16,7 +16,7 @@ type TfgridReservationVolume1 struct {
 }
 
 // ToProvisionType converts TfgridReservationVolume1 to provision.Volume
-func (v TfgridReservationVolume1) ToProvisionType() (provision.Volume, error) {
+func (v TfgridReservationVolume1) ToProvisionType() (provision.Volume, string, error) {
 	volume := provision.Volume{
 		Size: uint64(v.Size),
 	}
@@ -26,9 +26,9 @@ func (v TfgridReservationVolume1) ToProvisionType() (provision.Volume, error) {
 	case "SSD":
 		volume.Type = provision.SSDDiskType
 	default:
-		return volume, fmt.Errorf("disk type %s not supported", v.Type.String())
+		return volume, v.NodeID, fmt.Errorf("disk type %s not supported", v.Type.String())
 	}
-	return volume, nil
+	return volume, v.NodeID, nil
 }
 
 //TfgridReservationVolume1TypeEnum jsx schema

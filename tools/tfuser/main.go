@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gedis"
 
 	"github.com/threefoldtech/zos/pkg/provision"
@@ -302,7 +301,7 @@ func main() {
 }
 
 type reserver interface {
-	Reserve(r *provision.Reservation, nodeID pkg.Identifier) (string, error)
+	Reserve(r *provision.Reservation) (string, error)
 }
 type clientIface interface {
 	network.TNoDB

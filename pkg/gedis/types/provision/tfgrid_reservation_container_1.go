@@ -22,7 +22,7 @@ type TfgridReservationContainer1 struct {
 }
 
 // ToProvisionType converts TfgridReservationContainer1 to provision.Container
-func (c TfgridReservationContainer1) ToProvisionType() (provision.Container, error) {
+func (c TfgridReservationContainer1) ToProvisionType() (provision.Container, string, error) {
 	container := provision.Container{
 		FList:        c.Flist,
 		FlistStorage: c.HubURL,
@@ -45,7 +45,7 @@ func (c TfgridReservationContainer1) ToProvisionType() (provision.Container, err
 		}
 	}
 
-	return container, nil
+	return container, c.NodeID, nil
 }
 
 //TfgridReservationContainerMount1 jsx schema

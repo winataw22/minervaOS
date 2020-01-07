@@ -21,7 +21,7 @@ type TfgridReservationZdb1 struct {
 }
 
 //ToProvisionType converts TfgridReservationZdb1 to provision.ZDB
-func (z TfgridReservationZdb1) ToProvisionType() (provision.ZDB, error) {
+func (z TfgridReservationZdb1) ToProvisionType() (provision.ZDB, string, error) {
 	zdb := provision.ZDB{
 		Size:     uint64(z.Size),
 		Password: z.Password,
@@ -33,7 +33,7 @@ func (z TfgridReservationZdb1) ToProvisionType() (provision.ZDB, error) {
 	case "ssd":
 		zdb.DiskType = pkg.SSDDevice
 	default:
-		return zdb, fmt.Errorf("device type %s not supported", z.DiskType.String())
+		return zdb, z.NodeID, fmt.Errorf("device type %s not supported", z.DiskType.String())
 	}
 
 	switch z.Mode.String() {
@@ -42,10 +42,10 @@ func (z TfgridReservationZdb1) ToProvisionType() (provision.ZDB, error) {
 	case "user":
 		zdb.Mode = pkg.ZDBModeUser
 	default:
-		return zdb, fmt.Errorf("0-db mode %s not supported", z.Mode.String())
+		return zdb, z.NodeID, fmt.Errorf("0-db mode %s not supported", z.Mode.String())
 	}
 
-	return zdb, nil
+	return zdb, z.NodeID, nil
 }
 
 //TfgridReservationZdb1ModeEnum jsx schema
