@@ -123,7 +123,7 @@ func (s *scraper) Scrap(user string) chan res {
 		defer func() {
 			close(cIn)
 		}()
-		for i := s.start; i < 500; i++ {
+		for i := s.start; i < s.end; i++ {
 			cIn <- job{
 				id:   i,
 				user: user,
@@ -149,6 +149,7 @@ func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- res) {
 		if err != nil {
 			continue
 		}
+
 		if res.Expired() == true {
 			continue
 		}

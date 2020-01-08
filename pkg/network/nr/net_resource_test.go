@@ -151,3 +151,40 @@ func Test_wgIP(t *testing.T) {
 		})
 	}
 }
+
+func Test_convert4to6(t *testing.T) {
+	type args struct {
+		netID string
+		ip    net.IP
+	}
+	tests := []struct {
+		name string
+		args args
+		want net.IP
+	}{
+		{
+			name: "valid",
+			args: args{
+				netID: "networkdID",
+				ip:    net.ParseIP("100.127.0.2"),
+			},
+			want: net.ParseIP("fd6e:6574:776f:0000::2"),
+		},
+		{
+			name: "valid",
+			args: args{
+				netID: "networkdID",
+				ip:    net.ParseIP("100.127.2.16"),
+			},
+			want: net.ParseIP("fd6e:6574:776f:0002::0010"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NotNil(t, tt.want)
+			got := convert4to6(tt.args.netID, tt.args.ip)
+			require.NotNil(t, got)
+			assert.EqualValues(t, tt.want, got)
+		})
+	}
+}

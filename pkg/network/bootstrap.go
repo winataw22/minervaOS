@@ -86,7 +86,7 @@ func Bootstrap() error {
 		}
 
 		log.Info().Str("interface", device.Name).Msg("start dhcp probing")
-		valid, err := dhcp.Probe(br.Name)
+		valid, err := dhcp.Probe(br.Name, netlink.FAMILY_ALL)
 		if err != nil {
 			log.Warn().Err(err).Str("device", device.Name).Msg("dhcp probing unexpected error")
 			if err := bridge.DetachNic(br); err != nil {

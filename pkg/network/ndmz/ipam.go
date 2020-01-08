@@ -51,9 +51,9 @@ func allocateIPv4(networkID string) (*net.IPNet, error) {
 		return &net.IPNet{IP: ip, Mask: rng.Subnet.Mask}, nil
 	}
 
-	aloc := allocator.NewIPAllocator(&set, store, 0)
+	alloc := allocator.NewIPAllocator(&set, store, 0)
 
-	ipConfig, err := aloc.Get(networkID, "eth0", nil)
+	ipConfig, err := alloc.Get(networkID, "eth0", nil)
 	if err != nil {
 		return nil, err
 	}

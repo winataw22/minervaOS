@@ -103,33 +103,65 @@ func main() {
 						},
 						{
 							Name:  "add-node",
-							Usage: "add a node to a existing network",
+							Usage: "Add a node to a existing network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
 									Name:  "node",
-									Usage: "node ID of the node to add to the network",
+									Usage: "Node ID of the node to add to the network",
 								},
 								cli.StringFlag{
 									Name:  "subnet",
-									Usage: "subnet to use on this node. The subnet needs to be included in the IP range of the network",
+									Usage: "Subnet to use on this node. The subnet needs to be included in the IP range of the network",
 								},
 								cli.UintFlag{
 									Name:  "port",
-									Usage: "Wireguar port to use. if not specified, tfuser will automatically check BCDB for free fort to use",
+									Usage: "Wireguard port to use. if not specified, tfuser will automatically check BCDB for free fort to use",
+								},
+								cli.BoolFlag{
+									Name:  "force-hidden",
+									Usage: "Forcibly mark the node as hidden, even if it is registered with public endpoints",
 								},
 							},
 							Action: cmdsAddNode,
 						},
 						{
 							Name:  "remove-node",
-							Usage: "prints the wg-quick configuration file for a certain user in the network",
+							Usage: "Removes a Network Resource from the network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
 									Name:  "node",
-									Usage: "node ID to remove from the network",
+									Usage: "Node ID to remove from the network",
 								},
 							},
 							Action: cmdsRemoveNode,
+						},
+						{
+							Name:   "graph",
+							Usage:  "create a dot graph of the network",
+							Action: cmdGraphNetwork,
+						},
+						{
+							Name:  "add-access",
+							Usage: "Add external access to the network",
+							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:  "node",
+									Usage: "Node ID of the node which will act as an access point",
+								},
+								cli.StringFlag{
+									Name:  "subnet",
+									Usage: "Local subnet which will have access to the network",
+								},
+								cli.BoolFlag{
+									Name:  "ip4",
+									Usage: "Use an IPv4 connection instead of IPv6 for the wireguard endpoint to the access node",
+								},
+								cli.StringFlag{
+									Name:  "wgpubkey",
+									Usage: "The wireguard public key of the external node, encoded in base64. If this flag is provided, you will need to manually set your private key in the generated wireguard config. If not provided, a keypair will be generated.",
+								},
+							},
+							Action: cmdsAddAccess,
 						},
 					},
 				},

@@ -71,6 +71,7 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP) (join pkg.Member
 			slog.Info().
 				Str("ip", addr.String()).
 				Msgf("set ip to container")
+
 			if err := netlink.AddrAdd(eth0, &netlink.Addr{IPNet: &net.IPNet{
 				IP:   addr,
 				Mask: net.CIDRMask(24, 32),
@@ -79,23 +80,47 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP) (join pkg.Member
 			}
 		}
 
+		ipv6 := convert4to6(nr.ID(), addrs[0])
+		slog.Info().
+			Str("ip", ipv6.String()).
+			Msgf("set ip to container")
+
+		if err := netlink.AddrAdd(eth0, &netlink.Addr{IPNet: &net.IPNet{
+			IP:   ipv6,
+			Mask: net.CIDRMask(64, 128),
+		}}); err != nil && !os.IsExist(err) {
+			return err
+		}
+
 		ipnet := nr.resource.Subnet
 		ipnet.IP[len(ipnet.IP)-1] = 0x01
 
-		// default IPv4 route
-		route := &netlink.Route{
-			Dst: &net.IPNet{
-				IP:   net.ParseIP("0.0.0.0"),
-				Mask: net.CIDRMask(0, 32),
+		routes := []*netlink.Route{
+			&netlink.Route{
+				Dst: &net.IPNet{
+					IP:   net.ParseIP("0.0.0.0"),
+					Mask: net.CIDRMask(0, 32),
+				},
+				Gw:        ipnet.IP,
+				LinkIndex: eth0.Attrs().Index,
 			},
-			Gw:        ipnet.IP,
-			LinkIndex: eth0.Attrs().Index,
+			&netlink.Route{
+				Dst: &net.IPNet{
+					IP:   net.ParseIP("::"),
+					Mask: net.CIDRMask(0, 128),
+				},
+				Gw:        net.ParseIP("fe80::1"),
+				LinkIndex: eth0.Attrs().Index,
+			},
 		}
-		slog.Info().
-			Str("route", route.String()).
-			Msgf("set route to container")
-		if err := netlink.RouteAdd(route); err != nil {
-			return errors.Wrapf(err, "failed to set route %s on eth0", route.String())
+		for _, r := range routes {
+			slog.Info().
+				Str("route", r.String()).
+				Msgf("set route to container")
+			err = netlink.RouteAdd(r)
+			if err != nil && !os.IsExist(err) {
+				return errors.Wrapf(err, "failed to set route %s on eth0", r.String())
+			}
 		}
 
 		return nil

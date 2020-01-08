@@ -58,7 +58,7 @@ func getPublicIface() (netlink.Link, error) {
 	}
 
 	if iface == nil {
-		return nil, fmt.Errorf("not interface with default gateway found")
+		return nil, fmt.Errorf("no interface with default gateway found")
 	}
 
 	log.Info().Str("iface", iface.Attrs().Name).Msg("interface with default gateway found")

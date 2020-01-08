@@ -2,6 +2,7 @@ package nr
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -367,6 +368,24 @@ func (nr *NetResource) attachToNRBridge() error {
 		if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
 			return err
 		}
+
+		ipv6 := convert4to6(nr.ID(), ipnet.IP)
+		addr = &netlink.Addr{IPNet: &net.IPNet{
+			IP:   ipv6,
+			Mask: net.CIDRMask(64, 128),
+		}}
+		if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
+			return err
+		}
+
+		addr = &netlink.Addr{IPNet: &net.IPNet{
+			IP:   net.ParseIP("fe80::1"),
+			Mask: net.CIDRMask(64, 128),
+		}}
+		if err = netlink.AddrAdd(link, addr); err != nil && !os.IsExist(err) {
+			return err
+		}
+
 		return netlink.LinkSetUp(link)
 	}
 	return netNS.Do(handler)
@@ -484,4 +503,14 @@ func (nr *NetResource) applyFirewall() error {
 	}
 
 	return nil
+}
+
+func convert4to6(netID string, ip net.IP) net.IP {
+	h := md5.New()
+	md5NetID := h.Sum([]byte(netID))
+
+	ipv6 := fmt.Sprintf("fd%x:%x%x:%x%x", md5NetID[0], md5NetID[1], md5NetID[2], md5NetID[3], md5NetID[4])
+	ipv6 = fmt.Sprintf("%s:%x::%x", ipv6, ip[14], ip[15])
+
+	return net.ParseIP(ipv6)
 }

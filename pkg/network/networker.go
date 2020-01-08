@@ -204,7 +204,7 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 			return "", errors.Wrap(err, "failed to retrieve the master interface name of the public interface")
 		}
 	} else {
-		pubIface, err = hostIPV6Iface()
+		pubIface, err = ifaceutil.HostIPV6Iface()
 		if err != nil {
 			return "", errors.Wrap(err, "failed to found a valid network interface to use as parent for 0-db container")
 		}
@@ -510,48 +510,6 @@ func publicMasterIface() (string, error) {
 	}
 
 	return ml.Attrs().Name, nil
-}
-
-// hostIPV6Iface return the first physical interface to have an
-// ipv6 public address
-func hostIPV6Iface() (string, error) {
-
-	links, err := netlink.LinkList()
-	if err != nil {
-		return "", err
-	}
-
-	for _, link := range ifaceutil.LinkFilter(links, []string{"device"}) {
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
-		if err != nil {
-			return "", err
-		}
-
-		for _, addr := range addrs {
-			if addr.IP.IsGlobalUnicast() {
-				return link.Attrs().Name, nil
-			}
-		}
-	}
-
-	// not found on host interfaces, check on zos bridge
-	link, err := netlink.LinkByName("zos")
-	if err != nil {
-		return "", err
-	}
-
-	addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
-	if err != nil {
-		return "", err
-	}
-
-	for _, addr := range addrs {
-		if addr.IP.IsGlobalUnicast() {
-			return link.Attrs().Name, nil
-		}
-	}
-
-	return "", fmt.Errorf("no interface found with ipv6")
 }
 
 // createNetNS create a network namespace and set lo interface up

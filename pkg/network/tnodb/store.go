@@ -121,7 +121,7 @@ func (s *httpTNoDB) GetNode(nodeID pkg.Identifier) (*types.Node, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("node %s node found", nodeID.Identity())
+		return nil, fmt.Errorf("node %s not found", nodeID.Identity())
 	}
 
 	if resp.StatusCode != http.StatusOK {
