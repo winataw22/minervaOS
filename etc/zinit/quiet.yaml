@@ -1,0 +1,5 @@
+# makes sure kernel does not print to console
+# it would be better if we can just force the kernel
+# not to write to the active tty
+exec: dmesg -n crit
+oneshot: true

@@ -40,7 +40,7 @@ deadcode:
 	@${GOPATH}/bin/deadcode -test $(shell go list ./...) || true
 
 spelling:
-	@${GOPATH}/bin/misspell -error `find .`
+	@${GOPATH}/bin/misspell -i monitord -error `find .`
 
 # Builds minio, runs the verifiers then runs the tests.
 check: test

@@ -5,9 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
@@ -16,14 +14,12 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gedis"
 	"github.com/threefoldtech/zos/pkg/network"
-	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/tnodb"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 	"github.com/threefoldtech/zos/pkg/version"
-	"github.com/vishvananda/netlink"
 )
 
 const redisSocket = "unix:///var/run/redis.sock"
@@ -69,10 +65,29 @@ func main() {
 	networker := network.NewNetworker(identity, db, root)
 	nodeID := identity.NodeID()
 
-	if err := publishIfaces(nodeID, db); err != nil {
-		log.Error().Err(err).Msg("failed to publish network interfaces to tnodb")
-		os.Exit(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ifaces, err := getLocalInterfaces()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read local network interfaces")
 	}
+	if err := publishIfaces(ifaces, nodeID, db); err != nil {
+		log.Fatal().Err(err).Msg("failed to publish network interfaces to BCDB")
+	}
+
+	go func() {
+		ifaceNames := make([]string, len(ifaces))
+		for i, iface := range ifaces {
+			ifaceNames[i] = iface.Name
+		}
+		log.Info().Msgf("watched interfaces %v", ifaceNames)
+		wl := NewWatchedLinks(ifaceNames, nodeID, db)
+
+		if err := WatchAddrs(ctx, wl.CallBack); err != nil {
+			log.Fatal().Err(err).Msg("error while watching network interfaces addresses")
+		}
+	}()
 
 	ifaceVersion := -1
 	exitIface, err := db.GetPubIface(nodeID)
@@ -87,9 +102,6 @@ func main() {
 	if err := ndmz.Create(nodeID); err != nil {
 		log.Fatal().Err(err).Msgf("failed to create DMZ")
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	chIface := watchPubIface(ctx, nodeID, db, ifaceVersion)
 	go func(ctx context.Context, ch <-chan *types.PubIface) {
@@ -126,74 +138,6 @@ func main() {
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Fatal().Err(err).Msg("unexpected error")
 	}
-}
-
-func getLocalInterfaces() ([]types.IfaceInfo, error) {
-	var output []types.IfaceInfo
-
-	links, err := netlink.LinkList()
-	if err != nil {
-		log.Error().Err(err).Msgf("failed to list interfaces")
-		return nil, err
-	}
-
-	for _, link := range ifaceutil.LinkFilter(links, []string{"device", "bridge"}) {
-		//TODO: why bringing the interface up? shouldn't we just check if it's up or not?
-		if err := netlink.LinkSetUp(link); err != nil {
-			log.Info().Str("interface", link.Attrs().Name).Msg("failed to bring interface up")
-			continue
-		}
-
-		if !ifaceutil.IsVirtEth(link.Attrs().Name) && !ifaceutil.IsPluggedTimeout(link.Attrs().Name, time.Second*5) {
-			log.Info().Str("interface", link.Attrs().Name).Msg("interface is not plugged in, skipping")
-			continue
-		}
-
-		_, gw, err := ifaceutil.HasDefaultGW(link, netlink.FAMILY_ALL)
-		if err != nil {
-			return nil, err
-		}
-
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-		if err != nil {
-			return nil, err
-		}
-
-		info := types.IfaceInfo{
-			Name:  link.Attrs().Name,
-			Addrs: make([]types.IPNet, len(addrs)),
-		}
-		for i, addr := range addrs {
-			info.Addrs[i] = types.NewIPNet(addr.IPNet)
-		}
-
-		if gw != nil {
-			info.Gateway = append(info.Gateway, gw)
-		}
-
-		output = append(output, info)
-	}
-
-	return output, err
-}
-
-func publishIfaces(id pkg.Identifier, db network.TNoDB) error {
-	ifaces, err := getLocalInterfaces()
-	if err != nil {
-		return err
-	}
-
-	f := func() error {
-		log.Info().Msg("try to publish interfaces to TNoDB")
-		return db.PublishInterfaces(id, ifaces)
-	}
-	errHandler := func(err error, _ time.Duration) {
-		if err != nil {
-			log.Error().Err(err).Msg("error while trying to publish the node interaces")
-		}
-	}
-
-	return backoff.RetryNotify(f, backoff.NewExponentialBackOff(), errHandler)
 }
 
 func startServer(ctx context.Context, broker string, networker pkg.Networker) error {

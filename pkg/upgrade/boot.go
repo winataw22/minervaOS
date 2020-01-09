@@ -17,9 +17,12 @@ const (
 	// those values must match the values
 	// in the bootstrap process. (bootstrap.sh)
 
-	nameFile = "/tmp/flist.name"
-	infoFile = "/tmp/flist.info"
-	binsFile = "/tmp/bins.info"
+	// FlistNameFile file contains boot flist repo/name
+	FlistNameFile = "/tmp/flist.name"
+	// FlistInfoFile file container boot flist infor
+	FlistInfoFile = "/tmp/flist.info"
+	// BinariesFile file contains binaries database
+	BinariesFile = "/tmp/bins.info"
 )
 
 // BootMethod defines the node boot method
@@ -40,7 +43,7 @@ type Boot struct{}
 // of the node
 func (b Boot) DetectBootMethod() BootMethod {
 	log.Info().Msg("detecting boot method")
-	_, err := os.Stat(nameFile)
+	_, err := os.Stat(FlistNameFile)
 	if err != nil {
 		log.Warn().Err(err).Msg("no flist file found")
 		return BootMethodOther
@@ -57,13 +60,13 @@ func (b Boot) DetectBootMethod() BootMethod {
 // Name always return name of the boot flist. If name file
 // does not exist, an empty string is returned
 func (b *Boot) Name() string {
-	data, _ := ioutil.ReadFile(nameFile)
+	data, _ := ioutil.ReadFile(FlistNameFile)
 	return strings.TrimSpace(string(data))
 }
 
 //CurrentBins returns a list of current binaries installed
 func (b *Boot) CurrentBins() (map[string]RepoFList, error) {
-	f, err := os.Open(binsFile)
+	f, err := os.Open(BinariesFile)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +79,7 @@ func (b *Boot) CurrentBins() (map[string]RepoFList, error) {
 
 //SetBins sets the current list of binaries in boot files
 func (b *Boot) SetBins(current map[string]RepoFList) error {
-	f, err := os.Create(binsFile)
+	f, err := os.Create(BinariesFile)
 	if err != nil {
 		return err
 	}
@@ -91,7 +94,7 @@ func (b *Boot) Current() (FListEvent, error) {
 		return FListEvent{}, fmt.Errorf("flist name is not known")
 	}
 
-	info, err := loadInfo(name, infoFile)
+	info, err := loadInfo(name, FlistInfoFile)
 	if err != nil {
 		return FListEvent{}, err
 	}
@@ -101,7 +104,7 @@ func (b *Boot) Current() (FListEvent, error) {
 
 // Set updates the stored flist info
 func (b *Boot) Set(c FListEvent) error {
-	return c.Commit(infoFile)
+	return c.Commit(FlistInfoFile)
 }
 
 // Version always returns curent version of flist

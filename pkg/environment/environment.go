@@ -27,6 +27,19 @@ type Environment struct {
 // RunningMode type
 type RunningMode string
 
+func (r RunningMode) String() string {
+	switch r {
+	case RunningDev:
+		return "development"
+	case RunningMain:
+		return "production"
+	case RunningTest:
+		return "testing"
+	}
+
+	return "unknown"
+}
+
 // Possible running mode of a node
 const (
 	RunningDev  RunningMode = "dev"

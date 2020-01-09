@@ -7,6 +7,7 @@ image=zos.efi
 kernelargs=""
 bridge=zos
 graphics="-nographic -nodefaults"
+smp=1
 
 usage() {
    cat <<EOF
@@ -15,6 +16,7 @@ Usage: vm -n $name [ -r ] [ -d ]
    -d: run in debug mode
    -r: reset vm (recreate disks)
    -c: Kernel command
+   -s: number of virtual cpus
    -i: kernel image to boot
    -b: bridge for network (default zos)
    -g: open GUI
@@ -25,7 +27,7 @@ EOF
 }
 
 
-while getopts "c:n:i:rdb:g" opt; do
+while getopts "c:n:i:rdb:gs:" opt; do
    case $opt in
    i )  image=$OPTARG ;;
    r )  reset=1 ;;
@@ -34,6 +36,7 @@ while getopts "c:n:i:rdb:g" opt; do
    c )  kernelargs=$OPTARG ;;
    b )  bridge=$OPTARG ;;
    g )  graphics="" ;;
+   s )  smp=$OPTARG ;;
    h )  usage ; exit 0 ;;
    \?)  usage ; exit 1 ;;
    esac
@@ -70,14 +73,13 @@ fi
 echo "boot $image"
 
 qemu-system-x86_64 -kernel $image \
-    -m 3072 -enable-kvm -cpu host \
+    -m 3072 -enable-kvm -cpu host -smp $smp \
     -uuid $uuid \
     -netdev bridge,id=zos0,br=${bridge} -device virtio-net-pci,netdev=zos0,mac="${basemac}1" \
     -drive file=fat:rw:$basepath/overlay,format=raw \
-    -append "${cmdline} console=ttyS1,115200" \
+    -append "${cmdline}" \
     -drive file=$vmdir/vda.qcow2,if=virtio -drive file=$vmdir/vdb.qcow2,if=virtio \
     -drive file=$vmdir/vdc.qcow2,if=virtio -drive file=$vmdir/vdd.qcow2,if=virtio \
     -drive file=$vmdir/vde.qcow2,if=virtio \
     -serial null -serial mon:stdio \
     ${graphics}
-

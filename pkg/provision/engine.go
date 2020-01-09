@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/stubs"
 
 	"github.com/pkg/errors"
@@ -18,6 +19,7 @@ type ReservationReadWriter interface {
 	Add(r *Reservation) error
 	Get(id string) (*Reservation, error)
 	Remove(id string) error
+	Counters() pkg.ProvisionCounters
 }
 
 // Feedbacker defines the method that needs to be implemented
@@ -86,6 +88,7 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 				if err := e.provision(ctx, reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
 				}
+
 			}
 		}
 	}
@@ -189,4 +192,23 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 	result.Signature = sig
 
 	return e.fb.Feedback(r.ID, result)
+}
+
+func (e *defaultEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {
+	ch := make(chan pkg.ProvisionCounters)
+	go func() {
+		for {
+			select {
+			case <-time.After(2 * time.Second):
+			case <-ctx.Done():
+			}
+
+			select {
+			case <-ctx.Done():
+			case ch <- e.store.Counters():
+			}
+		}
+	}()
+
+	return ch
 }

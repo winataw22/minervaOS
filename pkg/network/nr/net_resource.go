@@ -80,6 +80,15 @@ func (nr *NetResource) Namespace() (string, error) {
 	return name, nil
 }
 
+// NRIface returns name of netresource local interface
+func (nr *NetResource) NRIface() (string, error) {
+	name := fmt.Sprintf("n-%s", nr.id)
+	if len(name) > 15 {
+		return "", errors.Errorf("NR interface name too long %s", name)
+	}
+	return name, nil
+}
+
 // WGName returns the name of the wireguard interface to create for the network resource
 func (nr *NetResource) WGName() (string, error) {
 	wgName := fmt.Sprintf("w-%s", nr.id)
@@ -333,8 +342,15 @@ func (nr *NetResource) createNetNS() error {
 // attachToNRBridge creates a macvlan interface in the NR namespace, and attaches
 // it to the NR bridge
 func (nr *NetResource) attachToNRBridge() error {
+	// are we really sure length is always <= 5 ?
 	nsName, err := nr.Namespace()
-	nrIfaceName := fmt.Sprintf("nr-%s", nr.id[:12])
+	if err != nil {
+		return err
+	}
+	nrIfaceName, err := nr.NRIface()
+	if err != nil {
+		return err
+	}
 
 	netNS, err := namespace.GetByName(nsName)
 	if err != nil {

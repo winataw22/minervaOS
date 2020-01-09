@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -92,6 +93,25 @@ func (s *StorageModuleStub) Find(arg0 string) (ret0 pkg.Allocation, ret1 error) 
 		panic(err)
 	}
 	return
+}
+
+func (s *StorageModuleStub) Monitor(ctx context.Context) (<-chan pkg.PoolsStats, error) {
+	ch := make(chan pkg.PoolsStats)
+	recv, err := s.client.Stream(ctx, s.module, s.object, "Monitor")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(ch)
+		for event := range recv {
+			var obj pkg.PoolsStats
+			if err := event.Unmarshal(&obj); err != nil {
+				panic(err)
+			}
+			ch <- obj
+		}
+	}()
+	return ch, nil
 }
 
 func (s *StorageModuleStub) Path(arg0 string) (ret0 string, ret1 error) {

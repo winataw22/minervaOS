@@ -9,6 +9,8 @@ package provision
 
 import (
 	"context"
+
+	"github.com/threefoldtech/zos/pkg"
 )
 
 // ReservationSource interface. The source
@@ -21,7 +23,10 @@ type ReservationSource interface {
 
 // Engine interface
 type Engine interface {
+	// Start the engine
 	Run(ctx context.Context) error
+	// Counters stream for number of provisioned resources
+	Counters(ctx context.Context) <-chan pkg.ProvisionCounters
 }
 
 type provisioner func(ctx context.Context, reservation *Reservation) (interface{}, error)

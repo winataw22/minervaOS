@@ -1,0 +1,4 @@
+exec: openvt -s -c 3 -w -- zui -broker unix:///var/run/redis.sock
+after:
+  - capacityd
+  - quiet

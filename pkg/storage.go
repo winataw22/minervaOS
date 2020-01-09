@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -134,4 +135,7 @@ type StorageModule interface {
 	BrokenPools() []BrokenPool
 	// BrokenDevices lists the broken devices that have been detected
 	BrokenDevices() []BrokenDevice
+
+	//Monitor returns stats stream about pools
+	Monitor(ctx context.Context) <-chan PoolsStats
 }

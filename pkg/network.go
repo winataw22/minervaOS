@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"net"
 
 	"github.com/threefoldtech/zos/pkg/network/types"
@@ -43,6 +44,14 @@ type Networker interface {
 	// Addrs return the IP addresses of interface
 	// if the interface is in a network namespace netns needs to be not empty
 	Addrs(iface string, netns string) ([]net.IP, error)
+
+	// ZOSAddresses monitoring streams for ZOS bridge IPs
+	ZOSAddresses(ctx context.Context) <-chan NetlinkAddresses
+
+	// DMZAddresses monitoring streams for dmz public interface
+	DMZAddresses(ctx context.Context) <-chan NetlinkAddresses
+
+	PublicAddresses(ctx context.Context) <-chan NetlinkAddresses
 }
 
 // Network represent the description if a user private network

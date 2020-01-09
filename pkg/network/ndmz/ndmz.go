@@ -33,11 +33,13 @@ import (
 const (
 	//BridgeNDMZ is the name of the ipv4 routing bridge in the ndmz namespace
 	BridgeNDMZ = "br-ndmz"
-	netNSNDMZ  = "ndmz"
+	//NetNSNDMZ name of the dmz namespace
+	NetNSNDMZ = "ndmz"
 
 	ndmzNsMACDerivationSuffix = "-ndmz"
 
-	publicIfaceName = "public"
+	// PublicIfaceName interface name of dmz
+	PublicIfaceName = "public"
 )
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
@@ -45,9 +47,9 @@ func Create(nodeID pkg.Identifier) error {
 
 	os.RemoveAll("/var/cache/modules/networkd/lease/dmz/")
 
-	netNS, err := namespace.GetByName(netNSNDMZ)
+	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {
-		netNS, err = namespace.Create(netNSNDMZ)
+		netNS, err = namespace.Create(NetNSNDMZ)
 		if err != nil {
 			return err
 		}
@@ -136,7 +138,7 @@ func Create(nodeID pkg.Identifier) error {
 
 // Delete deletes the NDMZ network namespace
 func Delete() error {
-	netNS, err := namespace.GetByName(netNSNDMZ)
+	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err == nil {
 		if err := namespace.Delete(netNS); err != nil {
 			return errors.Wrap(err, "failed to delete ndmz network namespace")
@@ -261,7 +263,7 @@ func applyFirewall() error {
 		return errors.Wrap(err, "failed to build nft rule set")
 	}
 
-	if err := nft.Apply(&buf, netNSNDMZ); err != nil {
+	if err := nft.Apply(&buf, NetNSNDMZ); err != nil {
 		return errors.Wrap(err, "failed to apply nft rule set")
 	}
 
@@ -280,8 +282,8 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 		return err
 	}
 
-	if !ifaceutil.Exists(publicIfaceName, nrNS) {
-		if _, err = macvlan.Create(publicIfaceName, BridgeNDMZ, nrNS); err != nil {
+	if !ifaceutil.Exists(PublicIfaceName, nrNS) {
+		if _, err = macvlan.Create(PublicIfaceName, BridgeNDMZ, nrNS); err != nil {
 			return err
 		}
 	}
@@ -292,7 +294,7 @@ func AttachNR(networkID string, nr *nr.NetResource) error {
 			return errors.Wrap(err, "ip allocation for network resource")
 		}
 
-		pubIface, err := netlink.LinkByName(publicIfaceName)
+		pubIface, err := netlink.LinkByName(PublicIfaceName)
 		if err != nil {
 			return err
 		}

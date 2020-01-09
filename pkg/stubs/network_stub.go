@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -54,6 +55,25 @@ func (s *NetworkerStub) CreateNR(arg0 pkg.Network) (ret0 string, ret1 error) {
 	return
 }
 
+func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
+	ch := make(chan pkg.NetlinkAddresses)
+	recv, err := s.client.Stream(ctx, s.module, s.object, "DMZAddresses")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(ch)
+		for event := range recv {
+			var obj pkg.NetlinkAddresses
+			if err := event.Unmarshal(&obj); err != nil {
+				panic(err)
+			}
+			ch <- obj
+		}
+	}()
+	return ch, nil
+}
+
 func (s *NetworkerStub) DeleteNR(arg0 pkg.Network) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "DeleteNR", args...)
@@ -96,6 +116,25 @@ func (s *NetworkerStub) Leave(arg0 pkg.NetID, arg1 string) (ret0 error) {
 	return
 }
 
+func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
+	ch := make(chan pkg.NetlinkAddresses)
+	recv, err := s.client.Stream(ctx, s.module, s.object, "PublicAddresses")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(ch)
+		for event := range recv {
+			var obj pkg.NetlinkAddresses
+			if err := event.Unmarshal(&obj); err != nil {
+				panic(err)
+			}
+			ch <- obj
+		}
+	}()
+	return ch, nil
+}
+
 func (s *NetworkerStub) ZDBPrepare(arg0 []uint8) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "ZDBPrepare", args...)
@@ -110,4 +149,23 @@ func (s *NetworkerStub) ZDBPrepare(arg0 []uint8) (ret0 string, ret1 error) {
 		panic(err)
 	}
 	return
+}
+
+func (s *NetworkerStub) ZOSAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
+	ch := make(chan pkg.NetlinkAddresses)
+	recv, err := s.client.Stream(ctx, s.module, s.object, "ZOSAddresses")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(ch)
+		for event := range recv {
+			var obj pkg.NetlinkAddresses
+			if err := event.Unmarshal(&obj); err != nil {
+				panic(err)
+			}
+			ch <- obj
+		}
+	}()
+	return ch, nil
 }

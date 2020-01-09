@@ -169,6 +169,7 @@ func main() {
 		log.Info().Str("version", current).Msg("node registered successfully")
 	}
 
+	monitor := newVersionMonitor(2 * time.Second)
 	// 3. start zbus server to serve identity interface
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {
@@ -176,6 +177,7 @@ func main() {
 	}
 
 	server.Register(zbus.ObjectID{Name: "manager", Version: "0.0.1"}, idMgr)
+	server.Register(zbus.ObjectID{Name: "monitor", Version: "0.0.1"}, monitor)
 
 	ctx, cancel := utils.WithSignal(context.Background())
 	// register the cancel function with defer if the process stops because of a update
@@ -203,7 +205,7 @@ func main() {
 	// 4. Start watcher for new version
 	log.Info().Msg("start upgrade daemon")
 
-	upgradeLoop(ctx, &boot, root, debug, register)
+	upgradeLoop(ctx, &boot, root, debug, monitor, register)
 }
 
 func getBinsRepo() string {
@@ -249,6 +251,7 @@ func upgradeLoop(
 	boot *upgrade.Boot,
 	root string,
 	debug bool,
+	monitor *monitorStream,
 	register func(string) error) {
 
 	zinit, err := zinit.New(zinitSocket)
@@ -275,6 +278,9 @@ func upgradeLoop(
 		Current:  boot.MustVersion(), //if we are here version must be valid
 		Duration: 600 * time.Second,
 	}
+
+	// make sure we push the current version to monitor
+	monitor.C <- boot.MustVersion()
 
 	flistEvents, err := flistWatcher.Watch(ctx)
 	if err != nil {
@@ -335,6 +341,7 @@ func upgradeLoop(
 				log.Error().Err(err).Msg("failed to update boot information")
 			}
 
+			monitor.C <- version
 			if err := backoff.RetryNotify(func() error {
 				return register(version.String())
 			}, backoff.NewExponentialBackOff(), retryNotify); err != nil {

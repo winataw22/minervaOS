@@ -1,12 +1,14 @@
 package network
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 
@@ -477,6 +479,140 @@ func (n *networker) releasePort(port uint16) error {
 	}
 
 	return nil
+}
+
+func (n *networker) getAddresses(nsName, link string) ([]netlink.Addr, error) {
+	netns, err := namespace.GetByName(nsName)
+	if err != nil {
+		return nil, err
+	}
+
+	defer netns.Close()
+	var addr []netlink.Addr
+	err = netns.Do(func(_ ns.NetNS) error {
+		link, err := netlink.LinkByName(link)
+		if err != nil {
+			return err
+		}
+		addr, err = netlink.AddrList(link, netlink.FAMILY_ALL)
+		return err
+	})
+
+	return addr, err
+}
+
+func (n *networker) monitorNS(ctx context.Context, name, link string) <-chan pkg.NetlinkAddresses {
+	get := func() (pkg.NetlinkAddresses, error) {
+		var result pkg.NetlinkAddresses
+		values, err := n.getAddresses(name, link)
+		for _, value := range values {
+			result = append(result, pkg.NetlinkAddress(value))
+		}
+
+		return result, err
+	}
+
+	addresses, _ := get()
+	ch := make(chan pkg.NetlinkAddresses)
+	go func() {
+		monitorCtx, cancel := context.WithCancel(context.Background())
+
+		defer func() {
+			close(ch)
+			cancel()
+		}()
+
+	main:
+		for {
+			updates, err := namespace.Monitor(monitorCtx, name)
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(30 * time.Second):
+					continue
+				}
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-updates:
+					addresses, err = get()
+					if err != nil {
+						// this might be duo too namespace was deleted, hence
+						// we need to try find the namespace object again
+						cancel()
+						monitorCtx, cancel = context.WithCancel(context.Background())
+						continue main
+					}
+				case <-time.After(2 * time.Second):
+					ch <- addresses
+				}
+			}
+
+		}
+	}()
+
+	return ch
+}
+
+func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
+	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.PublicIfaceName)
+}
+
+func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
+	return n.monitorNS(ctx, types.PublicNamespace, types.PublicIface)
+}
+
+func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
+	// we don't use monitorNS because
+	// 1- this is the host namespace
+	// 2- the ZOS bridge must exist all the time
+	updates := make(chan netlink.AddrUpdate)
+	if err := netlink.AddrSubscribe(updates, ctx.Done()); err != nil {
+		log.Fatal().Err(err).Msg("failed to listen to netlink address updates")
+	}
+
+	link, err := netlink.LinkByName(DefaultBridge)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not find the '%s' bridge", DefaultBridge)
+	}
+
+	get := func() pkg.NetlinkAddresses {
+		var result pkg.NetlinkAddresses
+		values, _ := netlink.AddrList(link, netlink.FAMILY_ALL)
+		for _, value := range values {
+			result = append(result, pkg.NetlinkAddress(value))
+		}
+
+		return result
+	}
+
+	addresses := get()
+
+	ch := make(chan pkg.NetlinkAddresses)
+	go func() {
+		defer close(ch)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case update := <-updates:
+				if update.LinkIndex != link.Attrs().Index {
+					continue
+				}
+
+				addresses = get()
+			case <-time.After(2 * time.Second):
+				ch <- addresses
+			}
+		}
+	}()
+
+	return ch
+
 }
 
 // publicMasterIface return the name of the master interface

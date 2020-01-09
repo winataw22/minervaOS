@@ -2,9 +2,9 @@ package capacity
 
 import (
 	"github.com/shirou/gopsutil/host"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 // Capacity hold the amount of resource unit of a node
@@ -17,11 +17,11 @@ type Capacity struct {
 
 // ResourceOracle is the structure responsible for capacity tracking
 type ResourceOracle struct {
-	storage pkg.StorageModule
+	storage *stubs.StorageModuleStub
 }
 
 // NewResourceOracle creates a new ResourceOracle
-func NewResourceOracle(s pkg.StorageModule) *ResourceOracle {
+func NewResourceOracle(s *stubs.StorageModuleStub) *ResourceOracle {
 	return &ResourceOracle{storage: s}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"time"
 
@@ -11,7 +12,9 @@ import (
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gedis"
+	"github.com/threefoldtech/zos/pkg/monitord"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/pkg/utils"
 
 	"github.com/rs/zerolog/log"
 
@@ -19,30 +22,11 @@ import (
 	"github.com/threefoldtech/zos/pkg/version"
 )
 
-const module = "capacity"
+const module = "monitor"
 
-func main() {
-	app.Initialize()
-
-	var (
-		msgBrokerCon string
-		ver          bool
-	)
-
-	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
-	flag.BoolVar(&ver, "v", false, "show version and exit")
-
-	flag.Parse()
-	if ver {
-		version.ShowAndExit(false)
-	}
-
-	redis, err := zbus.NewRedisClient(msgBrokerCon)
-	if err != nil {
-		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
-	}
-	storage := stubs.NewStorageModuleStub(redis)
-	identity := stubs.NewIdentityManagerStub(redis)
+func cap(ctx context.Context, client zbus.Client) {
+	storage := stubs.NewStorageModuleStub(client)
+	identity := stubs.NewIdentityManagerStub(client)
 	store, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
@@ -97,10 +81,71 @@ func main() {
 	}
 
 	tick := time.NewTicker(time.Minute * 10)
-	defer tick.Stop()
 
-	for range tick.C {
-		backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
+	go func() {
+		defer tick.Stop()
+
+		for {
+			select {
+			case <-tick.C:
+				backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func mon(ctx context.Context, server zbus.Server) {
+	system, err := monitord.NewSystemMonitor(2 * time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize system monitor")
+	}
+	host, err := monitord.NewHostMonitor(2 * time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize host monitor")
+	}
+
+	server.Register(zbus.ObjectID{Name: "host", Version: "0.0.1"}, host)
+	server.Register(zbus.ObjectID{Name: "system", Version: "0.0.1"}, system)
+}
+
+func main() {
+	app.Initialize()
+
+	var (
+		msgBrokerCon string
+		ver          bool
+	)
+
+	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
+	flag.BoolVar(&ver, "v", false, "show version and exit")
+
+	flag.Parse()
+	if ver {
+		version.ShowAndExit(false)
+	}
+
+	redis, err := zbus.NewRedisClient(msgBrokerCon)
+	if err != nil {
+		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
+	}
+
+	server, err := zbus.NewRedisServer(module, msgBrokerCon, 1)
+	if err != nil {
+		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)
+	}
+
+	ctx, _ := utils.WithSignal(context.Background())
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
+	cap(ctx, redis)
+	mon(ctx, server)
+
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		log.Fatal().Err(err).Msg("unexpected error")
 	}
 }
 

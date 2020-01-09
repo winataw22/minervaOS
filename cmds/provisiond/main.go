@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gedis"
@@ -20,6 +21,10 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/version"
+)
+
+const (
+	module = "provision"
 )
 
 func main() {
@@ -63,9 +68,13 @@ func main() {
 		log.Fatal().Msg("orphan node, we won't provision anything at all")
 	}
 
+	server, err := zbus.NewRedisServer(module, msgBrokerCon, 1)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to message broker")
+	}
 	client, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
-		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
+		log.Fatal().Err(err).Msg("fail to connect to message broker server")
 	}
 
 	identity := stubs.NewIdentityManagerStub(client)
@@ -97,6 +106,7 @@ func main() {
 	)
 
 	engine := provision.New(source, localStore, remoteStore)
+	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.ProvisionMonitor(engine))
 
 	log.Info().
 		Str("broker", msgBrokerCon).
@@ -106,6 +116,12 @@ func main() {
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
+
+	go func() {
+		if err := server.Run(ctx); err != nil && err != context.Canceled {
+			log.Fatal().Err(err).Msg("unexpected error")
+		}
+	}()
 
 	if err := engine.Run(ctx); err != nil {
 		log.Error().Err(err).Msg("unexpected error")
