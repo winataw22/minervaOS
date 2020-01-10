@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/crypto"
 	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/pkg/provision"
 
@@ -18,6 +21,43 @@ import (
 var (
 	day             = time.Hour * 24
 	defaultDuration = day * 30
+)
+
+func encryptPassword(password, nodeID string) (string, error) {
+	if len(password) == 0 {
+		return "", nil
+	}
+
+	pubkey, err := crypto.KeyFromID(pkg.StrIdentifier(nodeID))
+	if err != nil {
+		return "", err
+	}
+
+	encrypted, err := crypto.Encrypt([]byte(password), pubkey)
+	return hex.EncodeToString(encrypted), err
+}
+
+func provisionCustomZDB(r *provision.Reservation) error {
+	var config provision.ZDB
+	if err := json.Unmarshal(r.Data, &config); err != nil {
+		return errors.Wrap(err, "failed to load zdb reservation schema")
+	}
+
+	encrypted, err := encryptPassword(config.Password, r.NodeID)
+	if err != nil {
+		return err
+	}
+
+	config.Password = encrypted
+	r.Data, err = json.Marshal(config)
+
+	return err
+}
+
+var (
+	provCustomModifiers = map[provision.ReservationType]func(r *provision.Reservation) error{
+		provision.ZDBReservation: provisionCustomZDB,
+	}
 )
 
 func cmdsProvision(c *cli.Context) error {
@@ -65,6 +105,13 @@ func cmdsProvision(c *cli.Context) error {
 
 	for _, nodeID := range nodeIDs {
 		r.NodeID = nodeID
+
+		custom, ok := provCustomModifiers[r.Type]
+		if ok {
+			if err := custom(r); err != nil {
+				return err
+			}
+		}
 
 		if err := r.Sign(keypair.PrivateKey); err != nil {
 			return errors.Wrap(err, "failed to sign the reservation")

@@ -76,7 +76,7 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name: "schema,s",
-					Usage: `location of the generated schema. 
+					Usage: `location of the generated schema.
 					For the network sub-commands add-node and add-user this flag is
 					also used to read the network schema before modifying it`,
 				},
@@ -252,6 +252,10 @@ func main() {
 								cli.StringFlag{
 									Name:  "password, p",
 									Usage: "optional password",
+								},
+								cli.StringFlag{
+									Name:  "node, n",
+									Usage: "node ID. Required if password is set to encrypt the password",
 								},
 								cli.BoolFlag{
 									Name:  "public",

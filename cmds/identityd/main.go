@@ -189,6 +189,23 @@ func main() {
 		}
 	}()
 
+	zinit, err := zinit.New(zinitSocket)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to zinit")
+	}
+
+	// with volume allocation is set to nil this flister can be
+	// only used for RO mounts. Otherwise it will panic
+	flister := flist.New(root, nil)
+
+	upgrader := upgrade.Upgrader{
+		FLister:      flister,
+		Zinit:        zinit,
+		NoSelfUpdate: debug,
+	}
+
+	installBinaries(&boot, &upgrader)
+
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("received a termination signal")
 	})
@@ -205,7 +222,7 @@ func main() {
 	// 4. Start watcher for new version
 	log.Info().Msg("start upgrade daemon")
 
-	upgradeLoop(ctx, &boot, root, debug, monitor, register)
+	upgradeLoop(ctx, &boot, &upgrader, debug, monitor, register)
 }
 
 func getBinsRepo() string {
@@ -246,31 +263,45 @@ func debugReinstall(boot *upgrade.Boot, up *upgrade.Upgrader) {
 	}()
 }
 
+func installBinaries(boot *upgrade.Boot, upgrader *upgrade.Upgrader) {
+
+	bins, _ := boot.CurrentBins()
+
+	repoWatcher := upgrade.FListRepoWatcher{
+		Repo:    getBinsRepo(),
+		Current: bins,
+	}
+
+	current, toAdd, toDel, err := repoWatcher.Diff()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list latest binaries to install")
+	}
+
+	for _, pkg := range toDel {
+		if err := upgrader.UninstallBinary(pkg); err != nil {
+			log.Error().Err(err).Str("flist", pkg.Fqdn()).Msg("failed to uninstall flist")
+		}
+	}
+
+	for _, pkg := range toAdd {
+		if err := upgrader.InstallBinary(pkg); err != nil {
+			log.Error().Err(err).Str("package", pkg.Fqdn()).Msg("failed to install package")
+		}
+	}
+
+	boot.SetBins(current)
+}
+
 func upgradeLoop(
 	ctx context.Context,
 	boot *upgrade.Boot,
-	root string,
+	upgrader *upgrade.Upgrader,
 	debug bool,
 	monitor *monitorStream,
 	register func(string) error) {
 
-	zinit, err := zinit.New(zinitSocket)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to connect to zinit")
-	}
-
-	// with volume allocation is set to nil this flister can be
-	// only used for RO mounts. Otherwise it will panic
-	flister := flist.New(root, nil)
-
-	upgrader := upgrade.Upgrader{
-		FLister:      flister,
-		Zinit:        zinit,
-		NoSelfUpdate: debug,
-	}
-
 	if debug {
-		debugReinstall(boot, &upgrader)
+		debugReinstall(boot, upgrader)
 	}
 
 	flistWatcher := upgrade.FListSemverWatcher{

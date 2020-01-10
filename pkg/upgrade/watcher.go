@@ -197,6 +197,17 @@ func (w *FListRepoWatcher) diff(packages map[string]RepoFList) (toAdd, toDel []R
 	return
 }
 
+// Diff return the remote changes related to current list of packages
+func (w *FListRepoWatcher) Diff() (all map[string]RepoFList, toAdd, toDell []RepoFList, err error) {
+	all, err = w.list()
+	if err != nil {
+		return all, nil, nil, errors.Wrap(err, "failed to get available packages")
+	}
+
+	toAdd, toDell = w.diff(all)
+	return
+}
+
 // Watch watches a full repo for changes. Event is always of concrete type RepoEvent
 func (w *FListRepoWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 	if w.Duration == time.Duration(0) {
@@ -204,12 +215,10 @@ func (w *FListRepoWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 		w.Duration = 600 * time.Second
 	}
 
-	packages, err := w.list()
+	packages, toAdd, toDel, err := w.Diff()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get available packages")
 	}
-
-	toAdd, toDel := w.diff(packages)
 
 	ch := make(chan Event, 1)
 
@@ -236,13 +245,11 @@ func (w *FListRepoWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 				return
 			}
 
-			packages, err := w.list()
+			packages, toAdd, toDel, err := w.Diff()
 			if err != nil {
 				log.Error().Err(err).Str("repo", w.Repo).Msg("failed to list repo flists")
 				continue
 			}
-
-			toAdd, toDel := w.diff(packages)
 
 			if len(toAdd) > 0 || len(toDel) > 0 {
 				select {

@@ -16,7 +16,18 @@ func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 	if err != nil {
 		return err
 	}
-	format := fmt.Sprintf("Zero OS [%s] Version: %%s", env.RunningMode.String())
+
+	identity := stubs.NewIdentityManagerStub(c)
+	nodeID := identity.NodeID()
+	var farm string
+	farmID, err := identity.FarmID()
+	if err != nil {
+		farm = "not attached to a farm"
+	} else {
+		farm = fmt.Sprintf("%d", farmID)
+	}
+
+	format := fmt.Sprintf("Zero OS [%s] Version: %%s NodeID: %s FarmID: %s", env.RunningMode.String(), nodeID.Identity(), farm)
 
 	h.Text = "Zero OS"
 

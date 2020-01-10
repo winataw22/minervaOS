@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -56,10 +57,11 @@ func TestZDBProvision(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithZBus(ctx, &client)
 
+	passwd := "pa$$w0rd"
 	conf := ZDB{
 		Size:     280682,
 		Mode:     pkg.ZDBModeSeq,
-		Password: "pa$$w0rd",
+		Password: hex.EncodeToString([]byte(passwd)),
 		DiskType: pkg.SSDDevice,
 		Public:   true,
 	}
@@ -98,6 +100,10 @@ func TestZDBProvision(t *testing.T) {
 			},
 		}, nil)
 
+	client.On("Request", "identityd", zbus.ObjectID{Name: "manager", Version: "0.0.1"},
+		"Decrypt", []byte(passwd)).
+		Return("password", nil)
+
 	client.On("Request", "network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
 		"Addrs",
 		"zdb0", "net-ns").Return([]net.IP{net.ParseIP("2001:cdba::3257:9652")}, nil)
@@ -105,7 +111,7 @@ func TestZDBProvision(t *testing.T) {
 	var zdbClient zdbTestClient
 	zdbClient.On("Exist", reservation.ID).Return(false, nil)
 	zdbClient.On("CreateNamespace", reservation.ID).Return(nil)
-	zdbClient.On("NamespaceSetPassword", reservation.ID, conf.Password).Return(nil)
+	zdbClient.On("NamespaceSetPassword", reservation.ID, "password").Return(nil)
 	zdbClient.On("NamespaceSetPublic", reservation.ID, conf.Public).Return(nil)
 	zdbClient.On("NamespaceSetSize", reservation.ID, conf.Size*gigabyte).Return(nil)
 
@@ -128,10 +134,11 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 	ctx := context.Background()
 	ctx = WithZBus(ctx, &client)
 
+	passwd := "pa$$w0rd"
 	zdb := ZDB{
 		Size:     10,
 		Mode:     pkg.ZDBModeSeq,
-		Password: "pa$$w0rd",
+		Password: hex.EncodeToString([]byte(passwd)),
 		DiskType: pkg.SSDDevice,
 		Public:   true,
 	}
@@ -147,6 +154,10 @@ func TestZDBProvisionNoMappingContainerDoesNotExists(t *testing.T) {
 
 	// it's followed by allocation request to see if there is already a
 	// zdb instance running that has enough space for the ns
+
+	client.On("Request", "identityd", zbus.ObjectID{Name: "manager", Version: "0.0.1"},
+		"Decrypt", []byte(passwd)).
+		Return("password", nil)
 
 	client.On("Request", "storage", zbus.ObjectID{Name: "storage", Version: "0.0.1"},
 		"Allocate",

@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
@@ -35,6 +37,8 @@ type ZDB struct {
 	Password string         `json:"password"`
 	DiskType pkg.DeviceType `json:"disk_type"`
 	Public   bool           `json:"public"`
+
+	PlainPassword string `json:"-"`
 }
 
 // ZDBResult is the information return to the BCDB
@@ -49,6 +53,21 @@ func zdbProvision(ctx context.Context, reservation *Reservation) (interface{}, e
 	return zdbProvisionImpl(ctx, reservation)
 }
 
+func decryptPassword(client zbus.Client, password string) (string, error) {
+	if len(password) == 0 {
+		return "", nil
+	}
+	identitry := stubs.NewIdentityManagerStub(client)
+
+	bytes, err := hex.DecodeString(password)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := identitry.Decrypt(bytes)
+	return string(out), err
+}
+
 func zdbProvisionImpl(ctx context.Context, reservation *Reservation) (ZDBResult, error) {
 	var (
 		client  = GetZBus(ctx)
@@ -60,6 +79,12 @@ func zdbProvisionImpl(ctx context.Context, reservation *Reservation) (ZDBResult,
 	)
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
 		return ZDBResult{}, errors.Wrap(err, "failed to decode reservation schema")
+	}
+
+	var err error
+	config.PlainPassword, err = decryptPassword(client, config.Password)
+	if err != nil {
+		return ZDBResult{}, errors.Wrap(err, "failed to decrypt namespace password")
 	}
 
 	// if we reached here, we need to create the 0-db namespace
@@ -271,8 +296,8 @@ func createZDBNamespace(containerID pkg.ContainerID, nsID string, config ZDB) er
 		}
 	}
 
-	if config.Password != "" {
-		if err := zdbCl.NamespaceSetPassword(nsID, config.Password); err != nil {
+	if config.PlainPassword != "" {
+		if err := zdbCl.NamespaceSetPassword(nsID, config.PlainPassword); err != nil {
 			return errors.Wrapf(err, "failed to set password namespace %s in 0-db: %s", nsID, containerID)
 		}
 	}
