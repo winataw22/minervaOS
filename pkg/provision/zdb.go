@@ -57,14 +57,14 @@ func decryptPassword(client zbus.Client, password string) (string, error) {
 	if len(password) == 0 {
 		return "", nil
 	}
-	identitry := stubs.NewIdentityManagerStub(client)
+	identity := stubs.NewIdentityManagerStub(client)
 
 	bytes, err := hex.DecodeString(password)
 	if err != nil {
 		return "", err
 	}
 
-	out, err := identitry.Decrypt(bytes)
+	out, err := identity.Decrypt(bytes)
 	return string(out), err
 }
 

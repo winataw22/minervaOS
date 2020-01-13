@@ -166,3 +166,25 @@ func (s *HTTPStore) Deleted(id string) error {
 	}
 	return nil
 }
+
+// Delete marks a reservation as to be deleted
+func (s *HTTPStore) Delete(id string) error {
+	url := fmt.Sprintf("%s/reservations/%s", s.baseURL, id)
+
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("wrong response status code %s", resp.Status)
+	}
+	return nil
+}

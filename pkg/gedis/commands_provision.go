@@ -172,7 +172,18 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 }
 
 // Deleted implements provision.Feedbacker
-func (g *Gedis) Deleted(id string) error { return nil }
+func (g *Gedis) Deleted(id string) error {
+	_, err := g.Send("tfgrid.workloads.workload_manager", "workload_deleted", Args{})
+	return err
+}
+
+// Delete marks a reservation to be deleted
+func (g *Gedis) Delete(id string) error {
+	_, err := g.Send("tfgrid.workloads.workload_manager", "sign_delete", Args{
+		"reservation_id": id,
+	})
+	return err
+}
 
 func reservationFromSchema(w types.TfgridReservationWorkload1) (*provision.Reservation, error) {
 	reservation := &provision.Reservation{

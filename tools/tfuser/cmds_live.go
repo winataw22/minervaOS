@@ -19,6 +19,7 @@ func cmdsLive(c *cli.Context) error {
 		seedPath = c.String("seed")
 		start    = c.Int("start")
 		end      = c.Int("end")
+		expired  = c.Bool("expired")
 	)
 
 	keypair, err := identity.LoadKeyPair(seedPath)
@@ -30,6 +31,7 @@ func cmdsLive(c *cli.Context) error {
 		poolSize: 10,
 		start:    start,
 		end:      end,
+		expired:  expired,
 	}
 
 	cResults := s.Scrap(keypair.Identity())
@@ -96,11 +98,13 @@ type scraper struct {
 	poolSize int
 	start    int
 	end      int
+	expired  bool
 	wg       sync.WaitGroup
 }
 type job struct {
-	id   int
-	user string
+	id      int
+	user    string
+	expired bool
 }
 type res struct {
 	provision.Reservation
@@ -125,8 +129,9 @@ func (s *scraper) Scrap(user string) chan res {
 		}()
 		for i := s.start; i < s.end; i++ {
 			cIn <- job{
-				id:   i,
-				user: user,
+				id:      i,
+				user:    user,
+				expired: s.expired,
 			}
 		}
 	}()
@@ -150,7 +155,7 @@ func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- res) {
 			continue
 		}
 
-		if res.Expired() == true {
+		if !job.expired && res.Expired() == true {
 			continue
 		}
 		if res.User != job.user {

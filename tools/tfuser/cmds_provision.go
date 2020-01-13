@@ -146,3 +146,13 @@ func embed(schema interface{}, t provision.ReservationType) (*provision.Reservat
 
 	return r, nil
 }
+
+func cmdsDeleteReservation(c *cli.Context) error {
+	id := c.String("id")
+
+	if err := client.Delete(id); err != nil {
+		return errors.Wrapf(err, "failed to mark reservation %s to be deleted", id)
+	}
+	fmt.Printf("Reservation %v marked as to be deleted\n", id)
+	return nil
+}
