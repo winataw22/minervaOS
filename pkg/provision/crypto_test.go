@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"testing"
 
@@ -33,14 +34,19 @@ func TestVerifySignature(t *testing.T) {
 	err = Verify(r)
 	assert.NoError(t, err)
 
+	validSignature := make([]byte, len(r.Signature))
+	copy(validSignature, r.Signature)
+
 	// corrupt the signature
-	validByte := r.Signature[0]
-	r.Signature[0] = 'a'
+	_, err = rand.Read(r.Signature)
+	require.NoError(t, err)
+
 	err = Verify(r)
 	assert.Error(t, err)
 
 	// restore signature
-	r.Signature[0] = validByte
+	copy(r.Signature, validSignature)
+
 	// sanity test
 	err = Verify(r)
 	require.NoError(t, err)
