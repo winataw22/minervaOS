@@ -2,14 +2,15 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/threefoldtech/zos/pkg"
@@ -327,7 +328,8 @@ func (s *storageModule) Path(name string) (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Could not find filesystem %v", name)
+
+	return "", errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
 }
 
 // ensureCache creates a "cache" subvolume and mounts it in /var

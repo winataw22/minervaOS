@@ -1,0 +1,4 @@
+exec: vmd -broker unix:///var/run/redis.sock
+after:
+  - boot
+  - networkd

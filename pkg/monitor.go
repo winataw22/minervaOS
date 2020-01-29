@@ -104,6 +104,7 @@ type ProvisionCounters struct {
 	Volume    int64 `jons:"volume"`
 	Network   int64 `json:"network"`
 	ZDB       int64 `json:"zdb"`
+	VM        int64 `json:"vm"`
 	Debug     int64 `json:"debug"`
 }
 

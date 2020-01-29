@@ -26,6 +26,8 @@ const (
 	ZDBReservation ReservationType = "zdb"
 	// DebugReservation type
 	DebugReservation ReservationType = "debug"
+	// KubernetesReservation type
+	KubernetesReservation ReservationType = "kubernetes"
 )
 
 var (

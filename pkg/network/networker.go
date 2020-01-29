@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
+	"github.com/threefoldtech/zos/pkg/network/tuntap"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -224,6 +225,113 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	}
 
 	return netNSName, nil
+}
+
+// SetupTap interface in the network resource. We only allow 1 tap interface to be
+// set up per NR currently
+func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
+	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
+
+	network, err := n.networkOf(string(networkID))
+	if err != nil {
+		return "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	nodeID := n.identity.NodeID().Identity()
+	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	if err != nil {
+		return "", err
+	}
+
+	netRes, err := nr.New(networkID, localNR, &network.IPRange.IPNet)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to load network resource")
+	}
+
+	bridgeName, err := netRes.BridgeName()
+	if err != nil {
+		return "", errors.Wrap(err, "could not get network namespace bridge")
+	}
+
+	tapIface, err := netRes.TapName()
+	if err != nil {
+		return "", errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	_, err = tuntap.CreateTap(tapIface, bridgeName)
+
+	return tapIface, err
+}
+
+// RemoveTap in the network resource.
+func (n *networker) RemoveTap(networkID pkg.NetID) error {
+	log.Info().Str("network-id", string(networkID)).Msg("Removing tap interface")
+
+	network, err := n.networkOf(string(networkID))
+	if err != nil {
+		return errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	nodeID := n.identity.NodeID().Identity()
+	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	if err != nil {
+		return err
+	}
+
+	netRes, err := nr.New(networkID, localNR, &network.IPRange.IPNet)
+	if err != nil {
+		return errors.Wrap(err, "failed to load network resource")
+	}
+
+	tapIface, err := netRes.TapName()
+	if err != nil {
+		return errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	return ifaceutil.Delete(tapIface, nil)
+}
+
+// GetSubnet of a local network resource identified by the network ID
+func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
+	network, err := n.networkOf(string(networkID))
+	if err != nil {
+		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	nodeID := n.identity.NodeID().Identity()
+	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	if err != nil {
+		return net.IPNet{}, err
+	}
+
+	return localNR.Subnet.IPNet, nil
+}
+
+// GetDefaultGwIP returns the IP(v4) of the default gateway inside the network
+// resource identified by the network ID on the local node
+func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, error) {
+	network, err := n.networkOf(string(networkID))
+	if err != nil {
+		return nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	nodeID := n.identity.NodeID().Identity()
+	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	if err != nil {
+		return nil, err
+	}
+
+	// only IP4 atm
+	ip := localNR.Subnet.IP.To4()
+	if ip == nil {
+		return nil, errors.New("nr subnet is not valid IPv4")
+	}
+
+	// defaut gw is currently implied to be at `x.x.x.1`
+	// also a subnet in a NR is assumed to be a /24
+	ip[len(ip)-1] = 1
+
+	return ip, nil
 }
 
 // Addrs return the IP addresses of interface

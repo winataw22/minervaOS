@@ -36,17 +36,23 @@ func main() {
 		version.ShowAndExit(false)
 	}
 
-	storage, err := storage.New()
+	storageModule, err := storage.New()
 	if err != nil {
-		log.Fatal().Msgf("Error initializing storage module: %s", err)
+		log.Fatal().Err(err).Msg("Error initializing storage module")
 	}
 
 	server, err := zbus.NewRedisServer(module, msgBrokerCon, workerNr)
 	if err != nil {
-		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
+		log.Fatal().Err(err).Msg("fail to connect to message broker server")
 	}
 
-	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, storage)
+	vdiskModule, err := storage.NewVDiskModule(storageModule)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	server.Register(zbus.ObjectID{Name: "storage", Version: "0.0.1"}, storageModule)
+	server.Register(zbus.ObjectID{Name: "vdisk", Version: "0.0.1"}, vdiskModule)
 
 	log.Info().
 		Str("broker", msgBrokerCon).

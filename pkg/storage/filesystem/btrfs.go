@@ -516,10 +516,19 @@ func (v *btrfsVolume) Usage() (usage Usage, err error) {
 		return
 	}
 
+	size := group.MaxRfer
+	if size == 0 {
+		// in case no limit is set on the subvolume, we assume
+		// it's size is the size of the files on that volumes
+		size, err = FilesUsage(v.Path())
+		if err != nil {
+			return usage, errors.Wrap(err, "failed to get subvolume usage")
+		}
+	}
 	// otherwise, we return the size as maxrefer and usage as the rfer of the
 	// associated group
 	// todo: size should be the size of the pool, if maxrfer is 0
-	return Usage{Used: group.Rfer, Size: group.MaxRfer}, nil
+	return Usage{Used: group.Rfer, Size: size}, nil
 }
 
 // Limit size of volume, setting size to 0 means unlimited

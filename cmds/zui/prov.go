@@ -21,6 +21,7 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *Flag) error {
 		{"Containers", ""},
 		{"Volumes", ""},
 		{"Networks", ""},
+		{"VMs", ""},
 		{"ZDB Namespaces", ""},
 		{"Debug", ""},
 	}
@@ -45,8 +46,9 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *Flag) error {
 			rows[0][1] = fmt.Sprint(counter.Container)
 			rows[1][1] = fmt.Sprint(counter.Volume)
 			rows[2][1] = fmt.Sprint(counter.Network)
-			rows[3][1] = fmt.Sprint(counter.ZDB)
-			rows[4][1] = fmt.Sprint(counter.Debug)
+			rows[3][1] = fmt.Sprint(counter.VM)
+			rows[4][1] = fmt.Sprint(counter.ZDB)
+			rows[5][1] = fmt.Sprint(counter.Debug)
 
 			render.Signal()
 		}

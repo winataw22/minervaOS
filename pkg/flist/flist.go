@@ -113,10 +113,57 @@ func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
 	return newFlister(root, storage, cmd(exec.Command))
 }
 
+// NamedMount implements the Flister.NamedMount interface
+func (f *flistModule) NamedMount(name, url, storage string, opts pkg.MountOptions) (string, error) {
+	return f.mount(name, url, storage, opts)
+}
+
 // Mount implements the Flister.Mount interface
 func (f *flistModule) Mount(url, storage string, opts pkg.MountOptions) (string, error) {
+	rnd, err := random()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to generate random id for the mount")
+	}
+	return f.mount(rnd, url, storage, opts)
+}
+
+func (f *flistModule) mountpath(name string) (string, error) {
+	mountpath := filepath.Join(f.mountpoint, name)
+	if filepath.Dir(mountpath) != f.mountpoint {
+		return "", errors.New("invalid mount name")
+	}
+
+	return mountpath, nil
+}
+
+// valid checks that this mount path is free, and can be used
+func (f *flistModule) valid(path string) error {
+	stat, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to check mountpoint: %s", path)
+	}
+
+	if !stat.IsDir() {
+		return fmt.Errorf("not a directory: %s", path)
+	}
+
+	if err := exec.Command("mountpoint", path).Run(); err == nil {
+		return fmt.Errorf("mount point '%s' is used", path)
+	}
+
+	return nil
+}
+
+func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (string, error) {
 	sublog := log.With().Str("url", url).Str("storage", storage).Logger()
 	sublog.Info().Msg("request to mount flist")
+
+	mountpoint, err := f.mountpath(name)
+	if err != nil {
+		return "", err
+	}
 
 	if storage == "" {
 		storage = defaultStorage
@@ -128,14 +175,9 @@ func (f *flistModule) Mount(url, storage string, opts pkg.MountOptions) (string,
 		return "", err
 	}
 
-	rnd, err := random()
-	if err != nil {
-		sublog.Error().Err(err).Msg("fail to generate random id for the mount")
-		return "", err
-	}
 	var args []string
 	if !opts.ReadOnly {
-		path, err := f.storage.CreateFilesystem(rnd, opts.Limit*mib, pkg.SSDDevice)
+		path, err := f.storage.CreateFilesystem(name, opts.Limit*mib, pkg.SSDDevice)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
 		}
@@ -144,12 +186,15 @@ func (f *flistModule) Mount(url, storage string, opts pkg.MountOptions) (string,
 		args = append(args, "-ro")
 	}
 
-	mountpoint := filepath.Join(f.mountpoint, rnd)
+	if err := f.valid(mountpoint); err != nil {
+		return "", errors.Wrap(err, "invalid mount point")
+	}
+
 	if err := os.MkdirAll(mountpoint, 0755); err != nil {
 		return "", err
 	}
-	pidPath := filepath.Join(f.pid, rnd) + ".pid"
-	logPath := filepath.Join(f.log, rnd) + ".log"
+	pidPath := filepath.Join(f.pid, name) + ".pid"
+	logPath := filepath.Join(f.log, name) + ".log"
 
 	args = append(args,
 		"-cache", f.cache,
@@ -204,6 +249,11 @@ func (f *flistModule) getMountOptions(pidPath string) (options, error) {
 	return result, nil
 }
 
+// NamedUmount implements the Flister.NamedUmount interface
+func (f *flistModule) NamedUmount(name string) error {
+	return f.Umount(filepath.Join(f.mountpoint, name))
+}
+
 // Umount implements the Flister.Umount interface
 func (f *flistModule) Umount(path string) error {
 	log.Info().Str("path", path).Msg("request unmount flist")
@@ -216,7 +266,7 @@ func (f *flistModule) Umount(path string) error {
 		return fmt.Errorf("specified path is not a directory")
 	}
 
-	if !strings.HasPrefix(path, f.root) {
+	if filepath.Dir(path) != filepath.Clean(f.mountpoint) {
 		return fmt.Errorf("trying to unmount a directory outside of the flist module boundaries")
 	}
 

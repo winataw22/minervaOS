@@ -8,6 +8,37 @@ It has 3 main commands:
 - **generate**: used to provisioning reservation schema
 - **provision**: used to send schema created with the generate command to a node
 
+## Build tfuser
+
+```
+$ cd tools
+$ make tfuser
+cd tfuser && go build -ldflags '-w -s -X github.com/threefoldtech/zos/pkg/version.Branch=fcvm -X github.com/threefoldtech/zos/pkg/version.Revision=c00740b8fbb75746cd02fb5614ccf57342b7a9f4 -X github.com/threefoldtech/zos/pkg/version.Dirty='
+$ cd tfuser
+$ ./tfuser --help
+NAME:
+   tfuser - Let you provision capacity on the ThreefoldGrid 2.0
+
+USAGE:
+   tfuser [global options] command [command options] [arguments...]
+
+VERSION:
+   0.0.1
+
+COMMANDS:
+   id             generate a user identity
+   generate, gen  Group of command to generate provisioning schemas
+   provision      Provision a workload
+   live           show you all the reservations that are still alive
+   help, h        Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --debug, -d             enable debug logging
+   --bcdb value, -u value  URL of the BCDB (default: "https://explorer.devnet.grid.tf") [$BCDB_URL]
+   --help, -h              show help
+   --version, -v           print the version
+```
+
 ## Examples
 
 ### Generate a network provisioning schema
@@ -15,26 +46,26 @@ It has 3 main commands:
 Here is a full example how you would use tfuser to create a network schema.
 
 1. create a network from scratch
-`tfuser generate --schema network.json network create --name network --cidr 172.20.0.0/16`
+   `tfuser generate --schema network.json network create --name network --cidr 172.20.0.0/16`
 
 `--schema`: Optional file name to save the reservation schema. If not provided, the schema will be printed on stdout
 `--name`: Arbitrary name of your network.
 `--cidr`: The prefix which will be used by the network resources in the network.
 
 2. add another node to the network:
-`tfuser generate --schema schema.json network add-node --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 172.20.1.0/24 --port 12345`
+   `tfuser generate --schema schema.json network add-node --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 172.20.1.0/24 --port 12345`
 
 `--schema`: The file name of in which the current schema is stored. The new node
-	will be added to the schema, and the new schema version will be saved in the file.
+will be added to the schema, and the new schema version will be saved in the file.
 `--node`: The ID of the node to add in the reservation.
 `--subnet`: The subnet to assign to the network resource on this node. All workloads
-	in this network resource will receive an IP from this subnet. The subnet must be
-	part of the `CIDR` provided when the network is created.
+in this network resource will receive an IP from this subnet. The subnet must be
+part of the `CIDR` provided when the network is created.
 `--port`: Optional wireguard listening port on the host. If this is not specified, one will be
-	generated automatically. It is the responsibility of the caller to ensure this port
-	is not already in use.
+generated automatically. It is the responsibility of the caller to ensure this port
+is not already in use.
 `--force-hidden`: Optional flag which marks the node which is going to be added as hidden, even if it reports itself as having
-	public endpoints.
+public endpoints.
 
 A list of node (ids) can be found on the explorers. Currently there are 2:
 
@@ -42,11 +73,11 @@ A list of node (ids) can be found on the explorers. Currently there are 2:
 - testnet explorer: https://explorer.testnet.grid.tf
 
 3. add external access to your network:
-`tfuser generate --schema network.json network add-access --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 10.1.0.0/24`
+   `tfuser generate --schema network.json network add-access --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 10.1.0.0/24`
 
 `--node`: The node ID of the network resource which is going to act as a gateway for your external access.
 `--subnet`: A subnet on your external machine, which will be reachable from inside the network. The wireguard IP of your
-	external machine will be derived from this subnet.
+external machine will be derived from this subnet.
 `--ipv4`: Optional flag to use an IPv4 connection instead of IPv6 for the wireguard endpoint to the access node
 
 An example setup could look something like this:
@@ -56,7 +87,7 @@ An example setup could look something like this:
 ./tfuser generate --schema network.json network add-node --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 172.20.1.0/24 --port 12345
 ./tfuser generate --schema network.json network add-node --node Gr8NxBLHe7yjSsnSTgTqGr7BHbyAUVPJqs8fnudEE4Sf --subnet 172.20.2.0/24 --port 12346
 ./tfuser generate --schema network.json network add-node --node 48YmkyvfoXnXqEojpJieMfFPnCv2enEuqEJcmhvkcdAk --subnet 172.20.3.0/24 --port 12347 --force-hidden
-./tfuser generate --schema network.json network add-node --node BpTAry1Na2s1J8RAHNyDsbvaBSM3FjR4gMXEKga3UPbs --subnet 172.20.4.0/24 --port 12348 
+./tfuser generate --schema network.json network add-node --node BpTAry1Na2s1J8RAHNyDsbvaBSM3FjR4gMXEKga3UPbs --subnet 172.20.4.0/24 --port 12348
 ./tfuser generate --schema network.json network add-access --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 --subnet 10.1.0.0/24
 ```
 
@@ -82,37 +113,25 @@ Which could produce the following output:
           {
             "subnet": "172.20.2.0/24",
             "wg_public_key": "Do3rwwzZ611whUXC55Ln79JbZgmN9ekys7MoAXWmim4=",
-            "allowed_ips": [
-              "172.20.2.0/24",
-              "100.64.20.2/32"
-            ],
+            "allowed_ips": ["172.20.2.0/24", "100.64.20.2/32"],
             "endpoint": "[2a02:1802:5e:0:225:90ff:fe82:7255]:12346"
           },
           {
             "subnet": "172.20.3.0/24",
             "wg_public_key": "eYa+g59QLNtO2lWu8qVp6DLNl5ZERSCF22D/JjqL4Qk=",
-            "allowed_ips": [
-              "172.20.3.0/24",
-              "100.64.20.3/32"
-            ],
+            "allowed_ips": ["172.20.3.0/24", "100.64.20.3/32"],
             "endpoint": ""
           },
           {
             "subnet": "172.20.4.0/24",
             "wg_public_key": "JgZx+H4OxdTXfjr/MA+qobXNXu/Mqp0eJyvBO8X+6Vk=",
-            "allowed_ips": [
-              "172.20.4.0/24",
-              "100.64.20.4/32"
-            ],
+            "allowed_ips": ["172.20.4.0/24", "100.64.20.4/32"],
             "endpoint": "[2a02:1802:5e:0:225:90ff:fef4:40af]:12348"
           },
           {
             "subnet": "10.1.0.0/24",
             "wg_public_key": "Nj61KY+BFkGEaslUwEFuFx7ChqUgxvKyndqPB3peaVA=",
-            "allowed_ips": [
-              "10.1.0.0/24",
-              "100.64.1.0/32"
-            ],
+            "allowed_ips": ["10.1.0.0/24", "100.64.1.0/32"],
             "endpoint": ""
           }
         ]
@@ -140,10 +159,7 @@ Which could produce the following output:
           {
             "subnet": "172.20.4.0/24",
             "wg_public_key": "JgZx+H4OxdTXfjr/MA+qobXNXu/Mqp0eJyvBO8X+6Vk=",
-            "allowed_ips": [
-              "172.20.4.0/24",
-              "100.64.20.4/32"
-            ],
+            "allowed_ips": ["172.20.4.0/24", "100.64.20.4/32"],
             "endpoint": "[2a02:1802:5e:0:225:90ff:fef4:40af]:12348"
           }
         ]
@@ -195,10 +211,7 @@ Which could produce the following output:
           {
             "subnet": "172.20.2.0/24",
             "wg_public_key": "Do3rwwzZ611whUXC55Ln79JbZgmN9ekys7MoAXWmim4=",
-            "allowed_ips": [
-              "172.20.2.0/24",
-              "100.64.20.2/32"
-            ],
+            "allowed_ips": ["172.20.2.0/24", "100.64.20.2/32"],
             "endpoint": "[2a02:1802:5e:0:225:90ff:fe82:7255]:12346"
           }
         ]
@@ -241,7 +254,6 @@ tfuser generate --schema ubuntu.json container \
 
 To provision a workload on a node, you need to have a user identity. It is used to sign the schema before sending to the node.  
 Generate an identity using `tfuser id`. This command will generate a `user.seed` file that you need to use with the provision command.
-
 
 ```shell
 tfuser provision --schema container.json --duration 2 --seed user.seed --node {nodeID}

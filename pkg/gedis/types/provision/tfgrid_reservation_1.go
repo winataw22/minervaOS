@@ -28,6 +28,7 @@ type TfgridReservationData1 struct {
 	Volumes                 []TfgridReservationVolume1       `json:"volumes"`
 	Zdbs                    []TfgridReservationZdb1          `json:"zdbs"`
 	Networks                []TfgridReservationNetwork1      `json:"networks"`
+	Kubernets               []TfgridWorkloadsReservationK8S1 `json:"kubernetes"`
 	ExpirationProvisioning  schema.Date                      `json:"expiration_provisioning"`
 	ExpirationReservation   schema.Date                      `json:"expiration_reservation"`
 }

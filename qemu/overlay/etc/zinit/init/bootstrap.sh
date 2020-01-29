@@ -1,1 +1,0 @@
-../../../../../bootstrap/etc/zinit/init/bootstrap.sh

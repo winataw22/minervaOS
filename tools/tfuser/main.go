@@ -267,6 +267,42 @@ func main() {
 					},
 				},
 				{
+					Name:  "kubernetes",
+					Usage: "Provision a vm running a kubernetes server or agent on a node",
+					Flags: []cli.Flag{
+						cli.UintFlag{
+							Name:  "size",
+							Usage: "Size of the VM, only 1 (small) and 2 (medium) are supported",
+							Value: 1,
+						},
+						cli.StringFlag{
+							Name:  "network-id",
+							Usage: "ID of the network resource in which the vm will be created",
+						},
+						cli.StringFlag{
+							Name:  "ip",
+							Usage: "Ip address of the vm in the network resource",
+						},
+						cli.StringFlag{
+							Name:  "secret, s",
+							Usage: "Cluster token to set for kubernetes, this is encrypted by the nodes public key",
+						},
+						cli.StringFlag{
+							Name:  "node, n",
+							Usage: "node ID. Required if password is set to encrypt the password",
+						},
+						cli.StringSliceFlag{
+							Name:  "master-ips",
+							Usage: "IP address(es) of the master node(s) (multiple in HA node). If this flag is not set, this instance will be set up as a master node",
+						},
+						cli.StringSliceFlag{
+							Name:  "ssh-keys",
+							Usage: "Ssh keys to authorize for the vm. Can be either a full ssh key, or a \"github:username\" form which will pull the ssh keys from github",
+						},
+					},
+					Action: generateKubernetes,
+				},
+				{
 					Name:  "debug",
 					Usage: "Enable debug mode on a node. In this mode the forward its logs to the specified redis endpoint",
 					Flags: []cli.Flag{

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -26,6 +27,25 @@ func getMountTarget(f io.Reader, device string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// FilesUsage return the total size of files under path (recursively) in bytes
+func FilesUsage(path string) (uint64, error) {
+	var total uint64
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		total += uint64(info.Size())
+		return nil
+	})
+
+	return total, err
 }
 
 // GetMountTarget returns the mount target of a device or false if the
