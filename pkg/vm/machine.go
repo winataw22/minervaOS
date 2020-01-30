@@ -161,12 +161,22 @@ func (m *Machine) exec(ctx context.Context, base string) error {
 	// process exit. hence daemonizing is required.
 	// due to issues with jailer --daemonize flag, we use the ash trick below
 
+	jailerBin, err := exec.LookPath("jailer")
+	if err != nil {
+		return err
+	}
+
+	fcBin, err := exec.LookPath("firecracker")
+	if err != nil {
+		return err
+	}
+
 	args := []string{
-		JailerBin,
+		jailerBin,
 		"--id", m.ID,
 		"--uid", "0", "--gid", "0",
 		"--chroot-base-dir", base, // this stupid flag creates so many layers but is needed
-		"--exec-file", FCBin,
+		"--exec-file", fcBin,
 		"--node", "0",
 		"--", // fc flags starts here
 		"--config-file", "/config.json",

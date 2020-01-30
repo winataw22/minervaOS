@@ -22,10 +22,6 @@ import (
 )
 
 const (
-	// FCBin  path for firecracker
-	FCBin = "/bin/firecracker"
-	// JailerBin path for fc jailer
-	JailerBin = "/bin/jailer"
 	// FCSockDir where vm firecracker sockets are kept
 	FCSockDir = "/var/run/firecracker"
 

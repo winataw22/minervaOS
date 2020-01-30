@@ -128,3 +128,21 @@ func (p *ZDBPool) Exists(name string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// IndexMode return the mode of the index of the namespace called name
+func (p *ZDBPool) IndexMode(name string) (mode IndexMode, err error) {
+	path := filepath.Join(p.path, name, "zdb-index-00000")
+
+	f, err := os.Open(path)
+	if err != nil {
+		return mode, err
+	}
+
+	defer f.Close()
+	index, err := ReadIndex(f)
+	if err != nil {
+		return mode, errors.Wrapf(err, "failed to read namespace index header at %s", path)
+	}
+
+	return index.Mode, nil
+}

@@ -18,11 +18,12 @@ import (
 // provisionOrder is used to sort the workload type
 // in the right order for provisiond
 var provisionOrder = map[provision.ReservationType]int{
-	provision.DebugReservation:     0,
-	provision.NetworkReservation:   1,
-	provision.ZDBReservation:       2,
-	provision.VolumeReservation:    3,
-	provision.ContainerReservation: 4,
+	provision.DebugReservation:      0,
+	provision.NetworkReservation:    1,
+	provision.ZDBReservation:        2,
+	provision.VolumeReservation:     3,
+	provision.ContainerReservation:  4,
+	provision.KubernetesReservation: 5,
 }
 
 // Reserve provision.Reserver
@@ -55,7 +56,7 @@ func (g *Gedis) Reserve(r *provision.Reservation) (string, error) {
 			networkReservation(w),
 		}
 	case provision.KubernetesReservation:
-		res.DataReservation.Kubernets = []types.TfgridWorkloadsReservationK8S1{
+		res.DataReservation.Kubernetes = []types.TfgridWorkloadsReservationK8S1{
 			k8sReservation(w, r.NodeID),
 		}
 	}

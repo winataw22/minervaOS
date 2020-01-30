@@ -41,3 +41,13 @@ func TestExists(t *testing.T) {
 	assert.True(t, pool.Exists("test"))
 	assert.False(t, pool.Exists("foo"))
 }
+
+func TestIndexMode(t *testing.T) {
+	pool := ZDBPool{
+		path: "./test_data/pool_layout",
+	}
+
+	mode, err := pool.IndexMode("test")
+	require.NoError(t, err)
+	assert.Equal(t, IndexModeKeyValue, mode)
+}

@@ -23,9 +23,10 @@ const (
 	TfgridReservationWorkload1TypeContainer
 	TfgridReservationWorkload1TypeVolume
 	TfgridReservationWorkload1TypeNetwork
+	TfgridReservationWorkload1TypeKubernetes
 )
 
-// String implements Stringer inerface
+// String implements Stringer interface
 func (e TfgridReservationWorkload1TypeEnum) String() string {
 	switch e {
 	case TfgridReservationWorkload1TypeNetwork:
@@ -36,6 +37,8 @@ func (e TfgridReservationWorkload1TypeEnum) String() string {
 		return "zdb"
 	case TfgridReservationWorkload1TypeContainer:
 		return "container"
+	case TfgridReservationWorkload1TypeKubernetes:
+		return "kubernetes"
 	}
 	return "UNKNOWN"
 }

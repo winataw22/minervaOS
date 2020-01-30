@@ -54,6 +54,7 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 	log := log.With().
 		Str("type", string(diskType)).
 		Uint64("size", size).
+		Str("mode", string(mode)).
 		Logger()
 
 	log.Info().Msg("try to allocation space for 0-DB")
@@ -71,6 +72,7 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 		}
 
 		for _, volume := range volumes {
+
 			// skip all non-zdb volume
 			if !filesystem.IsZDBVolume(volume) {
 				continue
@@ -95,6 +97,11 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 	type Candidate struct {
 		filesystem.Volume
 		Free uint64
+	}
+
+	targetMode := zdbpool.IndexModeKeyValue
+	if mode == pkg.ZDBModeSeq {
+		targetMode = zdbpool.IndexModeSequential
 	}
 
 	var candidates []Candidate
@@ -130,6 +137,20 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 
 			if volumeUsage.Size+size > usage.Size {
 				// not enough space on this volume
+				continue
+			}
+
+			zdb := zdbpool.New(volume.Path())
+
+			// check if the mode is the same
+			indexMode, err := zdb.IndexMode("default")
+			if err != nil {
+				log.Err(err).Str("namespace", "default").Msg("failed to read index mode")
+				continue
+			}
+
+			if indexMode != targetMode {
+				log.Info().Msg("skip because wrong mode")
 				continue
 			}
 

@@ -66,10 +66,16 @@ impl Zfs {
             let mut dst = PathBuf::new();
             dst.push(&target);
             dst.push(src.strip_prefix(&self.target)?);
-            if entry.file_type().is_dir() {
+
+            let typ = entry.file_type();
+            if typ.is_dir() {
+                debug!("creating directory {:?}", dst);
                 std::fs::create_dir_all(dst)?;
-            } else {
+            } else if typ.is_file() {
+                debug!("installing file {:?}", dst);
                 std::fs::copy(&src, &dst)?;
+            } else {
+                error!("unsupported file type: ({:?}): {:?}", src, typ)
             }
         }
 
