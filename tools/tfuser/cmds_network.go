@@ -571,16 +571,6 @@ func generatePeers(n *Network) error {
 						break
 					}
 				}
-
-				// as a fallback assign IPv4
-				if endpoint == "" {
-					for _, pep := range onr.PubEndpoints {
-						if pep.To4() != nil {
-							endpoint = fmt.Sprintf("%s:%d", pep.String(), onr.WGListenPort)
-							break
-						}
-					}
-				}
 			}
 
 			// Add subnets for external access
