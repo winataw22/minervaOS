@@ -1,0 +1,9 @@
+exec: |
+  promtail 
+  -config.file /etc/promtail/promtail.yaml
+  -client.url http://explorer.devnet.grid.tf:3100/loki/api/v1/push
+log: stdout
+after:
+  - promtail-config
+  - logger
+

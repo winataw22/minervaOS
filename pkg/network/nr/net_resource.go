@@ -71,16 +71,6 @@ func (nr *NetResource) BridgeName() (string, error) {
 	return name, nil
 }
 
-// TapName returns the name of the tap device to create for the network resource
-// in the host network namespace
-func (nr *NetResource) TapName() (string, error) {
-	name := fmt.Sprintf("t-%s", nr.id)
-	if len(name) > 15 {
-		return "", errors.Errorf("tap name too long %s", name)
-	}
-	return name, nil
-}
-
 // Namespace returns the name of the network namespace to create for the network resource
 func (nr *NetResource) Namespace() (string, error) {
 	name := fmt.Sprintf("n-%s", nr.id)

@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/versioned"
 )
@@ -78,12 +79,29 @@ type FSStore struct {
 
 // NewFSStore creates a in memory reservation store
 func NewFSStore(root string) (*FSStore, error) {
-	if err := os.RemoveAll(root); err != nil {
+	if err := os.MkdirAll("/var/run/modules", 0770); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(root, 0770); err != nil {
-		return nil, err
+
+	_, err := os.OpenFile("/var/run/modules/provisiond", os.O_RDONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
+	// if we managed to create the file, this means the node
+	// has just booted and this is the first time provisiond starts since boot
+	// so we empty the reservation cache
+
+	// if the file is already present, this mean this is just a restart/update of provisiond
+	// so we need to keep the reservation cache as it is
+	if err == nil {
+		log.Info().Msg("first boot, empty reservation cache")
+		if err := os.RemoveAll(root); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(root, 0770); err != nil {
+			return nil, err
+		}
+	} else {
+		log.Info().Msg("restart detected, keep reservation cache intact")
 	}
+
 	return &FSStore{
 		root: root,
 	}, nil

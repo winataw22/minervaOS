@@ -21,6 +21,7 @@ try to provision the workload and report the result to the BCDB.
 - volume
 - [0-DB](https://github.com/threefoldtech/0-DB) namespace
 - private network
+- kubernetes VM
 
 Check the [provision.md](provision.md) file to see the expected reservation schema for each type of workload
 

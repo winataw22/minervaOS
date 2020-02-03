@@ -253,7 +253,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 		return "", errors.Wrap(err, "could not get network namespace bridge")
 	}
 
-	tapIface, err := netRes.TapName()
+	tapIface, err := tapName(networkID)
 	if err != nil {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -267,23 +267,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 func (n *networker) RemoveTap(networkID pkg.NetID) error {
 	log.Info().Str("network-id", string(networkID)).Msg("Removing tap interface")
 
-	network, err := n.networkOf(string(networkID))
-	if err != nil {
-		return errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
-	}
-
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return err
-	}
-
-	netRes, err := nr.New(networkID, localNR, &network.IPRange.IPNet)
-	if err != nil {
-		return errors.Wrap(err, "failed to load network resource")
-	}
-
-	tapIface, err := netRes.TapName()
+	tapIface, err := tapName(networkID)
 	if err != nil {
 		return errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -783,4 +767,13 @@ func ResourceByNodeID(nodeID string, resources []pkg.NetResource) (*pkg.NetResou
 		}
 	}
 	return nil, fmt.Errorf("not network resource for this node: %s", nodeID)
+}
+
+// tapName returns the name of the tap device for a network namespace
+func tapName(netID pkg.NetID) (string, error) {
+	name := fmt.Sprintf("t-%s", netID)
+	if len(name) > 15 {
+		return "", errors.Errorf("tap name too long %s", name)
+	}
+	return name, nil
 }

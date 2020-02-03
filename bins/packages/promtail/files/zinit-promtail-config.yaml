@@ -1,0 +1,7 @@
+exec: |
+  sh -c 
+    'sed "s/NODE-ID/$(identityd -id)/g" -i /etc/promtail/promtail.yaml'
+oneshot: true
+after:
+  - boot
+
