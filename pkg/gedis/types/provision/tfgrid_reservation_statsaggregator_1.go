@@ -55,6 +55,7 @@ type TfgridReservationResult1StateEnum uint8
 const (
 	TfgridReservationResult1StateError TfgridReservationResult1StateEnum = iota
 	TfgridReservationResult1StateOk
+	TfgridReservationResult1StateDeleted
 )
 
 func (e TfgridReservationResult1StateEnum) String() string {
@@ -63,6 +64,8 @@ func (e TfgridReservationResult1StateEnum) String() string {
 		return "error"
 	case TfgridReservationResult1StateOk:
 		return "ok"
+	case TfgridReservationResult1StateDeleted:
+		return "deleted"
 	}
 	return "UNKNOWN"
 }

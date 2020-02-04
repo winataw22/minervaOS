@@ -211,3 +211,45 @@ func TestProvisionReserve(t *testing.T) {
 	require.Equal("10", result)
 	conn.AssertCalled(t, "Close")
 }
+
+func TestProvisionDeleted(t *testing.T) {
+	require := require.New(t)
+	pool, conn := getTestPool()
+	gedis := Gedis{
+		pool: pool,
+	}
+
+	id := "101"
+	args := Args{
+		"workload_id": id,
+	}
+
+	conn.On("Do", "tfgrid.workloads.workload_manager.workload_deleted", mustMarshal(t, args)).
+		Return(nil, nil)
+
+	err := gedis.Deleted(id)
+
+	require.NoError(err)
+	conn.AssertCalled(t, "Close")
+}
+
+func TestProvisionDelete(t *testing.T) {
+	require := require.New(t)
+	pool, conn := getTestPool()
+	gedis := Gedis{
+		pool: pool,
+	}
+
+	id := "101"
+	args := Args{
+		"reservation_id": id,
+	}
+
+	conn.On("Do", "tfgrid.workloads.workload_manager.sign_delete", mustMarshal(t, args)).
+		Return(nil, nil)
+
+	err := gedis.Delete(id)
+
+	require.NoError(err)
+	conn.AssertCalled(t, "Close")
+}
