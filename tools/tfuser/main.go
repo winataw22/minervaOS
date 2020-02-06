@@ -209,6 +209,10 @@ func main() {
 							Name:  "memory",
 							Usage: "limit the amount of memory a container can allocate",
 						},
+						cli.BoolFlag{
+							Name:  "public6",
+							Usage: "when enabled, the container will have a public IPv6 interface",
+						},
 					},
 					Action: generateContainer,
 				},

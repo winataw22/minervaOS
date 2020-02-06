@@ -74,6 +74,7 @@ func TestContainerProvisionNew(t *testing.T) {
 			IPs: []net.IP{
 				net.ParseIP("192.168.1.1"),
 			},
+			PublicIP6: false,
 		},
 	}
 
@@ -100,7 +101,7 @@ func TestContainerProvisionNew(t *testing.T) {
 	client.On("Request",
 		"network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
 		"Join",
-		netID, reservation.ID, []string{"192.168.1.1"}).
+		netID, reservation.ID, []string{"192.168.1.1"}, false).
 		Return(pkg.Member{
 			Namespace: "net-ns",
 			IPv4:      net.ParseIP("192.168.1.1"),
@@ -142,9 +143,6 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 	ctx = WithZBus(ctx, &client)
 	ctx = WithOwnerCache(ctx, &cache)
 
-	// const module = "network"
-	// version := zbus.ObjectID{Name: "network", Version: "0.0.1"}
-
 	container := Container{
 		FList: "https://hub.grid.tf/thabet/redis.flist",
 		Network: Network{
@@ -152,6 +150,7 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 			IPs: []net.IP{
 				net.ParseIP("192.168.1.1"),
 			},
+			PublicIP6: false,
 		},
 		Mounts: []Mount{
 			{
@@ -188,7 +187,7 @@ func TestContainerProvisionWithMounts(t *testing.T) {
 	client.On("Request",
 		"network", zbus.ObjectID{Name: "network", Version: "0.0.1"},
 		"Join",
-		netID, reservation.ID, []string{"192.168.1.1"}).
+		netID, reservation.ID, []string{"192.168.1.1"}, false).
 		Return(pkg.Member{
 			Namespace: "net-ns",
 			IPv4:      net.ParseIP("192.168.1.1"),

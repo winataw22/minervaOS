@@ -101,7 +101,7 @@ func zdbProvisionImpl(ctx context.Context, reservation *Reservation) (ZDBResult,
 		return ZDBResult{}, err
 	}
 
-	containerIP, err = getZDBIP(ctx, cont)
+	containerIP, err = getIfaceIP(ctx, nwmod.ZDBIface, cont.Network.Namespace)
 	if err != nil {
 		return ZDBResult{}, err
 	}
@@ -238,23 +238,21 @@ func createZdbContainer(ctx context.Context, allocation pkg.Allocation, mode pkg
 	return nil
 }
 
-func getZDBIP(ctx context.Context, container pkg.Container) (containerIP net.IP, err error) {
+func getIfaceIP(ctx context.Context, ifaceName, namespace string) (containerIP net.IP, err error) {
 	var (
 		client  = GetZBus(ctx)
 		network = stubs.NewNetworkerStub(client)
-
-		slog = log.With().Str("containerID", container.Name).Logger()
 	)
 
 	getIP := func() error {
-		ips, err := network.Addrs(nwmod.ZDBIface, container.Network.Namespace)
+		ips, err := network.Addrs(ifaceName, namespace)
 		if err != nil {
-			slog.Debug().Err(err).Msg("not ip public found, waiting")
+			log.Debug().Err(err).Msg("not ip public found, waiting")
 			return err
 		}
 		for _, ip := range ips {
 			if isPublic(ip) {
-				slog.Debug().IPAddr("ip", ip).Msg("0-db container public ip found")
+				log.Debug().IPAddr("ip", ip).Msg("0-db container public ip found")
 				containerIP = ip
 				return nil
 			}
@@ -269,12 +267,12 @@ func getZDBIP(ctx context.Context, container pkg.Container) (containerIP net.IP,
 	if err := backoff.RetryNotify(getIP, bo, func(err error, d time.Duration) {
 		log.Debug().Err(err).Str("duration", d.String()).Msg("failed to get zdb public IP")
 	}); err != nil {
-		return nil, errors.Wrapf(err, "failed to get an IP for 0-db container %s", container.Name)
+		return nil, errors.Wrapf(err, "failed to get an IP for interface %s", ifaceName)
 	}
 
-	slog.Info().
+	log.Info().
 		IPAddr("container IP", containerIP).
-		Str("name", container.Name).
+		Str("iface", ifaceName).
 		Msgf("0-db container created")
 	return containerIP, nil
 }

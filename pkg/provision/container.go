@@ -19,7 +19,8 @@ import (
 type Network struct {
 	NetworkID pkg.NetID `json:"network_id"`
 	// IP to give to the container
-	IPs []net.IP `json:"ips"`
+	IPs       []net.IP `json:"ips"`
+	PublicIP6 bool     `json:"public_ip6"`
 }
 
 // Mount defines a container volume mounted inside the container
@@ -156,10 +157,22 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		ips[i] = ip.String()
 	}
 
-	join, err := networkMgr.Join(netID, containerID, ips)
+	join, err := networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
 	if err != nil {
 		return ContainerResult{}, err
 	}
+
+	defer func() {
+		if err != nil {
+			if err := networkMgr.Leave(netID, containerID); err != nil {
+				log.Error().Err(err).Msgf("failed leave containrt network namespace")
+			}
+
+			if err := flistClient.Umount(mnt); err != nil {
+				log.Error().Err(err).Str("path", mnt).Msgf("failed to unmount")
+			}
+		}
+	}()
 
 	log.Info().
 		Str("ipv6", join.IPv6.String()).
@@ -183,17 +196,15 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			Memory:      config.Capacity.Memory * 1024 * 1024,
 		},
 	)
-
 	if err != nil {
-		if err := networkMgr.Leave(netID, containerID); err != nil {
-			log.Error().Err(err).Msgf("failed leave containrt network namespace")
-		}
+		return ContainerResult{}, errors.Wrap(err, "error starting container")
+	}
 
-		if err := flistClient.Umount(mnt); err != nil {
-			log.Error().Err(err).Str("path", mnt).Msgf("failed to unmount")
+	if config.Network.PublicIP6 {
+		join.IPv6, err = getIfaceIP(ctx, "pub", join.Namespace)
+		if err != nil {
+			return ContainerResult{}, errors.Wrap(err, "error reading container ipv6")
 		}
-
-		return ContainerResult{}, err
 	}
 
 	log.Info().Msgf("container created with id: '%s'", id)

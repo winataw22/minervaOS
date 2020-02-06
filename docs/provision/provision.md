@@ -73,6 +73,8 @@ type Network struct {
 	NetworkID pkg.NetID `json:"network_id"`
 	// IP to give to the container
 	IPs []net.IP `json:"ips"`
+	// If true, the container will receive a public IPv6 address
+	PublicIP6 bool     `json:"public_ip6"`
 }
 
 // Mount defines a container volume mounted inside the container

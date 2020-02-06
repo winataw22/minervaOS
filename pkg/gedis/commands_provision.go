@@ -353,6 +353,7 @@ func containerReservation(i interface{}, nodeID string) types.TfgridReservationC
 			{
 				NetworkID: string(c.Network.NetworkID),
 				Ipaddress: c.Network.IPs[0],
+				PublicIP6: c.Network.PublicIP6,
 			},
 		},
 		// StatsAggregator:   c.StatsAggregator,

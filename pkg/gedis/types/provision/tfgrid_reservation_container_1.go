@@ -58,4 +58,5 @@ type TfgridReservationContainerMount1 struct {
 type TfgridReservationNetworkConnection1 struct {
 	NetworkID string `json:"network_id"`
 	Ipaddress net.IP `json:"ipaddress"`
+	PublicIP6 bool   `json:"public_ip6"`
 }

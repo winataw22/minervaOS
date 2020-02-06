@@ -40,6 +40,7 @@ func generateContainer(c *cli.Context) error {
 			IPs: []net.IP{
 				net.ParseIP(c.String("ip")),
 			},
+			PublicIP6: c.Bool("public6"),
 		},
 		Capacity: cap,
 	}

@@ -31,7 +31,7 @@ type Networker interface {
 	// name.
 	// The member name specifies the name of the member, and must be unique
 	// The NetID is the network id to join
-	Join(networkdID NetID, containerID string, addrs []string) (join Member, err error)
+	Join(networkdID NetID, containerID string, addrs []string, publicIP6 bool) (join Member, err error)
 	// Leave delete a container nameapce created by Join
 	Leave(networkdID NetID, containerID string) (err error)
 

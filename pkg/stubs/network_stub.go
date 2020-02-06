@@ -120,8 +120,8 @@ func (s *NetworkerStub) GetSubnet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 []string) (ret0 pkg.Member, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2}
+func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 []string, arg3 bool) (ret0 pkg.Member, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2, arg3}
 	result, err := s.client.Request(s.module, s.object, "Join", args...)
 	if err != nil {
 		panic(err)

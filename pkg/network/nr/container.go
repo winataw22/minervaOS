@@ -18,7 +18,7 @@ import (
 )
 
 // Join make a network namespace of a container join a network resource network
-func (nr *NetResource) Join(containerID string, addrs []net.IP) (join pkg.Member, err error) {
+func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) (join pkg.Member, err error) {
 	name, err := nr.BridgeName()
 	if err != nil {
 		return join, err
@@ -80,16 +80,18 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP) (join pkg.Member
 			}
 		}
 
-		ipv6 := convert4to6(nr.ID(), addrs[0])
-		slog.Info().
-			Str("ip", ipv6.String()).
-			Msgf("set ip to container")
+		if !publicIP6 {
+			ipv6 := convert4to6(nr.ID(), addrs[0])
+			slog.Info().
+				Str("ip", ipv6.String()).
+				Msgf("set ip to container")
 
-		if err := netlink.AddrAdd(eth0, &netlink.Addr{IPNet: &net.IPNet{
-			IP:   ipv6,
-			Mask: net.CIDRMask(64, 128),
-		}}); err != nil && !os.IsExist(err) {
-			return err
+			if err := netlink.AddrAdd(eth0, &netlink.Addr{IPNet: &net.IPNet{
+				IP:   ipv6,
+				Mask: net.CIDRMask(64, 128),
+			}}); err != nil && !os.IsExist(err) {
+				return err
+			}
 		}
 
 		ipnet := nr.resource.Subnet
@@ -104,15 +106,19 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP) (join pkg.Member
 				Gw:        ipnet.IP,
 				LinkIndex: eth0.Attrs().Index,
 			},
-			&netlink.Route{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("::"),
-					Mask: net.CIDRMask(0, 128),
-				},
-				Gw:        net.ParseIP("fe80::1"),
-				LinkIndex: eth0.Attrs().Index,
-			},
 		}
+		if !publicIP6 {
+			routes = append(routes,
+				&netlink.Route{
+					Dst: &net.IPNet{
+						IP:   net.ParseIP("::"),
+						Mask: net.CIDRMask(0, 128),
+					},
+					Gw:        net.ParseIP("fe80::1"),
+					LinkIndex: eth0.Attrs().Index,
+				})
+		}
+
 		for _, r := range routes {
 			slog.Info().
 				Str("route", r.String()).
