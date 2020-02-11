@@ -2,7 +2,6 @@ package provision
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
@@ -53,21 +51,6 @@ func zdbProvision(ctx context.Context, reservation *Reservation) (interface{}, e
 	return zdbProvisionImpl(ctx, reservation)
 }
 
-func decryptPassword(client zbus.Client, password string) (string, error) {
-	if len(password) == 0 {
-		return "", nil
-	}
-	identity := stubs.NewIdentityManagerStub(client)
-
-	bytes, err := hex.DecodeString(password)
-	if err != nil {
-		return "", err
-	}
-
-	out, err := identity.Decrypt(bytes)
-	return string(out), err
-}
-
 func zdbProvisionImpl(ctx context.Context, reservation *Reservation) (ZDBResult, error) {
 	var (
 		client  = GetZBus(ctx)
@@ -82,7 +65,7 @@ func zdbProvisionImpl(ctx context.Context, reservation *Reservation) (ZDBResult,
 	}
 
 	var err error
-	config.PlainPassword, err = decryptPassword(client, config.Password)
+	config.PlainPassword, err = decryptSecret(client, config.Password)
 	if err != nil {
 		return ZDBResult{}, errors.Wrap(err, "failed to decrypt namespace password")
 	}

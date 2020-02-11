@@ -1,0 +1,151 @@
+# to run define K3S_TOKEN, K3S_VERSION is optional, eg:
+
+version: "3.7"
+services:
+  server1:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    command: server --cluster-init
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_TOKEN=230792876520407
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+      - K3S_KUBECONFIG_MODE=666
+    volumes:
+      - k3s-server:/var/lib/rancher/k3s
+      # This is just so that we get the kubeconfig file out
+      - .:/output
+    ports:
+      - 6443:6443
+    networks:
+      - k3s-net
+
+  server2:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    command: server --server https://server1:6443
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_TOKEN=230792876520407
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+      - K3S_KUBECONFIG_MODE=666
+    depends_on:
+      - server1
+    networks:
+      - k3s-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 650M
+        reservations:
+          cpus: "0.25"
+          memory: 100M
+  server3:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    command: server --server https://server1:6443
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_TOKEN=230792876520407
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+      - K3S_KUBECONFIG_MODE=666
+    depends_on:
+      - server2
+    networks:
+      - k3s-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 500M
+        reservations:
+          cpus: "1"
+          memory: 200M
+
+  agent:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_URL=https://server1:6443
+      - K3S_TOKEN=230792876520407
+    depends_on:
+      - server3
+    networks:
+      - k3s-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2.50"
+          memory: 550M
+        reservations:
+          cpus: "2"
+          memory: 300M
+
+  agent2:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_URL=https://server1:6443
+      - K3S_TOKEN=230792876520407
+    depends_on:
+      - server3
+    networks:
+      - k3s-net
+    deploy:
+      resources:
+        limits:
+          cpus: "3.50"
+          memory: 450M
+        reservations:
+          cpus: "2"
+          memory: 200M
+
+  agent3:
+    image: "rancher/k3s:${K3S_VERSION:-latest}"
+    tmpfs:
+      - /run
+      - /var/run
+    privileged: true
+    environment:
+      - K3S_URL=https://192.168.168.168:543
+      - K3S_TOKEN=230792876520407
+    depends_on:
+      - server3
+    networks:
+      - k3s-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 750M
+        reservations:
+          cpus: "0.5"
+          memory: 600M
+
+networks:
+  k3s-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.168.0/24
+
+volumes:
+  k3s-server:
+    driver: local
+    driver_opts:
+      type: "none"
+      o: "bind"
+      device: "${PWD}/data"

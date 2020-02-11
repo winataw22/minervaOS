@@ -23,8 +23,8 @@ var (
 	defaultDuration = day * 30
 )
 
-func encryptPassword(password, nodeID string) (string, error) {
-	if len(password) == 0 {
+func encryptSecret(plain, nodeID string) (string, error) {
+	if len(plain) == 0 {
 		return "", nil
 	}
 
@@ -33,7 +33,7 @@ func encryptPassword(password, nodeID string) (string, error) {
 		return "", err
 	}
 
-	encrypted, err := crypto.Encrypt([]byte(password), pubkey)
+	encrypted, err := crypto.Encrypt([]byte(plain), pubkey)
 	return hex.EncodeToString(encrypted), err
 }
 
@@ -43,7 +43,7 @@ func provisionCustomZDB(r *provision.Reservation) error {
 		return errors.Wrap(err, "failed to load zdb reservation schema")
 	}
 
-	encrypted, err := encryptPassword(config.Password, r.NodeID)
+	encrypted, err := encryptSecret(config.Password, r.NodeID)
 	if err != nil {
 		return err
 	}
@@ -54,9 +54,34 @@ func provisionCustomZDB(r *provision.Reservation) error {
 	return err
 }
 
+func provisionCustomContainer(r *provision.Reservation) error {
+	var config provision.Container
+	var err error
+	if err := json.Unmarshal(r.Data, &config); err != nil {
+		return errors.Wrap(err, "failed to load zdb reservation schema")
+	}
+
+	if config.SecretEnv == nil {
+		config.SecretEnv = make(map[string]string)
+	}
+
+	for k, v := range config.Env {
+		v, err := encryptSecret(v, r.NodeID)
+		if err != nil {
+			return errors.Wrapf(err, "failed to encrypt env with key '%s'", k)
+		}
+		config.SecretEnv[k] = v
+	}
+	config.Env = make(map[string]string)
+	r.Data, err = json.Marshal(config)
+
+	return err
+}
+
 var (
 	provCustomModifiers = map[provision.ReservationType]func(r *provision.Reservation) error{
-		provision.ZDBReservation: provisionCustomZDB,
+		provision.ZDBReservation:       provisionCustomZDB,
+		provision.ContainerReservation: provisionCustomContainer,
 	}
 )
 
@@ -93,22 +118,23 @@ func cmdsProvision(c *cli.Context) error {
 		return errors.Wrap(err, "could not find provision schema")
 	}
 
-	r := &provision.Reservation{}
-	if err := json.Unmarshal(schema, r); err != nil {
+	var reservation provision.Reservation
+	if err := json.Unmarshal(schema, &reservation); err != nil {
 		return errors.Wrap(err, "failed to read the provision schema")
 	}
 
-	r.Duration = duration
-	r.Created = time.Now()
+	reservation.Duration = duration
+	reservation.Created = time.Now()
 	// set the user ID into the reservation schema
-	r.User = keypair.Identity()
+	reservation.User = keypair.Identity()
 
 	for _, nodeID := range nodeIDs {
+		r := reservation //make a copy
 		r.NodeID = nodeID
 
 		custom, ok := provCustomModifiers[r.Type]
 		if ok {
-			if err := custom(r); err != nil {
+			if err := custom(&r); err != nil {
 				return err
 			}
 		}
@@ -117,11 +143,7 @@ func cmdsProvision(c *cli.Context) error {
 			return errors.Wrap(err, "failed to sign the reservation")
 		}
 
-		if err := output(path, r); err != nil {
-			return errors.Wrapf(err, "failed to write provision schema to %s after signature", path)
-		}
-
-		id, err := client.Reserve(r)
+		id, err := client.Reserve(&r)
 		if err != nil {
 			return errors.Wrap(err, "failed to send reservation")
 		}

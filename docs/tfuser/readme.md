@@ -258,3 +258,7 @@ Generate an identity using `tfuser id`. This command will generate a `user.seed`
 ```shell
 tfuser provision --schema container.json --duration 2 --seed user.seed --node {nodeID}
 ```
+
+### Kubernetes Provisioning
+
+Check the get started guide [here](../kubernetes/getstarted.md)

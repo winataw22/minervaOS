@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: traefik
+  name: graf-ing
+  namespace: graf
+spec:
+  rules:
+  - host: yarnouch.be
+    http:
+      paths:
+      - backend:
+          serviceName: g-grafana
+          servicePort: 80
+        path: /grafana

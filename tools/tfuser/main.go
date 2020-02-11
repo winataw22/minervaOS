@@ -257,10 +257,6 @@ func main() {
 									Name:  "password, p",
 									Usage: "optional password",
 								},
-								cli.StringFlag{
-									Name:  "node, n",
-									Usage: "node ID. Required if password is set to encrypt the password",
-								},
 								cli.BoolFlag{
 									Name:  "public",
 									Usage: "TODO",
@@ -379,6 +375,10 @@ func main() {
 				cli.BoolFlag{
 					Name:  "expired",
 					Usage: "include expired reservations",
+				},
+				cli.BoolFlag{
+					Name:  "deleted",
+					Usage: "include deleted reservations",
 				},
 			},
 			Action: cmdsLive,

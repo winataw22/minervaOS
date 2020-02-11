@@ -1,0 +1,7 @@
+---
+# TO INSTALL
+# helm repo add bitnami https://charts.bitnami.com
+#  helm install elastik bitnami/elasticsearch   --set global.storageClass=csi-cephfs,master.persistence.storageClass=csi-cephfs,data.persistence.storageClass=csi-cephfs,image.pullPolicy=Always
+
+# to remove
+# helm delete  elastik

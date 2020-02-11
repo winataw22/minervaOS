@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: varlog-pv-claim
+  namespace: kube-system
+  labels:
+    app: fluentd
+spec:
+  storageClassName: csi-cephfs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: varlibdockercontainers-pv-claim
+  namespace: kube-system
+  labels:
+    app: fluentd
+spec:
+  storageClassName: csi-cephfs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+    version: v1
+    kubernetes.io/cluster-service: "true"
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+        k8s-app: fluentd-logging
+        version: v1
+        kubernetes.io/cluster-service: "true"
+    spec:
+      serviceAccount: fluentd
+      serviceAccountName: fluentd
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: fluentd
+          image: fluent/fluentd-kubernetes-daemonset:elasticsearch
+          env:
+            - name: FLUENT_ELASTICSEARCH_HOST
+              value: "f505e785.qb0x.com"
+            - name: FLUENT_ELASTICSEARCH_PORT
+              value: "30216"
+            - name: FLUENT_ELASTICSEARCH_SCHEME
+              value: "https"
+            - name: FLUENT_UID
+              value: "0"
+            # X-Pack Authentication
+            # =====================
+            - name: FLUENT_ELASTICSEARCH_USER
+              value: "abf54990f0a286dc5d76"
+            - name: FLUENT_ELASTICSEARCH_PASSWORD
+              value: "75c4bd6f7b"
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: varlog
+          persistentVolumeClaim:
+            claimName: varlog-pv-claim
+        - name: varlibdockercontainers
+          persistentVolumeClaim:
+            claimName: varlibdockercontainers-pv-claim

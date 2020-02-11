@@ -5,7 +5,7 @@ debug=0
 reset=0
 image=zos.efi
 kernelargs=""
-bridge=zos
+bridge=zos0
 graphics="-nographic -nodefaults"
 smp=1
 

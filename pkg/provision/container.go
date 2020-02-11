@@ -37,6 +37,10 @@ type Container struct {
 	FlistStorage string `json:"flist_storage"`
 	// Env env variables to container in format
 	Env map[string]string `json:"env"`
+	// Env env variables to container that the value is encrypted
+	// with the node public key. the env will be exposed to plain
+	// text to the entrypoint.
+	SecretEnv map[string]string `json:"secret_env"`
 	// Entrypoint the process to start inside the container
 	Entrypoint string `json:"entrypoint"`
 	// Interactivity enable Core X as PID 1 on the container
@@ -108,6 +112,14 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 
 	var env []string
 	for k, v := range config.Env {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	for k, v := range config.SecretEnv {
+		v, err := decryptSecret(client, v)
+		if err != nil {
+			return ContainerResult{}, errors.Wrapf(err, "failed to decrypt secret env var '%s'", k)
+		}
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 

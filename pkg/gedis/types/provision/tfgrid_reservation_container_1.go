@@ -14,6 +14,7 @@ type TfgridReservationContainer1 struct {
 	Flist             string                                `json:"flist"`
 	HubURL            string                                `json:"hub_url"`
 	Environment       map[string]string                     `json:"environment"`
+	SecretEnvironment map[string]string                     `json:"secret_environment"`
 	Entrypoint        string                                `json:"entrypoint"`
 	Interactive       bool                                  `json:"interactive"`
 	Volumes           []TfgridReservationContainerMount1    `json:"volumes"`
@@ -27,6 +28,7 @@ func (c TfgridReservationContainer1) ToProvisionType() (provision.Container, str
 		FList:        c.Flist,
 		FlistStorage: c.HubURL,
 		Env:          c.Environment,
+		SecretEnv:    c.SecretEnvironment,
 		Entrypoint:   c.Entrypoint,
 		Interactive:  c.Interactive,
 		Mounts:       make([]provision.Mount, len(c.Volumes)),

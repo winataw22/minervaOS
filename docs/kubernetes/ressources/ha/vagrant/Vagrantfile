@@ -1,0 +1,92 @@
+IMAGE_NAME = "peru/ubuntu-18.04-server-amd64"
+N_MASTER = 2
+N_NODE = 1
+$script_master_OLD_1 = <<-SCRIPT
+echo launching first master...
+sudo apt-get install curl -y
+sudo apt-get install net-tools -y
+curl -fL https://github.com/rancher/k3s/releases/download/v1.17.0%2Bk3s.1/k3s -o k3s
+sudo chmod +x k3s
+alias k='/home/vagrant/k3s kubectl'
+sudo K3S_TOKEN='Ok875Tfs9974MLs9' ./k3s server --tls-san master.lan --cluster-init --write-kubeconfig-mode 644 &
+SCRIPT
+
+$script_master_1 = <<-SCRIPT
+echo launching first master...
+sudo apt-get install curl -y
+sudo apt-get install net-tools -y
+sudo apt-get install htop -y
+curl -sfL https://get.k3s.io | \
+INSTALL_K3S_EXEC=" \
+server \
+--write-kubeconfig-mode 644 \
+-t Ok875Tfs9974MLs9  \
+--cluster-init \
+--tls-san master.lan \
+INSTALL_K3S_VERSION="v1.0.0" \
+sh -
+SCRIPT
+
+$script_master_n = <<-SCRIPT
+echo launching other master...
+sudo apt-get install curl -y
+sudo apt-get install net-tools -y
+sudo apt-get install htop -y
+curl -sfL https://get.k3s.io | \
+INSTALL_K3S_EXEC=" \
+server \
+--write-kubeconfig-mode 644 \
+-t Ok875Tfs9974MLs9  \
+--server https://192.168.50.1:6443 \
+INSTALL_K3S_VERSION="v1.0.0" \
+sh -
+SCRIPT
+
+$script_node_n = <<-SCRIPT
+echo launching node...
+sudo apt-get install curl -y
+sudo apt-get install net-tools -y
+sudo apt-get install htop -y
+curl -sfL https://get.k3s.io | \
+INSTALL_K3S_EXEC=" \
+agent \
+--write-kubeconfig-mode 644 \
+-t Ok875Tfs9974MLs9  \
+--server https://192.168.50.1:6443 \
+INSTALL_K3S_VERSION="v1.0.0" \
+sh -
+SCRIPT
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 2048
+    v.cpus = 2
+  end
+  config.vm.define "k3s-master-1" do |master1|
+    master1.vm.box = IMAGE_NAME
+    master1.vm.network "private_network", ip: "192.168.50.1"
+    master1.vm.hostname = "k3s-master-1"
+    master1.vm.provision "shell", 
+      inline: $script_master_1
+  end
+  (1..N_MASTER).each do |i|
+    config.vm.define "k3s-master-#{i+1}" do |master|
+      master.vm.box = IMAGE_NAME
+      master.vm.network "private_network", ip: "192.168.50.#{i+1}"
+      master.vm.hostname = "k3s-master-#{i+1}"
+      master.vm.provision "shell", 
+        inline: $script_master_n
+    end
+  end
+  (1..N_NODE).each do |i|
+    config.vm.define "node-#{i}" do |node|
+      node.vm.box = IMAGE_NAME
+      node.vm.network "private_network", ip: "192.168.50.#{i + 10}"
+      node.vm.hostname = "node-#{i}"
+      node.vm.provision "shell", 
+        inline: $script_node_n
+    end
+  end
+end
