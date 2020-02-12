@@ -45,7 +45,7 @@ func isHardwareAddrInValidRange(addr net.HardwareAddr) bool {
 	// possible range 2
 	if bytes.Compare(addr[hwMacAddress-len(macPUR2):], macPUR2[:]) <= 0 {
 		return bytes.Compare(macPLR2[:], addr[:len(macPLR2)]) <= 0 &&
-			bytes.Compare(macPR2EL[:], addr[:len(macPR2EL)]) != 0
+			!bytes.Equal(macPR2EL[:], addr[:len(macPR2EL)])
 	}
 	// possible (last) range 3
 	return bytes.Compare(addr[hwMacAddress-len(macPUR3):], macPUR3[:]) <= 0 &&

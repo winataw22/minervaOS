@@ -17,7 +17,7 @@ getdeps:
 	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell
 	@echo "Installing ineffassign" && go install github.com/gordonklaus/ineffassign
 
-verifiers: vet fmt lint cyclo spelling
+verifiers: vet fmt lint cyclo spelling static
 
 vet:
 	@echo "Running $@"
@@ -42,6 +42,9 @@ cyclo:
 
 spelling:
 	misspell -i monitord -error `find .`
+
+static:
+	go run honnef.co/go/tools/cmd/staticcheck -- ./...
 
 # Builds minio, runs the verifiers then runs the tests.
 check: test

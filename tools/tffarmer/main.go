@@ -1,14 +1,11 @@
 package main
 
 import (
-	"path/filepath"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"os"
 
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/tnodb"
@@ -106,46 +103,4 @@ You can specify multime time the ip and gw flag to configure multiple IP on the 
 	if err != nil {
 		log.Fatal().Msg(err.Error())
 	}
-}
-
-func loadFarmID(seedPath string) (pkg.Identifier, error) {
-	if seedPath == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		seedPath = filepath.Join(cwd, "farm.seed")
-	}
-
-	log.Debug().Msgf("loading seed from %s", seedPath)
-	farmID, err := identity.LoadKeyPair(seedPath)
-	if err != nil {
-		return nil, err
-	}
-
-	return farmID, nil
-}
-
-func generateKeyPair(seedPath string) (pkg.Identifier, error) {
-	log.Debug().Msg("generating new key pair")
-	keypair, err := identity.GenerateKeyPair()
-	if err != nil {
-		log.Error().Err(err).Msg("fail to generate key pair for farm identity")
-		return nil, err
-	}
-
-	if seedPath == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		seedPath = filepath.Join(cwd, "farm.seed")
-	}
-
-	if err := keypair.Save(seedPath); err != nil {
-		log.Error().Err(err).Msg("fail to save identity seed on disk")
-		return nil, err
-	}
-
-	return keypair, nil
 }

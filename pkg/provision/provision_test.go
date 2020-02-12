@@ -27,9 +27,7 @@ func (t *TestClient) Request(module string, object zbus.ObjectID, method string,
 	inputs := []interface{}{
 		module, object, method,
 	}
-	for _, arg := range args {
-		inputs = append(inputs, arg)
-	}
+	inputs = append(inputs, args...)
 
 	return zbus.NewResponse("", "", t.Called(inputs...)...)
 }

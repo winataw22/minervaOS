@@ -27,10 +27,10 @@ func JWTUser(token string) (string, error) {
 	t, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		m, ok := token.Method.(*jwt.SigningMethodECDSA)
 		if !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		if token.Header["alg"] != m.Alg() {
-			return nil, fmt.Errorf("Unexpected signing algorithm: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing algorithm: %v", token.Header["alg"])
 		}
 		return pub, nil
 	})

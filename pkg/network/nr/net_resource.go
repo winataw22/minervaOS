@@ -336,7 +336,7 @@ func (nr *NetResource) createNetNS() error {
 		}
 		return nil
 	})
-	return nil
+	return err
 }
 
 // attachToNRBridge creates a macvlan interface in the NR namespace, and attaches

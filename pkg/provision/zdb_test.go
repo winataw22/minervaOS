@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -282,4 +283,13 @@ func Test_findDataVolume(t *testing.T) {
 			}
 		})
 	}
+}
+
+func findDataVolume(mounts []pkg.MountInfo) (string, error) {
+	for _, mount := range mounts {
+		if mount.Target == "/data" {
+			return filepath.Base(mount.Source), nil
+		}
+	}
+	return "", fmt.Errorf("data volume not found")
 }

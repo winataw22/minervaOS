@@ -81,7 +81,7 @@ func main() {
 		Handler: r,
 	}
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
 	go s.ListenAndServe()

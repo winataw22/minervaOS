@@ -142,10 +142,6 @@ func (m *Machine) Start(ctx context.Context, base string) error {
 	return jailed.exec(ctx, base)
 }
 
-func (m *Machine) cfgFilePath(base string) string {
-	return filepath.Join(m.root(base), "config.json")
-}
-
 // Log returns machine log file path
 func (m *Machine) Log(base string) string {
 	return filepath.Join(m.root(base), "machine.log")

@@ -101,12 +101,6 @@ func (s *nodeStore) Add(node directory.TfgridNode2) error {
 func (s *nodeStore) updateTotalCapacity(nodeID string, cap directory.TfgridNodeResourceAmount1) error {
 	return s.updateCapacity(nodeID, "total", cap)
 }
-func (s *nodeStore) updateReservedCapacity(nodeID string, cap directory.TfgridNodeResourceAmount1) error {
-	return s.updateCapacity(nodeID, "reserved", cap)
-}
-func (s *nodeStore) updateUsedCapacity(nodeID string, cap directory.TfgridNodeResourceAmount1) error {
-	return s.updateCapacity(nodeID, "used", cap)
-}
 
 func (s *nodeStore) updateCapacity(nodeID string, t string, cap directory.TfgridNodeResourceAmount1) error {
 	node, err := s.Get(nodeID)

@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/termie/go-shutil"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/types"
 
@@ -42,10 +45,46 @@ const (
 	PublicIfaceName = "public"
 )
 
+var ipamPath = "/var/cache/modules/networkd/lease"
+
 //Create create the NDMZ network namespace and configure its default routes and addresses
 func Create(nodeID pkg.Identifier) error {
+	path := filepath.Join(ipamPath, "ndmz")
 
-	os.RemoveAll("/var/cache/modules/networkd/lease/dmz/")
+	if app.IsFirstBoot("networkd-dmz") {
+		log.Info().Msg("first boot, empty reservation cache")
+
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+
+		// TODO @zaibon: remove once all the network has applies this fix
+
+		// This check ensure we do not delete current lease from the node
+		// running a previous version of this code.
+		// if the old leases directory exists, we copy the content
+		// into the new location and delete the old directory
+		var err error
+		oldFolder := filepath.Join(ipamPath, "dmz")
+		if _, err = os.Stat(oldFolder); err == nil {
+			if err := shutil.CopyTree(oldFolder, path, nil); err != nil {
+				return err
+			}
+			err = os.RemoveAll(oldFolder)
+		} else {
+			err = os.MkdirAll(path, 0770)
+		}
+		if err != nil {
+			return err
+		}
+
+		if err := app.MarkBooted("networkd-dmz"); err != nil {
+			return errors.Wrap(err, "fail to mark provisiond as booted")
+		}
+
+	} else {
+		log.Info().Msg("restart detected, keep IPAM lease cache intact")
+	}
 
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {

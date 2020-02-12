@@ -414,7 +414,7 @@ func waitPidFile(timeout time.Duration, path string, exists bool) error {
 			// or check NOT exist but it is still there
 			// we try again
 			if (exists && os.IsNotExist(err)) || (!exists && err == nil) {
-				break //the select statement
+				time.Sleep(delay)
 			} else if err != nil && !os.IsNotExist(err) {
 				//another error that is NOT IsNotExist.
 				return err
@@ -422,8 +422,6 @@ func waitPidFile(timeout time.Duration, path string, exists bool) error {
 				return nil
 			}
 		}
-
-		<-time.After(delay)
 	}
 }
 

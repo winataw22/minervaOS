@@ -431,13 +431,8 @@ func k8sReservation(i interface{}, nodeID string) types.TfgridWorkloadsReservati
 		SSHKeys:       make([]string, 0, len(k.SSHKeys)),
 	}
 
-	for i, ip := range k.MasterIPs {
-		k8s.MasterIps[i] = ip
-	}
-
-	for i, key := range k.SSHKeys {
-		k8s.SSHKeys[i] = key
-	}
+	copy(k8s.MasterIps, k.MasterIPs)
+	copy(k8s.SSHKeys, k.SSHKeys)
 
 	return k8s
 }

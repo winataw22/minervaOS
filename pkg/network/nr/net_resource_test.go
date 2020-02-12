@@ -111,15 +111,6 @@ func TestCreateBridge(t *testing.T) {
 	netlink.LinkDel(l)
 }
 
-func mustParseCIDR(cidr string) *net.IPNet {
-	ip, ipnet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		panic(err)
-	}
-	ipnet.IP = ip
-	return ipnet
-}
-
 func Test_wgIP(t *testing.T) {
 	type args struct {
 		subnet *net.IPNet

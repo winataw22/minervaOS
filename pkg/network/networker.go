@@ -73,7 +73,7 @@ func validateNetwork(n *pkg.Network) error {
 	}
 
 	if len(n.NetResources) < 1 {
-		return fmt.Errorf("Network needs at least one network resource")
+		return fmt.Errorf("network needs at least one network resource")
 	}
 
 	for _, nr := range n.NetResources {
@@ -101,7 +101,7 @@ func validateNR(nr pkg.NetResource) error {
 		return fmt.Errorf("network resource wireguard public key cannot empty")
 	}
 
-	if nr.WGListenPort <= 0 {
+	if nr.WGListenPort == 0 {
 		return fmt.Errorf("network resource wireguard listen port cannot empty")
 	}
 

@@ -59,11 +59,6 @@ func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.FarmID, version
 	return "(unknown)", nil
 }
 
-type farmRegisterReq struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
 // RegisterFarm implements the IDStore interface
 func (s *httpIDStore) RegisterFarm(tid uint64, name string, email string, wallet []string) (pkg.FarmID, error) {
 	buf := bytes.Buffer{}

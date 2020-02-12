@@ -19,6 +19,7 @@ func TestPublicKeyEncryption(t *testing.T) {
 	cipher, err := Encrypt(msg, pk)
 	require.NoError(t, err)
 	clear, err := Decrypt(cipher, sk)
+	require.NoError(t, err)
 	assert.Equal(t, clear, msg)
 }
 

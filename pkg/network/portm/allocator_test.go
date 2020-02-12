@@ -18,7 +18,7 @@ type testStore struct {
 func newTestStore() *testStore {
 	return &testStore{
 		reserved: make(map[string]mapset.Set),
-		last:     make(map[string]int, 0),
+		last:     make(map[string]int),
 	}
 }
 

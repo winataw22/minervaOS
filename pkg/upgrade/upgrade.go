@@ -19,8 +19,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 )
 
-type hookType string
-
 var (
 	// ErrRestartNeeded is returned if upgraded requires a restart
 	ErrRestartNeeded = fmt.Errorf("restart needed")
@@ -358,7 +356,7 @@ func (u *Upgrader) applyUpgrade(from, to FListEvent) error {
 }
 
 func copyRecursive(source string, destination string, skip ...string) error {
-	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(source, func(path string, info os.FileInfo, _ error) error {
 		rel, err := filepath.Rel(source, path)
 		if err != nil {
 			return err

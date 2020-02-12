@@ -12,7 +12,7 @@ import (
 // in the network with netID, and NetResource.
 func allocateIPv4(networkID string) (*net.IPNet, error) {
 	// FIXME: path to the cache disk shouldn't be hardcoded here
-	store, err := disk.New("dmz", "/var/cache/modules/networkd/lease")
+	store, err := disk.New("ndmz", ipamPath)
 	if err != nil {
 		return nil, err
 	}

@@ -12,17 +12,7 @@ import (
 )
 
 var (
-	dateRe  = regexp.MustCompile(`^(?:(\d{2,4})/)?(\d{2})/(\d{2,4})(?:\s+(\d{1,2})(am|pm)?:(\d{1,2}))?$`)
-	boolMap = map[string]bool{
-		"true":  true,
-		"yes":   true,
-		"y":     true,
-		"1":     true,
-		"false": false,
-		"no":    false,
-		"n":     false,
-		"0":     false,
-	}
+	dateRe = regexp.MustCompile(`^(?:(\d{2,4})/)?(\d{2})/(\d{2,4})(?:\s+(\d{1,2})(am|pm)?:(\d{1,2}))?$`)
 )
 
 // Numeric type. this type is tricky so we just going to handle it as string

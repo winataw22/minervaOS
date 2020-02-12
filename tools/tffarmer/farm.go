@@ -10,7 +10,7 @@ func registerFarm(c *cli.Context) error {
 
 	name := c.Args().First()
 	if name == "" {
-		return fmt.Errorf("A farm name needs to be specified")
+		return fmt.Errorf("farm name needs to be specified")
 	}
 
 	tid := c.Uint64("tid")

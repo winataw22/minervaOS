@@ -25,41 +25,6 @@ func withNetworkNamespace(name string) oci.SpecOpts {
 	)
 }
 
-func withHooks(hooks specs.Hooks) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, spec *oci.Spec) error {
-		spec.Hooks = &hooks
-		return nil
-	}
-}
-
-func capsContain(caps []string, s string) bool {
-	for _, c := range caps {
-		if c == s {
-			return true
-		}
-	}
-	return false
-}
-
-func withAddedCapabilities(caps []string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
-		// setCapabilities(s)
-		for _, c := range caps {
-			for _, cl := range []*[]string{
-				&s.Process.Capabilities.Bounding,
-				&s.Process.Capabilities.Effective,
-				&s.Process.Capabilities.Permitted,
-				&s.Process.Capabilities.Inheritable,
-			} {
-				if !capsContain(*cl, c) {
-					*cl = append(*cl, c)
-				}
-			}
-		}
-		return nil
-	}
-}
-
 func removeRunMount() oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 		for i, mount := range s.Mounts {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -334,10 +333,6 @@ func zdbDecommission(ctx context.Context, reservation *Reservation) error {
 	return nil
 }
 
-func zdbConnectionURL(ip string, port uint16) string {
-	return fmt.Sprintf("tcp://[%s]:%d", ip, port)
-}
-
 func socketDir(containerID pkg.ContainerID) string {
 	return fmt.Sprintf("/var/run/zdb_%s", containerID)
 }
@@ -359,13 +354,4 @@ func isPublic(ip net.IP) bool {
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast())
-}
-
-func findDataVolume(mounts []pkg.MountInfo) (string, error) {
-	for _, mount := range mounts {
-		if mount.Target == "/data" {
-			return filepath.Base(mount.Source), nil
-		}
-	}
-	return "", fmt.Errorf("data volume not found")
 }

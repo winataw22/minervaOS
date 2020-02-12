@@ -26,7 +26,7 @@ func (s *LogType) UnmarshalYAML(unmarshal func(interface{}) error) error {
 // All the type of logging supported by zinit
 const (
 	StdoutLogType LogType = "stdout"
-	RingLogType           = "ring"
+	RingLogType   LogType = "ring"
 )
 
 // InitService represent a Zinit service file

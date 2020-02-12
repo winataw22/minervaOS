@@ -57,6 +57,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/tcnksm/go-input v0.0.0-20180404061846-548a7d7a8ee8
+	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
 	github.com/threefoldtech/zbus v0.1.2
 	github.com/urfave/cli v1.22.1
 	github.com/vishvananda/netlink v1.0.0

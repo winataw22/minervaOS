@@ -47,17 +47,14 @@ func IsPlugged(inf string) bool {
 // IsPluggedTimeout is like IsPlugged but retry for duration time before returning
 func IsPluggedTimeout(name string, duration time.Duration) bool {
 	plugged := false
-	c := time.After(duration)
-	for out := false; out == false; {
+	for !plugged {
 		select {
-		case <-c:
-			out = true
-			break
+		case <-time.After(duration):
+			return false // timeout
 		default:
 			plugged = IsPlugged(name)
 			if plugged {
-				out = true
-				break
+				return true
 			}
 		}
 		time.Sleep(time.Second)

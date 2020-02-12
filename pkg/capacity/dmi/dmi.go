@@ -130,18 +130,6 @@ var dmitypeToString = map[Type]string{
 	TypeManagementControllerHostInterface: "ManagementControllerHostInterface",
 }
 
-var dmiKeywords = map[string]bool{
-	"bios":      true,
-	"system":    true,
-	"baseboard": true,
-	"chassis":   true,
-	"processor": true,
-	"memory":    true,
-	"cache":     true,
-	"connector": true,
-	"slot":      true,
-}
-
 var dmiTypeRegex = regexp.MustCompile("DMI type ([0-9]+)")
 var kvRegex = regexp.MustCompile("(.+?):(.*)")
 
@@ -157,7 +145,7 @@ func Decode() (*DMI, error) {
 
 // dmiTypeToString returns string representation of Type t
 func dmiTypeToString(t Type) string {
-	str, _ := dmitypeToString[t]
+	str := dmitypeToString[t]
 	if str == "" {
 		return fmt.Sprintf("Custom Type %d", t)
 	}

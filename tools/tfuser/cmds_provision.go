@@ -92,16 +92,21 @@ func cmdsProvision(c *cli.Context) error {
 		nodeIDs  = c.StringSlice("node")
 		seedPath = c.String("seed")
 		d        = c.String("duration")
+		duration time.Duration
 		err      error
 	)
 
-	duration, err := time.ParseDuration(d)
-	if err != nil {
-		nrDays, err := strconv.Atoi(d)
+	if d == "" {
+		duration = defaultDuration
+	} else {
+		duration, err = time.ParseDuration(d)
 		if err != nil {
-			return errors.Wrap(err, "unsupported duration format")
+			nrDays, err := strconv.Atoi(d)
+			if err != nil {
+				return errors.Wrap(err, "unsupported duration format")
+			}
+			duration = time.Duration(nrDays) * day
 		}
-		duration = time.Duration(nrDays) * day
 	}
 
 	keypair, err := identity.LoadKeyPair(seedPath)

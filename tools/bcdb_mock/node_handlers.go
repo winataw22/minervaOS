@@ -157,7 +157,7 @@ func (s *nodeStore) registerIfaces(w http.ResponseWriter, r *http.Request) {
 
 	input := []*types.IfaceInfo{}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		log.Printf(err.Error())
+		log.Print(err.Error())
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}

@@ -57,7 +57,7 @@ func Probe(inf string, family int) (bool, error) {
 				return false, err
 			}
 			if hasGW {
-				break
+				return true, nil
 			}
 
 		}

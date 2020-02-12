@@ -22,7 +22,7 @@ type TfgridNode2 struct {
 	ReservedResources TfgridNodeResourceAmount1 `json:"reserved_resources"`
 	Proofs            []TfgridNodeProof1        `json:"proofs"`
 	Ifaces            []TfgridNodeIface1        `json:"ifaces"`
-	PublicConfig      *TfgridNodePublicIface1   `json:"public_config,omitemtpy"`
+	PublicConfig      *TfgridNodePublicIface1   `json:"public_config,omitempty"`
 	WGPorts           []uint                    `json:"wg_ports"`
 	Approved          bool                      `json:"approved"`
 	PublicKeyHex      string                    `json:"public_key_hex"`

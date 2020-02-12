@@ -32,13 +32,8 @@ func (k TfgridWorkloadsReservationK8S1) ToProvisionType() (provision.Kubernetes,
 		SSHKeys:       make([]string, len(k.SSHKeys)),
 	}
 
-	for i, ip := range k.MasterIps {
-		k8s.MasterIPs[i] = ip
-	}
-
-	for i, key := range k.SSHKeys {
-		k8s.SSHKeys[i] = key
-	}
+	copy(k8s.MasterIPs, k.MasterIps)
+	copy(k8s.SSHKeys, k.SSHKeys)
 
 	return k8s, k.NodeID, nil
 }
