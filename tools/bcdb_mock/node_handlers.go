@@ -125,9 +125,10 @@ func (s *nodeStore) cockpitListNodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *nodeStore) registerCapacity(w http.ResponseWriter, r *http.Request) {
 	x := struct {
-		Capacity directory.TfgridNodeResourceAmount1 `json:"capacity,omitempty"`
-		DMI      dmi.DMI                             `json:"dmi,omitempty"`
-		Disks    capacity.Disks                      `json:"disks,omitempty"`
+		Capacity   directory.TfgridNodeResourceAmount1 `json:"capacity,omitempty"`
+		DMI        dmi.DMI                             `json:"dmi,omitempty"`
+		Disks      capacity.Disks                      `json:"disks,omitempty"`
+		Hypervisor []string                            `json:"hypervisor,omitempty"`
 	}{}
 
 	if err := json.NewDecoder(r.Body).Decode(&x); err != nil {
@@ -141,7 +142,7 @@ func (s *nodeStore) registerCapacity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.StoreProof(nodeID, x.DMI, x.Disks); err != nil {
+	if err := s.StoreProof(nodeID, x.DMI, x.Disks, x.Hypervisor); err != nil {
 		httpError(w, err, http.StatusNotFound)
 		return
 	}

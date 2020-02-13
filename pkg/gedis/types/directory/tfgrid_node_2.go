@@ -61,6 +61,7 @@ type TfgridNodeProof1 struct {
 	DiskHash     string                 `json:"disk_hash"`
 	Hardware     map[string]interface{} `json:"hardware"`
 	Disks        map[string]interface{} `json:"disks"`
+	Hypervisor   []string               `json:"hypervisor"`
 }
 
 // Equal test of 2 proofs have the same hashes

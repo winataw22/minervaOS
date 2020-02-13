@@ -46,12 +46,13 @@ func (g *Gedis) UpdateUsedNodeCapacity(node pkg.Identifier, mru, cru, hru, sru u
 }
 
 // SendHardwareProof sends a dump of hardware and disks to BCDB
-func (g *Gedis) SendHardwareProof(node pkg.Identifier, dmi interface{}, disks interface{}) error {
+func (g *Gedis) SendHardwareProof(node pkg.Identifier, dmi interface{}, disks interface{}, hypervisor []string) error {
 	_, err := g.Send("tfgrid.directory.nodes", "add_proof", Args{
 		"node_id": node.Identity(),
 		"proof": map[string]interface{}{
-			"hardware": dmi,
-			"disks":    disks,
+			"hardware":   dmi,
+			"disks":      disks,
+			"hypervisor": hypervisor,
 		},
 	})
 

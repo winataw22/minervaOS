@@ -1,6 +1,10 @@
 package capacity
 
 import (
+	"fmt"
+	"os/exec"
+	"strings"
+
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
@@ -98,4 +102,21 @@ func (r *ResourceOracle) Disks() (d Disks, err error) {
 	d.Aggregator = "0-OS smartctl aggregator"
 
 	return
+}
+
+//GetHypervisor gets the name of the hypervisor used on the node
+func (r *ResourceOracle) GetHypervisor() ([]string, error) {
+	out, err := exec.Command("virt-what").CombinedOutput()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not detect if VM or not: %s", string(out))
+	}
+
+	str := strings.TrimSpace(string(out))
+	if len(str) == 0 {
+		return nil, nil
+	}
+
+	lines := strings.Split(str, "\n")
+	return lines, nil
 }

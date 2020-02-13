@@ -134,14 +134,15 @@ func (s *nodeStore) updateUptime(nodeID string, uptime int64) error {
 	return nil
 }
 
-func (s *nodeStore) StoreProof(nodeID string, dmi dmi.DMI, disks capacity.Disks) error {
+func (s *nodeStore) StoreProof(nodeID string, dmi dmi.DMI, disks capacity.Disks, hypervisor []string) error {
 	node, err := s.Get(nodeID)
 	if err != nil {
 		return err
 	}
 
 	proof := directory.TfgridNodeProof1{
-		Created: schema.Date{Time: time.Now()},
+		Created:    schema.Date{Time: time.Now()},
+		Hypervisor: hypervisor,
 	}
 
 	proof.Hardware = map[string]interface{}{
@@ -166,8 +167,10 @@ func (s *nodeStore) StoreProof(nodeID string, dmi dmi.DMI, disks capacity.Disks)
 
 	// don't save the proof if we already have one with the same
 	// hash/content
-	for _, p := range node.Proofs {
-		if proof.Equal(p) {
+	for i := range node.Proofs {
+		if proof.Equal(node.Proofs[i]) {
+			// update hypervisor content
+			node.Proofs[i].Hypervisor = hypervisor
 			return nil
 		}
 	}

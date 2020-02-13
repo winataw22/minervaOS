@@ -135,6 +135,7 @@ func main() {
 		}
 	}(ctx, chIface)
 
+	log.Info().Msg("start zbus server")
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Fatal().Err(err).Msg("unexpected error")
 	}

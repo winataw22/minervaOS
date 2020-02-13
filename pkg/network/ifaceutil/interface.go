@@ -46,10 +46,12 @@ func IsPlugged(inf string) bool {
 
 // IsPluggedTimeout is like IsPlugged but retry for duration time before returning
 func IsPluggedTimeout(name string, duration time.Duration) bool {
+	log.Info().Str("iface", name).Msg("check if interface has a cable plugged in")
+	c := time.After(duration)
 	plugged := false
 	for !plugged {
 		select {
-		case <-time.After(duration):
+		case <-c:
 			return false // timeout
 		default:
 			plugged = IsPlugged(name)

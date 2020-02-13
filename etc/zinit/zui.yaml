@@ -1,4 +1,8 @@
-exec: openvt -s -c 3 -w -- zui -broker unix:///var/run/redis.sock
+# we make sure to kill any other running instance of zui before
+# starting a new one. this way we make sure that tty is always free
+# and also to work around the fact that openvt doesn't forward the signal
+# to it's children.
+exec: sh -c 'pkill zui; openvt -s -c 3 -w -- zui -broker unix:///var/run/redis.sock'
 after:
   - capacityd
   - quiet

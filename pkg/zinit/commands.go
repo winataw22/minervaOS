@@ -2,10 +2,8 @@ package zinit
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -242,7 +240,7 @@ func (c *Client) StopWait(timeout time.Duration, service string) error {
 	for {
 		select {
 		case <-deadline:
-			return c.Kill(service, syscall.SIGKILL)
+			return c.Kill(service, SIGKILL)
 		default:
 			status, err := c.Status(service)
 			if err != nil {
@@ -279,8 +277,8 @@ func (c *Client) Forget(service string) error {
 	return err
 }
 
-// Kill sends a signal to a running service.
-func (c *Client) Kill(service string, sig os.Signal) error {
-	_, err := c.cmd(fmt.Sprintf("kill %s %s", service, sig.String()))
+// Kill sends a signal to a running service. sig must be a valid signal (SIGINT, SIGKILL,...)
+func (c *Client) Kill(service string, sig Signal) error {
+	_, err := c.cmd(fmt.Sprintf("kill %s %s", service, string(sig)))
 	return err
 }
