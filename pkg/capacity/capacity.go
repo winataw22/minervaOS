@@ -1,10 +1,10 @@
 package capacity
 
 import (
-	"fmt"
 	"os/exec"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
@@ -109,7 +109,7 @@ func (r *ResourceOracle) GetHypervisor() ([]string, error) {
 	out, err := exec.Command("virt-what").CombinedOutput()
 
 	if err != nil {
-		return nil, fmt.Errorf("could not detect if VM or not: %s", string(out))
+		return nil, errors.Wrap(err, "could not detect if VM or not")
 	}
 
 	str := strings.TrimSpace(string(out))
