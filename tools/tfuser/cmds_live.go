@@ -93,6 +93,19 @@ func printResult(r res) {
 		}
 
 		fmt.Printf("\tnetwork ID: %s\n", data.Name)
+
+	case provision.KubernetesReservation:
+		data := provision.Kubernetes{}
+		if err := json.Unmarshal(r.Data, &data); err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("\tip: %v", data.IP)
+		if data.MasterIPs == nil || len(data.MasterIPs) == 0 {
+			fmt.Print(" master\n")
+		} else {
+			fmt.Printf("\n")
+		}
 	}
 }
 

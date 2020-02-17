@@ -2,8 +2,6 @@ package provision
 
 import (
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 // ReservationGetter define the interface how to get
@@ -46,10 +44,6 @@ func (c *ownerCache) OwnerOf(reservationID string) (string, error) {
 
 	if r == nil {
 		return "", fmt.Errorf("failed to get owner of reservation %s", reservationID)
-	}
-
-	if err := Verify(r); err != nil {
-		return "", errors.Wrapf(err, "failed to get owner of reservation %s", reservationID)
 	}
 
 	return r.User, nil

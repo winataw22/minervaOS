@@ -100,8 +100,8 @@ func AttachNicWithMac(link netlink.Link, bridge *netlink.Bridge) error {
 }
 
 // DetachNic detaches an interface from a bridge
-func DetachNic(bridge *netlink.Bridge) error {
-	return netlink.LinkSetNoMaster(bridge)
+func DetachNic(link netlink.Link) error {
+	return netlink.LinkSetNoMaster(link)
 }
 
 func filterBridge(links []netlink.Link) []*netlink.Bridge {

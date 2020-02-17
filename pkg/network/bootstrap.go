@@ -89,7 +89,7 @@ func Bootstrap() error {
 		valid, err := dhcp.Probe(br.Name, netlink.FAMILY_ALL)
 		if err != nil {
 			log.Warn().Err(err).Str("device", device.Name).Msg("dhcp probing unexpected error")
-			if err := bridge.DetachNic(br); err != nil {
+			if err := bridge.DetachNic(device); err != nil {
 				log.Warn().Err(err).Str("device", device.Name).Msg("error detaching device from default bridge")
 			}
 			continue
@@ -99,7 +99,8 @@ func Bootstrap() error {
 			defaultGW = device
 			break
 		} else {
-			if err := bridge.DetachNic(br); err != nil {
+			log.Info().Msgf("not IP received, detaching %s from zos bridge", device.Name)
+			if err := bridge.DetachNic(device); err != nil {
 				log.Warn().Err(err).Str("device", device.Name).Msg("error detaching device from default bridge")
 			}
 		}
