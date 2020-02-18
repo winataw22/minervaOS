@@ -119,9 +119,20 @@ func Create(nodeID pkg.Identifier) error {
 	}
 
 	return netNS.Do(func(_ ns.NetNS) error {
+		if err := ifaceutil.SetLoUp(); err != nil {
+			return errors.Wrapf(err, "ndmz: couldn't bring lo up in ndmz namespace")
+		}
 		// first, disable forwarding, so we can get an IPv6 deft route on public from an RA
 		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "0"); err != nil {
 			return errors.Wrapf(err, "ndmz: failed to disable ipv6 forwarding in ndmz namespace")
+		}
+		// also, set kernel parameter that public always accepts an ra even when forwarding
+		if _, err := sysctl.Sysctl("net.ipv6.conf.public.accept_ra", "2"); err != nil {
+			return errors.Wrapf(err, "ndmz: failed to accept_ra=2 in ndmz namespace")
+		}
+		// the more, also accept defaultrouter (if isp doesn't have fe80::1 on his deft gw)
+		if _, err := sysctl.Sysctl("net.ipv6.conf.public.accept_ra_defrtr", "1"); err != nil {
+			return errors.Wrapf(err, "ndmz: failed to enable enable_defrtr=1 in ndmz namespace")
 		}
 		// run DHCP to interface public in ndmz
 		received, err := dhcp.Probe(types.PublicIface, netlink.FAMILY_V4)
@@ -129,7 +140,7 @@ func Create(nodeID pkg.Identifier) error {
 			return err
 		}
 		if !received {
-			return errors.Errorf("public interface in ndmz did not received an IP. make sure dhcp is working")
+			return errors.Errorf("public interface in ndmz did not receive an IPV4 address. make sure dhcp is working")
 		}
 
 		var routes []netlink.Route
@@ -145,7 +156,7 @@ func Create(nodeID pkg.Identifier) error {
 		}
 
 		bo := backoff.NewExponentialBackOff()
-		bo.MaxElapsedTime = 15 * time.Second
+		bo.MaxElapsedTime = 122 * time.Second // default RA from router is every 60 secs
 		if err := backoff.Retry(getRoutes, bo); err != nil {
 			return err
 		}
@@ -154,24 +165,9 @@ func Create(nodeID pkg.Identifier) error {
 			if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
 				return errors.Wrapf(err, "ndmz: failed to enable ipv6 forwarding in ndmz namespace")
 			}
-			pubiface, err := netlink.LinkByName(types.PublicIface)
-			if err != nil {
-				return errors.Wrapf(err, "ndmz:couldn't find public iface")
-			}
-			deftgw := &netlink.Route{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("::"),
-					Mask: net.CIDRMask(0, 128),
-				},
-				Gw:        routes[0].Gw,
-				LinkIndex: pubiface.Attrs().Index,
-			}
-			if err = netlink.RouteAdd(deftgw); err != nil {
-				return errors.Wrapf(err, "could not reapply the default route")
-			}
 		}
+		return nil
 
-		return ifaceutil.SetLoUp()
 	})
 }
 

@@ -1,1 +1,171 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/4c2892fd74bf887b47b2acba405d9bcd
+name: Runtime packages
+on: 
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - v*
+    paths:
+      - 'bins/**'
+      - '.github/workflows/bins-extra-development'
+
+jobs:
+  containerd:
+    name: 'Package: containerd'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package containerd
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/containerd
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: containerd.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+
+  firecracker:
+    name: 'Package: firecracker'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package firecracker
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/firecracker
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: firecracker.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+
+  promtail:
+    name: 'Package: promtail'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package promtail
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/promtail
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: promtail.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+  
+  virtwhat:
+    name: 'Package: virtwhat'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package virtwhat
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/virtwhat
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: virtwhat.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
