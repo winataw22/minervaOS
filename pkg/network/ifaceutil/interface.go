@@ -87,19 +87,11 @@ func HasDefaultGW(link netlink.Link, family int) (bool, net.IP, error) {
 		return false, nil, nil
 	}
 
-	log.Info().Msg("IP addresses found")
-	for _, addr := range addrs {
-		log.Info().
-			Str("interface", link.Attrs().Name).
-			IPAddr("ip", addr.IP).Send()
-	}
-
 	routes, err := netlink.RouteList(link, family)
 	if err != nil {
 		return false, nil, err
 	}
 
-	log.Info().Msg("routes found")
 	for i, route := range routes {
 		log.Info().
 			Str("interface", link.Attrs().Name).

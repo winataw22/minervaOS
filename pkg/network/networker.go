@@ -694,9 +694,9 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 		log.Fatal().Err(err).Msg("failed to listen to netlink address updates")
 	}
 
-	link, err := netlink.LinkByName(DefaultBridge)
+	link, err := netlink.LinkByName(types.DefaultBridge)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not find the '%s' bridge", DefaultBridge)
+		log.Fatal().Err(err).Msgf("could not find the '%s' bridge", types.DefaultBridge)
 	}
 
 	get := func() pkg.NetlinkAddresses {

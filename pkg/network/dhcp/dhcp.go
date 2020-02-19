@@ -2,66 +2,52 @@ package dhcp
 
 import (
 	"os/exec"
-	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
-	"github.com/vishvananda/netlink"
 )
 
-// Probe will do a dhcp request on the interface inf
-// if the interface gets a lease from the dhcp server, dhcpProbe return true and a nil error
-// if something unexpected happens a non nil error is return
-// if the interface didn't receive an lease, false and a nil error is returns
-func Probe(inf string, family int) (bool, error) {
-	link, err := netlink.LinkByName(inf)
-	if err != nil {
-		return false, err
-	}
+// Probe is used to do some DHCP request on a interface
+type Probe struct {
+	cmd *exec.Cmd
+}
 
-	cmd := exec.Command("udhcpc",
+// NewPrope returns a Probe
+func NewPrope() *Probe {
+	return &Probe{}
+}
+
+// Start starts the DHCP client process
+func (d *Probe) Start(inf string) error {
+
+	d.cmd = exec.Command("udhcpc",
 		"-f", //foreground
 		"-i", inf,
-		"-t", "3", //try 3 times before giving up
-		"-A", "3", //wait 3 seconds between each trial
+		"-t", "5", //try 5 times before giving up
+		"-A", "20", //wait 20 seconds between each trial
 		"-s", "/usr/share/udhcp/simple.script",
 		"--now", // exit if lease is not obtained
 	)
 
-	if err := cmd.Start(); err != nil {
-		return false, err
+	log.Debug().Msgf("start udhcp: %v", d.cmd.String())
+	if err := d.cmd.Start(); err != nil {
+		return err
 	}
 
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			log.Error().Err(err).Send()
-		}
+	return nil
+}
 
-		_ = cmd.Wait()
-	}()
-
-	timeout := time.After(time.Second * 10)
-	var (
-		hasGW = false
-		stay  = true
-	)
-
-	for !hasGW && stay {
-		time.Sleep(time.Second)
-		select {
-		case <-timeout:
-			stay = false
-		default:
-			hasGW, _, err = ifaceutil.HasDefaultGW(link, family)
-			if err != nil {
-				return false, err
-			}
-			if hasGW {
-				return true, nil
-			}
-
-		}
+// Stop kills the DHCP client process
+func (d *Probe) Stop() error {
+	if d.cmd.ProcessState != nil && d.cmd.ProcessState.Exited() {
+		return nil
 	}
 
-	return hasGW, nil
+	if err := d.cmd.Process.Kill(); err != nil {
+		log.Error().Err(err).Msg("could not kill proper")
+		return err
+	}
+
+	_ = d.cmd.Wait()
+
+	return nil
 }

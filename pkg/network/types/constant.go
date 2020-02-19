@@ -8,4 +8,8 @@ const (
 	PublicIface = "public"
 	// GatewayNamespace is the name of the gateway namespace of a node
 	GatewayNamespace = "gateway"
+
+	// DefaultBridge is the name of the default bridge created
+	// by the bootstrap of networkd
+	DefaultBridge = "zos"
 )

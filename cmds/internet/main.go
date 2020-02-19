@@ -8,14 +8,18 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/vishvananda/netlink"
 
 	"github.com/threefoldtech/zos/pkg/app"
-	"github.com/threefoldtech/zos/pkg/network"
+	"github.com/threefoldtech/zos/pkg/network/bootstrap"
+	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"github.com/threefoldtech/zos/pkg/version"
-	"github.com/threefoldtech/zos/pkg/zinit"
 )
 
 func main() {
@@ -35,7 +39,7 @@ func main() {
 		return
 	}
 
-	if err := bootstrap(); err != nil {
+	if err := configureZOS(); err != nil {
 		log.Error().Err(err).Msg("failed to bootstrap network")
 		os.Exit(1)
 	}
@@ -68,7 +72,7 @@ func check() error {
 	return backoff.RetryNotify(f, backoff.NewExponentialBackOff(), errHandler)
 }
 
-func bootstrap() error {
+func configureZOS() error {
 	f := func() error {
 
 		z, err := zinit.New("")
@@ -78,15 +82,52 @@ func bootstrap() error {
 		}
 
 		log.Info().Msg("Start network bootstrap")
-		if err := network.Bootstrap(); err != nil {
-			log.Error().Err(err).Msg("fail to boostrap network")
+
+		ifaceConfigs, err := bootstrap.InspectIfaces()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to gather network interfaces configuration")
 			return err
+		}
+
+		zosChild, err := bootstrap.SelectZOS(ifaceConfigs)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to select a valid interface for zos bridge")
+			return err
+		}
+
+		br, err := bootstrap.CreateDefaultBridge(types.DefaultBridge)
+		if err != nil {
+			return err
+		}
+
+		time.Sleep(time.Second) // this is dirty
+
+		link, err := netlink.LinkByName(zosChild)
+		if err != nil {
+			return errors.Wrapf(err, "could not get link %s", zosChild)
+		}
+
+		log.Info().
+			Str("device", link.Attrs().Name).
+			Str("bridge", br.Name).
+			Msg("attach interface to bridge")
+
+		if err := bridge.AttachNicWithMac(link, br); err != nil {
+			log.Error().Err(err).
+				Str("device", link.Attrs().Name).
+				Str("bridge", br.Name).
+				Msg("fail to attach device to bridge")
+			return err
+		}
+
+		if err := netlink.LinkSetUp(link); err != nil {
+			return errors.Wrapf(err, "could not bring %s up", zosChild)
 		}
 
 		log.Info().Msg("writing udhcp init service")
 
 		err = zinit.AddService("dhcp-zos", zinit.InitService{
-			Exec:    fmt.Sprintf("/sbin/udhcpc -v -f -i %s -s /usr/share/udhcp/simple.script", network.DefaultBridge),
+			Exec:    fmt.Sprintf("/sbin/udhcpc -v -f -i %s -s /usr/share/udhcp/simple.script", types.DefaultBridge),
 			Oneshot: false,
 			After:   []string{},
 		})
@@ -100,6 +141,12 @@ func bootstrap() error {
 			log.Error().Err(err).Msg("fail to start monitoring dhcp-zos zinit service")
 			return err
 		}
+
+		if err := z.Start("dhcp-zos"); err != nil {
+			log.Error().Err(err).Msg("fail to start dhcp-zos zinit service")
+			return err
+		}
+
 		return nil
 	}
 
