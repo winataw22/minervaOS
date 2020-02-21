@@ -678,7 +678,7 @@ func (n *networker) monitorNS(ctx context.Context, name, link string) <-chan pkg
 }
 
 func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.PublicIfaceName)
+	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.DMZPub4)
 }
 
 func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {

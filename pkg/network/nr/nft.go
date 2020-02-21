@@ -13,26 +13,7 @@ func init() {
 var _nft = `
 flush ruleset
 
-table ip nat {
-  chain prerouting {
-    type nat hook prerouting priority dstnat; policy accept;
-  }
-
-  chain input {
-    type nat hook input priority 100; policy accept;
-  }
-
-  chain output {
-    type nat hook output priority -100; policy accept;
-  }
-
-  chain postrouting {
-    type nat hook postrouting priority srcnat; policy accept;
-    oifname "public" masquerade fully-random;
-  }
-}
-
-table ip6 nat {
+table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
   }
