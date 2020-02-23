@@ -134,8 +134,13 @@ func Create(nodeID pkg.Identifier) error {
 		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.accept_ra_defrtr", DMZPub6), "1"); err != nil {
 			return errors.Wrapf(err, "ndmz: failed to enable enable_defrtr=1 in ndmz namespace")
 		}
+		// ipv4InterfaceArpProxySysctlTemple sets proxy_arp by default, not sure if that's a good idea
+		// but we disable only here because the rest works.
+		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv4.conf.%s.proxy_arp", DMZPub6), "0"); err != nil {
+			return errors.Wrapf(err, "ndmz: couldn't disable proxy-arp on %s in ndmz namespace", DMZPub6)
+		}
 		// run DHCP to interface public in ndmz
-		probe := dhcp.NewPrope()
+		probe := dhcp.NewProbe()
 
 		if err := probe.Start(DMZPub4); err != nil {
 			return err

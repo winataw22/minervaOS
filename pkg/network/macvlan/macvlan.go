@@ -49,8 +49,12 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		// TODO: duplicate following lines for ipv6 support, when it will be added in other places
+
+		// containernetworking sets it up in some ref code somewhere, we copied it. we were stoopit
+		// disable proxy_arp, as it is ony useful in some very distinct cases, and otherwise can wreak
+		// havoc in networks -> 0!
 		ipv4SysctlValueName := fmt.Sprintf(ipv4InterfaceArpProxySysctlTemplate, tmpName)
-		if _, err := sysctl.Sysctl(ipv4SysctlValueName, "1"); err != nil {
+		if _, err := sysctl.Sysctl(ipv4SysctlValueName, "0"); err != nil {
 			// remove the newly added link and ignore errors, because we already are in a failed state
 			_ = netlink.LinkDel(mv)
 			return fmt.Errorf("failed to set proxy_arp on newly added interface %q: %v", tmpName, err)

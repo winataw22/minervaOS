@@ -11,8 +11,8 @@ type Probe struct {
 	cmd *exec.Cmd
 }
 
-// NewPrope returns a Probe
-func NewPrope() *Probe {
+// NewProbe returns a Probe
+func NewProbe() *Probe {
 	return &Probe{}
 }
 

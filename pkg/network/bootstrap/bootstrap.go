@@ -117,7 +117,7 @@ func analyseLink(cAddrs chan IfaceConfig, link netlink.Link) error {
 
 		log.Info().Str("interface", name).Msg("start DHCP probe")
 
-		probe := dhcp.NewPrope()
+		probe := dhcp.NewProbe()
 		if err := probe.Start(name); err != nil {
 			return errors.Wrap(err, "error duging DHCP probe")
 		}
