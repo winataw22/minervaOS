@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
@@ -69,6 +71,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctx, _ = utils.WithSignal(ctx)
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
 	ifaces, err := getLocalInterfaces()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read local network interfaces")
@@ -76,19 +83,6 @@ func main() {
 	if err := publishIfaces(ifaces, nodeID, db); err != nil {
 		log.Fatal().Err(err).Msg("failed to publish network interfaces to BCDB")
 	}
-
-	go func() {
-		ifaceNames := make([]string, len(ifaces))
-		for i, iface := range ifaces {
-			ifaceNames[i] = iface.Name
-		}
-		log.Info().Msgf("watched interfaces %v", ifaceNames)
-		wl := NewWatchedLinks(ifaceNames, nodeID, db)
-
-		if err := WatchAddrs(ctx, wl.CallBack); err != nil {
-			log.Fatal().Err(err).Msg("error while watching network interfaces addresses")
-		}
-	}()
 
 	ifaceVersion := -1
 	exitIface, err := db.GetPubIface(nodeID)
@@ -136,6 +130,8 @@ func main() {
 		}
 	}(ctx, chIface)
 
+	go startAddrWatch(ctx, nodeID, db, ifaces)
+
 	log.Info().Msg("start zbus server")
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Fatal().Err(err).Msg("unexpected error")
@@ -156,16 +152,34 @@ func startServer(ctx context.Context, broker string, networker pkg.Networker) er
 		Uint("worker nr", 1).
 		Msg("starting networkd module")
 
-	ctx, _ = utils.WithSignal(ctx)
-	utils.OnDone(ctx, func(_ error) {
-		log.Info().Msg("shutting down")
-	})
-
 	if err := server.Run(ctx); err != nil && err != context.Canceled {
 		return err
 	}
 
 	return nil
+}
+
+func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB, ifaces []types.IfaceInfo) {
+
+	ifaceNames := make([]string, len(ifaces))
+	for i, iface := range ifaces {
+		ifaceNames[i] = iface.Name
+	}
+	log.Info().Msgf("watched interfaces %v", ifaceNames)
+
+	f := func() error {
+		wl := NewWatchedLinks(ifaceNames, nodeID, db)
+		if err := wl.Forever(ctx); err != nil {
+			log.Error().Err(err).Msg("error in address watcher")
+			return err
+		}
+		return nil
+	}
+
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxInterval = time.Minute
+	bo.MaxElapsedTime = 0 // retry forever
+	backoff.Retry(f, bo)
 }
 
 // instantiate the proper client based on the running mode

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 
@@ -35,7 +36,7 @@ func NewWatchedLinks(linkNames []string, nodeID pkg.Identifier, db network.TNoDB
 	}
 }
 
-func (w WatchedLinks) CallBack(update netlink.AddrUpdate) error {
+func (w WatchedLinks) callBack(update netlink.AddrUpdate) error {
 	link, err := netlink.LinkByIndex(update.LinkIndex)
 	if err != nil {
 		return nil
@@ -54,6 +55,36 @@ func (w WatchedLinks) CallBack(update netlink.AddrUpdate) error {
 	}
 
 	return publishIfaces(ifaces, w.nodeID, w.bcdb)
+}
+
+func (w WatchedLinks) Forever(ctx context.Context) error {
+	ch := make(chan netlink.AddrUpdate)
+	done := make(chan struct{})
+	defer close(done)
+
+	log.Info().Msg("start netlink addr subscription")
+	if err := netlink.AddrSubscribe(ch, done); err != nil {
+		return err
+	}
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			return nil
+
+		case update, ok := <-ch:
+			if !ok {
+				log.Error().Msg("netlink address subscription exited")
+				return fmt.Errorf("netlink closed the subscription channel")
+			}
+
+			log.Debug().Msgf("addr update received %+v", update)
+			if err := w.callBack(update); err != nil {
+				log.Error().Err(err).Msg("addr watcher: error during callback")
+			}
+		}
+	}
 }
 
 func getLocalInterfaces() ([]types.IfaceInfo, error) {
@@ -123,30 +154,4 @@ func publishIfaces(ifaces []types.IfaceInfo, id pkg.Identifier, db network.TNoDB
 	}
 
 	return nil
-}
-
-func WatchAddrs(ctx context.Context, cb func(update netlink.AddrUpdate) error) error {
-	ch := make(chan netlink.AddrUpdate)
-	done := make(chan struct{})
-	defer close(done)
-
-	log.Info().Msg("start netlink addr subscription")
-	if err := netlink.AddrSubscribe(ch, done); err != nil {
-		return err
-	}
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return nil
-
-		case update := <-ch:
-			log.Debug().Msgf("addr update received %+v", update)
-			if err := cb(update); err != nil {
-				log.Error().Err(err).Msg("addr watcher: error during callback")
-			}
-		}
-
-	}
 }
