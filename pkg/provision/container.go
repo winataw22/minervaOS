@@ -265,8 +265,10 @@ func containerDecommission(ctx context.Context, reservation *Reservation) error 
 	}
 
 	netID := networkID(reservation.User, string(config.Network.NetworkID))
-	if err := networkMgr.Leave(netID, string(containerID)); err != nil {
-		return errors.Wrap(err, "failed to delete container network namespace")
+	if _, err := networkMgr.GetSubnet(netID); err == nil { // simple check to make sure the network still exists on the node
+		if err := networkMgr.Leave(netID, string(containerID)); err != nil {
+			return errors.Wrap(err, "failed to delete container network namespace")
+		}
 	}
 
 	return nil

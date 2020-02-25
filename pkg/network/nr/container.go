@@ -78,6 +78,7 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 			}}); err != nil && !os.IsExist(err) {
 				return err
 			}
+			join.IPv4 = addr
 		}
 
 		if !publicIP6 {
@@ -92,6 +93,7 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 			}}); err != nil && !os.IsExist(err) {
 				return err
 			}
+			join.IPv6 = ipv6
 		}
 
 		ipnet := nr.resource.Subnet
