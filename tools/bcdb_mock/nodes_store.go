@@ -102,6 +102,10 @@ func (s *nodeStore) updateTotalCapacity(nodeID string, cap directory.TfgridNodeR
 	return s.updateCapacity(nodeID, "total", cap)
 }
 
+func (s *nodeStore) updateReservedCapacity(nodeID string, cap directory.TfgridNodeResourceAmount1) error {
+	return s.updateCapacity(nodeID, "reserved", cap)
+}
+
 func (s *nodeStore) updateCapacity(nodeID string, t string, cap directory.TfgridNodeResourceAmount1) error {
 	node, err := s.Get(nodeID)
 	if err != nil {

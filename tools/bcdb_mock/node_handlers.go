@@ -252,3 +252,33 @@ func (s *nodeStore) updateUptimeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	w.WriteHeader(http.StatusOK)
 }
+
+func (s *nodeStore) updateUsedResources(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	u := struct {
+		SRU int64 `json:"sru,omitempty"`
+		HRU int64 `json:"hru,omitempty"`
+		MRU int64 `json:"mru,omitempty"`
+		CRU int64 `json:"cru,omitempty"`
+	}{}
+	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	nodeID := mux.Vars(r)["node_id"]
+
+	usedRescources := directory.TfgridNodeResourceAmount1{
+		Cru: int64(u.CRU),
+		Sru: int64(u.SRU),
+		Hru: int64(u.HRU),
+		Mru: int64(u.MRU),
+	}
+
+	if err := s.updateReservedCapacity(nodeID, usedRescources); err != nil {
+		httpError(w, err, http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}

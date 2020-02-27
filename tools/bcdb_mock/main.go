@@ -56,6 +56,7 @@ func main() {
 	router.HandleFunc("/nodes/{node_id}/capacity", nodeStore.registerCapacity).Methods("POST")
 	router.HandleFunc("/nodes/{node_id}/uptime", nodeStore.updateUptimeHandler).Methods("POST")
 	router.HandleFunc("/nodes", nodeStore.listNodes).Methods("GET")
+	router.HandleFunc("/nodes/{node_id}/used_resources", nodeStore.updateUsedResources).Methods("PUT")
 
 	router.HandleFunc("/farms", farmStore.registerFarm).Methods("POST")
 	router.HandleFunc("/farms", farmStore.listFarm).Methods("GET")

@@ -11,28 +11,27 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/versioned"
 )
 
 // Counter interface
 type Counter interface {
-	// Increment counter atomically by one
-	Increment() int64
-	// Decrement counter atomically by one
-	Decrement() int64
+	// Increment counter atomically by v
+	Increment(v int64) int64
+	// Decrement counter atomically by v
+	Decrement(v int64) int64
 	// Current returns the current value
 	Current() int64
 }
 
 type counterNop struct{}
 
-func (c *counterNop) Increment() int64 {
+func (c *counterNop) Increment(v int64) int64 {
 	return 0
 }
 
-func (c *counterNop) Decrement() int64 {
+func (c *counterNop) Decrement(v int64) int64 {
 	return 0
 }
 
@@ -44,13 +43,13 @@ func (c *counterNop) Current() int64 {
 type counterImpl int64
 
 // Increment counter atomically by one
-func (c *counterImpl) Increment() int64 {
-	return atomic.AddInt64((*int64)(c), 1)
+func (c *counterImpl) Increment(v int64) int64 {
+	return atomic.AddInt64((*int64)(c), v)
 }
 
 // Decrement counter atomically by one
-func (c *counterImpl) Decrement() int64 {
-	return atomic.AddInt64((*int64)(c), -1)
+func (c *counterImpl) Decrement(v int64) int64 {
+	return atomic.AddInt64((*int64)(c), -v)
 }
 
 // Current returns the current value
@@ -58,21 +57,31 @@ func (c *counterImpl) Current() int64 {
 	return atomic.LoadInt64((*int64)(c))
 }
 
-// FSStore is a in reservation store
-// using the filesystem as backend
-type FSStore struct {
-	sync.RWMutex
-	root string
+type (
+	// FSStore is a in reservation store
+	// using the filesystem as backend
+	FSStore struct {
+		sync.RWMutex
+		root     string
+		counters Counters
+	}
 
-	counters struct {
+	// Counters tracks the amount of primitives workload deployed and
+	// the amount of resource unit used
+	Counters struct {
 		containers counterImpl
 		volumes    counterImpl
 		networks   counterImpl
-		zdb        counterImpl
-		vm         counterImpl
-		debug      counterImpl
+		zdbs       counterImpl
+		vms        counterImpl
+		debugs     counterImpl
+
+		SRU counterImpl
+		HRU counterImpl
+		MRU counterImpl
+		CRU counterImpl
 	}
-}
+)
 
 // NewFSStore creates a in memory reservation store
 func NewFSStore(root string) (*FSStore, error) {
@@ -81,33 +90,54 @@ func NewFSStore(root string) (*FSStore, error) {
 		if err := os.RemoveAll(root); err != nil {
 			return nil, err
 		}
-		if err := os.MkdirAll(root, 0770); err != nil {
-			return nil, err
-		}
 
 		if err := app.MarkBooted("provisiond"); err != nil {
 			return nil, errors.Wrap(err, "fail to mark provisiond as booted")
 		}
-
-	} else {
-		log.Info().Msg("restart detected, keep reservation cache intact")
 	}
 
-	return &FSStore{
+	if err := os.MkdirAll(root, 0770); err != nil {
+		return nil, err
+	}
+
+	log.Info().Msg("restart detected, keep reservation cache intact")
+
+	store := &FSStore{
 		root: root,
-	}, nil
+	}
+
+	return store, store.sync()
+}
+
+func (s *FSStore) sync() error {
+	s.RLock()
+	defer s.RUnlock()
+
+	infos, err := ioutil.ReadDir(s.root)
+	if err != nil {
+		return err
+	}
+
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
+		}
+
+		r, err := s.get(info.Name())
+		if err != nil {
+			return err
+		}
+
+		s.counterFor(r.Type).Increment(1)
+		s.processResourceUnits(r, true)
+	}
+
+	return nil
 }
 
 // Counters returns stats about the cashed reservations
-func (s *FSStore) Counters() pkg.ProvisionCounters {
-	return pkg.ProvisionCounters{
-		Container: s.counters.containers.Current(),
-		Volume:    s.counters.volumes.Current(),
-		Network:   s.counters.networks.Current(),
-		ZDB:       s.counters.zdb.Current(),
-		VM:        s.counters.vm.Current(),
-		Debug:     s.counters.debug.Current(),
-	}
+func (s *FSStore) Counters() Counters {
+	return s.counters
 }
 
 func (s *FSStore) counterFor(typ ReservationType) Counter {
@@ -119,11 +149,11 @@ func (s *FSStore) counterFor(typ ReservationType) Counter {
 	case NetworkReservation:
 		return &s.counters.networks
 	case ZDBReservation:
-		return &s.counters.zdb
+		return &s.counters.zdbs
 	case DebugReservation:
-		return &s.counters.debug
+		return &s.counters.debugs
 	case KubernetesReservation:
-		return &s.counters.vm
+		return &s.counters.vms
 	default:
 		// this will avoid nil pointer
 		return &counterNop{}
@@ -157,7 +187,10 @@ func (s *FSStore) Add(r *Reservation) error {
 		return err
 	}
 
-	s.counterFor(r.Type).Increment()
+	s.counterFor(r.Type).Increment(1)
+	if err := s.processResourceUnits(r, true); err != nil {
+		return errors.Wrapf(err, "could not compute the amount of resource used by reservation %s", r.ID)
+	}
 
 	return nil
 }
@@ -181,7 +214,10 @@ func (s *FSStore) Remove(id string) error {
 		return err
 	}
 
-	s.counterFor(r.Type).Decrement()
+	s.counterFor(r.Type).Decrement(1)
+	if err := s.processResourceUnits(r, false); err != nil {
+		return errors.Wrapf(err, "could not compute the amount of resource used by reservation %s", r.ID)
+	}
 
 	return nil
 }
@@ -203,7 +239,7 @@ func (s *FSStore) GetExpired() ([]*Reservation, error) {
 			continue
 		}
 
-		r, err := s.Get(info.Name())
+		r, err := s.get(info.Name())
 		if err != nil {
 			return nil, err
 		}

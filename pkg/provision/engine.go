@@ -20,7 +20,7 @@ type ReservationCache interface {
 	Get(id string) (*Reservation, error)
 	Remove(id string) error
 	Exists(id string) (bool, error)
-	Counters() pkg.ProvisionCounters
+	Counters() Counters
 }
 
 // Feedbacker defines the method that needs to be implemented
@@ -28,9 +28,11 @@ type ReservationCache interface {
 type Feedbacker interface {
 	Feedback(id string, r *Result) error
 	Deleted(id string) error
+	UpdateReservedResources(nodeID string, c Counters) error
 }
 
 type defaultEngine struct {
+	nodeID string
 	source ReservationSource
 	store  ReservationCache
 	fb     Feedbacker
@@ -42,8 +44,9 @@ type defaultEngine struct {
 // the default implementation is a single threaded worker. so it process
 // one reservation at a time. On error, the engine will log the error. and
 // continue to next reservation.
-func New(source ReservationSource, rw ReservationCache, fb Feedbacker) Engine {
+func New(nodeID string, source ReservationSource, rw ReservationCache, fb Feedbacker) Engine {
 	return &defaultEngine{
+		nodeID: nodeID,
 		source: source,
 		store:  rw,
 		fb:     fb,
@@ -90,6 +93,9 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
 					continue
 				}
+			}
+			if err := e.fb.UpdateReservedResources(e.nodeID, e.store.Counters()); err != nil {
+				log.Error().Err(err).Msg("failed to updated the used resources")
 			}
 		}
 	}
@@ -217,9 +223,18 @@ func (e *defaultEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounte
 			case <-ctx.Done():
 			}
 
+			c := e.store.Counters()
+			pc := pkg.ProvisionCounters{
+				Container: int64(c.containers),
+				Network:   int64(c.networks),
+				ZDB:       int64(c.zdbs),
+				Volume:    int64(c.volumes),
+				VM:        int64(c.vms),
+			}
+
 			select {
 			case <-ctx.Done():
-			case ch <- e.store.Counters():
+			case ch <- pc:
 			}
 		}
 	}()
