@@ -1,6 +1,7 @@
 package dhcp
 
 import (
+	"fmt"
 	"os/exec"
 
 	"github.com/rs/zerolog/log"
@@ -22,9 +23,10 @@ func (d *Probe) Start(inf string) error {
 	d.cmd = exec.Command("udhcpc",
 		"-f", //foreground
 		"-i", inf,
-		"-t", "5", //try 5 times before giving up
-		"-A", "20", //wait 20 seconds between each trial
+		"-t", "20", //send 20 dhcp queries
+		"-T", "1", // every second
 		"-s", "/usr/share/udhcp/simple.script",
+		"-p", fmt.Sprintf("/run/udhcpc.%s.pid", inf),
 		"--now", // exit if lease is not obtained
 	)
 
