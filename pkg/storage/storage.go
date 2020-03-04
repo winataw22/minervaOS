@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
+	log "github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
@@ -114,6 +114,19 @@ func (s *storageModule) BrokenDevices() []pkg.BrokenDevice {
 	return s.brokenDevices
 }
 
+func (s *storageModule) Dump() {
+	log.Debug().Int("volumes", len(s.volumes)).Msg("dumping volumes")
+
+	for i := range s.volumes {
+		devices := s.volumes[i].Devices()
+		for id := range devices {
+			d := devices[id]
+			log.Debug().Str("path", d.Path).Str("label", d.Label).Str("type", string(d.DiskType)).Send()
+		}
+	}
+
+}
+
 /**
 initialize, must be called at least onetime each boot.
 What Initialize will do is the following:
@@ -169,9 +182,8 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		return err
 	}
 
-	// collect free disks, sort by read time so faster disks are first
-	sort.Sort(filesystem.ByReadTime(disks))
 	freeDisks := filesystem.DeviceCache{}
+
 	for idx := range disks {
 		if !disks[idx].Used() {
 			log.Debug().Msgf("Found free device %s", disks[idx].Path)
@@ -179,7 +191,13 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		}
 	}
 
-	log.Info().Msgf("Creating new volumes using policy %s", policy.Raid)
+	// sort by read time so faster disks are first
+	sort.Sort(filesystem.ByReadTime(freeDisks))
+
+	// dumping current s.volumes list
+	s.Dump()
+
+	log.Info().Msgf("Creating new volumes using policy: %s", policy.Raid)
 
 	// sanity check for disk amount
 	diskBase, exists := diskBase[policy.Raid]
@@ -217,7 +235,7 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		log.Debug().Msgf("Creating %d new volumes", possiblePools)
 
 		for i := 0; i < possiblePools; i++ {
-			log.Debug().Msgf("Creating new volume %d", i)
+			log.Debug().Msgf("Creating new volume: %d", i)
 			poolDevices := []*filesystem.Device{}
 
 			for j := 0; j < int(policy.Disks); j++ {
@@ -227,6 +245,8 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 
 			pool, err := fs.Create(ctx, uuid.New().String(), policy.Raid, poolDevices...)
 			if err != nil {
+				log.Info().Err(err).Msg("create filesystem")
+
 				// Failure to create a filesystem -> disk is dead. It is possible
 				// that multiple devices are used to create a single pool, and only
 				// one devices is actuall broken. We should probably expand on

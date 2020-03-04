@@ -398,6 +398,10 @@ func (p *btrfsPool) Type() pkg.DeviceType {
 	return p.devices[0].DiskType
 }
 
+func (p *btrfsPool) Devices() []*Device {
+	return p.devices
+}
+
 // Reserved is reserved size of the devices in bytes
 func (p *btrfsPool) Reserved() (uint64, error) {
 
