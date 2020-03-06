@@ -2,7 +2,6 @@ package filesystem
 
 import (
 	"context"
-	"io/ioutil"
 	"strings"
 	"syscall"
 
@@ -14,12 +13,9 @@ const (
 	zosV1PoolPrefix = "sp_"
 )
 
-var (
-	zeros [1024]byte
-)
-
 func wipe(ctx context.Context, device *Device, exe executer) error {
-	return ioutil.WriteFile(device.Path, zeros[:], 0660)
+	_, err := exe.run(ctx, "wipefs", "-a", "-f", device.Path)
+	return err
 }
 
 // Migrate is a simple migration routine that makes sure we have

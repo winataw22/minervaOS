@@ -275,6 +275,10 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		}
 	}
 
+	if err := filesystem.Partprobe(ctx); err != nil {
+		return err
+	}
+
 	return s.ensureCache()
 }
 

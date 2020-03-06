@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,13 @@ func TestMigrate(t *testing.T) {
 	}
 
 	ctx := context.Background()
-
+	exec.On("run", ctx, "wipefs", "-a", "-f", mock.Anything).Return([]byte{}, nil).Run(func(args mock.Arguments) {
+		f, err := os.Create(args.String(4))
+		if err != nil {
+			panic(err)
+		}
+		f.Close()
+	})
 	exec.On("run", ctx, "partprobe").Return([]byte{}, nil)
 	_, err := migrate(ctx, &mgr, &exec)
 	require.NoError(err)
@@ -34,9 +41,8 @@ func TestMigrate(t *testing.T) {
 	exec.AssertCalled(t, "run", ctx, "partprobe")
 
 	for _, fake := range []string{"/tmp/fakeb", "/tmp/fakec"} {
-		stat, err := os.Stat(fake)
+		_, err := os.Stat(fake)
 		require.NoError(err)
-		require.Equal(int64(1024), stat.Size())
 		os.Remove(fake)
 	}
 

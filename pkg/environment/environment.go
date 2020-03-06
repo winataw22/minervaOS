@@ -71,7 +71,7 @@ var (
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode: RunningMain,
-		BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
+		BcdbURL:     "tcp://explorer.grid.tf:8901",
 		// ProvisionTimeout:  240,
 		// ProvisionInterval: 20,
 	}
