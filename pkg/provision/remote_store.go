@@ -71,17 +71,17 @@ func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, er
 
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return nil, err
+		return nil, ErrTemporary
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("reservation request returned: %s", resp.Status)
+		return nil, ErrTemporary
 	}
 
 	if resp.Header.Get("content-type") != "application/json" {
-		return nil, fmt.Errorf("reservation request returned '%s', expected 'application/json'", resp.Header.Get("content-type"))
+		return nil, ErrTemporary
 	}
 
 	reservations := []*Reservation{}

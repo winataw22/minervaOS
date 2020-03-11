@@ -444,11 +444,11 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 
 	cleanup := func() {
 		log.Error().Msg("clean up network resource")
-		if err := n.releasePort(netNR.WGListenPort); err != nil {
-			log.Error().Err(err).Msg("release wireguard port failed")
-		}
 		if err := netr.Delete(); err != nil {
 			log.Error().Err(err).Msg("error during deletion of network resource after failed deployment")
+		}
+		if err := n.releasePort(netNR.WGListenPort); err != nil {
+			log.Error().Err(err).Msg("release wireguard port failed")
 		}
 	}
 

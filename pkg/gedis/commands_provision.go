@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/schema"
 
 	dtypes "github.com/threefoldtech/zos/pkg/gedis/types/directory"
@@ -109,7 +110,7 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 	}))
 
 	if err != nil {
-		return nil, err
+		return nil, provision.ErrTemporary
 	}
 
 	var out struct {
@@ -120,13 +121,14 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 		return nil, err
 	}
 
-	reservations := make([]*provision.Reservation, len(out.Workloads))
-	for i, w := range out.Workloads {
+	reservations := make([]*provision.Reservation, 0, len(out.Workloads))
+	for _, w := range out.Workloads {
 		r, err := reservationFromSchema(w)
 		if err != nil {
-			return nil, err
+			log.Warn().Err(err).Msgf("workload %s has bad format skipping", w.WorkloadID)
+			continue
 		}
-		reservations[i] = r
+		reservations = append(reservations, r)
 	}
 
 	// sorts the primitive in the oder they need to be processed by provisiond
@@ -194,15 +196,14 @@ func (g *Gedis) Delete(id string) error {
 
 // UpdateReservedResources send the amount of resource units reserved to BCDB
 func (g *Gedis) UpdateReservedResources(nodeID string, c provision.Counters) error {
-	r := dtypes.TfgridNodeResourceAmount1{
-		Cru: c.CRU.Current(),
-		Mru: c.MRU.Current(),
-		Hru: c.HRU.Current(),
-		Sru: c.SRU.Current(),
-	}
 	_, err := g.Send("tfgrid.directory.nodes", "update_reserved_capacity", Args{
-		"node_id":   nodeID,
-		"resources": r,
+		"node_id": nodeID,
+		"resource": dtypes.TfgridNodeResourceAmount1{
+			Cru: c.CRU.Current(),
+			Mru: c.MRU.Current(),
+			Hru: c.HRU.Current(),
+			Sru: c.SRU.Current(),
+		},
 	})
 	return err
 }

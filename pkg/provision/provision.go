@@ -10,6 +10,7 @@ package provision
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 )
 
@@ -54,3 +55,7 @@ var (
 		KubernetesReservation: kubernetesDecomission,
 	}
 )
+
+// ErrTemporary is return when a reservation source failed to contact the BCDB
+// user usually want to retry after getting this error
+var ErrTemporary = errors.New("network error contacting BCDB")
