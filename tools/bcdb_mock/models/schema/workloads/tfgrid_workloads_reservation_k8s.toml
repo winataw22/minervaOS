@@ -1,0 +1,22 @@
+@url = tfgrid.workloads.reservation.k8s.1
+#unique id inside the reservation is an autoincrement
+workload_id = (I)
+#links to unique node on the TFGrid
+node_id = (S)
+# defines the amount of vCpu, memory, and the disk size
+# size 1: 1 vCpu, 2 GiB RAM, 50 GB disk
+# size 2: 2 vCpu, 4 GiB RAM, 100 GB disk
+size = (I)
+network_id = (S)
+ipaddress = (ipaddress)
+# ClusterSecret is the hex encoded encrypted cluster secret
+cluster_secret = (S)
+# master_ips define the URL's for the kubernetes master nodes. If this
+# list is empty, this node is considered to be a master node.
+master_ips = (Lipaddress)
+# list of public ssh keys to add to the VM
+ssh_keys = (LS)
+#where to send the statistics too
+stats_aggregator = (LO) !tfgrid.workloads.reservation.statsaggregator.1
+#id of threebot who is the farmer
+farmer_tid = (I)

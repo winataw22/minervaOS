@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -11,6 +12,9 @@ import (
 func cmdsGenerateID(c *cli.Context) error {
 
 	output := c.String("output")
+	name := c.String("name")
+	email := c.String("email")
+	description := c.String("description")
 
 	k, err := identity.LoadKeyPair(output)
 	if err == nil {
@@ -24,10 +28,16 @@ func cmdsGenerateID(c *cli.Context) error {
 		return err
 	}
 
+	id, err := client.CreateUser(name, email, hex.EncodeToString(k.PublicKey), description)
+	if err != nil {
+		return errors.Wrap(err, "failed to register user")
+	}
+
 	if err := k.Save(c.String("output")); err != nil {
 		return errors.Wrap(err, "failed to save seed")
 	}
-	fmt.Printf("new identity generated: %s\n", k.Identity())
-	fmt.Printf("seed saved at %s\n", output)
+
+	fmt.Printf("Your ID is: %d\n", id)
+	fmt.Printf("seed saved to: %s\n", output)
 	return nil
 }

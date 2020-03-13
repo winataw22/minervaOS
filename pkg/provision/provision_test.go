@@ -3,8 +3,11 @@ package provision
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zbus"
@@ -63,4 +66,14 @@ type TestOwnerCache struct {
 func (t *TestOwnerCache) OwnerOf(id string) (string, error) {
 	result := t.Called(id)
 	return result.String(0), result.Error(1)
+}
+
+func TestErrTemporary(t *testing.T) {
+	err := fmt.Errorf("base error")
+	wrap1 := NewErrTemporary(err)
+	wrap2 := fmt.Errorf("upper err: %w", wrap1)
+
+	assert.True(t, errors.Is(wrap1, ErrTemporary{}))
+	assert.True(t, errors.Is(wrap2, ErrTemporary{}))
+	assert.Equal(t, err.Error(), wrap1.Error())
 }

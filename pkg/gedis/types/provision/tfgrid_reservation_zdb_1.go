@@ -1,12 +1,5 @@
 package provision
 
-import (
-	"fmt"
-
-	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/provision"
-)
-
 //TfgridReservationZdb1 jsx schema
 type TfgridReservationZdb1 struct {
 	WorkloadID      int64                               `json:"workload_id"`
@@ -18,34 +11,6 @@ type TfgridReservationZdb1 struct {
 	DiskType        TfgridReservationZdb1DiskTypeEnum   `json:"disk_type"`
 	Public          bool                                `json:"public"`
 	StatsAggregator []TfgridReservationStatsaggregator1 `json:"stats_aggregator"`
-}
-
-//ToProvisionType converts TfgridReservationZdb1 to provision.ZDB
-func (z TfgridReservationZdb1) ToProvisionType() (provision.ZDB, string, error) {
-	zdb := provision.ZDB{
-		Size:     uint64(z.Size),
-		Password: z.Password,
-		Public:   z.Public,
-	}
-	switch z.DiskType.String() {
-	case "hdd":
-		zdb.DiskType = pkg.HDDDevice
-	case "ssd":
-		zdb.DiskType = pkg.SSDDevice
-	default:
-		return zdb, z.NodeID, fmt.Errorf("device type %s not supported", z.DiskType.String())
-	}
-
-	switch z.Mode.String() {
-	case "seq":
-		zdb.Mode = pkg.ZDBModeSeq
-	case "user":
-		zdb.Mode = pkg.ZDBModeUser
-	default:
-		return zdb, z.NodeID, fmt.Errorf("0-db mode %s not supported", z.Mode.String())
-	}
-
-	return zdb, z.NodeID, nil
 }
 
 //TfgridReservationZdb1ModeEnum jsx schema

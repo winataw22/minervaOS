@@ -53,7 +53,7 @@ func printResult(r res) {
 		return
 	}
 	fmt.Printf("state: %6s", r.Result.State)
-	if r.Result.State == "error" {
+	if r.Result.State == provision.StateError {
 		fmt.Printf("\t%s\n", r.Result.Error)
 		return
 	}

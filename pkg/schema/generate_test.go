@@ -43,11 +43,12 @@ creation = (D)
 	// )
 	//
 	// type JumpscaleDigitalmePackage struct {
-	// 	Name     string                            `json:"name"`
-	// 	Enable   bool                              `json:"enable"`
-	// 	Numerics []schema.Numeric                  `json:"numerics"`
-	// 	Args     []JumpscaleDigitalmePackageArg    `json:"args"`
-	// 	Loaders  []JumpscaleDigitalmePackageLoader `json:"loaders"`
+	// 	ID       schema.ID                         `bson:"_id" json:"id"`
+	// 	Name     string                            `bson:"name" json:"name"`
+	// 	Enable   bool                              `bson:"enable" json:"enable"`
+	// 	Numerics []schema.Numeric                  `bson:"numerics" json:"numerics"`
+	// 	Args     []JumpscaleDigitalmePackageArg    `bson:"args" json:"args"`
+	// 	Loaders  []JumpscaleDigitalmePackageLoader `bson:"loaders" json:"loaders"`
 	// }
 	//
 	// func NewJumpscaleDigitalmePackage() (JumpscaleDigitalmePackage, error) {
@@ -60,8 +61,8 @@ creation = (D)
 	// }
 	//
 	// type JumpscaleDigitalmePackageArg struct {
-	// 	Key string `json:"key"`
-	// 	Val string `json:"val"`
+	// 	Key string `bson:"key" json:"key"`
+	// 	Val string `bson:"val" json:"val"`
 	// }
 	//
 	// func NewJumpscaleDigitalmePackageArg() (JumpscaleDigitalmePackageArg, error) {
@@ -74,10 +75,10 @@ creation = (D)
 	// }
 	//
 	// type JumpscaleDigitalmePackageLoader struct {
-	// 	Giturl   string      `json:"giturl"`
-	// 	Dest     string      `json:"dest"`
-	// 	Enable   bool        `json:"enable"`
-	// 	Creation schema.Date `json:"creation"`
+	// 	Giturl   string      `bson:"giturl" json:"giturl"`
+	// 	Dest     string      `bson:"dest" json:"dest"`
+	// 	Enable   bool        `bson:"enable" json:"enable"`
+	// 	Creation schema.Date `bson:"creation" json:"creation"`
 	// }
 	//
 	// func NewJumpscaleDigitalmePackageLoader() (JumpscaleDigitalmePackageLoader, error) {
@@ -88,6 +89,7 @@ creation = (D)
 	// 	}
 	// 	return object, nil
 	// }
+
 }
 
 func ExampleGenerateGolang_enums() {
@@ -109,11 +111,15 @@ gender = "male,female,others" (E)
 	// Output:
 	// package test
 	//
-	// import "encoding/json"
+	// import (
+	// 	"encoding/json"
+	// 	schema "github.com/threefoldtech/zos/pkg/schema"
+	// )
 	//
 	// type Person struct {
-	// 	Name   string           `json:"name"`
-	// 	Gender PersonGenderEnum `json:"gender"`
+	// 	ID     schema.ID        `bson:"_id" json:"id"`
+	// 	Name   string           `bson:"name" json:"name"`
+	// 	Gender PersonGenderEnum `bson:"gender" json:"gender"`
 	// }
 	//
 	// func NewPerson() (Person, error) {
@@ -142,8 +148,9 @@ gender = "male,female,others" (E)
 	// 	case PersonGenderOthers:
 	// 		return "others"
 	// 	}
-	//	return "UNKNOWN"
+	// 	return "UNKNOWN"
 	// }
+
 }
 
 func ExampleGenerateGolang_enums2() {
@@ -171,15 +178,19 @@ currency = "EUR,USD,TFT,AED,GBP" (E)
 	// Output:
 	// package test
 	//
-	// import "encoding/json"
+	// import (
+	// 	"encoding/json"
+	// 	schema "github.com/threefoldtech/zos/pkg/schema"
+	// )
 	//
 	// type TfgridNodeResourcePrice1 struct {
-	// 	Cru      float64                              `json:"cru"`
-	// 	Mru      float64                              `json:"mru"`
-	// 	Hru      float64                              `json:"hru"`
-	// 	Sru      float64                              `json:"sru"`
-	// 	Nru      float64                              `json:"nru"`
-	// 	Currency TfgridNodeResourcePrice1CurrencyEnum `json:"currency"`
+	// 	ID       schema.ID                            `bson:"_id" json:"id"`
+	// 	Cru      float64                              `bson:"cru" json:"cru"`
+	// 	Mru      float64                              `bson:"mru" json:"mru"`
+	// 	Hru      float64                              `bson:"hru" json:"hru"`
+	// 	Sru      float64                              `bson:"sru" json:"sru"`
+	// 	Nru      float64                              `bson:"nru" json:"nru"`
+	// 	Currency TfgridNodeResourcePrice1CurrencyEnum `bson:"currency" json:"currency"`
 	// }
 	//
 	// func NewTfgridNodeResourcePrice1() (TfgridNodeResourcePrice1, error) {
@@ -246,10 +257,11 @@ addresses = (Lipaddr)
 	// )
 	//
 	// type Network struct {
-	// 	Name      string         `json:"name"`
-	// 	Ip        net.IP         `json:"ip"`
-	// 	Net       schema.IPRange `json:"net"`
-	// 	Addresses []net.IP       `json:"addresses"`
+	// 	ID        schema.ID      `bson:"_id" json:"id"`
+	// 	Name      string         `bson:"name" json:"name"`
+	// 	Ip        net.IP         `bson:"ip" json:"ip"`
+	// 	Net       schema.IPRange `bson:"net" json:"net"`
+	// 	Addresses []net.IP       `bson:"addresses" json:"addresses"`
 	// }
 	//
 	// func NewNetwork() (Network, error) {
@@ -285,12 +297,16 @@ name = (S)
 	// Output:
 	// package test
 	//
-	// import "encoding/json"
+	// import (
+	// 	"encoding/json"
+	// 	schema "github.com/threefoldtech/zos/pkg/schema"
+	// )
 	//
 	// type Parent struct {
-	// 	Name string                 `json:"name"`
-	// 	Data map[string]Child       `json:"data"`
-	// 	Tags map[string]interface{} `json:"tags"`
+	// 	ID   schema.ID              `bson:"_id" json:"id"`
+	// 	Name string                 `bson:"name" json:"name"`
+	// 	Data map[string]Child       `bson:"data" json:"data"`
+	// 	Tags map[string]interface{} `bson:"tags" json:"tags"`
 	// }
 	//
 	// func NewParent() (Parent, error) {
@@ -303,7 +319,7 @@ name = (S)
 	// }
 	//
 	// type Child struct {
-	// 	Name string `json:"name"`
+	// 	Name string `bson:"name" json:"name"`
 	// }
 	//
 	// func NewChild() (Child, error) {
@@ -314,5 +330,4 @@ name = (S)
 	// 	}
 	// 	return object, nil
 	// }
-
 }

@@ -1,6 +1,10 @@
 package provision
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/threefoldtech/zos/pkg/schema"
+)
 
 //TfgridReservationWorkload1 jsx schema
 type TfgridReservationWorkload1 struct {
@@ -8,7 +12,7 @@ type TfgridReservationWorkload1 struct {
 	Type       TfgridReservationWorkload1TypeEnum `json:"type,omitempty"`
 	Workload   json.RawMessage                    `json:"content,omitempty"`
 	User       string                             `json:"user,omitempty"`
-	Created    int64                              `json:"created,omitempty"`
+	Created    schema.Date                        `json:"created,omitempty"`
 	Duration   int64                              `json:"duration,omitempty"`
 	Signature  string                             `json:"signature,omitempty"`
 	ToDelete   bool                               `json:"to_delete,omitempty"`

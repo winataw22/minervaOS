@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 
-	"github.com/threefoldtech/zos/pkg/gedis"
+	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zos/pkg/provision"
 
@@ -13,6 +16,7 @@ import (
 
 	"os"
 
+	types "github.com/threefoldtech/zos/pkg/gedis/types/provision"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/tnodb"
 	"github.com/urfave/cli"
@@ -65,6 +69,21 @@ func main() {
 					Name:  "output,o",
 					Usage: "output path of the identity seed",
 					Value: "user.seed",
+				},
+				cli.StringFlag{
+					Name:     "name,n",
+					Usage:    "user name",
+					Required: true,
+				},
+				cli.StringFlag{
+					Name:     "email",
+					Usage:    "user email address",
+					Required: true,
+				},
+				cli.StringFlag{
+					Name:     "description",
+					Usage:    "user description",
+					Required: true,
 				},
 			},
 			Action: cmdsGenerateID,
@@ -336,9 +355,16 @@ func main() {
 					Usage: "duration of the reservation. By default is number of days. But also support notation with duration suffix like m for minute or h for hours",
 				},
 				cli.StringFlag{
-					Name:   "seed",
-					Usage:  "path to the file container the seed of the user private key",
-					EnvVar: "SEED_PATH",
+					Name:     "seed",
+					Usage:    "path to the file container the seed of the user private key",
+					EnvVar:   "SEED_PATH",
+					Required: true,
+				},
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
 				},
 			},
 			Action: cmdsProvision,
@@ -347,9 +373,22 @@ func main() {
 			Name:  "delete",
 			Usage: "Mark a workload as to be deleted",
 			Flags: []cli.Flag{
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
+				},
+				cli.Int64Flag{
+					Name:     "reservation",
+					Usage:    "reservation id",
+					Required: true,
+				},
 				cli.StringFlag{
-					Name:  "id",
-					Usage: "workload id",
+					Name:     "seed",
+					Usage:    "path to the file container the seed of the user private key",
+					EnvVar:   "SEED_PATH",
+					Required: true,
 				},
 			},
 			Action: cmdsDeleteReservation,
@@ -393,18 +432,117 @@ func main() {
 
 type reserveDeleter interface {
 	Reserve(r *provision.Reservation) (string, error)
-	Delete(id string) error
+	Delete(userID, id int64, sig []byte) error
 }
 type clientIface interface {
 	network.TNoDB
 	reserveDeleter
+	CreateUser(name, email, pubkey, description string) (int64, error)
+	ReserveJSX(res types.TfgridReservation1) (int64, error)
+	GetJSX(id int64) (res types.TfgridReservation1, err error)
+}
+
+type clientImpl struct {
+	network.TNoDB
+	reserveDeleter
+	baseURL string
+}
+
+func (p clientImpl) GetJSX(id int64) (res types.TfgridReservation1, err error) {
+	url := fmt.Sprintf("%s/reservations/%d", p.baseURL, id)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return res, err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return res, fmt.Errorf("wrong response status code %s", resp.Status)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return res, err
+	}
+
+	return
+}
+
+func (p clientImpl) ReserveJSX(res types.TfgridReservation1) (int64, error) {
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(res)
+	if err != nil {
+		return 0, err
+	}
+
+	response, err := http.Post(
+		fmt.Sprintf("%s/reservations", p.baseURL),
+		"application/json",
+		&buf,
+	)
+
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create reservation")
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusCreated {
+		return 0, fmt.Errorf("wrong status for reservation create: %s", response.Status)
+	}
+
+	var id int64
+
+	if err := json.NewDecoder(response.Body).Decode(&id); err != nil {
+		return 0, errors.Wrap(err, "failed to load user response")
+	}
+
+	return id, nil
+
+}
+
+func (p clientImpl) CreateUser(name, email, pubkey, description string) (int64, error) {
+	var buf bytes.Buffer
+	type U map[string]interface{}
+	err := json.NewEncoder(&buf).Encode(U{
+		"name":        name,
+		"email":       email,
+		"pubkey":      pubkey,
+		"description": description,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	response, err := http.Post(
+		fmt.Sprintf("%s/users", p.baseURL),
+		"application/json",
+		&buf,
+	)
+
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create user")
+	}
+
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusCreated {
+		return 0, fmt.Errorf("wrong status for user create: %s", response.Status)
+	}
+
+	var result struct {
+		ID int64 `json:"id"`
+	}
+
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		return 0, errors.Wrap(err, "failed to load user response")
+	}
+
+	return result.ID, nil
 }
 
 func getClient(addr string) (clientIface, error) {
-	type client struct {
-		network.TNoDB
-		reserveDeleter
-	}
 
 	u, err := url.Parse(addr)
 	if err != nil {
@@ -413,16 +551,17 @@ func getClient(addr string) (clientIface, error) {
 
 	switch u.Scheme {
 	case "http", "https":
-		return client{
-			tnodb.NewHTTPTNoDB(addr),
-			provision.NewHTTPStore(addr),
+		return clientImpl{
+			TNoDB:          tnodb.NewHTTPTNoDB(addr),
+			reserveDeleter: provision.NewHTTPStore(addr),
+			baseURL:        addr,
 		}, nil
-	case "tcp":
-		c, err := gedis.New(addr, "")
-		return client{
-			c,
-			c,
-		}, err
+	// case "tcp":
+	// 	c, err := gedis.New(addr, "")
+	// 	return client{
+	// 		c,
+	// 		c,
+	// 	}, err
 	default:
 		return nil, fmt.Errorf("unsupported address scheme for BCDB: %s", u.Scheme)
 	}

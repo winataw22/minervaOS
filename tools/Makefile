@@ -29,7 +29,7 @@ fmt:
 
 lint:
 	@echo "Running $@"
-	golint -set_exit_status $(shell go list ./... | grep -v stubs)
+	golint -set_exit_status $(shell go list ./... | grep -v stubs | grep -v generated)
 
 ineffassign:
 	@echo "Running $@"
@@ -62,4 +62,4 @@ testrace: verifiers
 
 
 %: %/*.go output
-	cd $(shell dirname $<) && go build -ldflags $(ldflags) 
+	cd $(shell dirname $<) && go build -ldflags $(ldflags)

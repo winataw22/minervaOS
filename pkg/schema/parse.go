@@ -26,6 +26,7 @@ type Schema []*Object
 // Object defines a schema object
 type Object struct {
 	URL        string
+	IsRoot     bool
 	Directives []Directive
 	Properties []Property
 }
@@ -136,6 +137,34 @@ func New(r io.Reader) (schema Schema, err error) {
 
 	if current != nil {
 		schema = append(schema, current)
+	}
+
+	// mark roots
+root:
+	for i := 0; i < len(schema); i++ {
+		a := schema[i]
+		for j := 0; j < len(schema); j++ {
+			b := schema[j]
+			for _, prop := range b.Properties {
+				var ref string
+				switch prop.Type.Kind {
+				case ObjectKind:
+					ref = prop.Type.Reference
+				case ListKind:
+					fallthrough
+				case DictKind:
+					if prop.Type.Element != nil {
+						ref = prop.Type.Element.Reference
+					}
+				}
+
+				if a.URL == ref {
+					continue root
+				}
+			}
+		}
+
+		a.IsRoot = true
 	}
 
 	return

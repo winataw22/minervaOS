@@ -68,7 +68,7 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 				log.Error().Err(err).Msg("failed to get reservation")
 				// if this is not a temporary error, then skip the reservation entirely
 				// and try to get the next one
-				if !errors.Is(err, ErrTemporary) {
+				if !errors.Is(err, ErrTemporary{}) {
 					next++
 				}
 				continue

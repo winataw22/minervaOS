@@ -1,0 +1,12 @@
+
+
+@url = tfgrid.workloads.reservation.volume.1
+#unique id inside the reservation is an autoincrement
+workload_id = (I)
+node_id = (S)
+size = (I)
+type = "HDD,SSD" (E)
+#where to send the statistics too
+stats_aggregator = (LO) !tfgrid.workloads.reservation.statsaggregator.1
+#id of threebot who is the farmer
+farmer_tid = (I)

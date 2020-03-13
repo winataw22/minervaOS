@@ -2,6 +2,7 @@ package provision
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -26,8 +27,8 @@ type ReservationCache interface {
 // Feedbacker defines the method that needs to be implemented
 // to send the provision result to BCDB
 type Feedbacker interface {
-	Feedback(id string, r *Result) error
-	Deleted(id string) error
+	Feedback(nodeID string, r *Result) error
+	Deleted(nodeID, id string) error
 	UpdateReservedResources(nodeID string, c Counters) error
 }
 
@@ -74,14 +75,17 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 				return nil
 			}
 
+			expired := reservation.Expired()
 			slog := log.With().
 				Str("id", string(reservation.ID)).
 				Str("type", string(reservation.Type)).
 				Str("duration", fmt.Sprintf("%v", reservation.Duration)).
 				Str("tag", reservation.Tag.String()).
+				Bool("to-delete", reservation.ToDelete).
+				Bool("expired", expired).
 				Logger()
 
-			if reservation.Expired() || reservation.ToDelete {
+			if expired || reservation.ToDelete {
 				slog.Info().Msg("start decommissioning reservation")
 				if err := e.decommission(ctx, reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to decommission reservation %s", reservation.ID)
@@ -147,7 +151,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 
 	if !exists {
 		log.Info().Str("id", r.ID).Msg("reservation not provisioned, no need to decomission")
-		if err := e.fb.Deleted(r.ID); err != nil {
+		if err := e.fb.Deleted(r.NodeID, r.ID); err != nil {
 			log.Error().Err(err).Str("id", r.ID).Msg("failed to mark reservation as deleted")
 		}
 		return nil
@@ -162,7 +166,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
 	}
 
-	if err := e.fb.Deleted(r.ID); err != nil {
+	if err := e.fb.Deleted(r.NodeID, r.ID); err != nil {
 		return errors.Wrap(err, "failed to mark reservation as deleted")
 	}
 
@@ -186,12 +190,12 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 			Str("id", r.ID).
 			Msgf("failed to apply provision")
 		result.Error = rErr.Error()
-		result.State = "error" //TODO: create enum
+		result.State = StateError
 	} else {
 		log.Info().
 			Str("result", fmt.Sprintf("%v", info)).
 			Msgf("workload deployed")
-		result.State = "ok"
+		result.State = StateOk
 	}
 
 	br, err := json.Marshal(info)
@@ -209,9 +213,9 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 	if err != nil {
 		return errors.Wrap(err, "failed to signed the result")
 	}
-	result.Signature = sig
+	result.Signature = hex.EncodeToString(sig)
 
-	return e.fb.Feedback(r.ID, result)
+	return e.fb.Feedback(r.NodeID, result)
 }
 
 func (e *defaultEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {

@@ -3,11 +3,8 @@ package gedis
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"sort"
-	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/schema"
 
 	dtypes "github.com/threefoldtech/zos/pkg/gedis/types/directory"
@@ -30,37 +27,9 @@ var provisionOrder = map[provision.ReservationType]int{
 
 // Reserve provision.Reserver
 func (g *Gedis) Reserve(r *provision.Reservation) (string, error) {
-	res := ptypes.TfgridReservation1{
-		DataReservation: ptypes.TfgridReservationData1{},
-		// CustomerTid:     r.User, //TODO: wrong type.
-	}
-
-	w, err := workloadFromRaw(r.Data, r.Type)
+	res, err := ReservationToSchemaType(r)
 	if err != nil {
 		return "", err
-	}
-
-	switch r.Type {
-	case provision.ContainerReservation:
-		res.DataReservation.Containers = []ptypes.TfgridReservationContainer1{
-			containerReservation(w, r.NodeID),
-		}
-	case provision.VolumeReservation:
-		res.DataReservation.Volumes = []ptypes.TfgridReservationVolume1{
-			volumeReservation(w, r.NodeID),
-		}
-	case provision.ZDBReservation:
-		res.DataReservation.Zdbs = []ptypes.TfgridReservationZdb1{
-			zdbReservation(w, r.NodeID),
-		}
-	case provision.NetworkReservation:
-		res.DataReservation.Networks = []ptypes.TfgridReservationNetwork1{
-			networkReservation(w),
-		}
-	case provision.KubernetesReservation:
-		res.DataReservation.Kubernetes = []ptypes.TfgridWorkloadsReservationK8S1{
-			k8sReservation(w, r.NodeID),
-		}
 	}
 
 	result, err := Bytes(g.Send("tfgrid.workloads.workload_manager", "reservation_register", Args{
@@ -95,7 +64,7 @@ func (g *Gedis) Get(id string) (*provision.Reservation, error) {
 		return nil, err
 	}
 
-	return reservationFromSchema(workload)
+	return provision.WorkloadToProvisionType(workload)
 }
 
 // Poll retrieves reservations from BCDB. from acts like a cursor, first call should use
@@ -110,7 +79,7 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 	}))
 
 	if err != nil {
-		return nil, provision.ErrTemporary
+		return nil, provision.NewErrTemporary(err)
 	}
 
 	var out struct {
@@ -121,14 +90,13 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 		return nil, err
 	}
 
-	reservations := make([]*provision.Reservation, 0, len(out.Workloads))
-	for _, w := range out.Workloads {
-		r, err := reservationFromSchema(w)
+	reservations := make([]*provision.Reservation, len(out.Workloads))
+	for i, w := range out.Workloads {
+		r, err := provision.WorkloadToProvisionType(w)
 		if err != nil {
-			log.Warn().Err(err).Msgf("workload %s has bad format skipping", w.WorkloadID)
-			continue
+			return nil, err
 		}
-		reservations = append(reservations, r)
+		reservations[i] = r
 	}
 
 	// sorts the primitive in the oder they need to be processed by provisiond
@@ -141,7 +109,7 @@ func (g *Gedis) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservati
 }
 
 // Feedback implements provision.Feedbacker
-func (g *Gedis) Feedback(id string, r *provision.Result) error {
+func (g *Gedis) Feedback(nodeID string, r *provision.Result) error {
 
 	var rType ptypes.TfgridReservationResult1CategoryEnum
 	switch r.Type {
@@ -155,33 +123,40 @@ func (g *Gedis) Feedback(id string, r *provision.Result) error {
 		rType = ptypes.TfgridReservationResult1CategoryNetwork
 	}
 
-	var rState ptypes.TfgridReservationResult1StateEnum
-	switch r.State {
-	case "ok":
-		rState = ptypes.TfgridReservationResult1StateOk
-	case "error":
-		rState = ptypes.TfgridReservationResult1StateError
-	}
-
 	result := ptypes.TfgridReservationResult1{
 		Category:   rType,
-		WorkloadID: id,
+		WorkloadID: r.ID,
 		DataJSON:   string(r.Data),
 		Signature:  r.Signature,
-		State:      rState,
+		State:      ptypes.TfgridReservationResult1StateEnum(r.State),
 		Message:    r.Error,
 		Epoch:      schema.Date{r.Created},
 	}
 
 	_, err := g.Send("tfgrid.workloads.workload_manager", "set_workload_result", Args{
-		"global_workload_id": id,
+		"global_workload_id": r.ID,
 		"result":             result,
 	})
 	return err
 }
 
+//UpdateReservedResources sends current reserved resources
+func (g *Gedis) UpdateReservedResources(nodeID string, c provision.Counters) error {
+	r := dtypes.TfgridNodeResourceAmount1{
+		Cru: c.CRU.Current(),
+		Mru: c.MRU.Current(),
+		Hru: c.HRU.Current(),
+		Sru: c.SRU.Current(),
+	}
+	_, err := g.Send("tfgrid.directory.nodes", "update_reserved_capacity", Args{
+		"node_id":   nodeID,
+		"resources": r,
+	})
+	return err
+}
+
 // Deleted implements provision.Feedbacker
-func (g *Gedis) Deleted(id string) error {
+func (g *Gedis) Deleted(nodeID, id string) error {
 	_, err := g.Send("tfgrid.workloads.workload_manager", "workload_deleted", Args{"workload_id": id})
 	return err
 }
@@ -192,264 +167,4 @@ func (g *Gedis) Delete(id string) error {
 		"reservation_id": id,
 	})
 	return err
-}
-
-// UpdateReservedResources send the amount of resource units reserved to BCDB
-func (g *Gedis) UpdateReservedResources(nodeID string, c provision.Counters) error {
-	_, err := g.Send("tfgrid.directory.nodes", "update_reserved_capacity", Args{
-		"node_id": nodeID,
-		"resource": dtypes.TfgridNodeResourceAmount1{
-			Cru: c.CRU.Current(),
-			Mru: c.MRU.Current(),
-			Hru: c.HRU.Current(),
-			Sru: c.SRU.Current(),
-		},
-	})
-	return err
-}
-
-func reservationFromSchema(w ptypes.TfgridReservationWorkload1) (*provision.Reservation, error) {
-	reservation := &provision.Reservation{
-		ID:        w.WorkloadID,
-		User:      w.User,
-		Type:      provision.ReservationType(w.Type.String()),
-		Created:   time.Unix(w.Created, 0),
-		Duration:  time.Duration(w.Duration) * time.Second,
-		Signature: []byte(w.Signature),
-		Data:      w.Workload,
-		Tag:       provision.Tag{"source": "BCDB"},
-	}
-
-	var (
-		data interface{}
-		err  error
-	)
-
-	// convert the workload description from jsx schema to zos types
-	switch reservation.Type {
-	case provision.ZDBReservation:
-		tmp := ptypes.TfgridReservationZdb1{}
-		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
-			return nil, err
-		}
-
-		data, reservation.NodeID, err = tmp.ToProvisionType()
-		if err != nil {
-			return nil, err
-		}
-
-	case provision.VolumeReservation:
-		tmp := ptypes.TfgridReservationVolume1{}
-		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
-			return nil, err
-		}
-
-		data, reservation.NodeID, err = tmp.ToProvisionType()
-		if err != nil {
-			return nil, err
-		}
-
-	case provision.NetworkReservation:
-		tmp := ptypes.TfgridReservationNetwork1{}
-		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
-			return nil, err
-		}
-
-		data, err = tmp.ToProvisionType()
-		if err != nil {
-			return nil, err
-		}
-
-	case provision.ContainerReservation:
-		tmp := ptypes.TfgridReservationContainer1{}
-		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
-			return nil, err
-		}
-
-		data, reservation.NodeID, err = tmp.ToProvisionType()
-		if err != nil {
-			return nil, err
-		}
-
-	case provision.KubernetesReservation:
-		tmp := ptypes.TfgridWorkloadsReservationK8S1{}
-		if err := json.Unmarshal(reservation.Data, &tmp); err != nil {
-			return nil, err
-		}
-
-		data, reservation.NodeID, err = tmp.ToProvisionType()
-		if err != nil {
-			return nil, err
-		}
-
-	}
-
-	reservation.Data, err = json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return reservation, nil
-}
-
-func workloadFromRaw(s json.RawMessage, t provision.ReservationType) (interface{}, error) {
-	switch t {
-	case provision.ContainerReservation:
-		c := provision.Container{}
-		err := json.Unmarshal([]byte(s), &c)
-		return c, err
-
-	case provision.VolumeReservation:
-		v := provision.Volume{}
-		err := json.Unmarshal([]byte(s), &v)
-		return nil, err
-
-	case provision.NetworkReservation:
-		n := pkg.Network{}
-		err := json.Unmarshal([]byte(s), &n)
-		return n, err
-
-	case provision.ZDBReservation:
-		z := provision.ZDB{}
-		err := json.Unmarshal([]byte(s), &z)
-		return z, err
-
-	case provision.KubernetesReservation:
-		k := provision.Kubernetes{}
-		err := json.Unmarshal([]byte(s), &k)
-		return k, err
-	}
-
-	return nil, fmt.Errorf("unsupported reservation type %v", t)
-}
-
-func networkReservation(i interface{}) ptypes.TfgridReservationNetwork1 {
-	n := i.(pkg.Network)
-	network := ptypes.TfgridReservationNetwork1{
-		Name:             n.Name,
-		Iprange:          n.IPRange.ToSchema(),
-		WorkloadID:       1,
-		NetworkResources: make([]ptypes.TfgridNetworkNetResource1, len(n.NetResources)),
-	}
-
-	for i, nr := range n.NetResources {
-		network.NetworkResources[i] = ptypes.TfgridNetworkNetResource1{
-			NodeID:                       nr.NodeID,
-			IPRange:                      nr.Subnet.ToSchema(),
-			WireguardPrivateKeyEncrypted: nr.WGPrivateKey,
-			WireguardPublicKey:           nr.WGPublicKey,
-			Peers:                        make([]ptypes.WireguardPeer1, len(nr.Peers)),
-		}
-
-		for y, peer := range nr.Peers {
-			network.NetworkResources[i].Peers[y] = ptypes.WireguardPeer1{
-				Endpoint:   peer.Endpoint,
-				PublicKey:  peer.WGPublicKey,
-				AllowedIPs: make([]string, len(peer.AllowedIPs)),
-			}
-
-			for z, ip := range peer.AllowedIPs {
-				network.NetworkResources[i].Peers[y].AllowedIPs[z] = ip.String()
-			}
-		}
-	}
-	return network
-}
-
-func containerReservation(i interface{}, nodeID string) ptypes.TfgridReservationContainer1 {
-	c := i.(provision.Container)
-	container := ptypes.TfgridReservationContainer1{
-		// NodeID:      nodeID,
-		Flist:       c.FList,
-		HubURL:      c.FlistStorage,
-		Environment: c.Env,
-		Entrypoint:  c.Entrypoint,
-		Interactive: c.Interactive,
-		Volumes:     make([]ptypes.TfgridReservationContainerMount1, len(c.Mounts)),
-		NetworkConnection: []ptypes.TfgridReservationNetworkConnection1{
-			{
-				NetworkID: string(c.Network.NetworkID),
-				Ipaddress: c.Network.IPs[0],
-				PublicIP6: c.Network.PublicIP6,
-			},
-		},
-		// StatsAggregator:   c.StatsAggregator,
-		// FarmerTid:         c.FarmerTid,
-	}
-
-	for i, v := range c.Mounts {
-		container.Volumes[i] = ptypes.TfgridReservationContainerMount1{
-			VolumeID:   v.VolumeID,
-			Mountpoint: v.Mountpoint,
-		}
-	}
-	return container
-}
-
-func volumeReservation(i interface{}, nodeID string) ptypes.TfgridReservationVolume1 {
-	v := i.(provision.Volume)
-
-	volume := ptypes.TfgridReservationVolume1{
-		// WorkloadID:
-		// NodeID:
-		// ReservationID:
-		Size: int64(v.Size),
-		// StatsAggregator:
-		// FarmerTid:
-	}
-	if v.Type == provision.HDDDiskType {
-		volume.Type = ptypes.TfgridReservationVolume1TypeHDD
-	} else if v.Type == provision.SSDDiskType {
-		volume.Type = ptypes.TfgridReservationVolume1TypeSSD
-	}
-
-	return volume
-}
-
-func zdbReservation(i interface{}, nodeID string) ptypes.TfgridReservationZdb1 {
-	z := i.(provision.ZDB)
-
-	zdb := ptypes.TfgridReservationZdb1{
-		// WorkloadID:
-		// NodeID:
-		// ReservationID:
-		Size:     int64(z.Size),
-		Password: z.Password,
-		Public:   z.Public,
-		// StatsAggregator:
-		// FarmerTid:
-	}
-	if z.DiskType == pkg.SSDDevice {
-		zdb.DiskType = ptypes.TfgridReservationZdb1DiskTypeHdd
-	} else if z.DiskType == pkg.HDDDevice {
-		zdb.DiskType = ptypes.TfgridReservationZdb1DiskTypeSsd
-	}
-
-	if z.Mode == pkg.ZDBModeUser {
-		zdb.Mode = ptypes.TfgridReservationZdb1ModeUser
-	} else if z.Mode == pkg.ZDBModeSeq {
-		zdb.Mode = ptypes.TfgridReservationZdb1ModeSeq
-	}
-
-	return zdb
-}
-
-func k8sReservation(i interface{}, nodeID string) ptypes.TfgridWorkloadsReservationK8S1 {
-	k := i.(provision.Kubernetes)
-
-	k8s := ptypes.TfgridWorkloadsReservationK8S1{
-		// WorkloadID      int64
-		NodeID:        nodeID,
-		Size:          k.Size,
-		NetworkID:     string(k.NetworkID),
-		Ipaddress:     k.IP,
-		ClusterSecret: k.ClusterSecret,
-		MasterIps:     make([]net.IP, 0, len(k.MasterIPs)),
-		SSHKeys:       make([]string, 0, len(k.SSHKeys)),
-	}
-
-	copy(k8s.MasterIps, k.MasterIPs)
-	copy(k8s.SSHKeys, k.SSHKeys)
-
-	return k8s
 }

@@ -16,7 +16,7 @@ type TfgridReservationResult1 struct {
 	Category   TfgridReservationResult1CategoryEnum `json:"category"`
 	WorkloadID string                               `json:"workload_id"`
 	DataJSON   string                               `json:"data_json"`
-	Signature  []byte                               `json:"signature"`
+	Signature  string                               `json:"signature"`
 	State      TfgridReservationResult1StateEnum    `json:"state"`
 	Message    string                               `json:"message"`
 	Epoch      schema.Date                          `json:"epoch"`

@@ -2,13 +2,16 @@ package provision
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
+	generated "github.com/threefoldtech/zos/pkg/gedis/types/provision"
 )
 
 // HTTPStore is a reservation store
@@ -58,7 +61,7 @@ func (s *HTTPStore) Reserve(r *Reservation) (string, error) {
 // Note that from is a reservation ID not a workload ID. so user the Reservation.SplitID() method
 // to get the reservation part.
 func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
-	u, err := url.Parse(fmt.Sprintf("%s/reservations/%s/poll", s.baseURL, nodeID.Identity()))
+	u, err := url.Parse(fmt.Sprintf("%s/reservations/workloads/%s", s.baseURL, nodeID.Identity()))
 	if err != nil {
 		return nil, err
 	}
@@ -71,32 +74,38 @@ func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, er
 
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return nil, ErrTemporary
+		return nil, NewErrTemporary(err)
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, ErrTemporary
+		return nil, NewErrTemporary(err)
 	}
 
 	if resp.Header.Get("content-type") != "application/json" {
-		return nil, ErrTemporary
+		return nil, NewErrTemporary(err)
 	}
 
-	reservations := []*Reservation{}
-	if err := json.NewDecoder(resp.Body).Decode(&reservations); err != nil {
+	workloads := []generated.TfgridReservationWorkload1{}
+	if err := json.NewDecoder(resp.Body).Decode(&workloads); err != nil {
 		return nil, err
 	}
-	for _, r := range reservations {
+	reservations := make([]*Reservation, 0, len(workloads))
+	for _, wl := range workloads {
+		r, err := WorkloadToProvisionType(wl)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load workload type")
+		}
 		r.Tag = Tag{"source": "HTTPStore"}
+		reservations = append(reservations, r)
 	}
 	return reservations, nil
 }
 
 // Get retrieves a single reservation using its ID
 func (s *HTTPStore) Get(id string) (*Reservation, error) {
-	url := fmt.Sprintf("%s/reservations/%s", s.baseURL, id)
+	url := fmt.Sprintf("%s/reservations/workloads/%s", s.baseURL, id)
 
 	r := &Reservation{}
 	resp, err := http.Get(url)
@@ -118,8 +127,8 @@ func (s *HTTPStore) Get(id string) (*Reservation, error) {
 }
 
 // Feedback sends back the result of a provisioning to BCDB
-func (s *HTTPStore) Feedback(id string, r *Result) error {
-	url := fmt.Sprintf("%s/reservations/%s", s.baseURL, id)
+func (s *HTTPStore) Feedback(nodeID string, r *Result) error {
+	url := fmt.Sprintf("%s/reservations/workloads/%s/%s", s.baseURL, r.ID, nodeID)
 
 	buf := &bytes.Buffer{}
 
@@ -127,7 +136,7 @@ func (s *HTTPStore) Feedback(id string, r *Result) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PUT", url, buf)
+	req, err := http.NewRequest(http.MethodPut, url, buf)
 	if err != nil {
 		return err
 	}
@@ -139,17 +148,17 @@ func (s *HTTPStore) Feedback(id string, r *Result) error {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("wrong response status code %s", resp.Status)
 	}
 	return nil
 }
 
 // Deleted marks a reservation as deleted
-func (s *HTTPStore) Deleted(id string) error {
-	url := fmt.Sprintf("%s/reservations/%s/deleted", s.baseURL, id)
+func (s *HTTPStore) Deleted(nodeID, id string) error {
+	url := fmt.Sprintf("%s/reservations/workloads/%s/%s", s.baseURL, id, nodeID)
 
-	req, err := http.NewRequest("PUT", url, nil)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -167,11 +176,22 @@ func (s *HTTPStore) Deleted(id string) error {
 	return nil
 }
 
-// Delete marks a reservation as to be deleted
-func (s *HTTPStore) Delete(id string) error {
-	url := fmt.Sprintf("%s/reservations/%s", s.baseURL, id)
+// Delete marks a reservation as to be deleted, signature
+// is of the `str(reservation.id) + reservation.json`
+func (s *HTTPStore) Delete(userID, resID int64, sig []byte) error {
+	url := fmt.Sprintf("%s/reservations/%d/sign/delete", s.baseURL, resID)
 
-	req, err := http.NewRequest("DELETE", url, nil)
+	signature := generated.TfgridReservationSigningSignature1{
+		Tid:       userID,
+		Signature: hex.EncodeToString(sig),
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(signature); err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, &buf)
 	if err != nil {
 		return err
 	}
@@ -183,9 +203,10 @@ func (s *HTTPStore) Delete(id string) error {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("wrong response status code %s", resp.Status)
 	}
+
 	return nil
 }
 
@@ -205,7 +226,7 @@ func (s *HTTPStore) UpdateReservedResources(nodeID string, c Counters) error {
 		return err
 	}
 
-	req, err := http.NewRequest("PUT", url, buf)
+	req, err := http.NewRequest("POST", url, buf)
 	if err != nil {
 		return err
 	}

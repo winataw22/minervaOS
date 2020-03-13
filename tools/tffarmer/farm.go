@@ -15,7 +15,7 @@ func registerFarm(c *cli.Context) error {
 
 	tid := c.Uint64("tid")
 
-	farmID, err := idStore.RegisterFarm(tid, name, "", []string{})
+	farmID, err := idStore.RegisterFarm(tid, name, "", []string{"fake"})
 	if err != nil {
 		return err
 	}

@@ -201,7 +201,8 @@ loaders= (LO) !jumpscale.digitalme.package.loader
 	}
 
 	if ok := assert.Equal(t, &Object{
-		URL: "jumpscale.digitalme.package",
+		URL:    "jumpscale.digitalme.package",
+		IsRoot: true,
 		Properties: []Property{
 			{Name: "name", Type: Type{
 				Default: `"UNKNOWN"`,
@@ -238,11 +239,11 @@ func TestNew(t *testing.T) {
 	enable = true (B)
 	args = (LO) !jumpscale.digitalme.package.arg
 	loaders= (LO) !jumpscale.digitalme.package.loader
-	
+
 	@url =  jumpscale.digitalme.package.arg
 	key = "" (S)
 	val =  "" (S)
-	
+
 	@url =  jumpscale.digitalme.package.loader
 	giturl =  (S)
 	dest =  (S)
@@ -260,7 +261,8 @@ func TestNew(t *testing.T) {
 	}
 
 	if ok := assert.Equal(t, &Object{
-		URL: "jumpscale.digitalme.package",
+		URL:    "jumpscale.digitalme.package",
+		IsRoot: true,
 		Properties: []Property{
 			{Name: "name", Type: Type{
 				Default: `"UNKNOWN"`,
@@ -330,7 +332,7 @@ func TestObjectDefault(t *testing.T) {
 name = "UNKNOWN" (S)    #official name of the package, there can be no overlap (can be dot notation)
 enable = true (B)
 unset = (S)
-args = "1,2,3" (LI) 
+args = "1,2,3" (LI)
 int = 1 (I)
 strings = ["hello", "world"] (LS)
 `

@@ -12,22 +12,27 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	// SchemaQual path to schema package
+	SchemaQual = "github.com/threefoldtech/zos/pkg/schema"
+)
+
 var (
 	// this is only the list of the types implemented so far
 	// in go, more types can be later added to schema modules
 	// and then mapped here to support it.
 	goKindMap = map[Kind][2]string{
 		StringKind:    {"", "string"},
-		EmailKind:     {"", "string"},
 		IntegerKind:   {"", "int64"},
 		FloatKind:     {"", "float64"},
 		BoolKind:      {"", "bool"},
 		BytesKind:     {"", "[]byte"},
-		DateKind:      {"github.com/threefoldtech/zos/pkg/schema", "Date"},
-		DateTimeKind:  {"github.com/threefoldtech/zos/pkg/schema", "Date"},
-		NumericKind:   {"github.com/threefoldtech/zos/pkg/schema", "Numeric"},
+		DateKind:      {SchemaQual, "Date"},
+		DateTimeKind:  {SchemaQual, "Date"},
+		NumericKind:   {SchemaQual, "Numeric"},
 		IPAddressKind: {"net", "IP"},
-		IPRangeKind:   {"github.com/threefoldtech/zos/pkg/schema", "IPRange"},
+		IPRangeKind:   {SchemaQual, "IPRange"},
+		EmailKind:     {SchemaQual, "Email"},
 		//TODO add other types here (for example, Email, Phone, etc..)
 	}
 )
@@ -163,6 +168,9 @@ func (g *goGenerator) object(j *jen.File, obj *Object) error {
 	}
 	var structErr error
 	j.Type().Id(structName).StructFunc(func(group *jen.Group) {
+		if obj.IsRoot {
+			group.Id("ID").Add(jen.Qual(SchemaQual, "ID")).Tag(map[string]string{"json": "id", "bson": "_id"})
+		}
 		for _, prop := range obj.Properties {
 			name := strcase.ToCamel(prop.Name)
 
@@ -185,7 +193,7 @@ func (g *goGenerator) object(j *jen.File, obj *Object) error {
 				}
 			}
 
-			group.Id(name).Add(typ).Tag(map[string]string{"json": prop.Name})
+			group.Id(name).Add(typ).Tag(map[string]string{"json": prop.Name, "bson": prop.Name})
 		}
 	})
 

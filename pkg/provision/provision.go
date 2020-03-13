@@ -10,7 +10,6 @@ package provision
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 )
 
@@ -58,4 +57,27 @@ var (
 
 // ErrTemporary is return when a reservation source failed to contact the BCDB
 // user usually want to retry after getting this error
-var ErrTemporary = errors.New("network error contacting BCDB")
+type ErrTemporary struct {
+	err error
+}
+
+// NewErrTemporary wrap an error and mark it as temporary
+func NewErrTemporary(err error) error {
+	return ErrTemporary{err: err}
+}
+
+// Error implements the errors.Error interface
+func (e ErrTemporary) Error() string {
+	return e.err.Error()
+}
+
+// Is implements errors.Is interface
+func (e ErrTemporary) Is(target error) bool {
+	_, ok := target.(ErrTemporary)
+	return ok
+}
+
+// Unwrap implements errors.Unwrap interface
+func (e ErrTemporary) Unwrap() error {
+	return e.err
+}

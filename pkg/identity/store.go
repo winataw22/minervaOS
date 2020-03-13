@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
@@ -76,11 +77,16 @@ func (s *httpIDStore) RegisterFarm(tid uint64, name string, email string, wallet
 	if err != nil {
 		return 0, err
 	}
+	defer func() {
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+	}()
+
 	if resp.StatusCode != http.StatusCreated {
-		return 0, fmt.Errorf("wrong response status code received: %v", resp.Status)
+		msg, _ := ioutil.ReadAll(resp.Body)
+		return 0, fmt.Errorf("wrong response status code received: (%s) %s", string(msg), resp.Status)
 	}
 
-	defer resp.Body.Close()
 	id := struct {
 		ID pkg.FarmID `json:"id"`
 	}{}

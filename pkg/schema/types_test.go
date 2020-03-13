@@ -39,6 +39,48 @@ func TestParseDate(t *testing.T) {
 	}
 }
 
+func TestParseEmail(t *testing.T) {
+	cases := []struct {
+		Input  string
+		Output Email
+	}{
+		{`"azmy@gmail.com"`, Email("azmy@gmail.com")},
+		{`"a@b"`, Email("a@b")},
+		{`""`, Email("")},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Input, func(t *testing.T) {
+			var d Email
+			err := json.Unmarshal([]byte(c.Input), &d)
+			if ok := assert.NoError(t, err); !ok {
+				t.Fatal()
+			}
+
+			if ok := assert.Equal(t, c.Output, d); !ok {
+				t.Error()
+			}
+		})
+	}
+
+	failed := []string{
+		`"gmail.com"`,
+		`"a"`,
+	}
+
+	for _, c := range failed {
+		t.Run(c, func(t *testing.T) {
+			var d Email
+			err := json.Unmarshal([]byte(c), &d)
+			if ok := assert.Error(t, err); !ok {
+				t.Fatal()
+			}
+
+		})
+	}
+
+}
+
 func TestNumericBigInt(t *testing.T) {
 	const inputValue = "1344719667586153181419716641724567886890850696275767987106294472017884974410332069524504824747437757"
 	var n Numeric

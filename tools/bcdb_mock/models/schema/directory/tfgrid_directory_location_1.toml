@@ -1,0 +1,7 @@
+
+@url = tfgrid.directory.location.1
+city = (S)
+country = (S)
+continent = (S)
+latitude = (F)
+longitude = (F)
