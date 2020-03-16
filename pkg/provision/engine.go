@@ -215,7 +215,7 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 	}
 	result.Signature = hex.EncodeToString(sig)
 
-	return e.fb.Feedback(r.NodeID, result)
+	return e.fb.Feedback(e.nodeID, result)
 }
 
 func (e *defaultEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {

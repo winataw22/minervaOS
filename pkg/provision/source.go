@@ -58,6 +58,7 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 		defer close(ch)
 		var next uint64
 		on := time.Now()
+		log.Info().Msg("Started polling for reservations")
 		for {
 			time.Sleep(time.Until(on))
 			on = time.Now().Add(s.maxSleep)
@@ -130,7 +131,7 @@ func (s *decommissionSource) Reservations(ctx context.Context) <-chan *Reservati
 		for {
 			// <-time.After(time.Minute * 10) //TODO: make configuration ? default value ?
 			<-time.After(time.Second * 20) //TODO: make configuration ? default value ?
-			log.Info().Msg("check for expired reservation")
+			log.Debug().Msg("check for expired reservation")
 
 			reservations, err := s.store.GetExpired()
 			if err != nil {

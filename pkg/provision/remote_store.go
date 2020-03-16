@@ -70,7 +70,7 @@ func (s *HTTPStore) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, er
 
 	u.RawQuery = q.Encode()
 
-	log.Info().Str("url", u.String()).Msg("fetching")
+	log.Debug().Str("url", u.String()).Msg("fetching")
 
 	resp, err := http.Get(u.String())
 	if err != nil {

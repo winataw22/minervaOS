@@ -29,6 +29,8 @@ func (s *NodeAPI) registerNode(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.BadRequest(err)
 	}
 
+	//make sure node can not set public config
+	n.PublicConfig = nil
 	db := mw.Database(r)
 	if _, err := s.Add(r.Context(), db, n); err != nil {
 		return nil, mw.Error(err)

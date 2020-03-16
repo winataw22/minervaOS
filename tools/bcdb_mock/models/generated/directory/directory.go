@@ -79,7 +79,7 @@ type TfgridDirectoryNode2 struct {
 	ReservedResources TfgridDirectoryNodeResourceAmount1 `bson:"reserved_resources" json:"reserved_resources"`
 	Proofs            []TfgridDirectoryNodeProof1        `bson:"proofs" json:"proofs"`
 	Ifaces            []TfgridDirectoryNodeIface1        `bson:"ifaces" json:"ifaces"`
-	PublicConfig      *TfgridDirectoryNodePublicIface1   `bson:"public_config" json:"public_config"`
+	PublicConfig      *TfgridDirectoryNodePublicIface1   `bson:"public_config,omitempty" json:"public_config"`
 	ExitNode          bool                               `bson:"exit_node" json:"exit_node"`
 	Approved          bool                               `bson:"approved" json:"approved"`
 	PublicKeyHex      string                             `bson:"public_key_hex" json:"public_key_hex"`

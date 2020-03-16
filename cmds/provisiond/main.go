@@ -47,8 +47,10 @@ func main() {
 		version.ShowAndExit(false)
 	}
 
+	// Default level for this example is info, unless debug flag is present
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if debug {
-		log.Logger.Level(zerolog.DebugLevel)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	flag.Parse()
