@@ -91,7 +91,6 @@ func cmdsProvision(c *cli.Context) error {
 	var (
 		schema   []byte
 		path     = c.String("schema")
-		nodeIDs  = c.StringSlice("node")
 		seedPath = c.String("seed")
 		d        = c.String("duration")
 		userID   = c.Int64("id")
@@ -136,60 +135,63 @@ func cmdsProvision(c *cli.Context) error {
 	// set the user ID into the reservation schema
 	//reservation.User = keypair.Identity()
 
-	for _, nodeID := range nodeIDs {
-		r := reservation //make a copy
-		r.NodeID = nodeID
-
-		custom, ok := provCustomModifiers[r.Type]
-		if ok {
-			if err := custom(&r); err != nil {
-				return err
-			}
-		}
-
-		jsx, err := gedis.ReservationToSchemaType(&r)
-		if err != nil {
-			return errors.Wrap(err, "failed to convert reservation to schema type")
-		}
-		jsx.CustomerTid = userID
-		// we always allow user to delete his own reservations
-		jsx.DataReservation.SigningRequestDelete.QuorumMin = 1
-		jsx.DataReservation.SigningRequestDelete.Signers = []int64{userID}
-
-		bytes, err := json.Marshal(jsx.DataReservation)
-		if err != nil {
+	custom, ok := provCustomModifiers[reservation.Type]
+	fmt.Println("customization: ", ok)
+	if ok {
+		fmt.Println("running customization function", reservation.NodeID)
+		if err := custom(&reservation); err != nil {
 			return err
 		}
-
-		jsx.JSON = string(bytes)
-		signature, err := crypto.Sign(keypair.PrivateKey, []byte(jsx.JSON))
-		if err != nil {
-			return errors.Wrap(err, "failed to sign the reservation")
-		}
-
-		jsx.CustomerSignature = hex.EncodeToString(signature)
-
-		id, err := client.ReserveJSX(jsx)
-		if err != nil {
-			return errors.Wrap(err, "failed to send reservation")
-		}
-
-		fmt.Printf("Reservation for %v send to node %s\n", duration, r.NodeID)
-		fmt.Printf("Resource: /reservations/%v\n", id)
 	}
+
+	jsx, err := gedis.ReservationToSchemaType(&reservation)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert reservation to schema type")
+	}
+	jsx.CustomerTid = userID
+	// we always allow user to delete his own reservations
+	jsx.DataReservation.SigningRequestDelete.QuorumMin = 1
+	jsx.DataReservation.SigningRequestDelete.Signers = []int64{userID}
+
+	bytes, err := json.Marshal(jsx.DataReservation)
+	if err != nil {
+		return err
+	}
+
+	jsx.JSON = bytes
+	signature, err := crypto.Sign(keypair.PrivateKey, []byte(jsx.JSON))
+	if err != nil {
+		return errors.Wrap(err, "failed to sign the reservation")
+	}
+
+	jsx.CustomerSignature = hex.EncodeToString(signature)
+
+	if c.Bool("dry-run") {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(jsx)
+	}
+
+	id, err := client.ReserveJSX(jsx)
+	if err != nil {
+		return errors.Wrap(err, "failed to send reservation")
+	}
+
+	fmt.Printf("Reservation for %v send to node bcdb\n", duration)
+	fmt.Printf("Resource: /reservations/%v\n", id)
 
 	return nil
 }
 
-func embed(schema interface{}, t provision.ReservationType) (*provision.Reservation, error) {
+func embed(schema interface{}, t provision.ReservationType, node string) (*provision.Reservation, error) {
 	raw, err := json.Marshal(schema)
 	if err != nil {
 		return nil, err
 	}
-
 	r := &provision.Reservation{
-		Type: t,
-		Data: raw,
+		NodeID: node,
+		Type:   t,
+		Data:   raw,
 	}
 
 	return r, nil
@@ -216,7 +218,7 @@ func cmdsDeleteReservation(c *cli.Context) error {
 	if _, err := buf.WriteString(fmt.Sprint(resID)); err != nil {
 		return err
 	}
-	if _, err := buf.WriteString(reservation.JSON); err != nil {
+	if _, err := buf.Write(reservation.JSON); err != nil {
 		return err
 	}
 

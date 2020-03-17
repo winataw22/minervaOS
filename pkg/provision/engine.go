@@ -151,7 +151,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 
 	if !exists {
 		log.Info().Str("id", r.ID).Msg("reservation not provisioned, no need to decomission")
-		if err := e.fb.Deleted(r.NodeID, r.ID); err != nil {
+		if err := e.fb.Deleted(e.nodeID, r.ID); err != nil {
 			log.Error().Err(err).Str("id", r.ID).Msg("failed to mark reservation as deleted")
 		}
 		return nil
@@ -166,7 +166,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
 	}
 
-	if err := e.fb.Deleted(r.NodeID, r.ID); err != nil {
+	if err := e.fb.Deleted(e.nodeID, r.ID); err != nil {
 		return errors.Wrap(err, "failed to mark reservation as deleted")
 	}
 

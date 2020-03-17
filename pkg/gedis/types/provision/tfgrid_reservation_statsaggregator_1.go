@@ -1,6 +1,8 @@
 package provision
 
 import (
+	"encoding/json"
+
 	schema "github.com/threefoldtech/zos/pkg/schema"
 )
 
@@ -15,7 +17,7 @@ type TfgridReservationStatsaggregator1 struct {
 type TfgridReservationResult1 struct {
 	Category   TfgridReservationResult1CategoryEnum `json:"category"`
 	WorkloadID string                               `json:"workload_id"`
-	DataJSON   string                               `json:"data_json"`
+	DataJSON   json.RawMessage                      `json:"data_json"`
 	Signature  string                               `json:"signature"`
 	State      TfgridReservationResult1StateEnum    `json:"state"`
 	Message    string                               `json:"message"`

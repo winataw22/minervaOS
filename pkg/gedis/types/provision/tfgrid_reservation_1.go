@@ -1,13 +1,15 @@
 package provision
 
 import (
+	"encoding/json"
+
 	schema "github.com/threefoldtech/zos/pkg/schema"
 )
 
 // TfgridReservation1 jsx schema
 type TfgridReservation1 struct {
 	ID                  uint                                 `json:"id"`
-	JSON                string                               `json:"json"`
+	JSON                json.RawMessage                      `json:"json"`
 	DataReservation     TfgridReservationData1               `json:"data_reservation"`
 	CustomerTid         int64                                `json:"customer_tid"`
 	CustomerSignature   string                               `json:"customer_signature"`

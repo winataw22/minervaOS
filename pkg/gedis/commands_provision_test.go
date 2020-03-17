@@ -132,7 +132,7 @@ func TestProvisionFeedback(t *testing.T) {
 		ID:        id,
 		Created:   time.Now(),
 		State:     provision.StateOk,
-		Data:      json.RawMessage("returned data"),
+		Data:      json.RawMessage("{}"),
 		Signature: "signature",
 	}
 
@@ -141,10 +141,10 @@ func TestProvisionFeedback(t *testing.T) {
 		"result": types.TfgridReservationResult1{
 			Category:   types.TfgridReservationResult1CategoryContainer,
 			WorkloadID: "101",
-			DataJSON:   string(result.Data),
+			DataJSON:   result.Data,
 			Signature:  result.Signature,
 			State:      types.TfgridReservationResult1StateOk,
-			Epoch:      schema.Date{result.Created},
+			Epoch:      schema.Date{Time: result.Created},
 		},
 	}
 

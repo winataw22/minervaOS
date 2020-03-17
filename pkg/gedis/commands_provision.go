@@ -126,7 +126,7 @@ func (g *Gedis) Feedback(nodeID string, r *provision.Result) error {
 	result := ptypes.TfgridReservationResult1{
 		Category:   rType,
 		WorkloadID: r.ID,
-		DataJSON:   string(r.Data),
+		DataJSON:   r.Data,
 		Signature:  r.Signature,
 		State:      ptypes.TfgridReservationResult1StateEnum(r.State),
 		Message:    r.Error,

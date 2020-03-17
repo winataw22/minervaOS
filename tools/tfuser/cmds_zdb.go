@@ -38,7 +38,7 @@ func generateZDB(c *cli.Context) error {
 		Public:   public,
 	}
 
-	p, err := embed(zdb, provision.ZDBReservation)
+	p, err := embed(zdb, provision.ZDBReservation, c.String("node"))
 	if err != nil {
 		return err
 	}

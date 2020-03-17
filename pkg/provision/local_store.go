@@ -85,9 +85,12 @@ type (
 
 // NewFSStore creates a in memory reservation store
 func NewFSStore(root string) (*FSStore, error) {
+	store := &FSStore{
+		root: root,
+	}
 	if app.IsFirstBoot("provisiond") {
 		log.Info().Msg("first boot, empty reservation cache")
-		if err := os.RemoveAll(root); err != nil {
+		if err := store.removeAllButPersistent(root); err != nil {
 			return nil, err
 		}
 
@@ -102,11 +105,32 @@ func NewFSStore(root string) (*FSStore, error) {
 
 	log.Info().Msg("restart detected, keep reservation cache intact")
 
-	store := &FSStore{
-		root: root,
-	}
-
 	return store, store.sync()
+}
+
+func (s *FSStore) removeAllButPersistent(rootPath string) error {
+	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, r error) error {
+		if r != nil {
+			return r
+		}
+		if info.IsDir() {
+			return nil
+		}
+		reservationType, err := s.getType(filepath.Base(path))
+		if err != nil {
+			return err
+		}
+		if reservationType != VolumeReservation && reservationType != ZDBReservation {
+			log.Info().Msgf("Removing %s from cache", path)
+			return os.Remove(path)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Error().Msgf("error walking the path %q: %v\n", rootPath, err)
+		return err
+	}
+	return nil
 }
 
 func (s *FSStore) sync() error {
@@ -260,6 +284,41 @@ func (s *FSStore) Get(id string) (*Reservation, error) {
 	defer s.RUnlock()
 
 	return s.get(id)
+}
+
+// getType retrieves a specific reservation's type using its ID
+// if returns a non nil error if the reservation is not present in the store
+func (s *FSStore) getType(id string) (ReservationType, error) {
+	res := struct {
+		Type ReservationType `json:"type"`
+	}{}
+	path := filepath.Join(s.root, id)
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return "", errors.Wrapf(err, "reservation %s not found", id)
+	} else if err != nil {
+		return "", err
+	}
+
+	defer f.Close()
+	reader, err := versioned.NewReader(f)
+	if versioned.IsNotVersioned(err) {
+		if _, err := f.Seek(0, 0); err != nil { // make sure to read from start
+			return "", err
+		}
+		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), f)
+	}
+
+	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", reservationSchemaV1))
+
+	if validV1(reader.Version()) {
+		if err := json.NewDecoder(reader).Decode(&res); err != nil {
+			return "nil", err
+		}
+	} else {
+		return "", fmt.Errorf("unknown reservation object version (%s)", reader.Version())
+	}
+	return res.Type, nil
 }
 
 // Exists checks if the reservation ID is in the store

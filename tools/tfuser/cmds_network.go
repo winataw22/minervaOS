@@ -69,7 +69,7 @@ func cmdCreateNetwork(c *cli.Context) error {
 		NetResources: []pkg.NetResource{},
 	}
 
-	r, err := embed(network, provision.NetworkReservation)
+	r, err := embed(network, provision.NetworkReservation, "")
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func cmdsAddNode(c *cli.Context) error {
 		return errors.Wrap(err, "failed to generate peers")
 	}
 
-	r, err := embed(pkgNetFromNetwork(*network), provision.NetworkReservation)
+	r, err := embed(pkgNetFromNetwork(*network), provision.NetworkReservation, "")
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func cmdsAddAccess(c *cli.Context) error {
 
 	fmt.Println(wgConf)
 
-	r, err := embed(pkgNetFromNetwork(*network), provision.NetworkReservation)
+	r, err := embed(pkgNetFromNetwork(*network), provision.NetworkReservation, "")
 	if err != nil {
 		return err
 	}

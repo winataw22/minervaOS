@@ -125,12 +125,14 @@ func main() {
 							Usage: "Add a node to a existing network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
-									Name:  "node",
-									Usage: "Node ID of the node to add to the network",
+									Name:     "node",
+									Usage:    "Node ID of the node to add to the network",
+									Required: true,
 								},
 								cli.StringFlag{
-									Name:  "subnet",
-									Usage: "Subnet to use on this node. The subnet needs to be included in the IP range of the network",
+									Name:     "subnet",
+									Usage:    "Subnet to use on this node. The subnet needs to be included in the IP range of the network",
+									Required: true,
 								},
 								cli.UintFlag{
 									Name:  "port",
@@ -148,8 +150,9 @@ func main() {
 							Usage: "Removes a Network Resource from the network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
-									Name:  "node",
-									Usage: "Node ID to remove from the network",
+									Name:     "node",
+									Usage:    "Node ID to remove from the network",
+									Required: true,
 								},
 							},
 							Action: cmdsRemoveNode,
@@ -164,8 +167,9 @@ func main() {
 							Usage: "Add external access to the network",
 							Flags: []cli.Flag{
 								cli.StringFlag{
-									Name:  "node",
-									Usage: "Node ID of the node which will act as an access point",
+									Name:     "node",
+									Usage:    "Node ID of the node which will act as an access point",
+									Required: true,
 								},
 								cli.StringFlag{
 									Name:  "subnet",
@@ -189,8 +193,14 @@ func main() {
 					Usage: "Generate container provisioning schema",
 					Flags: []cli.Flag{
 						cli.StringFlag{
-							Name:  "flist",
-							Usage: "URL to the flist",
+							Name:     "node",
+							Usage:    "node id for the generated workload",
+							Required: true,
+						},
+						cli.StringFlag{
+							Name:     "flist",
+							Usage:    "URL to the flist",
+							Required: true,
 						},
 						cli.StringFlag{
 							Name:  "storage",
@@ -205,8 +215,9 @@ func main() {
 							Usage: "enable coreX",
 						},
 						cli.StringFlag{
-							Name:  "network",
-							Usage: "network ID the container needs to be part of",
+							Name:     "network",
+							Usage:    "network ID the container needs to be part of",
+							Required: true,
 						},
 						cli.StringSliceFlag{
 							Name:  "mounts",
@@ -217,8 +228,9 @@ func main() {
 							Usage: "environment variable to set into the container",
 						},
 						cli.StringFlag{
-							Name:  "ip",
-							Usage: "ip address to assign to the container",
+							Name:     "ip",
+							Usage:    "ip address to assign to the container",
+							Required: true,
 						},
 						cli.UintFlag{
 							Name:  "cpu",
@@ -243,14 +255,20 @@ func main() {
 							Name:    "volume",
 							Aliases: []string{"vol"},
 							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:     "node",
+									Usage:    "node id for the generated workload",
+									Required: true,
+								},
 								cli.Uint64Flag{
 									Name:  "size, s",
 									Usage: "Size of the volume in GiB",
 									Value: 1,
 								},
 								cli.StringFlag{
-									Name:  "type, t",
-									Usage: "Type of disk to use, HHD or SSD",
+									Name:     "type, t",
+									Usage:    "Type of disk to use, HHD or SSD",
+									Required: true,
 								},
 							},
 							Action: generateVolume,
@@ -259,18 +277,25 @@ func main() {
 							Name:  "zdb",
 							Usage: "reserve a 0-db namespace",
 							Flags: []cli.Flag{
+								cli.StringFlag{
+									Name:     "node",
+									Usage:    "node id for the generated workload",
+									Required: true,
+								},
 								cli.Uint64Flag{
 									Name:  "size, s",
 									Usage: "Size of the volume in GiB",
 									Value: 1,
 								},
 								cli.StringFlag{
-									Name:  "type, t",
-									Usage: "Type of disk to use, HHD or SSD",
+									Name:     "type, t",
+									Usage:    "Type of disk to use, HHD or SSD",
+									Required: true,
 								},
 								cli.StringFlag{
-									Name:  "mode, m",
-									Usage: "0-DB mode (user, seq)",
+									Name:     "mode, m",
+									Usage:    "0-DB mode (user, seq)",
+									Required: true,
 								},
 								cli.StringFlag{
 									Name:  "password, p",
@@ -307,8 +332,9 @@ func main() {
 							Usage: "Cluster token to set for kubernetes, this is encrypted by the nodes public key",
 						},
 						cli.StringFlag{
-							Name:  "node, n",
-							Usage: "node ID. Required if password is set to encrypt the password",
+							Name:     "node, n",
+							Usage:    "node ID.",
+							Required: true,
 						},
 						cli.StringSliceFlag{
 							Name:  "master-ips",
@@ -325,6 +351,11 @@ func main() {
 					Name:  "debug",
 					Usage: "Enable debug mode on a node. In this mode the forward its logs to the specified redis endpoint",
 					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:     "node",
+							Usage:    "node id for the generated workload",
+							Required: true,
+						},
 						cli.StringFlag{
 							Name: "endpoint",
 						},
@@ -346,10 +377,6 @@ func main() {
 					Usage: "path to the provisioning schema, use - to read from stdin",
 					Value: "provision.json",
 				},
-				cli.StringSliceFlag{
-					Name:  "node",
-					Usage: "Node ID where to deploy the workload",
-				},
 				cli.StringFlag{
 					Name:  "duration",
 					Usage: "duration of the reservation. By default is number of days. But also support notation with duration suffix like m for minute or h for hours",
@@ -365,6 +392,10 @@ func main() {
 					Usage:    "user id associated with the seed",
 					EnvVar:   "TF_USER_ID",
 					Required: true,
+				},
+				cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "dry run, prints the reservation instead of registering it",
 				},
 			},
 			Action: cmdsProvision,
@@ -397,10 +428,11 @@ func main() {
 			Name:  "live",
 			Usage: "show you all the reservations that are still alive",
 			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "seed",
-					Usage:  "path to the file container the seed of the user private key",
-					EnvVar: "SEED_PATH",
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
 				},
 				cli.IntFlag{
 					Name:  "start",
