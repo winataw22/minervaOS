@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	cacheTarget = "/var/cache"
+	// CacheTarget is the path where the cache disk is mounted
+	CacheTarget = "/var/cache"
 	cacheLabel  = "zos-cache"
 	cacheSize   = 20 * 1024 * 1024 * 1024 // 20GB
 )
@@ -396,11 +397,11 @@ func (s *storageModule) ensureCache() error {
 		cacheFs = fs
 	}
 
-	if !filesystem.IsMountPoint(cacheTarget) {
-		log.Debug().Msgf("Mounting cache partition in %s", cacheTarget)
-		return filesystem.BindMount(cacheFs, cacheTarget)
+	if !filesystem.IsMountPoint(CacheTarget) {
+		log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
+		return filesystem.BindMount(cacheFs, CacheTarget)
 	}
-	log.Debug().Msgf("Cache partition already mounted in %s", cacheTarget)
+	log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
 	return nil
 }
 

@@ -2,10 +2,13 @@ package identity
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/jbenet/go-base58"
 
 	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
 
@@ -33,6 +36,9 @@ func NewHTTPIDStore(url string) IDStore {
 // RegisterNode implements the IDStore interface
 func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.FarmID, version string, loc geoip.Location) (string, error) {
 	buf := bytes.Buffer{}
+
+	pk := base58.Decode(node.Identity())
+
 	err := json.NewEncoder(&buf).Encode(directory.TfgridNode2{
 		NodeID:    node.Identity(),
 		FarmID:    uint64(farm),
@@ -44,6 +50,7 @@ func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.FarmID, version
 			Latitude:  loc.Latitude,
 			Longitude: loc.Longitute,
 		},
+		PublicKeyHex: hex.EncodeToString(pk),
 	})
 	if err != nil {
 		return "", err

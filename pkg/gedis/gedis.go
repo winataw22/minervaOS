@@ -122,7 +122,8 @@ func newRedisPool(address string) (*redis.Pool, error) {
 
 			return nil
 		},
-		MaxActive:   10,
+		MaxActive:   5,
+		MaxIdle:     5,
 		IdleTimeout: 1 * time.Minute,
 		Wait:        true,
 	}, nil

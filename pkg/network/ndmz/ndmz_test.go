@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"sync"
 	"testing"
 
@@ -38,37 +39,31 @@ func TestIpv6(t *testing.T) {
 }
 
 func TestIPv4Allocate(t *testing.T) {
-	var (
-		err    error
-		origin = ipamPath
-	)
-
-	ipamPath, err = ioutil.TempDir("", "")
+	ipamPath, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
-	defer func() { ipamPath = origin }()
+	t.Cleanup(func() {
+		_ = os.RemoveAll(ipamPath)
+	})
 
-	addr, err := allocateIPv4("network1")
+	addr, err := allocateIPv4("network1", ipamPath)
 	require.NoError(t, err)
 
-	addr2, err := allocateIPv4("network1")
+	addr2, err := allocateIPv4("network1", ipamPath)
 	require.NoError(t, err)
 
 	assert.Equal(t, addr.String(), addr2.String())
 
-	addr3, err := allocateIPv4("network2")
+	addr3, err := allocateIPv4("network2", ipamPath)
 	require.NoError(t, err)
 	assert.NotEqual(t, addr.String(), addr3.String())
 }
 
 func TestIPv4AllocateConcurent(t *testing.T) {
-	var (
-		err    error
-		origin = ipamPath
-	)
-
-	ipamPath, err = ioutil.TempDir("", "")
+	ipamPath, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
-	defer func() { ipamPath = origin }()
+	t.Cleanup(func() {
+		_ = os.RemoveAll(ipamPath)
+	})
 
 	wg := sync.WaitGroup{}
 	wg.Add(10)
@@ -80,7 +75,7 @@ func TestIPv4AllocateConcurent(t *testing.T) {
 			defer wg.Done()
 			for y := 0; y < 10; y++ {
 				nw := fmt.Sprintf("network%d%d", i, y)
-				addr, err := allocateIPv4(nw)
+				addr, err := allocateIPv4(nw, ipamPath)
 				require.NoError(t, err)
 				c <- addr
 			}

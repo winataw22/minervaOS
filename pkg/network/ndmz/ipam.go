@@ -10,9 +10,8 @@ import (
 
 // allocateIPv4 allocates a unique IPv4 for the entity defines by the given id (for example container id, or a vm).
 // in the network with netID, and NetResource.
-func allocateIPv4(networkID string) (*net.IPNet, error) {
-	// FIXME: path to the cache disk shouldn't be hardcoded here
-	store, err := disk.New("ndmz", ipamPath)
+func allocateIPv4(networkID, leaseDir string) (*net.IPNet, error) {
+	store, err := disk.New("ndmz", leaseDir)
 	if err != nil {
 		return nil, err
 	}

@@ -55,17 +55,12 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to zbus broker")
 	}
 
-	if err := os.MkdirAll(root, 0750); err != nil {
-		log.Fatal().Err(err).Msgf("fail to create module root")
-	}
-
 	db, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to BCDB")
 	}
 
 	identity := stubs.NewIdentityManagerStub(client)
-	networker := network.NewNetworker(identity, db, root)
 	nodeID := identity.NodeID()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -133,6 +128,15 @@ func main() {
 	go startAddrWatch(ctx, nodeID, db, ifaces)
 
 	log.Info().Msg("start zbus server")
+	if err := os.MkdirAll(root, 0750); err != nil {
+		log.Fatal().Err(err).Msgf("fail to create module root")
+	}
+
+	networker, err := network.NewNetworker(identity, db, root)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error creating network manager")
+	}
+
 	if err := startServer(ctx, broker, networker); err != nil {
 		log.Fatal().Err(err).Msg("unexpected error")
 	}

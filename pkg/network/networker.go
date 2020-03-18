@@ -5,11 +5,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/termie/go-shutil"
+
+	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
 
@@ -35,26 +39,102 @@ import (
 
 const (
 	// ZDBIface is the name of the interface used in the 0-db network namespace
-	ZDBIface = "zdb0"
+	ZDBIface     = "zdb0"
+	wgPortDir    = "wireguard_ports"
+	networkDir   = "networks"
+	ipamLeaseDir = "ndmz-lease"
+	ipamPath     = "/var/cache/modules/networkd/lease"
+)
+
+const (
+	mib = 1024 * 1024
 )
 
 type networker struct {
-	identity   pkg.IdentityManager
-	storageDir string
-	tnodb      TNoDB
-	portSet    *set.UintSet
+	identity     pkg.IdentityManager
+	networkDir   string
+	ipamLeaseDir string
+	tnodb        TNoDB
+	portSet      *set.UintSet
 }
 
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity pkg.IdentityManager, tnodb TNoDB, storageDir string) pkg.Networker {
-	nw := &networker{
-		identity:   identity,
-		storageDir: storageDir,
-		tnodb:      tnodb,
-		portSet:    set.NewUint(),
+func NewNetworker(identity pkg.IdentityManager, tnodb TNoDB, storageDir string) (pkg.Networker, error) {
+
+	vd, err := cache.VolatileDir("networkd", 50*mib)
+	if err != nil && !os.IsExist(err) {
+		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
 	}
 
-	return nw
+	wgDir := filepath.Join(vd, wgPortDir)
+	if err := os.MkdirAll(wgDir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create wireguard port cache directory: %w", err)
+	}
+
+	nwDir := filepath.Join(vd, networkDir)
+	ipamLease := filepath.Join(vd, ipamLeaseDir)
+
+	oldPath := filepath.Join(ipamPath, "ndmz")
+	newPath := filepath.Join(ipamLease, "ndmz")
+	if _, err := os.Stat(oldPath); err == nil {
+		if err := shutil.CopyTree(oldPath, newPath, nil); err != nil {
+			return nil, err
+		}
+		_ = os.RemoveAll(ipamPath)
+	}
+
+	//TODO: remove once all the node have move the network into the volatile directory
+	if _, err = os.Stat(storageDir); err == nil {
+		if err := copyNetworksToVolatile(storageDir, nwDir); err != nil {
+			return nil, fmt.Errorf("failed to copy old networks directory: %w", err)
+		}
+	}
+
+	nw := &networker{
+		identity:     identity,
+		tnodb:        tnodb,
+		networkDir:   nwDir,
+		ipamLeaseDir: ipamLease,
+		portSet:      set.NewUint(wgDir),
+	}
+
+	return nw, nil
+}
+
+func copyNetworksToVolatile(src, dst string) error {
+	log.Info().Msg("move network cached file to volatile directory")
+	if err := os.MkdirAll(dst, 0700); err != nil {
+		return err
+	}
+
+	infos, err := ioutil.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	copy := func(src string, dst string) error {
+		log.Info().Str("source", src).Str("dst", dst).Msg("copy file")
+		// Read all content of src to data
+		data, err := ioutil.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		// Write data to dst
+		return ioutil.WriteFile(dst, data, 0644)
+	}
+
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
+		}
+
+		s := filepath.Join(src, info.Name())
+		d := filepath.Join(dst, info.Name())
+		if err := copy(s, d); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var _ pkg.Networker = (*networker)(nil)
@@ -387,6 +467,12 @@ func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
 
 // CreateNR implements pkg.Networker interface
 func (n *networker) CreateNR(network pkg.Network) (string, error) {
+	defer func() {
+		if err := n.publishWGPorts(); err != nil {
+			log.Warn().Err(err).Msg("failed to publish wireguard port to BCDB")
+		}
+	}()
+
 	var err error
 	var nodeID = n.identity.NodeID().Identity()
 
@@ -416,7 +502,6 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 	// check if there is a reserved wireguard port for this NR already
 	// or if we need to update it
 	storedNet, err := n.networkOf(string(network.NetID))
-
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
@@ -426,15 +511,13 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if netNR.WGListenPort != storedNR.WGListenPort {
-			if err := n.releasePort(storedNR.WGListenPort); err != nil {
-				return "", err
-			}
-		}
-	} else if os.IsNotExist(err) {
-		if err := n.reservePort(netNR.WGListenPort); err != nil {
+		if err := n.releasePort(storedNR.WGListenPort); err != nil {
 			return "", err
 		}
+	}
+
+	if err := n.reservePort(netNR.WGListenPort); err != nil {
+		return "", err
 	}
 
 	netr, err := nr.New(network.NetID, netNR, &network.IPRange.IPNet)
@@ -461,7 +544,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to create network resource")
 	}
 
-	if err := ndmz.AttachNR(string(network.NetID), netr); err != nil {
+	if err := ndmz.AttachNR(string(network.NetID), netr, n.ipamLeaseDir); err != nil {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
@@ -471,7 +554,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 	}
 
 	// map the network ID to the network namespace
-	path := filepath.Join(n.storageDir, string(network.NetID))
+	path := filepath.Join(n.networkDir, string(network.NetID))
 	file, err := os.Create(path)
 	if err != nil {
 		cleanup()
@@ -494,7 +577,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 }
 
 func (n *networker) networkOf(id string) (*pkg.Network, error) {
-	path := filepath.Join(n.storageDir, string(id))
+	path := filepath.Join(n.networkDir, string(id))
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -530,6 +613,12 @@ func (n *networker) networkOf(id string) (*pkg.Network, error) {
 
 // DeleteNR implements pkg.Networker interface
 func (n *networker) DeleteNR(network pkg.Network) error {
+	defer func() {
+		if err := n.publishWGPorts(); err != nil {
+			log.Warn().Msg("failed to publish wireguard port to BCDB")
+		}
+	}()
+
 	netNR, err := ResourceByNodeID(n.identity.NodeID().Identity(), network.NetResources)
 	if err != nil {
 		return err
@@ -550,7 +639,7 @@ func (n *networker) DeleteNR(network pkg.Network) error {
 	}
 
 	// map the network ID to the network namespace
-	path := filepath.Join(n.storageDir, string(network.NetID))
+	path := filepath.Join(n.networkDir, string(network.NetID))
 	if err := os.Remove(path); err != nil {
 		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
 	}
@@ -575,28 +664,32 @@ func (n *networker) extractPrivateKey(hexKey string) (string, error) {
 }
 
 func (n *networker) reservePort(port uint16) error {
+	log.Debug().Uint16("port", port).Msg("reserve wireguard port")
 	err := n.portSet.Add(uint(port))
 	if err != nil {
 		return errors.Wrap(err, "wireguard listen port already in use, pick another one")
-	}
-
-	if err := n.tnodb.PublishWGPort(n.identity.NodeID(), n.portSet.List()); err != nil {
-		n.portSet.Remove(uint(port))
-		return errors.Wrap(err, "fail to publish wireguard port to bcdb")
 	}
 
 	return nil
 }
 
 func (n *networker) releasePort(port uint16) error {
+	log.Debug().Uint16("port", port).Msg("release wireguard port")
 	n.portSet.Remove(uint(port))
+	return nil
+}
 
-	if err := n.tnodb.PublishWGPort(n.identity.NodeID(), n.portSet.List()); err != nil {
+func (n *networker) publishWGPorts() error {
+	ports, err := n.portSet.List()
+	if err != nil {
+		return err
+	}
+
+	if err := n.tnodb.PublishWGPort(n.identity.NodeID(), ports); err != nil {
 		// maybe retry a couple of times ?
 		// having bdb and the node out of sync is pretty bad
 		return errors.Wrap(err, "fail to publish wireguard port to bcdb")
 	}
-
 	return nil
 }
 
