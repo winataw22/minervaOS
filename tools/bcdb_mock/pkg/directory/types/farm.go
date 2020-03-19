@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	farmCollection = "farm"
+	FarmCollection = "farm"
 )
 
 //Farm mongo db wrapper for generated TfgridDirectoryFarm
@@ -54,9 +54,14 @@ func (f FarmFilter) WithName(name string) FarmFilter {
 	return append(f, bson.E{Key: "name", Value: name})
 }
 
+// WithOwner filter farm by owner ID
+func (f FarmFilter) WithOwner(tid int64) FarmFilter {
+	return append(f, bson.E{Key: "threebot_id", Value: tid})
+}
+
 // Find run the filter and return a cursor result
 func (f FarmFilter) Find(ctx context.Context, db *mongo.Database, opts ...*options.FindOptions) (*mongo.Cursor, error) {
-	col := db.Collection(farmCollection)
+	col := db.Collection(FarmCollection)
 	if f == nil {
 		f = FarmFilter{}
 	}
@@ -68,7 +73,7 @@ func (f FarmFilter) Get(ctx context.Context, db *mongo.Database) (farm Farm, err
 	if f == nil {
 		f = FarmFilter{}
 	}
-	col := db.Collection(farmCollection)
+	col := db.Collection(FarmCollection)
 	result := col.FindOne(ctx, f, options.FindOne())
 
 	err = result.Err()
@@ -86,8 +91,8 @@ func FarmCreate(ctx context.Context, db *mongo.Database, farm Farm) (schema.ID, 
 		return 0, err
 	}
 
-	col := db.Collection(farmCollection)
-	id, err := models.NextID(ctx, db, farmCollection)
+	col := db.Collection(FarmCollection)
+	id, err := models.NextID(ctx, db, FarmCollection)
 	if err != nil {
 		return id, err
 	}

@@ -76,6 +76,8 @@ func (s *HTTPStore) Register(nodeID pkg.Identifier, c Capacity, d dmi.DMI, disks
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}
@@ -100,6 +102,8 @@ func (s *HTTPStore) Ping(nodeID pkg.Identifier, uptime uint64) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
-	"github.com/threefoldtech/zos/pkg/gedis"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
@@ -193,15 +192,5 @@ func bcdbClient() (network.TNoDB, error) {
 		return nil, errors.Wrap(err, "failed to parse node environment")
 	}
 
-	// use the bcdb mock for dev and test
-	if env.RunningMode == environment.RunningDev {
-		return tnodb.NewHTTPTNoDB(env.BcdbURL), nil
-	}
-
-	// use gedis for production bcdb
-	store, err := gedis.New(env.BcdbURL, env.BcdbPassword)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to connect to BCDB")
-	}
-	return store, nil
+	return tnodb.NewHTTPTNoDB(env.BcdbURL), nil
 }

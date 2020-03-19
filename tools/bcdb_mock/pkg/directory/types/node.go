@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	nodeCollection = "node"
+	NodeCollection = "node"
 )
 
 // Node model
@@ -66,10 +66,26 @@ func (f NodeFilter) WithFarmID(id schema.ID) NodeFilter {
 // WithTotalCap filter with total cap only units that > 0 are used
 // in the query
 func (f NodeFilter) WithTotalCap(cru, mru, hru, sru int64) NodeFilter {
-	for k, v := range map[string]int64{"cru": cru, "mru": mru, "hru": hru, "sru": sru} {
+	for k, v := range map[string]int64{
+		"total_resources.cru": cru,
+		"total_resources.mru": mru,
+		"total_resources.hru": hru,
+		"total_resources.sru": sru} {
 		if v > 0 {
-			f = append(f, bson.E{Key: "$gt", Value: bson.M{k: v}})
+			f = append(f, bson.E{Key: k, Value: bson.M{"$gte": v}})
 		}
+	}
+
+	return f
+}
+
+// WithLocation search the nodes that are located in country and or city
+func (f NodeFilter) WithLocation(country, city string) NodeFilter {
+	if country != "" {
+		f = append(f, bson.E{Key: "location.country", Value: country})
+	}
+	if city != "" {
+		f = append(f, bson.E{Key: "location.city", Value: city})
 	}
 
 	return f
@@ -77,7 +93,7 @@ func (f NodeFilter) WithTotalCap(cru, mru, hru, sru int64) NodeFilter {
 
 // Find run the filter and return a cursor result
 func (f NodeFilter) Find(ctx context.Context, db *mongo.Database, opts ...*options.FindOptions) (*mongo.Cursor, error) {
-	col := db.Collection(nodeCollection)
+	col := db.Collection(NodeCollection)
 	if f == nil {
 		f = NodeFilter{}
 	}
@@ -86,13 +102,22 @@ func (f NodeFilter) Find(ctx context.Context, db *mongo.Database, opts ...*optio
 }
 
 // Get one farm that matches the filter
-func (f NodeFilter) Get(ctx context.Context, db *mongo.Database) (node Node, err error) {
+func (f NodeFilter) Get(ctx context.Context, db *mongo.Database, includeproofs bool) (node Node, err error) {
 	if f == nil {
 		f = NodeFilter{}
 	}
 
-	col := db.Collection(nodeCollection)
-	result := col.FindOne(ctx, f, options.FindOne())
+	col := db.Collection(NodeCollection)
+
+	var projection bson.D
+	if !includeproofs {
+		projection = bson.D{
+			{Key: "proofs", Value: 0},
+		}
+	} else {
+		projection = bson.D{}
+	}
+	result := col.FindOne(ctx, f, options.FindOne().SetProjection(projection))
 
 	err = result.Err()
 	if err != nil {
@@ -105,7 +130,7 @@ func (f NodeFilter) Get(ctx context.Context, db *mongo.Database) (node Node, err
 
 // Count number of documents matching
 func (f NodeFilter) Count(ctx context.Context, db *mongo.Database) (int64, error) {
-	col := db.Collection(nodeCollection)
+	col := db.Collection(NodeCollection)
 	if f == nil {
 		f = NodeFilter{}
 	}
@@ -129,10 +154,10 @@ func NodeCreate(ctx context.Context, db *mongo.Database, node Node) (schema.ID, 
 	var filter NodeFilter
 	filter = filter.WithNodeID(node.NodeId)
 	var id schema.ID
-	current, err := filter.Get(ctx, db)
+	current, err := filter.Get(ctx, db, false)
 	if err != nil {
 		//TODO: check that this is a NOT FOUND error
-		id, err = models.NextID(ctx, db, nodeCollection)
+		id, err = models.NextID(ctx, db, NodeCollection)
 		if err != nil {
 			return id, err
 		}
@@ -147,7 +172,7 @@ func NodeCreate(ctx context.Context, db *mongo.Database, node Node) (schema.ID, 
 	}
 
 	node.Updated = schema.Date{Time: time.Now()}
-	col := db.Collection(nodeCollection)
+	col := db.Collection(NodeCollection)
 	result := col.FindOneAndUpdate(ctx, filter, bson.M{"$set": node}, options.FindOneAndUpdate().SetUpsert(true))
 	return id, result.Err()
 }
@@ -157,7 +182,7 @@ func nodeUpdate(ctx context.Context, db *mongo.Database, nodeID string, value in
 		return fmt.Errorf("invalid node id")
 	}
 
-	col := db.Collection(nodeCollection)
+	col := db.Collection(NodeCollection)
 	var filter NodeFilter
 	filter = filter.WithNodeID(nodeID)
 	_, err := col.UpdateOne(ctx, filter, bson.M{
@@ -217,7 +242,7 @@ func NodePushProof(ctx context.Context, db *mongo.Database, nodeID string, proof
 		return fmt.Errorf("invalid node id")
 	}
 
-	col := db.Collection(nodeCollection)
+	col := db.Collection(NodeCollection)
 	var filter NodeFilter
 	filter = filter.WithNodeID(nodeID)
 	_, err := col.UpdateOne(ctx, filter, bson.M{

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	generated "github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/workloads"
 )
 
@@ -31,6 +32,7 @@ func (p *Pipeline) checkProvisionSignatures() bool {
 	// required quorum has been reached
 
 	request := p.r.DataReservation.SigningRequestProvision
+	log.Debug().Msgf("%+v", request)
 	if request.QuorumMin == 0 {
 		return true
 	}
@@ -101,6 +103,7 @@ func (p *Pipeline) Next() (Reservation, bool) {
 	if p.r.Expired() || p.checkDeleteSignatures() {
 		// reservation has expired
 		// set its status (next action) to delete
+		log.Debug().Int64("id", int64(p.r.ID)).Msg("expired or to be deleted")
 		p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionDelete
 		return p.r, true
 	}
@@ -115,22 +118,27 @@ func (p *Pipeline) Next() (Reservation, bool) {
 			if time.Until(p.r.DataReservation.ExpirationProvisioning.Time) <= 0 {
 				// exceeded
 				// TODO: I think this should be set to "delete" not "invalid"
+				log.Debug().Int64("id", int64(p.r.ID)).Msg("expired")
 				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionInvalid
 			} else {
+				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to sign")
 				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionSign
 			}
 		case generated.TfgridWorkloadsReservation1NextActionSign:
 			// this stage will not change unless all
 			if p.checkProvisionSignatures() {
+				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to pay")
 				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionPay
 			}
 		case generated.TfgridWorkloadsReservation1NextActionPay:
 			// TODO: here we should actually start the payment process
 			// but this is not implemented yet, so now we just need to move
 			// to deploy
+			log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to deploy")
 			p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionDeploy
 		case generated.TfgridWorkloadsReservation1NextActionDeploy:
 			//nothing to do
+			log.Debug().Int64("id", int64(p.r.ID)).Msg("let's deploy")
 		}
 
 		if current == p.r.NextAction {

@@ -349,6 +349,7 @@ func (f *flistModule) downloadFlist(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("fail to download flist: %v", resp.Status)

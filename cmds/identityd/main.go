@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/flist"
-	"github.com/threefoldtech/zos/pkg/gedis"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
@@ -443,17 +442,7 @@ func bcdbClient() (identity.IDStore, error) {
 		return nil, errors.Wrap(err, "failed to parse node environment")
 	}
 
-	// use the bcdb mock for dev and test
-	if env.RunningMode == environment.RunningDev {
-		return identity.NewHTTPIDStore(env.BcdbURL), nil
-	}
-
-	// use gedis for production bcdb
-	store, err := gedis.New(env.BcdbURL, env.BcdbPassword)
-	if err != nil {
-		return nil, errors.Wrap(err, "fail to connect to BCDB")
-	}
-	return store, nil
+	return identity.NewHTTPIDStore(env.BcdbURL), nil
 }
 
 func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, store identity.IDStore, loc geoip.Location) error {

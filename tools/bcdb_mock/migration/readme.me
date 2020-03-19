@@ -1,0 +1,15 @@
+## Migration
+this migration tool accepts the path to a bcdb exported data directory and iterate over all structures that we need
+to import in the database.
+
+> *NOTE:* You need to convert all the data from yaml to json data. We don't support importing the yaml data. to make this easy
+please use the `convert.py` util as follows
+
+```bash
+find ~/bcdb_exports/18_Mar_2020_11_48_38/ -name '*.yaml'  -print -exec python convert.py {} \;
+```
+
+Then run migration like
+```bash
+./migration -name explorer -root ~/tmp/bcdb_exports/18_Mar_2020_11_48_38
+```

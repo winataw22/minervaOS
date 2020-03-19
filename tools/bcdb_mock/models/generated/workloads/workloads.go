@@ -9,7 +9,7 @@ import (
 
 type TfgridWorkloadsReservation1 struct {
 	ID                  schema.ID                                     `bson:"_id" json:"id"`
-	Json                json.RawMessage                               `bson:"json" json:"json"`
+	Json                string                                        `bson:"json" json:"json"`
 	DataReservation     TfgridWorkloadsReservationData1               `bson:"data_reservation" json:"data_reservation"`
 	CustomerTid         int64                                         `bson:"customer_tid" json:"customer_tid"`
 	CustomerSignature   string                                        `bson:"customer_signature" json:"customer_signature"`

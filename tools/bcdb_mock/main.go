@@ -61,7 +61,7 @@ func main() {
 
 	log.Printf("start on %s\n", listen)
 	r := handlers.LoggingHandler(os.Stderr, router)
-	r = handlers.CORS()(r)
+	r = handlers.CORS(handlers.AllowedOrigins([]string{"*"}))(r)
 
 	s := &http.Server{
 		Addr:    listen,

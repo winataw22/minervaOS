@@ -18,12 +18,12 @@ import (
 )
 
 const (
-	userCollection = "user"
+	UserCollection = "user"
 )
 
 var (
 	// ErrUserExists returned if user with same name exists
-	ErrUserExists = errors.New("user with same name exists")
+	ErrUserExists = errors.New("user with same name or email exists")
 	// ErrUserNotFound is returned if user is not found
 	ErrUserNotFound = errors.New("user not found")
 	// ErrAuthorization returned if user is not allowed to do an operation
@@ -57,16 +57,25 @@ type UserFilter bson.D
 
 // WithID filters user with ID
 func (f UserFilter) WithID(id schema.ID) UserFilter {
+	if id == 0 {
+		return f
+	}
 	return append(f, bson.E{Key: "_id", Value: id})
 }
 
 // WithName filters user with name
 func (f UserFilter) WithName(name string) UserFilter {
+	if name == "" {
+		return f
+	}
 	return append(f, bson.E{Key: "name", Value: name})
 }
 
 // WithEmail filters user with email
 func (f UserFilter) WithEmail(email string) UserFilter {
+	if email == "" {
+		return f
+	}
 	return append(f, bson.E{Key: "email", Value: email})
 }
 
@@ -75,7 +84,7 @@ func (f UserFilter) Find(ctx context.Context, db *mongo.Database, opts ...*optio
 	if f == nil {
 		f = UserFilter{}
 	}
-	return db.Collection(userCollection).Find(ctx, f, opts...)
+	return db.Collection(UserCollection).Find(ctx, f, opts...)
 }
 
 // Get single user
@@ -84,7 +93,7 @@ func (f UserFilter) Get(ctx context.Context, db *mongo.Database) (user User, err
 		f = UserFilter{}
 	}
 
-	result := db.Collection(userCollection).FindOne(ctx, f, options.FindOne())
+	result := db.Collection(UserCollection).FindOne(ctx, f, options.FindOne())
 	if err = result.Err(); err != nil {
 		return
 	}
@@ -114,7 +123,7 @@ func UserCreate(ctx context.Context, db *mongo.Database, name, email, pubkey str
 	}
 	// else ErrNoDocuments
 
-	id := models.MustID(ctx, db, userCollection)
+	id := models.MustID(ctx, db, UserCollection)
 	user = User{
 		ID:     id,
 		Name:   name,
@@ -122,8 +131,17 @@ func UserCreate(ctx context.Context, db *mongo.Database, name, email, pubkey str
 		Pubkey: pubkey,
 	}
 
-	col := db.Collection(userCollection)
+	col := db.Collection(UserCollection)
 	_, err = col.InsertOne(ctx, user)
+	if err != nil {
+		if merr, ok := err.(mongo.WriteException); ok {
+			errCode := merr.WriteErrors[0].Code
+			if errCode == 11000 {
+				return user, ErrUserExists
+			}
+		}
+		return user, err
+	}
 	return
 }
 
@@ -186,7 +204,7 @@ func UserUpdate(ctx context.Context, db *mongo.Database, id schema.ID, signature
 	}
 
 	// actually update the user with final data
-	if _, err := db.Collection(userCollection).UpdateOne(ctx, filter, bson.M{"$set": current}); err != nil {
+	if _, err := db.Collection(UserCollection).UpdateOne(ctx, filter, bson.M{"$set": current}); err != nil {
 		return err
 	}
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -14,30 +15,88 @@ import (
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/schema"
-	"github.com/threefoldtech/zos/tools/bcdb_mock/models"
 	generated "github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/bcdb_mock/mw"
 	directory "github.com/threefoldtech/zos/tools/bcdb_mock/pkg/directory/types"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // NodeAPI holds api for nodes
 type NodeAPI struct{}
 
+type nodeQuery struct {
+	FarmID  int64
+	Country string
+	City    string
+	CRU     int64
+	MRU     int64
+	SRU     int64
+	HRU     int64
+	Proofs  bool
+}
+
+func (n *nodeQuery) Parse(r *http.Request) mw.Response {
+	var err error
+	n.FarmID, err = queryInt(r, "farm")
+	if err != nil {
+		return mw.BadRequest(errors.Wrap(err, "invalid farm id"))
+	}
+	n.Country = r.URL.Query().Get("country")
+	n.City = r.URL.Query().Get("city")
+	n.CRU, err = queryInt(r, "cru")
+	if err != nil {
+		return mw.BadRequest(errors.Wrap(err, "invalid cru"))
+	}
+	n.MRU, err = queryInt(r, "mru")
+	if err != nil {
+		return mw.BadRequest(errors.Wrap(err, "invalid mru"))
+	}
+	n.SRU, err = queryInt(r, "sru")
+	if err != nil {
+		return mw.BadRequest(errors.Wrap(err, "invalid sru"))
+	}
+	n.HRU, err = queryInt(r, "hru")
+	if err != nil {
+		return mw.BadRequest(errors.Wrap(err, "invalid hru"))
+	}
+	n.Proofs = r.URL.Query().Get("proofs") == "true"
+
+	return nil
+}
+
+func queryInt(r *http.Request, q string) (int64, error) {
+	s := r.URL.Query().Get(q)
+	if s != "" {
+		return strconv.ParseInt(s, 10, 64)
+	}
+	return 0, nil
+}
+
 // List farms
 // TODO: add paging arguments
-func (s *NodeAPI) List(ctx context.Context, db *mongo.Database, farm schema.ID) ([]directory.Node, error) {
+func (s *NodeAPI) List(ctx context.Context, db *mongo.Database, q nodeQuery, opts ...*options.FindOptions) ([]directory.Node, error) {
 	var filter directory.NodeFilter
-	if farm > 0 {
-		filter = filter.WithFarmID(farm)
+	if q.FarmID > 0 {
+		filter = filter.WithFarmID(schema.ID(q.FarmID))
+	}
+	filter = filter.WithTotalCap(q.CRU, q.MRU, q.HRU, q.SRU)
+	filter = filter.WithLocation(q.Country, q.City)
+
+	if !q.Proofs {
+		projection := bson.D{
+			{Key: "proofs", Value: 0},
+		}
+		opts = append(opts, options.Find().SetProjection(projection))
 	}
 
-	cur, err := filter.Find(ctx, db, models.Page(0))
+	cur, err := filter.Find(ctx, db, opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list nodes")
 	}
 	defer cur.Close(ctx)
-	var out []directory.Node
+	out := []directory.Node{}
 	if err := cur.All(ctx, &out); err != nil {
 		return nil, errors.Wrap(err, "failed to load node list")
 	}
@@ -46,10 +105,10 @@ func (s *NodeAPI) List(ctx context.Context, db *mongo.Database, farm schema.ID) 
 }
 
 // Get a single node
-func (s *NodeAPI) Get(ctx context.Context, db *mongo.Database, nodeID string) (directory.Node, error) {
+func (s *NodeAPI) Get(ctx context.Context, db *mongo.Database, nodeID string, includeProofs bool) (directory.Node, error) {
 	var filter directory.NodeFilter
 	filter = filter.WithNodeID(nodeID)
-	return filter.Get(ctx, db)
+	return filter.Get(ctx, db, includeProofs)
 }
 
 // Exists tests if node exists
@@ -120,7 +179,7 @@ func (s *NodeAPI) SetInterfaces(ctx context.Context, db *mongo.Database, nodeID 
 
 // SetPublicConfig sets node public config
 func (s *NodeAPI) SetPublicConfig(ctx context.Context, db *mongo.Database, nodeID string, cfg generated.TfgridDirectoryNodePublicIface1) error {
-	node, err := s.Get(ctx, db, nodeID)
+	node, err := s.Get(ctx, db, nodeID, false)
 	if err != nil {
 		return err
 	}

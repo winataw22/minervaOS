@@ -77,3 +77,9 @@ func TestErrTemporary(t *testing.T) {
 	assert.True(t, errors.Is(wrap2, ErrTemporary{}))
 	assert.Equal(t, err.Error(), wrap1.Error())
 }
+
+func TestErrTemporaryNil(t *testing.T) {
+	wrap1 := NewErrTemporary(nil)
+	assert.Equal(t, wrap1.Error(), "")
+	assert.True(t, errors.Is(wrap1, ErrTemporary{}))
+}

@@ -12,7 +12,7 @@ import (
 // Setup sets up indexes for types, must be called at least
 // Onetime during the life time of the object
 func Setup(ctx context.Context, db *mongo.Database) error {
-	farm := db.Collection(userCollection)
+	farm := db.Collection(UserCollection)
 	_, err := farm.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{
 			Keys:    bson.M{"name": 1},
@@ -24,7 +24,7 @@ func Setup(ctx context.Context, db *mongo.Database) error {
 		},
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("failed to initialize farm index")
+		log.Error().Err(err).Msg("failed to initialize user index")
 	}
 
 	return err

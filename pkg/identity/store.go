@@ -60,6 +60,8 @@ func (s *httpIDStore) RegisterNode(node pkg.Identifier, farm pkg.FarmID, version
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("wrong response status code received: %v", resp.Status)
 	}

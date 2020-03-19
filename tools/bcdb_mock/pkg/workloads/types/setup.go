@@ -11,7 +11,7 @@ import (
 // Setup sets up indexes for types, must be called at least
 // Onetime during the life time of the object
 func Setup(ctx context.Context, db *mongo.Database) error {
-	col := db.Collection(reservationCollection)
+	col := db.Collection(ReservationCollection)
 	indexes := []mongo.IndexModel{
 		{
 			Keys: bson.M{"data_reservation.networks.network_resources.node_id": 1},

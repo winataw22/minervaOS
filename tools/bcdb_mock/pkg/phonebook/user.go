@@ -84,18 +84,9 @@ func (u *UserAPI) register(r *http.Request) (interface{}, mw.Response) {
 }
 
 func (u *UserAPI) list(r *http.Request) (interface{}, mw.Response) {
-	var (
-		name  = r.FormValue("name")
-		email = r.FormValue("email")
-	)
-
 	var filter types.UserFilter
-	if len(name) != 0 {
-		filter = filter.WithName(name)
-	}
-	if len(email) != 0 {
-		filter = filter.WithEmail(email)
-	}
+	filter = filter.WithName(r.FormValue("name"))
+	filter = filter.WithEmail(r.FormValue("email"))
 
 	db := mw.Database(r)
 	cur, err := filter.Find(r.Context(), db, models.PageFromRequest(r))
@@ -126,7 +117,6 @@ func (u *UserAPI) get(r *http.Request) (interface{}, mw.Response) {
 	if err != nil {
 		return nil, mw.BadRequest(err)
 	}
-
 	var filter types.UserFilter
 	filter = filter.WithID(userID)
 

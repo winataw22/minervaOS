@@ -222,7 +222,6 @@ func (e *Email) UnmarshalText(text []byte) error {
 		return fmt.Errorf("invalid email address: %s", v)
 	}
 
-	fmt.Println("setting email to:", v)
 	*e = Email(v)
 	return nil
 }

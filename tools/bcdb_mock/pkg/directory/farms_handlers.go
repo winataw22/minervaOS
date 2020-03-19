@@ -2,11 +2,14 @@ package directory
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"strconv"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models"
 	"github.com/threefoldtech/zos/tools/bcdb_mock/mw"
 	directory "github.com/threefoldtech/zos/tools/bcdb_mock/pkg/directory/types"
 
@@ -14,7 +17,7 @@ import (
 )
 
 func (s *FarmAPI) registerFarm(r *http.Request) (interface{}, mw.Response) {
-	log.Println("farm register request received")
+	log.Info().Msg("farm register request received")
 
 	db := mw.Database(r)
 	defer r.Body.Close()
@@ -42,7 +45,13 @@ func (s *FarmAPI) registerFarm(r *http.Request) (interface{}, mw.Response) {
 
 func (s *FarmAPI) listFarm(r *http.Request) (interface{}, mw.Response) {
 	db := mw.Database(r)
-	farms, err := s.List(r.Context(), db)
+
+	tid, err := parseOwnerID(r)
+	if err != nil {
+		return nil, mw.Error(err, http.StatusBadRequest)
+	}
+
+	farms, err := s.List(r.Context(), db, tid, models.PageFromRequest(r))
 	if err != nil {
 		return nil, mw.Error(err)
 	}
@@ -50,10 +59,22 @@ func (s *FarmAPI) listFarm(r *http.Request) (interface{}, mw.Response) {
 	return farms, nil
 }
 
+func parseOwnerID(r *http.Request) (tid int64, err error) {
+	stid := r.URL.Query().Get("owner")
+	if stid != "" {
+		tid, err = strconv.ParseInt(stid, 10, 64)
+		if err != nil {
+			return tid, fmt.Errorf("owner should be a integer")
+		}
+	}
+	log.Info().Msgf("owner id %d", tid)
+	return tid, err
+}
+
 func (s *FarmAPI) cockpitListFarm(r *http.Request) (interface{}, mw.Response) {
 	// TODO: do we need this ?
 	db := mw.Database(r)
-	farms, err := s.List(r.Context(), db)
+	farms, err := s.List(r.Context(), db, 0)
 	if err != nil {
 		return nil, mw.Error(err)
 	}

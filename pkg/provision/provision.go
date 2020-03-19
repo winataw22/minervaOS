@@ -68,6 +68,9 @@ func NewErrTemporary(err error) error {
 
 // Error implements the errors.Error interface
 func (e ErrTemporary) Error() string {
+	if e.err == nil {
+		return ""
+	}
 	return e.err.Error()
 }
 

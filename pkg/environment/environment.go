@@ -63,7 +63,7 @@ var (
 
 	envTest = Environment{
 		RunningMode: RunningTest,
-		BcdbURL:     "tcp://explorer.testnet.grid.tf:8901",
+		BcdbURL:     "https://explorer.testnet.grid.tf/explorer",
 		// ProvisionTimeout:  120,
 		// ProvisionInterval: 10,
 	}
@@ -71,7 +71,7 @@ var (
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode: RunningMain,
-		BcdbURL:     "tcp://explorer.grid.tf:8901",
+		BcdbURL:     "https://explorer.grid.tf/explorer",
 		// ProvisionTimeout:  240,
 		// ProvisionInterval: 20,
 	}

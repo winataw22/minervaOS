@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	generated "github.com/threefoldtech/zos/pkg/gedis/types/provision"
+	"github.com/threefoldtech/zos/pkg/schema"
 )
 
 // HTTPStore is a reservation store
@@ -130,9 +131,31 @@ func (s *HTTPStore) Get(id string) (*Reservation, error) {
 func (s *HTTPStore) Feedback(nodeID string, r *Result) error {
 	url := fmt.Sprintf("%s/reservations/workloads/%s/%s", s.baseURL, r.ID, nodeID)
 
+	var rType generated.TfgridReservationResult1CategoryEnum
+	switch r.Type {
+	case VolumeReservation:
+		rType = generated.TfgridReservationResult1CategoryVolume
+	case ContainerReservation:
+		rType = generated.TfgridReservationResult1CategoryContainer
+	case ZDBReservation:
+		rType = generated.TfgridReservationResult1CategoryZdb
+	case NetworkReservation:
+		rType = generated.TfgridReservationResult1CategoryNetwork
+	}
+
+	result := generated.TfgridReservationResult1{
+		Category:   rType,
+		WorkloadID: r.ID,
+		DataJSON:   r.Data,
+		Signature:  r.Signature,
+		State:      generated.TfgridReservationResult1StateEnum(r.State),
+		Message:    r.Error,
+		Epoch:      schema.Date{Time: r.Created},
+	}
+
 	buf := &bytes.Buffer{}
 
-	if err := json.NewEncoder(buf).Encode(r); err != nil {
+	if err := json.NewEncoder(buf).Encode(result); err != nil {
 		return err
 	}
 

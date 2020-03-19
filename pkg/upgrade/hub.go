@@ -61,6 +61,7 @@ func (h *hubClient) Info(flist string) (info flistInfo, err error) {
 	if response.StatusCode != http.StatusOK {
 		return info, fmt.Errorf("failed to get flist info: %s", response.Status)
 	}
+	defer response.Body.Close()
 
 	dec := json.NewDecoder(response.Body)
 
