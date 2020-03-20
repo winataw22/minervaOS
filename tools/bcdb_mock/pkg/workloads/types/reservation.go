@@ -21,6 +21,7 @@ import (
 )
 
 const (
+	// ReservationCollection db collection name
 	ReservationCollection = "reservation"
 	queueCollection       = "workqueue"
 )

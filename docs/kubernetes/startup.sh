@@ -1,7 +1,7 @@
 #!/bin/bash
 #set -Eeuo pipefail
 set -Eeo pipefail
-DEFAULT_NETWORK_RANGE="173.30"
+DEFAULT_NETWORK_RANGE="172.30"
 CIDR_16="${DEFAULT_NETWORK_RANGE}.0.0/16"
 CUR_DIR=$PWD
 echo "CUR_DIR:" $CUR_DIR

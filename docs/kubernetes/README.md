@@ -17,6 +17,10 @@ Prerequisite:
 - [kubectl](https://kubernetes.io/fr/docs/tasks/tools/install-kubectl/)
 - [wireguard](https://www.wireguard.com/install/)
 
+Optionally (if you want to deploy the charts);
+
+- helm (v3) ([install instructions](https://helm.sh/docs/intro/install))
+
 the script arguments are `startup.sh {GITHUB_ACCOUNT_OR_SSH_PUB_KEY} {CIDR/16} {DURATION} {NUMBER_OF_NODES} {VM_SIZE}`
 
 ```
@@ -78,21 +82,21 @@ If you want an API to explore the nodes on the grid you can go to : [https://exp
 ### Networking
 
 We now need to create a network between the nodes. Hopefully tfuser can help us generate the configuration file.
-Let's first create a network named `kubetest` with a large cidr `173.30.0.0/16` and write that configuration inside a file `network.json`
+Let's first create a network named `kubetest` with a large cidr `172.30.0.0/16` and write that configuration inside a file `network.json`
 
 ```
-$ ./tfuser generate --schema network.json network create --name kubetest --cidr 173.30.0.0/16
+$ ./tfuser generate --schema network.json network create --name kubetest --cidr 172.30.0.0/16
 ```
 
 now let's add the nodes that we have selected inside our network by specifying the path to our `network.json` network configuration file. We also specify a port for wireguard to use and a subnet to use on the nodes.
 
 ```
 $ ./tfuser generate --schema network.json network add-node --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3  \
-				      --subnet 173.30.1.0/24
+				      --subnet 172.30.1.0/24
 $ ./tfuser generate --schema network.json network add-node --node 3NAkUYqm5iPRmNAnmLfjwdreqDssvsebj4uPUt9BxFPm \
-				      --subnet 173.30.2.0/24
+				      --subnet 172.30.2.0/24
 $ ./tfuser generate --schema network.json network add-node --node FTothsg9ZuJubAEzZByEgQQUmkWM637x93YH1QSJM242 \
-				      --subnet 173.30.3.0/24
+				      --subnet 172.30.3.0/24
 ```
 
 there are two levels here :
@@ -106,7 +110,7 @@ We will need an external access to the network to be able to ssh into our VMs.
 
 ```
 $ ./tfuser generate --schema network.json network add-access --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3 \
-				       --subnet 173.30.4.0/24 --ip4 > wg.conf
+				       --subnet 172.30.4.0/24 --ip4 > wg.conf
 ```
 
 We generated the wireguard, a secure and fast VPN, configuration file that we will use here after in this guide.
@@ -116,7 +120,7 @@ here is an example
 
 ```
 $ ./tfuser generate --schema network.json network add-access --node BpTAry1Na2s1J8RAHNyDsbvaBSM3FjR4gMXEKga3UPbs \
-				      --subnet 173.30.4.0/24 > wg.conf
+				      --subnet 172.30.4.0/24 > wg.conf
 ```
 
 Let's take a look at a graphical representation of our network
@@ -168,20 +172,20 @@ Let's now provision some Kubernetes VM on those nodes
 ### Provision
 
 Let's provision a kubernetes VM on our first node and assign an IP allowed in the network `kubetest` defined here above.
-Replace `SSH_PUB_KEY` by your ssh public key and ssh key algorithm e.g. `"ssh-rsa AAAAB3NzaC1yc2EAAA.."`. We choose an IP for the VM that is part of the subnet we previously defined for the node. We can't choose 173.30.3.1 as it is the IP of the network ressource itself.
+Replace `SSH_PUB_KEY` by your ssh public key and ssh key algorithm e.g. `"ssh-rsa AAAAB3NzaC1yc2EAAA.."`. We choose an IP for the VM that is part of the subnet we previously defined for the node. We can't choose 172.30.3.1 as it is the IP of the network ressource itself.
 
 ```
-./tfuser generate --schema kube1.json kubernetes --size 1 --network-id kubetest --ip 173.30.1.2 --secret token --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3  --ssh-keys "{SSH_PUB_KEY}" &&  \
+./tfuser generate --schema kube1.json kubernetes --size 1 --network-id kubetest --ip 172.30.1.2 --secret token --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3  --ssh-keys "{SSH_PUB_KEY}" &&  \
  ./tfuser -d provision --schema kube1.json --duration 2 --seed user.seed --node qzuTJJVd5boi6Uyoco1WWnSgzTb7q8uN79AjBT9x9N3
 ```
 
 ```
-./tfuser generate --schema kube2.json kubernetes --size 1 --network-id kubetest --ip 173.30.2.2 --master-ips 173.30.1.2 --secret token --node 3NAkUYqm5iPRmNAnmLfjwdreqDssvsebj4uPUt9BxFPm  --ssh-keys "{SSH_PUB_KEY}" &&  \
+./tfuser generate --schema kube2.json kubernetes --size 1 --network-id kubetest --ip 172.30.2.2 --master-ips 172.30.1.2 --secret token --node 3NAkUYqm5iPRmNAnmLfjwdreqDssvsebj4uPUt9BxFPm  --ssh-keys "{SSH_PUB_KEY}" &&  \
  ./tfuser -d provision --schema kube2.json --duration 2 --seed user.seed --node 3NAkUYqm5iPRmNAnmLfjwdreqDssvsebj4uPUt9BxFPm
 ```
 
 ```
-./tfuser generate --schema kube3.json kubernetes --size 1 --network-id kubetest --ip 173.30.3.2 --master-ips 173.30.1.2 --secret token --node FTothsg9ZuJubAEzZByEgQQUmkWM637x93YH1QSJM242  --ssh-keys "{SSH_PUB_KEY}" &&  \
+./tfuser generate --schema kube3.json kubernetes --size 1 --network-id kubetest --ip 172.30.3.2 --master-ips 172.30.1.2 --secret token --node FTothsg9ZuJubAEzZByEgQQUmkWM637x93YH1QSJM242  --ssh-keys "{SSH_PUB_KEY}" &&  \
  ./tfuser -d provision --schema kube3.json --duration 2 --seed user.seed --node FTothsg9ZuJubAEzZByEgQQUmkWM637x93YH1QSJM242
 ```
 
@@ -200,7 +204,7 @@ interface: wg
 
 peer: BQE9qUNPKEH59Fy6B2xyMz0KrRfBDIdDm4Bd23ro8DM=
   endpoint: 185.69.166.246:3561
-  allowed ips: 173.30.5.0/24, 100.64.30.5/32
+  allowed ips: 172.30.5.0/24, 100.64.30.5/32
   latest handshake: 2 minutes, 43 seconds ago
   transfer: 14.26 KiB received, 19.14 KiB sent
   persistent keepalive: every 20 seconds
@@ -210,12 +214,12 @@ peer: BQE9qUNPKEH59Fy6B2xyMz0KrRfBDIdDm4Bd23ro8DM=
 log into your VM
 
 ```
-$ ping 173.30.1.2
-$ ssh rancher@173.30.1.2
-The authenticity of host '173.30.1.2 (173.30.1.2)' can't be established.
+$ ping 172.30.1.2
+$ ssh rancher@172.30.1.2
+The authenticity of host '172.30.1.2 (172.30.1.2)' can't be established.
 ECDSA key fingerprint is SHA256:Q4kQ94B8QaSbo1EsyI8dQrgBkZyk/USda72c8nwVwIE.
 Are you sure you want to continue connecting (yes/no)? yes
-Warning: Permanently added '173.30.1.2' (ECDSA) to the list of known hosts.
+Warning: Permanently added '172.30.1.2' (ECDSA) to the list of known hosts.
 Welcome to k3OS!
 
 Refer to https://github.com/rancher/k3os for README and issues
@@ -242,7 +246,11 @@ Copy the config so that we can use kubectl from our local machine. By default it
 Execute this command on your local machine not in a remote shell
 
 ```
-$ scp rancher@173.30.1.2:/etc/rancher/k3s/k3s.yaml ./k3s.yaml
+$ scp rancher@172.30.1.2:/etc/rancher/k3s/k3s.yaml ./k3s.yaml
+
+> IMPORTANT: Do not forget to update the server IP in the copied yaml file.
+> By default, it will be pointing to localhost, this must be changed into the
+> IP you used to connect to the VM.
 ```
 
 If you already have a kube config file usually located in `~/.kube/config`
@@ -255,7 +263,7 @@ apiVersion: v1
 clusters:
 - cluster:
     certificate-authority-data: LS0tLS1CRUdLKjhdDGhjDHKHKhDBJWakNCL3FBREFnRUNBZ0VBTUFvR0NDcUdTTTQ5QkFNQ01DTXhJVEFmQmdOVkJBTU1HR3N6Y3kxelpYSjIKWlhJdFkyRkFNVFU0TURjME9EQXhOakFlRncweU1EQXlNRE14TmpRd01UWmFGdzB6TURBeE16RXhOalF3TVRaYQpNQ014SVRBZkJnTlZCQU1NR0dzemN5MXpaWEoyWlhJdFkyRkFNVFU0TURjME9EQXhOakPPOIHjkDHDJHGkFnRUddaW9tdVR1MXQ1aVRlZDhHaVFrQ2FrdnRWL2xpRGJ3MUlxSS94dEkKWmUya2Y3Tm1mL0txR3IrMzN5SVZ5Q0tkaEdlelBCbEsvanNUSkZVSWpzdWpJekFoTUE0R0ExVWREd0DezdzedzenTlZIUk1CQWY4RUJUQURBUUgvTUFvR0NDcUdTTTQ5QkFNQ0EwY0FNRVFDSUJFNTYzcUttY2xiClVQWHc2UXJCbWxQUmlrbWdCVnY0VHlkMVZ0TWNXY3JYQWlCVlJPY3RjMTF1TXFrOGJWVHJOVFNiN0lFS3ZkRjAKelluMzhwME41MdLUVORCBDRVJUSUZJQ0FURS0D=
-    server: https://170.30.1.2:6443
+    server: https://172.30.1.2:6443
   name: k3s
 - context:
     cluster: k3s
@@ -343,7 +351,7 @@ $ kubectl get -o jsonpath="{.spec.ports[0].nodePort}" services wordpress
 31004
 ```
 
-We can browse any nodes url on port 31004 to find the wordpress website e.g. [http://173.30.3.2:31004/](http://173.30.3.2:31004/)
+We can browse any nodes url on port 31004 to find the wordpress website e.g. [http://172.30.3.2:31004/](http://172.30.3.2:31004/)
 and after some setup screens you will access your articles
 
 ![wordpress first article](ressources/wordpress/wordpress.png)
@@ -354,8 +362,8 @@ K3s comes with helm support built-in. Let's try to deploy prometheus and grafana
 
 ```
 $ kubectl create namespace mon
-$ helm install --namespace mon --skip-crds  my-release stable/prometheus-operator
-$ helm list
+$ helm install --namespace mon my-release stable/prometheus-operator
+$ helm -n mon list
 NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                      APP VERSION
 my-release      mon             1               2020-02-04 16:08:41.70990744 +0100 CET  deployed        prometheus-operator-8.5.11 0.34.0
 $ kubectl config set-context --current --namespace=mon

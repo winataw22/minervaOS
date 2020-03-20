@@ -158,7 +158,7 @@ func cmdsProvision(c *cli.Context) error {
 		return err
 	}
 
-	jsx.JSON = bytes
+	jsx.JSON = string(bytes)
 	signature, err := crypto.Sign(keypair.PrivateKey, []byte(jsx.JSON))
 	if err != nil {
 		return errors.Wrap(err, "failed to sign the reservation")
@@ -218,7 +218,7 @@ func cmdsDeleteReservation(c *cli.Context) error {
 	if _, err := buf.WriteString(fmt.Sprint(resID)); err != nil {
 		return err
 	}
-	if _, err := buf.Write(reservation.JSON); err != nil {
+	if _, err := buf.Write([]byte(reservation.JSON)); err != nil {
 		return err
 	}
 

@@ -204,8 +204,8 @@ func k8sReservation(i interface{}, nodeID string) types.TfgridWorkloadsReservati
 		NetworkID:     string(k.NetworkID),
 		Ipaddress:     k.IP,
 		ClusterSecret: k.ClusterSecret,
-		MasterIps:     make([]net.IP, 0, len(k.MasterIPs)),
-		SSHKeys:       make([]string, 0, len(k.SSHKeys)),
+		MasterIps:     make([]net.IP, len(k.MasterIPs)),
+		SSHKeys:       make([]string, len(k.SSHKeys)),
 	}
 
 	copy(k8s.MasterIps, k.MasterIPs)
