@@ -17,14 +17,26 @@ type entry struct {
 type args struct {
 	Name string
 	Dir  string
+	Args []string
 	Env  map[string]string
 }
 
 func (e entry) Entrypoint() string {
 	if e.Name == "core.system" ||
 		e.Name == "core.base" && e.Args.Name != "" {
-		return e.Args.Name
+		var buf strings.Builder
+		buf.WriteString(e.Args.Name)
+		for _, arg := range e.Args.Args {
+			buf.WriteRune(' ')
+			arg = strings.Replace(arg, "\"", "\\\"", -1)
+			buf.WriteRune('"')
+			buf.WriteString(arg)
+			buf.WriteRune('"')
+		}
+
+		return buf.String()
 	}
+
 	return ""
 }
 

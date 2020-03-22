@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	log "github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
 
@@ -365,7 +367,12 @@ func (s *storageModule) ensureCache() error {
 
 	var cacheFs filesystem.Volume
 
-	// check if we already have a cache
+	if filesystem.IsMountPoint(CacheTarget) {
+		log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
+		return nil
+	}
+
+	// check if cache volume available
 	for idx := range s.volumes {
 		filesystems, err := s.volumes[idx].Volumes()
 		if err != nil {
@@ -386,23 +393,41 @@ func (s *storageModule) ensureCache() error {
 	if cacheFs == nil {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
+		log.Debug().Msgf("Trying to create new cache on SSD")
 		fs, err := s.createSubvol(cacheSize, cacheLabel, pkg.SSDDevice)
-		if errors.Is(err, pkg.ErrNotEnoughSpace{}) {
-			// No space on SSD (probably no SSD in the node at all), try HDD
-			fs, err = s.createSubvol(cacheSize, cacheLabel, pkg.HDDDevice)
-		}
+
 		if err != nil {
-			return err
+			log.Warn().Err(err).Msg("failed to create new cache on SSD")
+		} else {
+			cacheFs = fs
 		}
-		cacheFs = fs
 	}
 
-	if !filesystem.IsMountPoint(CacheTarget) {
-		log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
-		return filesystem.BindMount(cacheFs, CacheTarget)
+	if cacheFs == nil {
+		log.Debug().Msgf("Trying to create new cache on HDD")
+		fs, err := s.createSubvol(cacheSize, cacheLabel, pkg.HDDDevice)
+
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to create new cache on HDD")
+		} else {
+			cacheFs = fs
+		}
 	}
-	log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
-	return nil
+
+	if cacheFs == nil {
+		log.Warn().Msg("failed to create persisted cache disk. Running on limited cache")
+
+		// set limited cache flag
+		if err := app.SetFlag("limited-cache"); err != nil {
+			return err
+		}
+
+		// when everything failed, mount the Tmpfs
+		return syscall.Mount("", "/var/cache", "tmpfs", 0, "size=500M")
+	}
+
+	log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
+	return filesystem.BindMount(cacheFs, CacheTarget)
 }
 
 // createSubvol creates a subvolume with the given name and limits it to the given size

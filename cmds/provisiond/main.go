@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
@@ -50,6 +51,14 @@ func main() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
+
+	// keep checking if limited-cache flag is set
+	if app.CheckFlag(app.LimitedCache) {
+		log.Error().Msg("failed cache reservation! Retrying every 30 seconds...")
+		for app.CheckFlag(app.LimitedCache) {
+			time.Sleep(time.Second * 30)
+		}
 	}
 
 	flag.Parse()
@@ -107,6 +116,7 @@ func main() {
 	)
 
 	engine := provision.New(nodeID.Identity(), source, localStore, remoteStore)
+
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.ProvisionMonitor(engine))
 
 	log.Info().
