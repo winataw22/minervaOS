@@ -115,6 +115,16 @@ func (f ReservationFilter) Find(ctx context.Context, db *mongo.Database, opts ..
 	return db.Collection(ReservationCollection).Find(ctx, f, opts...)
 }
 
+// Count number of documents matching
+func (f ReservationFilter) Count(ctx context.Context, db *mongo.Database) (int64, error) {
+	col := db.Collection(ReservationCollection)
+	if f == nil {
+		f = ReservationFilter{}
+	}
+
+	return col.CountDocuments(ctx, f)
+}
+
 // Reservation is a wrapper around generated type
 type Reservation generated.TfgridWorkloadsReservation1
 

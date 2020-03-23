@@ -12,6 +12,11 @@ import (
 type Response interface {
 	Status() int
 	Err() error
+
+	// header getter
+	Header() http.Header
+	// header setter
+	WithHeader(k, v string) Response
 }
 
 // Action interface
@@ -21,10 +26,20 @@ type Action func(r *http.Request) (interface{}, Response)
 func AsHandlerFunc(a Action) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		object, result := a(r)
+
 		w.Header().Set("Content-Type", "application/json")
+
 		if result == nil {
 			w.WriteHeader(http.StatusOK)
 		} else {
+
+			h := result.Header()
+			for k := range h {
+				for _, v := range h.Values(k) {
+					w.Header().Add(k, v)
+				}
+			}
+
 			w.WriteHeader(result.Status())
 			if err := result.Err(); err != nil {
 				log.Error().Msgf("%s", err.Error())
@@ -45,6 +60,7 @@ func AsHandlerFunc(a Action) http.HandlerFunc {
 type genericResponse struct {
 	status int
 	err    error
+	header http.Header
 }
 
 func (r genericResponse) Status() int {
@@ -55,9 +71,30 @@ func (r genericResponse) Err() error {
 	return r.err
 }
 
+func (r genericResponse) Header() http.Header {
+	if r.header == nil {
+		r.header = http.Header{}
+	}
+	return r.header
+}
+
+func (r genericResponse) WithHeader(k, v string) Response {
+	if r.header == nil {
+		r.header = http.Header{}
+	}
+
+	r.header.Add(k, v)
+	return r
+}
+
 // Created return a created response
 func Created() Response {
 	return genericResponse{status: http.StatusCreated}
+}
+
+// Ok return a ok response
+func Ok() Response {
+	return genericResponse{status: http.StatusOK}
 }
 
 // Error generic error response

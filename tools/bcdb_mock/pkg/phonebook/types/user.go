@@ -88,6 +88,16 @@ func (f UserFilter) Find(ctx context.Context, db *mongo.Database, opts ...*optio
 	return db.Collection(UserCollection).Find(ctx, f, opts...)
 }
 
+// Count number of documents matching
+func (f UserFilter) Count(ctx context.Context, db *mongo.Database) (int64, error) {
+	col := db.Collection(UserCollection)
+	if f == nil {
+		f = UserFilter{}
+	}
+
+	return col.CountDocuments(ctx, f)
+}
+
 // Get single user
 func (f UserFilter) Get(ctx context.Context, db *mongo.Database) (user User, err error) {
 	if f == nil {

@@ -128,12 +128,18 @@ func (a *API) list(r *http.Request) (interface{}, mw.Response) {
 	var filter types.ReservationFilter
 
 	db := mw.Database(r)
-	cur, err := filter.Find(r.Context(), db, models.PageFromRequest(r))
+	pager := models.PageFromRequest(r)
+	cur, err := filter.Find(r.Context(), db, pager)
 	if err != nil {
 		return nil, mw.Error(err)
 	}
 
 	defer cur.Close(r.Context())
+
+	total, err := filter.Count(r.Context(), db)
+	if err != nil {
+		return nil, mw.Error(err)
+	}
 
 	reservations := []types.Reservation{}
 
@@ -152,7 +158,8 @@ func (a *API) list(r *http.Request) (interface{}, mw.Response) {
 		reservations = append(reservations, reservation)
 	}
 
-	return reservations, nil
+	pages := fmt.Sprintf("%d", models.NrPages(total, *pager.Limit))
+	return reservations, mw.Ok().WithHeader("Pages", pages)
 }
 
 func (a *API) queued(ctx context.Context, db *mongo.Database, nodeID string, limit int64) ([]types.Workload, error) {

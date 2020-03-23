@@ -30,7 +30,7 @@ func VolatileDir(name string, size uint64) (string, error) {
 	}
 
 	if err := os.Mkdir(name, 0700); err != nil {
-		return "", err
+		return name, err
 	}
 	return name, syscall.Mount("", name, "tmpfs", 0, fmt.Sprintf("size=%d", size))
 }

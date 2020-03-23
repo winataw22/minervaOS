@@ -75,7 +75,7 @@ impl Zfs {
                 debug!("installing file {:?}", dst);
                 std::fs::copy(&src, &dst)?;
             } else {
-                error!("unsupported file type: ({:?}): {:?}", src, typ)
+                debug!("skipping: ({:?}): {:?}", src, typ)
             }
         }
 

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 
@@ -54,4 +55,9 @@ func PageFromRequest(r *http.Request) Pager {
 	}
 
 	return Page(page, size)
+}
+
+// NrPages compute the number of page of a collection
+func NrPages(total, pageSize int64) int64 {
+	return int64(math.Ceil(float64(total) / float64(pageSize)))
 }

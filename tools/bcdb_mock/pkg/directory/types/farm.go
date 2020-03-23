@@ -69,6 +69,16 @@ func (f FarmFilter) Find(ctx context.Context, db *mongo.Database, opts ...*optio
 	return col.Find(ctx, f, opts...)
 }
 
+// Count number of documents matching
+func (f FarmFilter) Count(ctx context.Context, db *mongo.Database) (int64, error) {
+	col := db.Collection(NodeCollection)
+	if f == nil {
+		f = FarmFilter{}
+	}
+
+	return col.CountDocuments(ctx, f)
+}
+
 // Get one farm that matches the filter
 func (f FarmFilter) Get(ctx context.Context, db *mongo.Database) (farm Farm, err error) {
 	if f == nil {

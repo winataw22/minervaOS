@@ -1,0 +1,2 @@
+# disable debug tty
+exec: true
