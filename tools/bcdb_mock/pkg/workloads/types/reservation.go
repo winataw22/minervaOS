@@ -28,19 +28,19 @@ const (
 
 const (
 	// Create action
-	Create = generated.TfgridWorkloadsReservation1NextActionCreate
+	Create = generated.NextActionCreate
 	// Sign action
-	Sign = generated.TfgridWorkloadsReservation1NextActionSign
+	Sign = generated.NextActionSign
 	// Pay action
-	Pay = generated.TfgridWorkloadsReservation1NextActionPay
+	Pay = generated.NextActionPay
 	// Deploy action
-	Deploy = generated.TfgridWorkloadsReservation1NextActionDeploy
+	Deploy = generated.NextActionDeploy
 	// Delete action
-	Delete = generated.TfgridWorkloadsReservation1NextActionDelete
+	Delete = generated.NextActionDelete
 	// Invalid action
-	Invalid = generated.TfgridWorkloadsReservation1NextActionInvalid
+	Invalid = generated.NextActionInvalid
 	// Deleted action
-	Deleted = generated.TfgridWorkloadsReservation1NextActionDeleted
+	Deleted = generated.NextActionDeleted
 )
 
 // ReservationFilter type
@@ -59,7 +59,7 @@ func (f ReservationFilter) WithIDGE(id schema.ID) ReservationFilter {
 }
 
 // WithNextAction filter reservations with next action
-func (f ReservationFilter) WithNextAction(action generated.TfgridWorkloadsReservation1NextActionEnum) ReservationFilter {
+func (f ReservationFilter) WithNextAction(action generated.NextActionEnum) ReservationFilter {
 	return append(f, bson.E{
 		Key: "next_action", Value: action,
 	})
@@ -126,7 +126,7 @@ func (f ReservationFilter) Count(ctx context.Context, db *mongo.Database) (int64
 }
 
 // Reservation is a wrapper around generated type
-type Reservation generated.TfgridWorkloadsReservation1
+type Reservation generated.Reservation
 
 // Validate that the reservation is valid
 func (r *Reservation) validate() error {
@@ -138,7 +138,7 @@ func (r *Reservation) validate() error {
 		return fmt.Errorf("customer_signature is required")
 	}
 
-	var data generated.TfgridWorkloadsReservationData1
+	var data generated.ReservationData
 
 	if err := json.Unmarshal([]byte(r.Json), &data); err != nil {
 		return errors.Wrap(err, "invalid json data on reservation")
@@ -227,7 +227,7 @@ func (r *Reservation) Expired() bool {
 }
 
 // IsAny checks if the reservation status is any of the given status
-func (r *Reservation) IsAny(status ...generated.TfgridWorkloadsReservation1NextActionEnum) bool {
+func (r *Reservation) IsAny(status ...generated.NextActionEnum) bool {
 	for _, s := range status {
 		if r.NextAction == s {
 			return true
@@ -255,7 +255,7 @@ func (r *Reservation) AllDeleted() bool {
 	for _, wl := range r.Workloads("") {
 		result := r.ResultOf(wl.WorkloadId)
 		if result == nil ||
-			result.State != generated.TfgridWorkloadsReservationResult1StateDeleted {
+			result.State != generated.ResultStateDeleted {
 			return false
 		}
 	}
@@ -273,10 +273,10 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 			continue
 		}
 		workload := Workload{
-			TfgridWorkloadsReservationWorkload1: generated.TfgridWorkloadsReservationWorkload1{
+			ReservationWorkload: generated.ReservationWorkload{
 				WorkloadId: fmt.Sprintf("%d-%d", r.ID, wl.WorkloadId),
 				User:       fmt.Sprint(r.CustomerTid),
-				Type:       generated.TfgridWorkloadsReservationWorkload1TypeContainer,
+				Type:       generated.WorkloadTypeContainer,
 				Content:    wl,
 				Created:    r.Epoch,
 				Duration:   int64(data.ExpirationReservation.Sub(r.Epoch.Time).Seconds()),
@@ -293,10 +293,10 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 			continue
 		}
 		workload := Workload{
-			TfgridWorkloadsReservationWorkload1: generated.TfgridWorkloadsReservationWorkload1{
+			ReservationWorkload: generated.ReservationWorkload{
 				WorkloadId: fmt.Sprintf("%d-%d", r.ID, wl.WorkloadId),
 				User:       fmt.Sprint(r.CustomerTid),
-				Type:       generated.TfgridWorkloadsReservationWorkload1TypeVolume,
+				Type:       generated.WorkloadTypeVolume,
 				Content:    wl,
 				Created:    r.Epoch,
 				Duration:   int64(data.ExpirationReservation.Sub(r.Epoch.Time).Seconds()),
@@ -313,10 +313,10 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 			continue
 		}
 		workload := Workload{
-			TfgridWorkloadsReservationWorkload1: generated.TfgridWorkloadsReservationWorkload1{
+			ReservationWorkload: generated.ReservationWorkload{
 				WorkloadId: fmt.Sprintf("%d-%d", r.ID, wl.WorkloadId),
 				User:       fmt.Sprint(r.CustomerTid),
-				Type:       generated.TfgridWorkloadsReservationWorkload1TypeZdb,
+				Type:       generated.WorkloadTypeZDB,
 				Content:    wl,
 				Created:    r.Epoch,
 				Duration:   int64(data.ExpirationReservation.Sub(r.Epoch.Time).Seconds()),
@@ -333,10 +333,10 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 			continue
 		}
 		workload := Workload{
-			TfgridWorkloadsReservationWorkload1: generated.TfgridWorkloadsReservationWorkload1{
+			ReservationWorkload: generated.ReservationWorkload{
 				WorkloadId: fmt.Sprintf("%d-%d", r.ID, wl.WorkloadId),
 				User:       fmt.Sprint(r.CustomerTid),
-				Type:       generated.TfgridWorkloadsReservationWorkload1TypeKubernetes,
+				Type:       generated.WorkloadTypeKubernetes,
 				Content:    wl,
 				Created:    r.Epoch,
 				Duration:   int64(data.ExpirationReservation.Sub(r.Epoch.Time).Seconds()),
@@ -360,10 +360,10 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 			// result is what is gonna be visible. We need to (may be) change
 			// the workload id to have the network resource index
 			workload := Workload{
-				TfgridWorkloadsReservationWorkload1: generated.TfgridWorkloadsReservationWorkload1{
+				ReservationWorkload: generated.ReservationWorkload{
 					WorkloadId: fmt.Sprintf("%d-%d", r.ID, wl.WorkloadId),
 					User:       fmt.Sprint(r.CustomerTid),
-					Type:       generated.TfgridWorkloadsReservationWorkload1TypeNetwork,
+					Type:       generated.WorkloadTypeNetwork,
 					Content:    wl,
 					Created:    r.Epoch,
 					Duration:   int64(data.ExpirationReservation.Sub(r.Epoch.Time).Seconds()),
@@ -395,7 +395,7 @@ func ReservationCreate(ctx context.Context, db *mongo.Database, r Reservation) (
 }
 
 // ReservationSetNextAction update the reservation next action in db
-func ReservationSetNextAction(ctx context.Context, db *mongo.Database, id schema.ID, action generated.TfgridWorkloadsReservation1NextActionEnum) error {
+func ReservationSetNextAction(ctx context.Context, db *mongo.Database, id schema.ID, action generated.NextActionEnum) error {
 	var filter ReservationFilter
 	filter = filter.WithID(id)
 
@@ -424,7 +424,7 @@ const (
 )
 
 //ReservationPushSignature push signature to reservation
-func ReservationPushSignature(ctx context.Context, db *mongo.Database, id schema.ID, mode SignatureMode, signature generated.TfgridWorkloadsReservationSigningSignature1) error {
+func ReservationPushSignature(ctx context.Context, db *mongo.Database, id schema.ID, mode SignatureMode, signature generated.SigningSignature) error {
 
 	var filter ReservationFilter
 	filter = filter.WithID(id)
@@ -456,8 +456,8 @@ func ReservationPushSignature(ctx context.Context, db *mongo.Database, id schema
 
 // Workload is a wrapper around generated TfgridWorkloadsReservationWorkload1 type
 type Workload struct {
-	generated.TfgridWorkloadsReservationWorkload1 `bson:",inline"`
-	NodeID                                        string `json:"node_id" bson:"node_id"`
+	generated.ReservationWorkload `bson:",inline"`
+	NodeID                        string `json:"node_id" bson:"node_id"`
 }
 
 // QueueFilter for workloads in temporary queue
@@ -495,7 +495,7 @@ func WorkloadPop(ctx context.Context, db *mongo.Database, id string) error {
 }
 
 // Result is a wrapper around TfgridWorkloadsReservationResult1 type
-type Result generated.TfgridWorkloadsReservationResult1
+type Result generated.Result
 
 func (r *Result) encode() ([]byte, error) {
 	buf := &bytes.Buffer{}

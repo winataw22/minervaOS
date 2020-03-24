@@ -93,8 +93,8 @@ func (p *Pipeline) checkDeleteSignatures() bool {
 
 // Next gets new modified reservation, and true if the reservation has changed from the input
 func (p *Pipeline) Next() (Reservation, bool) {
-	if p.r.NextAction == generated.TfgridWorkloadsReservation1NextActionDelete ||
-		p.r.NextAction == generated.TfgridWorkloadsReservation1NextActionDeleted {
+	if p.r.NextAction == generated.NextActionDelete ||
+		p.r.NextAction == generated.NextActionDeleted {
 		return p.r, false
 	}
 
@@ -104,7 +104,7 @@ func (p *Pipeline) Next() (Reservation, bool) {
 		// reservation has expired
 		// set its status (next action) to delete
 		log.Debug().Int64("id", int64(p.r.ID)).Msg("expired or to be deleted")
-		p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionDelete
+		p.r.NextAction = generated.NextActionDelete
 		return p.r, true
 	}
 
@@ -112,31 +112,31 @@ func (p *Pipeline) Next() (Reservation, bool) {
 	modified := false
 	for {
 		switch p.r.NextAction {
-		case generated.TfgridWorkloadsReservation1NextActionCreate:
+		case generated.NextActionCreate:
 			// provision expiration, if exceeded, the node should not
 			// try to deploy this reservation.
 			if time.Until(p.r.DataReservation.ExpirationProvisioning.Time) <= 0 {
 				// exceeded
 				// TODO: I think this should be set to "delete" not "invalid"
 				log.Debug().Int64("id", int64(p.r.ID)).Msg("expired")
-				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionInvalid
+				p.r.NextAction = generated.NextActionInvalid
 			} else {
 				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to sign")
-				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionSign
+				p.r.NextAction = generated.NextActionSign
 			}
-		case generated.TfgridWorkloadsReservation1NextActionSign:
+		case generated.NextActionSign:
 			// this stage will not change unless all
 			if p.checkProvisionSignatures() {
 				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to pay")
-				p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionPay
+				p.r.NextAction = generated.NextActionPay
 			}
-		case generated.TfgridWorkloadsReservation1NextActionPay:
+		case generated.NextActionPay:
 			// TODO: here we should actually start the payment process
 			// but this is not implemented yet, so now we just need to move
 			// to deploy
 			log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to deploy")
-			p.r.NextAction = generated.TfgridWorkloadsReservation1NextActionDeploy
-		case generated.TfgridWorkloadsReservation1NextActionDeploy:
+			p.r.NextAction = generated.NextActionDeploy
+		case generated.NextActionDeploy:
 			//nothing to do
 			log.Debug().Int64("id", int64(p.r.ID)).Msg("let's deploy")
 		}

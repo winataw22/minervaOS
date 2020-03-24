@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/tools/client"
 )
 
 type pollSource struct {
@@ -32,6 +33,34 @@ type ReservationPoller interface {
 	// reservation.ID >= from. So a client to the Poll method should make
 	// sure to call it with the last (MAX) reservation ID he receieved.
 	Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error)
+}
+
+type reservationPoller struct {
+	wl client.Workloads
+}
+
+func (r *reservationPoller) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
+	list, err := r.wl.Workloads(nodeID.Identity(), from)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*Reservation, 0, len(list))
+	for _, wl := range list {
+		r, err := WorkloadToProvisionType(wl)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, r)
+	}
+
+	return result, nil
+}
+
+// ReservationPollerFromWorkloads returns a reservation poller from client.Workloads
+func ReservationPollerFromWorkloads(wl client.Workloads) ReservationPoller {
+	return &reservationPoller{wl: wl}
 }
 
 // PollSource does a long poll on address to get new and to be deleted

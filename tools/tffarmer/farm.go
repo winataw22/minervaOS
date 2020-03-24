@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
 	"github.com/urfave/cli"
 )
 
@@ -15,7 +16,11 @@ func registerFarm(c *cli.Context) error {
 
 	tid := c.Uint64("tid")
 
-	farmID, err := idStore.RegisterFarm(tid, name, "", []string{"fake"})
+	farmID, err := db.FarmRegister(directory.Farm{
+		Name:            name,
+		ThreebotId:      int64(tid),
+		WalletAddresses: []string{"fake"},
+	})
 	if err != nil {
 		return err
 	}

@@ -17,11 +17,11 @@ import (
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
-	"github.com/threefoldtech/zos/pkg/network/tnodb"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 	"github.com/threefoldtech/zos/pkg/version"
+	"github.com/threefoldtech/zos/tools/client"
 )
 
 const redisSocket = "unix:///var/run/redis.sock"
@@ -54,7 +54,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to zbus broker")
 	}
 
-	db, err := bcdbClient()
+	dir, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to BCDB")
 	}
@@ -74,12 +74,13 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read local network interfaces")
 	}
-	if err := publishIfaces(ifaces, nodeID, db); err != nil {
+	if err := publishIfaces(ifaces, nodeID, dir); err != nil {
 		log.Fatal().Err(err).Msg("failed to publish network interfaces to BCDB")
 	}
 
 	ifaceVersion := -1
-	exitIface, err := db.GetPubIface(nodeID)
+
+	exitIface, err := getPubIface(dir, nodeID.Identity())
 	if err == nil {
 		if err := configurePubIface(exitIface, nodeID); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
@@ -92,7 +93,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("failed to create DMZ")
 	}
 
-	chIface := watchPubIface(ctx, nodeID, db, ifaceVersion)
+	chIface := watchPubIface(ctx, nodeID, dir, ifaceVersion)
 	go func(ctx context.Context, ch <-chan *types.PubIface) {
 		for {
 			select {
@@ -124,14 +125,14 @@ func main() {
 		}
 	}(ctx, chIface)
 
-	go startAddrWatch(ctx, nodeID, db, ifaces)
+	go startAddrWatch(ctx, nodeID, dir, ifaces)
 
 	log.Info().Msg("start zbus server")
 	if err := os.MkdirAll(root, 0750); err != nil {
 		log.Fatal().Err(err).Msgf("fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, db, root)
+	networker, err := network.NewNetworker(identity, dir, root)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating network manager")
 	}
@@ -162,7 +163,7 @@ func startServer(ctx context.Context, broker string, networker pkg.Networker) er
 	return nil
 }
 
-func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB, ifaces []types.IfaceInfo) {
+func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, cl client.Directory, ifaces []types.IfaceInfo) {
 
 	ifaceNames := make([]string, len(ifaces))
 	for i, iface := range ifaces {
@@ -171,7 +172,7 @@ func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB
 	log.Info().Msgf("watched interfaces %v", ifaceNames)
 
 	f := func() error {
-		wl := NewWatchedLinks(ifaceNames, nodeID, db)
+		wl := NewWatchedLinks(ifaceNames, nodeID, cl)
 		if err := wl.Forever(ctx); err != nil {
 			log.Error().Err(err).Msg("error in address watcher")
 			return err
@@ -186,11 +187,15 @@ func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB
 }
 
 // instantiate the proper client based on the running mode
-func bcdbClient() (network.TNoDB, error) {
+func bcdbClient() (client.Directory, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse node environment")
 	}
 
-	return tnodb.NewHTTPTNoDB(env.BcdbURL), nil
+	cl, err := client.NewClient(env.BcdbURL)
+	if err != nil {
+		return nil, err
+	}
+	return cl.Directory, nil
 }

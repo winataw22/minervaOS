@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
 
 	"github.com/urfave/cli"
 )
@@ -63,19 +63,19 @@ func configPublic(c *cli.Context) error {
 	}
 
 	node := c.Args().First()
-	pubIface := &types.PubIface{
+	pubIface := directory.PublicIface{
 		Master: iface,
-		GW4:    gw4,
-		GW6:    gw6,
+		Gw4:    gw4,
+		Gw6:    gw6,
 	}
 	if nv4 != nil {
-		pubIface.IPv4 = types.NewIPNet(nv4)
+		pubIface.Ipv4 = schema.IPRange{IPNet: *nv4}
 	}
 	if nv6 != nil {
-		pubIface.IPv6 = types.NewIPNet(nv6)
+		pubIface.Ipv6 = schema.IPRange{IPNet: *nv6}
 	}
 
-	if err := db.SetPublicIface(pkg.StrIdentifier(node), pubIface); err != nil {
+	if err := db.NodeSetPublic(node, pubIface); err != nil {
 		return err
 	}
 	fmt.Printf("public interface configured on node %s\n", node)

@@ -1,29 +1,17 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/url"
-
-	"github.com/pkg/errors"
-
-	"github.com/threefoldtech/zos/pkg/provision"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/tools/client"
 
 	"os"
 
-	types "github.com/threefoldtech/zos/pkg/gedis/types/provision"
-	"github.com/threefoldtech/zos/pkg/network"
-	"github.com/threefoldtech/zos/pkg/network/tnodb"
 	"github.com/urfave/cli"
 )
 
 var (
-	client clientIface
+	bcdb *client.Client
 )
 
 func main() {
@@ -53,7 +41,7 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		var err error
-		client, err = getClient(c.String("bcdb"))
+		bcdb, err = getClient(c.String("bcdb"))
 		if err != nil {
 			return err
 		}
@@ -243,6 +231,14 @@ func main() {
 						cli.BoolFlag{
 							Name:  "public6",
 							Usage: "when enabled, the container will have a public IPv6 interface",
+						},
+						cli.StringFlag{
+							Name:  "stdout",
+							Usage: "custom redis url to send process stdout (eg: redis://example.tld:1234/channel)",
+						},
+						cli.StringFlag{
+							Name:  "stderr",
+							Usage: "like stdout but for stderr, if only stdout is set, stderr will use the same",
 						},
 					},
 					Action: generateContainer,
@@ -462,139 +458,6 @@ func main() {
 	}
 }
 
-type reserveDeleter interface {
-	Reserve(r *provision.Reservation) (string, error)
-	Delete(userID, id int64, sig []byte) error
-}
-type clientIface interface {
-	network.TNoDB
-	reserveDeleter
-	CreateUser(name, email, pubkey, description string) (int64, error)
-	ReserveJSX(res types.TfgridReservation1) (int64, error)
-	GetJSX(id int64) (res types.TfgridReservation1, err error)
-}
-
-type clientImpl struct {
-	network.TNoDB
-	reserveDeleter
-	baseURL string
-}
-
-func (p clientImpl) GetJSX(id int64) (res types.TfgridReservation1, err error) {
-	url := fmt.Sprintf("%s/reservations/%d", p.baseURL, id)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return res, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return res, fmt.Errorf("wrong response status code %s", resp.Status)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return res, err
-	}
-
-	return
-}
-
-func (p clientImpl) ReserveJSX(res types.TfgridReservation1) (int64, error) {
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(res)
-	if err != nil {
-		return 0, err
-	}
-
-	response, err := http.Post(
-		fmt.Sprintf("%s/reservations", p.baseURL),
-		"application/json",
-		&buf,
-	)
-
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to create reservation")
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusCreated {
-		return 0, fmt.Errorf("wrong status for reservation create: %s", response.Status)
-	}
-
-	var id int64
-
-	if err := json.NewDecoder(response.Body).Decode(&id); err != nil {
-		return 0, errors.Wrap(err, "failed to load user response")
-	}
-
-	return id, nil
-
-}
-
-func (p clientImpl) CreateUser(name, email, pubkey, description string) (int64, error) {
-	var buf bytes.Buffer
-	type U map[string]interface{}
-	err := json.NewEncoder(&buf).Encode(U{
-		"name":        name,
-		"email":       email,
-		"pubkey":      pubkey,
-		"description": description,
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	response, err := http.Post(
-		fmt.Sprintf("%s/users", p.baseURL),
-		"application/json",
-		&buf,
-	)
-
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to create user")
-	}
-
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusCreated {
-		return 0, fmt.Errorf("wrong status for user create: %s", response.Status)
-	}
-
-	var result struct {
-		ID int64 `json:"id"`
-	}
-
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-		return 0, errors.Wrap(err, "failed to load user response")
-	}
-
-	return result.ID, nil
-}
-
-func getClient(addr string) (clientIface, error) {
-
-	u, err := url.Parse(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	switch u.Scheme {
-	case "http", "https":
-		return clientImpl{
-			TNoDB:          tnodb.NewHTTPTNoDB(addr),
-			reserveDeleter: provision.NewHTTPStore(addr),
-			baseURL:        addr,
-		}, nil
-	// case "tcp":
-	// 	c, err := gedis.New(addr, "")
-	// 	return client{
-	// 		c,
-	// 		c,
-	// 	}, err
-	default:
-		return nil, fmt.Errorf("unsupported address scheme for BCDB: %s", u.Scheme)
-	}
+func getClient(addr string) (*client.Client, error) {
+	return client.NewClient(addr)
 }

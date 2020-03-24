@@ -28,6 +28,7 @@ wg_ports = (LI)
 name = (S)
 addrs = (Liprange)
 gateway = (Lipaddr)
+macaddress = (S)
 
 #famer configures this information so we know how to configure the ipaddress
 @url = tfgrid.directory.node.public_iface.1

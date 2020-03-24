@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
+
 	"github.com/threefoldtech/zos/pkg/schema"
 )
 
@@ -22,9 +23,25 @@ const (
 // that the node will publish publicly
 // this is used to be able to configure public side of a node
 type IfaceInfo struct {
-	Name    string   `json:"name"`
-	Addrs   []IPNet  `json:"addrs"`
-	Gateway []net.IP `json:"gateway"`
+	Name       string            `json:"name"`
+	Addrs      []IPNet           `json:"addrs"`
+	Gateway    []net.IP          `json:"gateway"`
+	MacAddress schema.MacAddress `json:"macaddress"`
+}
+
+// NewIfaceInfoFromSchema creates an IfaceInfo from schema type
+func NewIfaceInfoFromSchema(iface directory.Iface) IfaceInfo {
+	return IfaceInfo{
+		Name: iface.Name,
+		Addrs: func() []IPNet {
+			var l []IPNet
+			for _, a := range iface.Addrs {
+				l = append(l, IPNet{a.IPNet})
+			}
+			return l
+		}(),
+		Gateway: iface.Gateway,
+	}
 }
 
 // DefaultIP return the IP address of the interface that has a default gateway configured
@@ -48,6 +65,21 @@ func (i *IfaceInfo) DefaultIP() (net.IP, error) {
 	return nil, fmt.Errorf("no ipv6 address with default gateway")
 }
 
+// ToSchema converts IfaceInfo to a schema type
+func (i *IfaceInfo) ToSchema() directory.Iface {
+	return directory.Iface{
+		Name: i.Name,
+		Addrs: func() []schema.IPRange {
+			var l []schema.IPRange
+			for _, a := range i.Addrs {
+				l = append(l, schema.IPRange{IPNet: a.IPNet})
+			}
+			return l
+		}(),
+		Gateway: i.Gateway,
+	}
+}
+
 // PubIface is the configuration of the interface
 // that is connected to the public internet
 type PubIface struct {
@@ -67,6 +99,27 @@ type PubIface struct {
 	Version int `json:"version"`
 }
 
+// ToSchema converts PubIface to schema type
+func (p *PubIface) ToSchema() directory.PublicIface {
+	var typ directory.IfaceTypeEnum
+	switch p.Type {
+	case VlanIface:
+		typ = directory.IfaceTypeVlan
+	case MacVlanIface:
+		typ = directory.IfaceTypeMacvlan
+	}
+
+	return directory.PublicIface{
+		Master:  p.Master,
+		Type:    typ,
+		Ipv4:    p.IPv4.ToSchema(),
+		Ipv6:    p.IPv4.ToSchema(),
+		Gw4:     p.GW4,
+		Gw6:     p.GW6,
+		Version: int64(p.Version),
+	}
+}
+
 // Node is the public information about a node
 type Node struct {
 	NodeID string `json:"node_id"`
@@ -80,23 +133,30 @@ type Node struct {
 }
 
 // NewNodeFromSchema converts a TfgridNode2 into Node
-func NewNodeFromSchema(node directory.TfgridNode2) *Node {
+func NewNodeFromSchema(node directory.Node) *Node {
 	n := &Node{
-		NodeID: node.NodeID,
-		FarmID: node.FarmID,
+		NodeID: node.NodeId,
+		FarmID: uint64(node.FarmId),
 
 		Ifaces: make([]*IfaceInfo, len(node.Ifaces)),
 
 		PublicConfig: nil,
 		ExitNode:     0,
-		WGPorts:      node.WGPorts,
+		WGPorts: func() []uint {
+			var p []uint
+			for _, i := range node.WgPorts {
+				p = append(p, uint(i))
+			}
+			return p
+		}(),
 	}
 	if node.Ifaces != nil {
 		for i, iface := range node.Ifaces {
 			n.Ifaces[i] = &IfaceInfo{
-				Name:    iface.Name,
-				Addrs:   make([]IPNet, len(iface.Addrs)),
-				Gateway: iface.Gateway,
+				Name:       iface.Name,
+				Addrs:      make([]IPNet, len(iface.Addrs)),
+				Gateway:    iface.Gateway,
+				MacAddress: iface.MacAddress,
 			}
 
 			for y, addr := range iface.Addrs {

@@ -32,7 +32,7 @@ var (
 )
 
 // User type
-type User generated.TfgridPhonebookUser1
+type User generated.User
 
 // Encode user data for signing
 func (u *User) Encode() []byte {

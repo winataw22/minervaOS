@@ -10,9 +10,28 @@ import (
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/tools/client"
 )
 
-func watchPubIface(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB, ifaceVersion int) <-chan *types.PubIface {
+// ErrNoPubIface is the error returns by ReadPubIface when no public
+// interface is configured
+var ErrNoPubIface = errors.New("no public interface configured for this node")
+
+func getPubIface(dir client.Directory, nodeID string) (*types.PubIface, error) {
+	schemaNode, err := dir.NodeGet(nodeID, false)
+	if err != nil {
+		return nil, err
+	}
+
+	node := types.NewNodeFromSchema(schemaNode)
+	if node.PublicConfig == nil {
+		return nil, ErrNoPubIface
+	}
+
+	return node.PublicConfig, nil
+}
+
+func watchPubIface(ctx context.Context, nodeID pkg.Identifier, dir client.Directory, ifaceVersion int) <-chan *types.PubIface {
 	var currentVersion = ifaceVersion
 
 	ch := make(chan *types.PubIface)
@@ -28,9 +47,9 @@ func watchPubIface(ctx context.Context, nodeID pkg.Identifier, db network.TNoDB,
 				break
 			}
 
-			exitIface, err := db.GetPubIface(nodeID)
+			exitIface, err := getPubIface(dir, nodeID.Identity())
 			if err != nil {
-				if err == network.ErrNoPubIface {
+				if err == ErrNoPubIface {
 					continue
 				}
 				log.Error().Err(err).Msg("failed to read public interface")

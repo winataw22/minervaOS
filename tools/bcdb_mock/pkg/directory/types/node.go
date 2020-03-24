@@ -20,7 +20,7 @@ const (
 )
 
 // Node model
-type Node generated.TfgridDirectoryNode2
+type Node generated.Node
 
 // Validate node
 func (n *Node) Validate() error {
@@ -38,7 +38,7 @@ func (n *Node) Validate() error {
 
 	// Unfortunately, jsx schema does not support nil types
 	// so this is the only way to check if values are not set
-	empty := generated.TfgridDirectoryLocation1{}
+	empty := generated.Location{}
 	if n.Location == empty {
 		return fmt.Errorf("location is required")
 	}
@@ -169,13 +169,13 @@ func NodeCreate(ctx context.Context, db *mongo.Database, node Node) (schema.ID, 
 
 	node.ID = id
 	if node.Proofs == nil {
-		node.Proofs = make([]generated.TfgridDirectoryNodeProof1, 0)
+		node.Proofs = make([]generated.Proof, 0)
 	}
 
 	node.Updated = schema.Date{Time: time.Now()}
 	col := db.Collection(NodeCollection)
-	result := col.FindOneAndUpdate(ctx, filter, bson.M{"$set": node}, options.FindOneAndUpdate().SetUpsert(true))
-	return id, result.Err()
+	_, err = col.UpdateOne(ctx, filter, bson.M{"$set": node}, options.Update().SetUpsert(true))
+	return id, err
 }
 
 func nodeUpdate(ctx context.Context, db *mongo.Database, nodeID string, value interface{}) error {
@@ -194,17 +194,17 @@ func nodeUpdate(ctx context.Context, db *mongo.Database, nodeID string, value in
 }
 
 // NodeUpdateTotalResources sets the node total resources
-func NodeUpdateTotalResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.TfgridDirectoryNodeResourceAmount1) error {
+func NodeUpdateTotalResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.ResourceAmount) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{"total_resources": capacity})
 }
 
 // NodeUpdateReservedResources sets the node reserved resources
-func NodeUpdateReservedResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.TfgridDirectoryNodeResourceAmount1) error {
+func NodeUpdateReservedResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.ResourceAmount) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{"reserved_resources": capacity})
 }
 
 // NodeUpdateUsedResources sets the node total resources
-func NodeUpdateUsedResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.TfgridDirectoryNodeResourceAmount1) error {
+func NodeUpdateUsedResources(ctx context.Context, db *mongo.Database, nodeID string, capacity generated.ResourceAmount) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{"used_resources": capacity})
 }
 
@@ -217,14 +217,14 @@ func NodeUpdateUptime(ctx context.Context, db *mongo.Database, nodeID string, up
 }
 
 // NodeSetInterfaces updates node interfaces
-func NodeSetInterfaces(ctx context.Context, db *mongo.Database, nodeID string, ifaces []generated.TfgridDirectoryNodeIface1) error {
+func NodeSetInterfaces(ctx context.Context, db *mongo.Database, nodeID string, ifaces []generated.Iface) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{
 		"ifaces": ifaces,
 	})
 }
 
 // NodeSetPublicConfig sets node public config
-func NodeSetPublicConfig(ctx context.Context, db *mongo.Database, nodeID string, cfg generated.TfgridDirectoryNodePublicIface1) error {
+func NodeSetPublicConfig(ctx context.Context, db *mongo.Database, nodeID string, cfg generated.PublicIface) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{
 		"public_config": cfg,
 	})
@@ -238,7 +238,7 @@ func NodeSetWGPorts(ctx context.Context, db *mongo.Database, nodeID string, port
 }
 
 // NodePushProof push proof to node
-func NodePushProof(ctx context.Context, db *mongo.Database, nodeID string, proof generated.TfgridDirectoryNodeProof1) error {
+func NodePushProof(ctx context.Context, db *mongo.Database, nodeID string, proof generated.Proof) error {
 	if nodeID == "" {
 		return fmt.Errorf("invalid node id")
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/identity"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/phonebook"
 	"github.com/urfave/cli"
 )
 
@@ -28,7 +29,13 @@ func cmdsGenerateID(c *cli.Context) error {
 		return err
 	}
 
-	id, err := client.CreateUser(name, email, hex.EncodeToString(k.PublicKey), description)
+	user := phonebook.User{
+		Name:        name,
+		Email:       email,
+		Signature:   hex.EncodeToString(k.PublicKey),
+		Description: description,
+	}
+	id, err := bcdb.Phonebook.Create(user)
 	if err != nil {
 		return errors.Wrap(err, "failed to register user")
 	}

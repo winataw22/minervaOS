@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/threefoldtech/zos/pkg/gedis/types/directory"
 	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
 )
 
 func TestParseIPNet(t *testing.T) {
@@ -88,7 +88,7 @@ func TestDumpIPNet(t *testing.T) {
 
 func TestNewNodeFromSchema(t *testing.T) {
 	type args struct {
-		node directory.TfgridNode2
+		node directory.Node
 	}
 	tests := []struct {
 		name string
@@ -98,10 +98,10 @@ func TestNewNodeFromSchema(t *testing.T) {
 		{
 			name: "full",
 			args: args{
-				node: directory.TfgridNode2{
-					NodeID: "node_id",
-					FarmID: 1,
-					Ifaces: []directory.TfgridNodeIface1{
+				node: directory.Node{
+					NodeId: "node_id",
+					FarmId: 1,
+					Ifaces: []directory.Iface{
 						{
 							Name: "eth0",
 							Addrs: []schema.IPRange{
@@ -112,15 +112,15 @@ func TestNewNodeFromSchema(t *testing.T) {
 							},
 						},
 					},
-					PublicConfig: &directory.TfgridNodePublicIface1{
+					PublicConfig: &directory.PublicIface{
 						Master: "eth1",
-						Type:   directory.TfgridNodePublicIface1TypeMacvlan,
+						Type:   directory.IfaceTypeMacvlan,
 						Ipv4:   schema.MustParseIPRange("185.69.166.245/24"),
 						Gw4:    net.ParseIP("185.69.166.1"),
 						Ipv6:   schema.MustParseIPRange("2a02:1802:5e:0:1000:0:ff:1/64"),
 						Gw6:    net.ParseIP("2a02:1802:5e::1"),
 					},
-					WGPorts: []uint{1, 2, 3},
+					WgPorts: []int64{1, 2, 3},
 				},
 			},
 			want: &Node{
@@ -156,10 +156,10 @@ func TestNewNodeFromSchema(t *testing.T) {
 		{
 			name: "no-public",
 			args: args{
-				node: directory.TfgridNode2{
-					NodeID: "node_id",
-					FarmID: 1,
-					Ifaces: []directory.TfgridNodeIface1{
+				node: directory.Node{
+					NodeId: "node_id",
+					FarmId: 1,
+					Ifaces: []directory.Iface{
 						{
 							Name: "eth0",
 							Addrs: []schema.IPRange{
@@ -171,7 +171,7 @@ func TestNewNodeFromSchema(t *testing.T) {
 						},
 					},
 					PublicConfig: nil,
-					WGPorts:      []uint{1, 2, 3},
+					WgPorts:      []int64{1, 2, 3},
 				},
 			},
 			want: &Node{
@@ -200,19 +200,19 @@ func TestNewNodeFromSchema(t *testing.T) {
 		{
 			name: "empty-ifaces",
 			args: args{
-				node: directory.TfgridNode2{
-					NodeID: "node_id",
-					FarmID: 1,
-					Ifaces: []directory.TfgridNodeIface1{},
-					PublicConfig: &directory.TfgridNodePublicIface1{
+				node: directory.Node{
+					NodeId: "node_id",
+					FarmId: 1,
+					Ifaces: []directory.Iface{},
+					PublicConfig: &directory.PublicIface{
 						Master: "eth1",
-						Type:   directory.TfgridNodePublicIface1TypeMacvlan,
+						Type:   directory.IfaceTypeVlan,
 						Ipv4:   schema.MustParseIPRange("185.69.166.245/24"),
 						Gw4:    net.ParseIP("185.69.166.1"),
 						Ipv6:   schema.MustParseIPRange("2a02:1802:5e:0:1000:0:ff:1/64"),
 						Gw6:    net.ParseIP("2a02:1802:5e::1"),
 					},
-					WGPorts: []uint{1, 2, 3},
+					WgPorts: []int64{1, 2, 3},
 				},
 			},
 			want: &Node{

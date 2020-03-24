@@ -74,7 +74,7 @@ func cmdCreateNetwork(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("schema"), r)
+	return writeWorkload(c.GlobalString("schema"), r)
 }
 
 func cmdsAddNode(c *cli.Context) error {
@@ -163,7 +163,7 @@ func cmdsAddNode(c *cli.Context) error {
 		return err
 	}
 
-	return output(schema, r)
+	return writeWorkload(schema, r)
 }
 
 func cmdsAddAccess(c *cli.Context) error {
@@ -273,7 +273,7 @@ func cmdsAddAccess(c *cli.Context) error {
 		return err
 	}
 
-	return output(schema, r)
+	return writeWorkload(schema, r)
 }
 
 func cmdsRemoveNode(c *cli.Context) error {
@@ -316,7 +316,7 @@ func cmdsRemoveNode(c *cli.Context) error {
 	//	return err
 	// }
 
-	return output(schema, r)
+	return writeWorkload(schema, r)
 }
 
 func loadNetwork(name string) (*Network, error) {
@@ -352,14 +352,14 @@ func loadNetwork(name string) (*Network, error) {
 }
 
 func pickPort(nodeID string) (uint, error) {
-	node, err := client.GetNode(pkg.StrIdentifier(nodeID))
+	node, err := bcdb.Directory.NodeGet(nodeID, false)
 	if err != nil {
 		return 0, err
 	}
 
 	p := uint(rand.Intn(6000) + 2000)
 
-	for isIn(node.WGPorts, p) {
+	for isIn(node.WgPorts, p) {
 		p = uint(rand.Intn(6000) + 2000)
 	}
 	return p, nil
@@ -369,10 +369,12 @@ func pickPort(nodeID string) (uint, error) {
 // some interface has received a SLAAC addr
 // which has been registered in BCDB
 func getEndPointAddrs(nodeID pkg.Identifier) ([]types.IPNet, error) {
-	node, err := client.GetNode(nodeID)
+
+	schemaNode, err := bcdb.Directory.NodeGet(nodeID.Identity(), false)
 	if err != nil {
 		return nil, err
 	}
+	node := types.NewNodeFromSchema(schemaNode)
 	var endpoints []types.IPNet
 	if node.PublicConfig != nil {
 		if node.PublicConfig.IPv4.IP != nil {
@@ -401,9 +403,9 @@ func getEndPointAddrs(nodeID pkg.Identifier) ([]types.IPNet, error) {
 	return endpoints, nil
 }
 
-func isIn(l []uint, i uint) bool {
+func isIn(l []int64, i uint) bool {
 	for _, x := range l {
-		if i == x {
+		if int64(i) == x {
 			return true
 		}
 	}

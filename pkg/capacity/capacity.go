@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
@@ -78,6 +79,11 @@ type Disks struct {
 // Disks list and parse the hardware information using smartctl
 func (r *ResourceOracle) Disks() (d Disks, err error) {
 	devices, err := smartctl.ListDevices()
+	if errors.Is(err, smartctl.ErrEmpty) {
+		// TODO: for now we allow to not have the smartctl dump of all the disks
+		log.Warn().Err(err).Msg("smartctl did not found any disk on the system")
+		return d, nil
+	}
 	if err != nil {
 		return
 	}

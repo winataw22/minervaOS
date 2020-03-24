@@ -9,6 +9,8 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
+	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -36,7 +38,7 @@ type defaultEngine struct {
 	nodeID string
 	source ReservationSource
 	store  ReservationCache
-	fb     Feedbacker
+	cl     *client.Client
 }
 
 // New creates a new engine. Once started, the engine
@@ -45,12 +47,12 @@ type defaultEngine struct {
 // the default implementation is a single threaded worker. so it process
 // one reservation at a time. On error, the engine will log the error. and
 // continue to next reservation.
-func New(nodeID string, source ReservationSource, rw ReservationCache, fb Feedbacker) Engine {
+func New(nodeID string, source ReservationSource, rw ReservationCache, cl *client.Client) Engine {
 	return &defaultEngine{
 		nodeID: nodeID,
 		source: source,
 		store:  rw,
-		fb:     fb,
+		cl:     cl,
 	}
 }
 
@@ -98,7 +100,14 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 					continue
 				}
 			}
-			if err := e.fb.UpdateReservedResources(e.nodeID, e.store.Counters()); err != nil {
+			counters := e.store.Counters()
+			amount := directory.ResourceAmount{
+				Sru: counters.SRU.Current(),
+				Hru: counters.MRU.Current(),
+				Cru: counters.CRU.Current(),
+				Mru: counters.MRU.Current(),
+			}
+			if err := e.cl.Directory.NodeUpdateUsedResources(e.nodeID, amount); err != nil {
 				log.Error().Err(err).Msg("failed to updated the used resources")
 			}
 		}
@@ -151,7 +160,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 
 	if !exists {
 		log.Info().Str("id", r.ID).Msg("reservation not provisioned, no need to decomission")
-		if err := e.fb.Deleted(e.nodeID, r.ID); err != nil {
+		if err := e.cl.Workloads.WorkloadPutDeleted(e.nodeID, r.ID); err != nil {
 			log.Error().Err(err).Str("id", r.ID).Msg("failed to mark reservation as deleted")
 		}
 		return nil
@@ -166,7 +175,7 @@ func (e *defaultEngine) decommission(ctx context.Context, r *Reservation) error 
 		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
 	}
 
-	if err := e.fb.Deleted(e.nodeID, r.ID); err != nil {
+	if err := e.cl.Workloads.WorkloadPutDeleted(e.nodeID, r.ID); err != nil {
 		return errors.Wrap(err, "failed to mark reservation as deleted")
 	}
 
@@ -215,7 +224,7 @@ func (e *defaultEngine) reply(ctx context.Context, r *Reservation, rErr error, i
 	}
 	result.Signature = hex.EncodeToString(sig)
 
-	return e.fb.Feedback(e.nodeID, result)
+	return e.cl.Workloads.WorkloadPutResult(e.nodeID, r.ID, result.ToSchemaType())
 }
 
 func (e *defaultEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {

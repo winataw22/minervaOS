@@ -41,10 +41,10 @@ func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 	// we make sure those arrays are initialized correctly
 	// this will make updating the document in place much easier
 	// in later stages
-	reservation.SignaturesProvision = make([]generated.TfgridWorkloadsReservationSigningSignature1, 0)
-	reservation.SignaturesDelete = make([]generated.TfgridWorkloadsReservationSigningSignature1, 0)
-	reservation.SignaturesFarmer = make([]generated.TfgridWorkloadsReservationSigningSignature1, 0)
-	reservation.Results = make([]generated.TfgridWorkloadsReservationResult1, 0)
+	reservation.SignaturesProvision = make([]generated.SigningSignature, 0)
+	reservation.SignaturesDelete = make([]generated.SigningSignature, 0)
+	reservation.SignaturesFarmer = make([]generated.SigningSignature, 0)
+	reservation.Results = make([]generated.Result, 0)
 
 	reservation, err := a.pipeline(reservation, nil)
 	if err != nil {
@@ -165,15 +165,15 @@ func (a *API) list(r *http.Request) (interface{}, mw.Response) {
 func (a *API) queued(ctx context.Context, db *mongo.Database, nodeID string, limit int64) ([]types.Workload, error) {
 
 	type intermediate struct {
-		WorkloadID string                                                `bson:"workload_id" json:"workload_id"`
-		User       string                                                `bson:"user" json:"user"`
-		Type       generated.TfgridWorkloadsReservationWorkload1TypeEnum `bson:"type" json:"type"`
-		Content    bson.Raw                                              `bson:"content" json:"content"`
-		Created    schema.Date                                           `bson:"created" json:"created"`
-		Duration   int64                                                 `bson:"duration" json:"duration"`
-		Signature  string                                                `bson:"signature" json:"signature"`
-		ToDelete   bool                                                  `bson:"to_delete" json:"to_delete"`
-		NodeID     string                                                `json:"node_id" bson:"node_id"`
+		WorkloadID string                     `bson:"workload_id" json:"workload_id"`
+		User       string                     `bson:"user" json:"user"`
+		Type       generated.WorkloadTypeEnum `bson:"type" json:"type"`
+		Content    bson.Raw                   `bson:"content" json:"content"`
+		Created    schema.Date                `bson:"created" json:"created"`
+		Duration   int64                      `bson:"duration" json:"duration"`
+		Signature  string                     `bson:"signature" json:"signature"`
+		ToDelete   bool                       `bson:"to_delete" json:"to_delete"`
+		NodeID     string                     `json:"node_id" bson:"node_id"`
 	}
 
 	workloads := make([]types.Workload, 0)
@@ -199,7 +199,7 @@ func (a *API) queued(ctx context.Context, db *mongo.Database, nodeID string, lim
 			return workloads, err
 		}
 
-		obj := generated.TfgridWorkloadsReservationWorkload1{
+		obj := generated.ReservationWorkload{
 			WorkloadId: wl.WorkloadID,
 			User:       wl.User,
 			Type:       wl.Type,
@@ -210,36 +210,36 @@ func (a *API) queued(ctx context.Context, db *mongo.Database, nodeID string, lim
 			ToDelete:  wl.ToDelete,
 		}
 		switch wl.Type {
-		case generated.TfgridWorkloadsReservationWorkload1TypeContainer:
-			var data generated.TfgridWorkloadsReservationContainer1
+		case generated.WorkloadTypeContainer:
+			var data generated.Container
 			if err := bson.Unmarshal(wl.Content, &data); err != nil {
 				return nil, err
 			}
 			obj.Content = data
 
-		case generated.TfgridWorkloadsReservationWorkload1TypeVolume:
-			var data generated.TfgridWorkloadsReservationVolume1
+		case generated.WorkloadTypeVolume:
+			var data generated.Volume
 			if err := bson.Unmarshal(wl.Content, &data); err != nil {
 				return nil, err
 			}
 			obj.Content = data
 
-		case generated.TfgridWorkloadsReservationWorkload1TypeZdb:
-			var data generated.TfgridWorkloadsReservationZdb1
+		case generated.WorkloadTypeZDB:
+			var data generated.ZDB
 			if err := bson.Unmarshal(wl.Content, &data); err != nil {
 				return nil, err
 			}
 			obj.Content = data
 
-		case generated.TfgridWorkloadsReservationWorkload1TypeNetwork:
-			var data generated.TfgridWorkloadsReservationNetwork1
+		case generated.WorkloadTypeNetwork:
+			var data generated.Network
 			if err := bson.Unmarshal(wl.Content, &data); err != nil {
 				return nil, err
 			}
 			obj.Content = data
 
-		case generated.TfgridWorkloadsReservationWorkload1TypeKubernetes:
-			var data generated.TfgridWorkloadsReservationK8S1
+		case generated.WorkloadTypeKubernetes:
+			var data generated.K8S
 			if err := bson.Unmarshal(wl.Content, &data); err != nil {
 				return nil, err
 			}
@@ -247,8 +247,8 @@ func (a *API) queued(ctx context.Context, db *mongo.Database, nodeID string, lim
 		}
 
 		workloads = append(workloads, types.Workload{
-			NodeID:                              wl.NodeID,
-			TfgridWorkloadsReservationWorkload1: obj,
+			NodeID:              wl.NodeID,
+			ReservationWorkload: obj,
 		})
 	}
 
@@ -472,7 +472,7 @@ func (a *API) workloadPutDeleted(r *http.Request) (interface{}, mw.Response) {
 		}
 	}
 
-	result.State = generated.TfgridWorkloadsReservationResult1StateDeleted
+	result.State = generated.ResultStateDeleted
 
 	if err := types.ResultPush(r.Context(), db, rid, *result); err != nil {
 		return nil, mw.Error(err)
@@ -492,7 +492,7 @@ func (a *API) workloadPutDeleted(r *http.Request) (interface{}, mw.Response) {
 		return nil, nil
 	}
 
-	if err := types.ReservationSetNextAction(r.Context(), db, reservation.ID, generated.TfgridWorkloadsReservation1NextActionDeleted); err != nil {
+	if err := types.ReservationSetNextAction(r.Context(), db, reservation.ID, generated.NextActionDeleted); err != nil {
 		return nil, mw.Error(err)
 	}
 
@@ -501,7 +501,7 @@ func (a *API) workloadPutDeleted(r *http.Request) (interface{}, mw.Response) {
 
 func (a *API) signProvision(r *http.Request) (interface{}, mw.Response) {
 	defer r.Body.Close()
-	var signature generated.TfgridWorkloadsReservationSigningSignature1
+	var signature generated.SigningSignature
 
 	if err := json.NewDecoder(r.Body).Decode(&signature); err != nil {
 		return nil, mw.BadRequest(err)
@@ -526,7 +526,7 @@ func (a *API) signProvision(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.NotFound(err)
 	}
 
-	if reservation.NextAction != generated.TfgridWorkloadsReservation1NextActionSign {
+	if reservation.NextAction != generated.NextActionSign {
 		return nil, mw.UnAuthorized(fmt.Errorf("reservation not expecting signatures"))
 	}
 
@@ -562,7 +562,7 @@ func (a *API) signProvision(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Error(err)
 	}
 
-	if reservation.NextAction == generated.TfgridWorkloadsReservation1NextActionDeploy {
+	if reservation.NextAction == generated.NextActionDeploy {
 		types.WorkloadPush(r.Context(), db, reservation.Workloads("")...)
 	}
 
@@ -571,7 +571,7 @@ func (a *API) signProvision(r *http.Request) (interface{}, mw.Response) {
 
 func (a *API) signDelete(r *http.Request) (interface{}, mw.Response) {
 	defer r.Body.Close()
-	var signature generated.TfgridWorkloadsReservationSigningSignature1
+	var signature generated.SigningSignature
 
 	if err := json.NewDecoder(r.Body).Decode(&signature); err != nil {
 		return nil, mw.BadRequest(err)
@@ -628,11 +628,11 @@ func (a *API) signDelete(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Error(err)
 	}
 
-	if reservation.NextAction != generated.TfgridWorkloadsReservation1NextActionDelete {
+	if reservation.NextAction != generated.NextActionDelete {
 		return nil, mw.Created()
 	}
 
-	if err := types.ReservationSetNextAction(r.Context(), db, reservation.ID, generated.TfgridWorkloadsReservation1NextActionDelete); err != nil {
+	if err := types.ReservationSetNextAction(r.Context(), db, reservation.ID, generated.NextActionDelete); err != nil {
 		return nil, mw.Error(err)
 	}
 

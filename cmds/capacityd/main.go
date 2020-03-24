@@ -14,6 +14,8 @@ import (
 	"github.com/threefoldtech/zos/pkg/monitord"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
+	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/rs/zerolog/log"
 
@@ -26,7 +28,7 @@ const module = "monitor"
 func cap(ctx context.Context, client zbus.Client) {
 	storage := stubs.NewStorageModuleStub(client)
 	identity := stubs.NewIdentityManagerStub(client)
-	store, err := bcdbClient()
+	cl, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
 	}
@@ -62,7 +64,13 @@ func cap(ctx context.Context, client zbus.Client) {
 	}
 
 	log.Info().Msg("sends capacity detail to BCDB")
-	if err := store.Register(identity.NodeID(), *resources, *dmi, disks, hypervisor); err != nil {
+
+	if err := cl.NodeSetCapacity(identity.NodeID().Identity(), directory.ResourceAmount{
+		Cru: int64(resources.CRU),
+		Mru: int64(resources.MRU),
+		Hru: int64(resources.HRU),
+		Sru: int64(resources.SRU),
+	}, *dmi, disks, hypervisor); err != nil {
 		log.Fatal().Err(err).Msgf("failed to write resources capacity on BCDB")
 	}
 
@@ -74,7 +82,7 @@ func cap(ctx context.Context, client zbus.Client) {
 		}
 
 		log.Info().Msg("send heart-beat to BCDB")
-		if err := store.Ping(identity.NodeID(), uptime); err != nil {
+		if err := cl.NodeUpdateUptime(identity.NodeID().Identity(), uptime); err != nil {
 			log.Error().Err(err).Msgf("failed to send heart-beat to BCDB")
 			return err
 		}
@@ -154,12 +162,17 @@ func main() {
 }
 
 // instantiate the proper client based on the running mode
-func bcdbClient() (capacity.Store, error) {
+func bcdbClient() (client.Directory, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse node environment")
 	}
 
-	return capacity.NewHTTPStore(env.BcdbURL), nil
+	cl, err := client.NewClient(env.BcdbURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return cl.Directory, nil
 
 }

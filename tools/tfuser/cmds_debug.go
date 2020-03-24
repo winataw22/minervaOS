@@ -31,5 +31,5 @@ func generateDebug(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), r)
+	return writeWorkload(c.GlobalString("output"), r)
 }

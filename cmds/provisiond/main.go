@@ -11,6 +11,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
@@ -91,7 +92,7 @@ func main() {
 	nodeID := identity.NodeID()
 
 	// to get reservation from tnodb
-	remoteStore, err := bcdbClient()
+	cl, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to instantiate BCDB client")
 	}
@@ -101,7 +102,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create local reservation store")
 	}
 	// to get the user ID of a reservation
-	ownerCache := provision.NewCache(localStore, remoteStore)
+	ownerCache := provision.NewCache(localStore, provision.ReservationGetterFromWorkloads(cl.Workloads))
 
 	// create context and add middlewares
 	ctx := context.Background()
@@ -111,11 +112,11 @@ func main() {
 	// From here we start the real provision engine that will live
 	// for the rest of the life of the node
 	source := provision.CombinedSource(
-		provision.PollSource(remoteStore, nodeID),
+		provision.PollSource(provision.ReservationPollerFromWorkloads(cl.Workloads), nodeID),
 		provision.NewDecommissionSource(localStore),
 	)
 
-	engine := provision.New(nodeID.Identity(), source, localStore, remoteStore)
+	engine := provision.New(nodeID.Identity(), source, localStore, cl)
 
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.ProvisionMonitor(engine))
 
@@ -148,11 +149,11 @@ type store interface {
 }
 
 // instantiate the proper client based on the running mode
-func bcdbClient() (store, error) {
+func bcdbClient() (*client.Client, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse node environment")
 	}
 
-	return provision.NewHTTPStore(env.BcdbURL), nil
+	return client.NewClient(env.BcdbURL)
 }

@@ -1,20 +1,18 @@
 package main
 
 import (
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"os"
 
-	"github.com/threefoldtech/zos/pkg/identity"
-	"github.com/threefoldtech/zos/pkg/network"
-	"github.com/threefoldtech/zos/pkg/network/tnodb"
+	"github.com/threefoldtech/zos/tools/client"
 	"github.com/urfave/cli"
 )
 
 var (
-	idStore identity.IDStore
-	db      network.TNoDB
+	db client.Directory
 )
 
 func main() {
@@ -44,8 +42,12 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		url := c.String("bcdb")
-		idStore = identity.NewHTTPIDStore(url)
-		db = tnodb.NewHTTPTNoDB(url)
+		cl, err := client.NewClient(url)
+		if err != nil {
+			return errors.Wrap(err, "failed to create client to bcdb")
+		}
+
+		db = cl.Directory
 
 		return nil
 	}

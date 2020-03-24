@@ -32,5 +32,5 @@ func generateVolume(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), p)
+	return writeWorkload(c.GlobalString("output"), p)
 }

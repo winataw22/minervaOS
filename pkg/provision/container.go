@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/container/logger"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -51,6 +52,8 @@ type Container struct {
 	Network Network `json:"network"`
 	// ContainerCapacity is the amount of resource to allocate to the container
 	Capacity ContainerCapacity `json:"capacity"`
+	// Logs contains a list of endpoint where to send containerlogs
+	Logs []logger.Logs `json:"logs,omitempty"`
 }
 
 // ContainerResult is the information return to the BCDB
@@ -206,6 +209,7 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			Interactive: config.Interactive,
 			CPU:         config.Capacity.CPU,
 			Memory:      config.Capacity.Memory * 1024 * 1024,
+			Logs:        config.Logs,
 		},
 	)
 	if err != nil {

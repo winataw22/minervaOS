@@ -2,12 +2,32 @@ package provision
 
 import (
 	"fmt"
+
+	"github.com/threefoldtech/zos/tools/client"
 )
 
 // ReservationGetter define the interface how to get
 // a reservation from its ID
 type ReservationGetter interface {
 	Get(id string) (*Reservation, error)
+}
+
+type reservationGetter struct {
+	wl client.Workloads
+}
+
+func (r *reservationGetter) Get(id string) (*Reservation, error) {
+	l, err := r.wl.WorkloadGet(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return WorkloadToProvisionType(l)
+}
+
+// ReservationGetterFromWorkloads get a reservation getter from the client.Workloads interface
+func ReservationGetterFromWorkloads(wl client.Workloads) ReservationGetter {
+	return &reservationGetter{wl: wl}
 }
 
 // ownerCache allows to get the user ID of owner of a reservation

@@ -228,3 +228,29 @@ func (e *Email) UnmarshalText(text []byte) error {
 
 // ID object id
 type ID int64
+
+// MacAddress type
+type MacAddress struct{ net.HardwareAddr }
+
+// MarshalText marshals MacAddress type to a string
+func (mac MacAddress) MarshalText() ([]byte, error) {
+	if mac.HardwareAddr == nil {
+		return nil, nil
+	} else if mac.HardwareAddr.String() == "" {
+		return nil, nil
+	}
+	return []byte(mac.HardwareAddr.String()), nil
+}
+
+// UnmarshalText loads a macaddress from a string
+func (mac *MacAddress) UnmarshalText(addr []byte) error {
+	if len(addr) == 0 {
+		return nil
+	}
+	addr, err := net.ParseMAC(string(addr))
+	if err != nil {
+		return err
+	}
+	mac.HardwareAddr = addr
+	return nil
+}

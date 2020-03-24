@@ -73,5 +73,5 @@ func generateKubernetes(c *cli.Context) error {
 		return errors.Wrap(err, "could not generate reservation schema")
 	}
 
-	return output(c.GlobalString("schema"), p)
+	return writeWorkload(c.GlobalString("schema"), p)
 }

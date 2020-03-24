@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/crypto"
-	"github.com/threefoldtech/zos/pkg/gedis"
-	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/urfave/cli"
 )
@@ -111,7 +110,7 @@ func cmdsProvision(c *cli.Context) error {
 		}
 	}
 
-	keypair, err := identity.LoadKeyPair(seedPath)
+	signer, err := client.NewSignerFromFile(seedPath)
 	if err != nil {
 		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}
@@ -144,7 +143,7 @@ func cmdsProvision(c *cli.Context) error {
 		}
 	}
 
-	jsx, err := gedis.ReservationToSchemaType(&reservation)
+	jsx, err := reservation.ToSchemaType()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert reservation to schema type")
 	}
@@ -158,13 +157,13 @@ func cmdsProvision(c *cli.Context) error {
 		return err
 	}
 
-	jsx.JSON = string(bytes)
-	signature, err := crypto.Sign(keypair.PrivateKey, []byte(jsx.JSON))
+	jsx.Json = string(bytes)
+	_, signature, err := signer.SignHex(jsx.Json)
 	if err != nil {
 		return errors.Wrap(err, "failed to sign the reservation")
 	}
 
-	jsx.CustomerSignature = hex.EncodeToString(signature)
+	jsx.CustomerSignature = signature
 
 	if c.Bool("dry-run") {
 		enc := json.NewEncoder(os.Stdout)
@@ -172,7 +171,7 @@ func cmdsProvision(c *cli.Context) error {
 		return enc.Encode(jsx)
 	}
 
-	id, err := client.ReserveJSX(jsx)
+	id, err := bcdb.Workloads.Create(jsx)
 	if err != nil {
 		return errors.Wrap(err, "failed to send reservation")
 	}
@@ -204,30 +203,22 @@ func cmdsDeleteReservation(c *cli.Context) error {
 		seedPath = c.String("seed")
 	)
 
-	reservation, err := client.GetJSX(resID)
+	reservation, err := bcdb.Workloads.Get(schema.ID(resID))
 	if err != nil {
 		return errors.Wrap(err, "failed to get reservation info")
 	}
 
-	keypair, err := identity.LoadKeyPair(seedPath)
+	signer, err := client.NewSignerFromFile(seedPath)
 	if err != nil {
 		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}
 
-	var buf bytes.Buffer
-	if _, err := buf.WriteString(fmt.Sprint(resID)); err != nil {
-		return err
-	}
-	if _, err := buf.Write([]byte(reservation.JSON)); err != nil {
-		return err
-	}
-
-	signature, err := crypto.Sign(keypair.PrivateKey, buf.Bytes())
+	_, signature, err := signer.SignHex(resID, reservation.Json)
 	if err != nil {
 		return errors.Wrap(err, "failed to sign the reservation")
 	}
 
-	if err := client.Delete(userID, resID, signature); err != nil {
+	if err := bcdb.Workloads.SignDelete(schema.ID(resID), schema.ID(userID), signature); err != nil {
 		return errors.Wrapf(err, "failed to sign deletion of reservation: %d", resID)
 	}
 

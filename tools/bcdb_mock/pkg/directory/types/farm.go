@@ -23,7 +23,7 @@ const (
 )
 
 //Farm mongo db wrapper for generated TfgridDirectoryFarm
-type Farm generated.TfgridDirectoryFarm1
+type Farm generated.Farm
 
 // Validate validates farm object
 func (f *Farm) Validate() error {

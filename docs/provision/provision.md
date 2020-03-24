@@ -109,6 +109,8 @@ type Container struct {
 	Network Network `json:"network"`
 	// ContainerCapacity is the amount of resource to allocate to the container
 	Capacity ContainerCapacity `json:"capacity"`
+	// Logs contains a list of endpoint where to send containerlogs
+	Logs []logger.Logs `json:"logs,omitempty"`
 }
 
 // ContainerResult is the information return to the BCDB
@@ -117,6 +119,21 @@ type ContainerResult struct {
 	ID   string `json:"id"`
 	IPv6 string `json:"ipv6"`
 	IPv4 string `json:"ipv4"`
+}
+
+//
+// Package logger
+//
+// Logs defines a custom (redis for now) backend 
+type Logs struct {
+	Type string    `json:"type"`
+	Data LogsRedis `json:"data"`
+}
+
+// LogsRedis defines how to connect a redis logs backend
+type LogsRedis struct {
+	Endpoint string `json:"endpoint"`
+	Channel  string `json:"channel"`
 }
 ```
 

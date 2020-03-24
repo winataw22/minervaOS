@@ -2,11 +2,12 @@ package phonebook
 
 import (
 	"encoding/json"
-	schema "github.com/threefoldtech/zos/pkg/schema"
 	"net"
+
+	schema "github.com/threefoldtech/zos/pkg/schema"
 )
 
-type TfgridPhonebookUser1 struct {
+type User struct {
 	ID          schema.ID `bson:"_id" json:"id"`
 	Name        string    `bson:"name" json:"name"`
 	Email       string    `bson:"email" json:"email"`
@@ -16,9 +17,9 @@ type TfgridPhonebookUser1 struct {
 	Signature   string    `bson:"signature" json:"signature"`
 }
 
-func NewTfgridPhonebookUser1() (TfgridPhonebookUser1, error) {
+func NewUser() (User, error) {
 	const value = "{}"
-	var object TfgridPhonebookUser1
+	var object User
 	if err := json.Unmarshal([]byte(value), &object); err != nil {
 		return object, err
 	}

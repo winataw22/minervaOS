@@ -7,6 +7,7 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 
+	"github.com/threefoldtech/zos/pkg/container/logger"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/urfave/cli"
 )
@@ -28,6 +29,39 @@ func generateContainer(c *cli.Context) error {
 		Memory: c.Uint64("memory"),
 	}
 
+	var logs []logger.Logs
+	if lo := c.String("stdout"); lo != "" {
+		// validating stdout argument
+		_, _, err := logger.RedisParseURL(lo)
+		if err != nil {
+			return err
+		}
+
+		// copy stdout to stderr
+		lr := lo
+
+		// check if stderr is specified
+		if nlr := c.String("stderr"); nlr != "" {
+			// validating stderr argument
+			_, _, err := logger.RedisParseURL(nlr)
+			if err != nil {
+				return nil
+			}
+
+			lr = nlr
+		}
+
+		lg := logger.Logs{
+			Type: "redis",
+			Data: logger.LogsRedis{
+				Stdout: lo,
+				Stderr: lr,
+			},
+		}
+
+		logs = append(logs, lg)
+	}
+
 	container := provision.Container{
 		FList:        c.String("flist"),
 		FlistStorage: c.String("storage"),
@@ -43,6 +77,7 @@ func generateContainer(c *cli.Context) error {
 			PublicIP6: c.Bool("public6"),
 		},
 		Capacity: cap,
+		Logs:     logs,
 	}
 
 	if err := validateContainer(container); err != nil {
@@ -54,7 +89,7 @@ func generateContainer(c *cli.Context) error {
 		return err
 	}
 
-	return output(c.GlobalString("output"), p)
+	return writeWorkload(c.GlobalString("output"), p)
 }
 
 func validateContainer(c provision.Container) error {

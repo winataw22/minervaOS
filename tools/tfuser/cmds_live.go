@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"sync"
 	"time"
 
-	generated "github.com/threefoldtech/zos/pkg/gedis/types/provision"
+	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/workloads"
+	"gopkg.in/yaml.v2"
 
-	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/urfave/cli"
 )
 
@@ -42,92 +43,113 @@ func cmdsLive(c *cli.Context) error {
 	return nil
 }
 
+type m map[string]interface{}
+
 const timeLayout = "02-Jan-2006 15:04:05"
 
-func printResult(r generated.TfgridReservation1) {
+func printResult(r workloads.Reservation) {
 	expire := r.DataReservation.ExpirationReservation
-	fmt.Printf("ID:%6d expired at:%20s", r.ID, expire.Format(timeLayout))
+	output := m{}
+	fmt.Printf("ID: %d Expires: %s\n", r.ID, expire.Format(timeLayout))
 
-	if len(r.Results) <= 0 {
-		fmt.Printf("state: not deployed yet\n")
-		return
-	}
-
-	resultPerID := make(map[int64]generated.TfgridReservationResult1, len(r.Results))
+	resultPerID := make(map[int64][]workloads.Result, len(r.Results))
 	for _, r := range r.Results {
 		var (
 			rid int64
 			wid int64
 		)
-		fmt.Sscanf(r.WorkloadID, "%d-%d", &rid, &wid)
-		resultPerID[wid] = r
+		fmt.Sscanf(r.WorkloadId, "%d-%d", &rid, &wid)
+		results := resultPerID[wid]
+		results = append(results, r)
+
+		resultPerID[wid] = results
+	}
+
+	resultData := func(in json.RawMessage) m {
+		var o m
+		if err := json.Unmarshal(in, &o); err != nil {
+			panic("invalid json")
+		}
+		return o
+	}
+
+	allResults := func(in []workloads.Result) []m {
+		var o []m
+		for _, i := range in {
+			r := resultData(i.DataJson)
+			r["node"] = i.NodeId
+			r["state"] = i.State.String()
+			o = append(o, r)
+		}
+		return o
 	}
 
 	for _, n := range r.DataReservation.Networks {
-		fmt.Printf("\tnetwork ID: %s\n", n.Name)
+		d := m{
+			"kind":    "network",
+			"name":    n.Name,
+			"results": allResults(resultPerID[n.WorkloadId]),
+		}
+
+		output[fmt.Sprintf("Workload %d", n.WorkloadId)] = d
 	}
+
 	for _, c := range r.DataReservation.Containers {
-		result := resultPerID[c.WorkloadID]
-		if result.State == generated.TfgridReservationResult1StateError {
-			fmt.Printf("\terror: %s\n", result.Message)
-			continue
+		var ips []string
+		for _, ip := range c.NetworkConnection {
+			ips = append(ips, ip.Ipaddress.String())
 		}
 
-		data := provision.Container{}
-		if err := json.Unmarshal(result.DataJSON, &data); err != nil {
-			panic(err)
+		d := m{
+			"kind":    "container",
+			"flist":   c.Flist,
+			"ip":      ips,
+			"results": allResults(resultPerID[c.WorkloadId]),
 		}
-		fmt.Printf("\tflist: %s", data.FList)
-		for _, ip := range data.Network.IPs {
-			fmt.Printf("\tIP: %s", ip)
-		}
-		fmt.Printf("\n")
+
+		output[fmt.Sprintf("Workload %d", c.WorkloadId)] = d
 	}
+
 	for _, v := range r.DataReservation.Volumes {
-		result := resultPerID[v.WorkloadID]
-		if result.State == generated.TfgridReservationResult1StateError {
-			fmt.Printf("\terror: %s\n", result.Message)
-			continue
+		d := m{
+			"kind":    "volume",
+			"size":    v.Size,
+			"type":    v.Type.String(),
+			"results": allResults(resultPerID[v.WorkloadId]),
 		}
 
-		data := provision.VolumeResult{}
-		if err := json.Unmarshal(result.DataJSON, &data); err != nil {
-			panic(err)
-		}
-		fmt.Printf("\tVolume ID: %s Size: %d Type: %s\n", data.ID, v.Size, v.Type)
+		output[fmt.Sprintf("Workload %d", v.WorkloadId)] = d
+
 	}
+
 	for _, z := range r.DataReservation.Zdbs {
-		result := resultPerID[z.WorkloadID]
-		if result.State == generated.TfgridReservationResult1StateError {
-			fmt.Printf("\terror: %s\n", result.Message)
-			continue
+		d := m{
+			"kind":    "zdb",
+			"size":    z.Size,
+			"mode":    z.Mode.String(),
+			"results": allResults(resultPerID[z.WorkloadId]),
 		}
 
-		data := provision.ZDBResult{}
-		if err := json.Unmarshal(result.DataJSON, &data); err != nil {
-			panic(err)
-		}
-		fmt.Printf("\tAddr %s:%d Namespace %s\n", data.IP, data.Port, data.Namespace)
+		output[fmt.Sprintf("Workload %d", z.WorkloadId)] = d
 	}
+
 	for _, k := range r.DataReservation.Kubernetes {
-		result := resultPerID[k.WorkloadID]
-		if result.State == generated.TfgridReservationResult1StateError {
-			fmt.Printf("\terror: %s\n", result.Message)
-			continue
+		d := m{
+			"kind":    "kubernetes",
+			"size":    k.Size,
+			"network": k.NetworkId,
+			"ip":      k.MasterIps,
+			"results": allResults(resultPerID[k.WorkloadId]),
 		}
 
-		data := provision.Kubernetes{}
-		if err := json.Unmarshal(result.DataJSON, &data); err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("\tip: %v", data.IP)
-		if data.MasterIPs == nil || len(data.MasterIPs) == 0 {
-			fmt.Print(" master\n")
-		} else {
-			fmt.Printf("\n")
-		}
+		output[fmt.Sprintf("Workload %d", k.WorkloadId)] = d
 	}
+
+	if err := yaml.NewEncoder(os.Stdout).Encode(output); err != nil {
+		log.Error().Err(err).Msg("failed to print result")
+	}
+
+	fmt.Println("-------------------------")
 }
 
 type scraper struct {
@@ -145,11 +167,11 @@ type job struct {
 	deleted bool
 }
 
-func (s *scraper) Scrap(user int64) chan generated.TfgridReservation1 {
+func (s *scraper) Scrap(user int64) chan workloads.Reservation {
 
 	var (
 		cIn  = make(chan job)
-		cOut = make(chan generated.TfgridReservation1)
+		cOut = make(chan workloads.Reservation)
 	)
 
 	s.wg.Add(s.poolSize)
@@ -178,7 +200,7 @@ func (s *scraper) Scrap(user int64) chan generated.TfgridReservation1 {
 	return cOut
 }
 
-func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- generated.TfgridReservation1) {
+func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- workloads.Reservation) {
 	defer func() {
 		wg.Done()
 	}()
@@ -197,7 +219,7 @@ func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- generated.TfgridRese
 			continue
 		}
 		// FIXME: beurk
-		if !job.deleted && len(res.Results) > 0 && res.Results[0].State == generated.TfgridReservationResult1StateDeleted {
+		if !job.deleted && len(res.Results) > 0 && res.Results[0].State == workloads.ResultStateDeleted {
 			continue
 		}
 		if res.CustomerTid != job.user {
@@ -207,26 +229,6 @@ func worker(wg *sync.WaitGroup, cIn <-chan job, cOut chan<- generated.TfgridRese
 	}
 }
 
-func getResult(id int) (res generated.TfgridReservation1, err error) {
-	url := fmt.Sprintf("https://explorer.devnet.grid.tf/reservations/%d", id)
-	resp, err := http.Get(url)
-	if err != nil {
-		return res, err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return res, os.ErrNotExist
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return res, fmt.Errorf("wrong status code %s", resp.Status)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return res, err
-	}
-
-	return res, nil
+func getResult(id int) (res workloads.Reservation, err error) {
+	return bcdb.Workloads.Get(schema.ID(id))
 }
