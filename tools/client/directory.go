@@ -8,7 +8,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/schema"
-	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 )
 
 type httpDirectory struct {
@@ -24,13 +24,15 @@ func (d *httpDirectory) FarmRegister(farm directory.Farm) (schema.ID, error) {
 	return output.ID, err
 }
 
-func (d *httpDirectory) FarmList(tid schema.ID, page *Pager) (farms []directory.Farm, err error) {
+func (d *httpDirectory) FarmList(tid schema.ID, name string, page *Pager) (farms []directory.Farm, err error) {
 	query := url.Values{}
 	page.apply(query)
 	if tid > 0 {
 		query.Set("owner", fmt.Sprint(tid))
 	}
-
+	if len(name) != 0 {
+		query.Set("name", name)
+	}
 	err = d.get(d.url("farms"), query, &farms, http.StatusOK)
 	return
 }

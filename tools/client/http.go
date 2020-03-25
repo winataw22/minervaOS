@@ -10,10 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-)
-
-const (
-	httpContentType = "application/json"
+	"github.com/threefoldtech/zos/pkg/identity"
+	"github.com/zaibon/httpsig"
 )
 
 var (
@@ -24,17 +22,26 @@ var (
 )
 
 type httpClient struct {
-	u  *url.URL
-	cl http.Client
+	u        *url.URL
+	cl       http.Client
+	signer   *httpsig.Signer
+	identity string
 }
 
-func newHTTPClient(raw string) (*httpClient, error) {
+func newHTTPClient(raw string, kp identity.KeyPair) (*httpClient, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid url")
 	}
 
-	return &httpClient{u: u}, nil
+	id := kp.Identity()
+	signer := httpsig.NewSigner(id, kp.PrivateKey, httpsig.Ed25519, []string{"(created)", "date", "threebot-id"})
+
+	return &httpClient{
+		u:        u,
+		signer:   signer,
+		identity: id,
+	}, nil
 }
 
 func (c *httpClient) url(p ...string) string {
@@ -42,6 +49,11 @@ func (c *httpClient) url(p ...string) string {
 	b.Path = filepath.Join(b.Path, filepath.Join(p...))
 
 	return b.String()
+}
+
+func (c *httpClient) sign(r *http.Request) error {
+	r.Header.Set(http.CanonicalHeaderKey("threebot-id"), c.identity)
+	return c.signer.Sign(r)
 }
 
 func (c *httpClient) process(response *http.Response, output interface{}, expect ...int) error {
@@ -92,7 +104,16 @@ func (c *httpClient) post(u string, input interface{}, output interface{}, expec
 		return errors.Wrap(err, "failed to serialize request body")
 	}
 
-	response, err := c.cl.Post(u, httpContentType, &buf)
+	req, err := http.NewRequest(http.MethodPost, u, &buf)
+	if err != nil {
+		return errors.Wrap(err, "failed to create new HTTP request")
+	}
+
+	if err := c.sign(req); err != nil {
+		return errors.Wrap(err, "failed to sign HTTP request")
+	}
+
+	response, err := c.cl.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to send request")
 	}
@@ -109,6 +130,11 @@ func (c *httpClient) put(u string, input interface{}, output interface{}, expect
 	if err != nil {
 		return errors.Wrap(err, "failed to build request")
 	}
+
+	if err := c.sign(req); err != nil {
+		return errors.Wrap(err, "failed to sign HTTP request")
+	}
+
 	response, err := c.cl.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to send request")
@@ -122,7 +148,16 @@ func (c *httpClient) get(u string, query url.Values, output interface{}, expect 
 		u = fmt.Sprintf("%s?%s", u, query.Encode())
 	}
 
-	response, err := c.cl.Get(u)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create new HTTP request")
+	}
+
+	if err := c.sign(req); err != nil {
+		return errors.Wrap(err, "failed to sign HTTP request")
+	}
+
+	response, err := c.cl.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to send request")
 	}
@@ -138,6 +173,11 @@ func (c *httpClient) delete(u string, query url.Values, output interface{}, expe
 	if err != nil {
 		return errors.Wrap(err, "failed to build request")
 	}
+
+	if err := c.sign(req); err != nil {
+		return errors.Wrap(err, "failed to sign HTTP request")
+	}
+
 	response, err := c.cl.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "failed to send request")

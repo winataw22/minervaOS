@@ -12,7 +12,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/pkg/versioned"
-	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/workloads"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
 )
 
 // ReservationType type

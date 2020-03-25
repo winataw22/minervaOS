@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/tools/client"
 
 	"os"
@@ -32,6 +33,13 @@ func main() {
 			Value:  "https://explorer.devnet.grid.tf",
 			EnvVar: "BCDB_URL",
 		},
+
+		cli.StringFlag{
+			Name:     "seed",
+			Usage:    "path to the file container the seed of the user private key",
+			EnvVar:   "SEED_PATH",
+			Required: true,
+		},
 	}
 	app.Before = func(c *cli.Context) error {
 		debug := c.Bool("debug")
@@ -41,7 +49,7 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		var err error
-		bcdb, err = getClient(c.String("bcdb"))
+		bcdb, err = getClient(c.String("bcdb"), c.String("seed"))
 		if err != nil {
 			return err
 		}
@@ -458,6 +466,10 @@ func main() {
 	}
 }
 
-func getClient(addr string) (*client.Client, error) {
-	return client.NewClient(addr)
+func getClient(addr, path string) (*client.Client, error) {
+	kp, err := identity.LoadKeyPair(path)
+	if err != nil {
+		return nil, err
+	}
+	return client.NewClient(addr, kp)
 }

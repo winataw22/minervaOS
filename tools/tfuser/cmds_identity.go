@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/identity"
-	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/phonebook"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/phonebook"
 	"github.com/urfave/cli"
 )
 
