@@ -7,7 +7,6 @@ import (
 
 	"os"
 
-	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/tools/client"
 	"github.com/urfave/cli"
 )
@@ -42,13 +41,8 @@ func main() {
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-		kp, err := identity.LoadKeyPair("user.seed")
-		if err != nil {
-			return err
-		}
-
 		url := c.String("bcdb")
-		cl, err := client.NewClient(url, kp)
+		cl, err := client.NewClient(url)
 		if err != nil {
 			return errors.Wrap(err, "failed to create client to bcdb")
 		}

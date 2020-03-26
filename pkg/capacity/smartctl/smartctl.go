@@ -1,7 +1,6 @@
 package smartctl
 
 import (
-	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -11,9 +10,6 @@ import (
 var reScan = regexp.MustCompile(`(?m)^([^\s]+)\s+-d\s+([^\s]+)\s+#`)
 var reHeader = regexp.MustCompile(`(?m)([^\[]+)\[([^\[]+)\]`)
 var reInfo = regexp.MustCompile(`(?m)([^:]+):\s+(.+)`)
-
-// ErrEmpty is return when smatctl doesn't find any device
-var ErrEmpty = errors.New("smartctl returned an empty response")
 
 // Device represents a device as returned by "smartctl --scan"
 type Device struct {
@@ -27,10 +23,6 @@ func ListDevices() ([]Device, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
-	}
-
-	if len(output) == 0 {
-		return nil, ErrEmpty
 	}
 
 	return parseScan(output)

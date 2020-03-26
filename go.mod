@@ -18,7 +18,6 @@ require (
 	github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd // indirect
 	github.com/containernetworking/cni v0.7.2-0.20190807151350-8c6c47d1c7fc
 	github.com/containernetworking/plugins v0.8.4
-	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/dave/jennifer v1.3.0
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -55,20 +54,20 @@ require (
 	github.com/rs/zerolog v1.18.0
 	github.com/shirou/gopsutil v2.19.11+incompatible
 	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
 	github.com/threefoldtech/zbus v0.1.3
-	github.com/urfave/cli v1.22.3
+	github.com/urfave/cli v1.22.1
 	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
 	github.com/xdg/stringprep v1.0.0 // indirect
-	github.com/zaibon/httpsig v0.0.0-20200330100750-92f51d8ee3ec
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.mongodb.org/mongo-driver v1.3.0
-	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d
+	golang.org/x/crypto v0.0.0-20200109152110-61a87790db17
+	golang.org/x/net v0.0.0-20200202094626-16171245cfb2 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20191219145116-fa6499c8e75f
