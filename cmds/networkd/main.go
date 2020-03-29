@@ -8,12 +8,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
-	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
@@ -188,14 +186,10 @@ func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, cl client.Direct
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (client.Directory, error) {
-	env, err := environment.Get()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse node environment")
-	}
-
-	cl, err := client.NewClient(env.BcdbURL)
+	client, err := app.ExplorerClient()
 	if err != nil {
 		return nil, err
 	}
-	return cl.Directory, nil
+
+	return client.Directory, nil
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
-	"github.com/threefoldtech/zos/tools/bcdb_mock/models/generated/directory"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/cenkalti/backoff/v3"
@@ -440,17 +440,12 @@ func identityMgr(root string) (pkg.IdentityManager, error) {
 
 // instantiate the proper client based on the running mode
 func bcdbClient() (client.Directory, error) {
-	env, err := environment.Get()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse node environment")
-	}
-
-	cl, err := client.NewClient(env.BcdbURL)
+	client, err := app.ExplorerClient()
 	if err != nil {
 		return nil, err
 	}
 
-	return cl.Directory, nil
+	return client.Directory, nil
 }
 
 func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, store client.Directory, loc geoip.Location) error {
