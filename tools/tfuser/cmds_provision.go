@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stellar/go/xdr"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/crypto"
 	"github.com/threefoldtech/zos/pkg/provision"
@@ -90,9 +92,10 @@ func cmdsProvision(c *cli.Context) error {
 	var (
 		schema   []byte
 		path     = c.String("schema")
-		seedPath = c.String("seed")
+		seedPath = mainSeed
 		d        = c.String("duration")
-		userID   = c.Int64("id")
+		assets   = c.StringSlice("asset")
+		userID   = int64(mainui.ThreebotID)
 		duration time.Duration
 		err      error
 	)
@@ -110,7 +113,7 @@ func cmdsProvision(c *cli.Context) error {
 		}
 	}
 
-	signer, err := client.NewSignerFromFile(seedPath)
+	signer, err := client.NewSigner(mainui.Key().PrivateKey.Seed())
 	if err != nil {
 		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}
@@ -152,6 +155,9 @@ func cmdsProvision(c *cli.Context) error {
 	jsx.DataReservation.SigningRequestDelete.QuorumMin = 1
 	jsx.DataReservation.SigningRequestDelete.Signers = []int64{userID}
 
+	// set allowed the currencies as provided by the user
+	jsx.DataReservation.Currencies = assets
+
 	bytes, err := json.Marshal(jsx.DataReservation)
 	if err != nil {
 		return err
@@ -171,15 +177,37 @@ func cmdsProvision(c *cli.Context) error {
 		return enc.Encode(jsx)
 	}
 
-	id, err := bcdb.Workloads.Create(jsx)
+	response, err := bcdb.Workloads.Create(jsx)
 	if err != nil {
 		return errors.Wrap(err, "failed to send reservation")
 	}
 
+	totalAmount := xdr.Int64(0)
+	for _, detail := range response.EscrowInformation.Details {
+		totalAmount += detail.TotalAmount
+	}
+
 	fmt.Printf("Reservation for %v send to node bcdb\n", duration)
-	fmt.Printf("Resource: /reservations/%v\n", id)
+	fmt.Printf("Resource: /reservations/%v\n", response.ID)
+	fmt.Println()
+
+	fmt.Printf("Reservation id: %d \n", response.ID)
+	fmt.Printf("Asset to pay: %s\n", response.EscrowInformation.Asset)
+	fmt.Printf("Reservation escrow address: %s \n", response.EscrowInformation.Address)
+	fmt.Printf("Reservation amount: %s %s\n", formatCurrency(totalAmount), response.EscrowInformation.Asset.Code())
+
+	for _, detail := range response.EscrowInformation.Details {
+		fmt.Println()
+		fmt.Printf("FarmerID: %v\n", detail.FarmerID)
+		fmt.Printf("Amount: %s\n", formatCurrency(detail.TotalAmount))
+	}
 
 	return nil
+}
+
+func formatCurrency(amount xdr.Int64) string {
+	currency := big.NewRat(int64(amount), 1e7)
+	return currency.FloatString(7)
 }
 
 func embed(schema interface{}, t provision.ReservationType, node string) (*provision.Reservation, error) {
@@ -198,9 +226,9 @@ func embed(schema interface{}, t provision.ReservationType, node string) (*provi
 
 func cmdsDeleteReservation(c *cli.Context) error {
 	var (
-		resID    = c.Int64("reservation")
-		userID   = c.Int64("id")
-		seedPath = c.String("seed")
+		resID  = c.Int64("reservation")
+		userID = mainui.ThreebotID
+		//seedPath = c.GlobalString("seed")
 	)
 
 	reservation, err := bcdb.Workloads.Get(schema.ID(resID))
@@ -208,9 +236,9 @@ func cmdsDeleteReservation(c *cli.Context) error {
 		return errors.Wrap(err, "failed to get reservation info")
 	}
 
-	signer, err := client.NewSignerFromFile(seedPath)
+	signer, err := client.NewSigner(mainui.Key().PrivateKey.Seed())
 	if err != nil {
-		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
+		return errors.Wrapf(err, "failed to load signer")
 	}
 
 	_, signature, err := signer.SignHex(resID, reservation.Json)

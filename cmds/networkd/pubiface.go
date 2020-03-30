@@ -42,7 +42,7 @@ func watchPubIface(ctx context.Context, nodeID pkg.Identifier, dir client.Direct
 
 		for {
 			select {
-			case <-time.After(time.Second * 10):
+			case <-time.After(time.Minute * 10):
 			case <-ctx.Done():
 				break
 			}

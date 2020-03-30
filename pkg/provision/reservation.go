@@ -10,6 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/container/logger"
+	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/pkg/versioned"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
@@ -265,6 +267,8 @@ func containerReservation(i interface{}, nodeID string) workloads.Container {
 		Entrypoint:        c.Entrypoint,
 		Interactive:       c.Interactive,
 		Volumes:           make([]workloads.ContainerMount, len(c.Mounts)),
+		StatsAggregator:   make([]workloads.StatsAggregator, len(c.StatsAggregator)),
+		Logs:              make([]workloads.Logs, len(c.Logs)),
 		NetworkConnection: []workloads.NetworkConnection{
 			{
 				NetworkId: string(c.Network.NetworkID),
@@ -284,6 +288,44 @@ func containerReservation(i interface{}, nodeID string) workloads.Container {
 			Mountpoint: v.Mountpoint,
 		}
 	}
+
+	for i, l := range c.Logs {
+		if l.Type != logger.RedisType {
+			container.Logs[i] = workloads.Logs{
+				Type: "unknown",
+				Data: workloads.LogsRedis{},
+			}
+
+			continue
+		}
+
+		container.Logs[i] = workloads.Logs{
+			Type: l.Type,
+			Data: workloads.LogsRedis{
+				Stdout: l.Data.Stdout,
+				Stderr: l.Data.Stderr,
+			},
+		}
+	}
+
+	for i, s := range c.StatsAggregator {
+		if s.Type != stats.RedisType {
+			container.StatsAggregator[i] = workloads.StatsAggregator{
+				Type: "unknown",
+				Data: workloads.StatsRedis{},
+			}
+
+			continue
+		}
+
+		container.StatsAggregator[i] = workloads.StatsAggregator{
+			Type: s.Type,
+			Data: workloads.StatsRedis{
+				Endpoint: s.Data.Endpoint,
+			},
+		}
+	}
+
 	return container
 }
 

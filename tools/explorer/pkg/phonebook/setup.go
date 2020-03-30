@@ -19,11 +19,11 @@ func Setup(parent *mux.Router, db *mongo.Database) error {
 	var userAPI UserAPI
 	users := parent.PathPrefix("/users").Subrouter()
 
-	users.HandleFunc("", mw.AsHandlerFunc(userAPI.create)).Methods(http.MethodPost)
-	users.HandleFunc("", mw.AsHandlerFunc(userAPI.list)).Methods(http.MethodGet)
-	users.HandleFunc("/{user_id}", mw.AsHandlerFunc(userAPI.register)).Methods(http.MethodPut)
-	users.HandleFunc("/{user_id}", mw.AsHandlerFunc(userAPI.get)).Methods(http.MethodGet)
-	users.HandleFunc("/{user_id}/validate", mw.AsHandlerFunc(userAPI.validate)).Methods(http.MethodPost)
+	users.HandleFunc("", mw.AsHandlerFunc(userAPI.create)).Methods(http.MethodPost).Name("user-create")
+	users.HandleFunc("", mw.AsHandlerFunc(userAPI.list)).Methods(http.MethodGet).Name(("user-list"))
+	users.HandleFunc("/{user_id}", mw.AsHandlerFunc(userAPI.register)).Methods(http.MethodPut).Name("user-register")
+	users.HandleFunc("/{user_id}", mw.AsHandlerFunc(userAPI.get)).Methods(http.MethodGet).Name("user-get")
+	users.HandleFunc("/{user_id}/validate", mw.AsHandlerFunc(userAPI.validate)).Methods(http.MethodPost).Name("user-validate")
 
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -34,6 +35,19 @@ var (
 // User type
 type User generated.User
 
+// Validate makes the sanity check requires for the user type
+func (u User) Validate() error {
+	if strings.ToLower(u.Name) != u.Name {
+		return fmt.Errorf("name should be all lower case")
+	}
+
+	if len(u.Name) < 3 {
+		return fmt.Errorf("name should be at least 3 character")
+	}
+
+	return nil
+}
+
 // Encode user data for signing
 func (u *User) Encode() []byte {
 	var buf bytes.Buffer
@@ -44,9 +58,7 @@ func (u *User) Encode() []byte {
 	buf.WriteString(fmt.Sprint(int64(u.ID)))
 	buf.WriteString(u.Name)
 	buf.WriteString(u.Email)
-	if len(u.Ipaddr) > 0 {
-		buf.WriteString(u.Ipaddr.String())
-	}
+	buf.WriteString(u.Host)
 	buf.WriteString(u.Description)
 	buf.WriteString(u.Pubkey)
 
@@ -120,7 +132,7 @@ func UserCreate(ctx context.Context, db *mongo.Database, name, email, pubkey str
 	}
 
 	if _, err := crypto.KeyFromHex(pubkey); err != nil {
-		return user, errors.Wrap(err, "invalid public key")
+		return user, errors.Wrapf(err, "invalid public key %s", pubkey)
 	}
 
 	var filter UserFilter
@@ -210,8 +222,8 @@ func UserUpdate(ctx context.Context, db *mongo.Database, id schema.ID, signature
 		current.Description = update.Description
 	}
 
-	if len(update.Ipaddr) != 0 {
-		current.Ipaddr = update.Ipaddr
+	if len(update.Host) != 0 {
+		current.Host = update.Host
 	}
 
 	// actually update the user with final data

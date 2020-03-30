@@ -33,7 +33,7 @@ func Test_processZDB(t *testing.T) {
 				},
 			},
 			want: resourceUnits{
-				SRU: 1,
+				SRU: 1 * gib,
 			},
 			wantErr: false,
 		},
@@ -49,7 +49,7 @@ func Test_processZDB(t *testing.T) {
 				},
 			},
 			want: resourceUnits{
-				HRU: 1,
+				HRU: 1 * gib,
 			},
 			wantErr: false,
 		},
@@ -89,7 +89,7 @@ func Test_processVolume(t *testing.T) {
 				},
 			},
 			wantU: resourceUnits{
-				SRU: 1,
+				SRU: 1 * gib,
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func Test_processVolume(t *testing.T) {
 				},
 			},
 			wantU: resourceUnits{
-				HRU: 1,
+				HRU: 1 * gib,
 			},
 		},
 	}
@@ -146,7 +146,8 @@ func Test_processContainer(t *testing.T) {
 			},
 			wantU: resourceUnits{
 				CRU: 2,
-				MRU: 1,
+				MRU: 1 * gib,
+				SRU: 256 * mib,
 			},
 		},
 		{
@@ -157,14 +158,15 @@ func Test_processContainer(t *testing.T) {
 					Data: mustMarshalJSON(t, Container{
 						Capacity: ContainerCapacity{
 							CPU:    2,
-							Memory: 2000,
+							Memory: 2048,
 						},
 					}),
 				},
 			},
 			wantU: resourceUnits{
 				CRU: 2,
-				MRU: 2,
+				MRU: 2 * gib,
+				SRU: 256 * mib,
 			},
 		},
 	}
@@ -203,8 +205,8 @@ func Test_processKubernetes(t *testing.T) {
 			},
 			wantU: resourceUnits{
 				CRU: 1,
-				MRU: 2,
-				SRU: 50,
+				MRU: 2 * gib,
+				SRU: 50 * gib,
 			},
 		},
 		{
@@ -219,8 +221,8 @@ func Test_processKubernetes(t *testing.T) {
 			},
 			wantU: resourceUnits{
 				CRU: 2,
-				MRU: 4,
-				SRU: 100,
+				MRU: 4 * gib,
+				SRU: 100 * gib,
 			},
 		},
 	}

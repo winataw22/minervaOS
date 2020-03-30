@@ -52,9 +52,13 @@ func (s *FarmAPI) GetByID(ctx context.Context, db *mongo.Database, id int64) (di
 }
 
 // Add add farm to store
-// TODO: support update farm information ?
 func (s *FarmAPI) Add(ctx context.Context, db *mongo.Database, farm directory.Farm) (schema.ID, error) {
 	return directory.FarmCreate(ctx, db, farm)
+}
+
+// Update farm information
+func (s *FarmAPI) Update(ctx context.Context, db *mongo.Database, id schema.ID, farm directory.Farm) error {
+	return directory.FarmUpdate(ctx, db, id, farm)
 }
 
 // Delete deletes a farm by ID

@@ -25,15 +25,10 @@ try to provision the workload and report the result to the BCDB.
 
 Check the [provision.md](provision.md) file to see the expected reservation schema for each type of workload
 
-## Provisioning diagram
+## Provisioning flows
 
-![process](../../assets/grid_provisioning2.png)
+See the [IT contract documentation](it_contract.md)
 
-## Actors
+## Payment of the reservations
 
-- **User 3bot**: digital avatar of a user. This is the one buying capacity on the grid.
-- **Farmer 3bot**: digital avatar of a farmer. It owns some node in the grid and is responsible to set the price of its node capacity.
-- **TF Directory**: Public directory listing all the nodes/farmers in the grid
-- **TFChain**: money blockchain, money transaction are executed on this chain using ThreefoldToken (TFT).
-- **BCDB**: blockchain database  used to store capacity reservations.
-- **Node**: Hardware running 0-OS and responsible to provide capacity to the TFGrid.
+See the [reservation payment documentation](reservation_payment.md)

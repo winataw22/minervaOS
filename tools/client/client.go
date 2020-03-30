@@ -1,16 +1,17 @@
 package client
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"net/url"
 
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
-	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/phonebook"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
+	wrklds "github.com/threefoldtech/zos/tools/explorer/pkg/workloads"
 )
 
 // Client structure
@@ -23,7 +24,7 @@ type Client struct {
 // Directory API interface
 type Directory interface {
 	FarmRegister(farm directory.Farm) (schema.ID, error)
-	FarmList(tid schema.ID, page *Pager) (farms []directory.Farm, err error)
+	FarmList(tid schema.ID, name string, page *Pager) (farms []directory.Farm, err error)
 	FarmGet(id schema.ID) (farm directory.Farm, err error)
 
 	NodeRegister(node directory.Node) error
@@ -45,7 +46,7 @@ type Directory interface {
 	) error
 
 	NodeUpdateUptime(id string, uptime uint64) error
-	NodeUpdateUsedResources(id string, amount directory.ResourceAmount) error
+	NodeUpdateUsedResources(id string, resources directory.ResourceAmount, workloads directory.WorkloadAmount) error
 }
 
 // Phonebook interface
@@ -59,8 +60,8 @@ type Phonebook interface {
 
 // Workloads interface
 type Workloads interface {
-	Create(reservation workloads.Reservation) (id schema.ID, err error)
-	List(page *Pager) (reservation []workloads.Reservation, err error)
+	Create(reservation workloads.Reservation) (resp wrklds.ReservationCreateResponse, err error)
+	List(nextAction *workloads.NextActionEnum, customerTid int64, page *Pager) (reservation []workloads.Reservation, err error)
 	Get(id schema.ID) (reservation workloads.Reservation, err error)
 
 	SignProvision(id schema.ID, user schema.ID, signature string) error
@@ -70,6 +71,14 @@ type Workloads interface {
 	WorkloadGet(gwid string) (result workloads.ReservationWorkload, err error)
 	WorkloadPutResult(nodeID, gwid string, result workloads.Result) error
 	WorkloadPutDeleted(nodeID, gwid string) error
+}
+
+// Identity is used by the client to authenticate to the explorer API
+type Identity interface {
+	// The unique ID as known by the explorer
+	Identity() string
+	// PrivateKey used to sign the requests
+	PrivateKey() ed25519.PrivateKey
 }
 
 // Pager for listing
@@ -100,9 +109,10 @@ func Page(page, size int) *Pager {
 	return &Pager{p: page, s: size}
 }
 
-// NewClient creates a new client
-func NewClient(u string, kp identity.KeyPair) (*Client, error) {
-	h, err := newHTTPClient(u, kp)
+// NewClient creates a new client, if identity is not nil, it will be used
+// to authenticate requests against the server
+func NewClient(u string, id Identity) (*Client, error) {
+	h, err := newHTTPClient(u, id)
 	if err != nil {
 		return nil, err
 	}

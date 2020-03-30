@@ -12,7 +12,7 @@ type Farm struct {
 	ThreebotId      int64               `bson:"threebot_id" json:"threebot_id"`
 	IyoOrganization string              `bson:"iyo_organization" json:"iyo_organization"`
 	Name            string              `bson:"name" json:"name"`
-	WalletAddresses []string            `bson:"wallet_addresses" json:"wallet_addresses"`
+	WalletAddresses []WalletAddress     `bson:"wallet_addresses" json:"wallet_addresses"`
 	Location        Location            `bson:"location" json:"location"`
 	Email           schema.Email        `bson:"email" json:"email"`
 	ResourcePrices  []NodeResourcePrice `bson:"resource_prices" json:"resource_prices"`
@@ -26,6 +26,11 @@ func NewFarm() (Farm, error) {
 		return object, err
 	}
 	return object, nil
+}
+
+type WalletAddress struct {
+	Asset   string `bson:"asset" json:"asset"`
+	Address string `bson:"address" json:"address"`
 }
 
 type NodeResourcePrice struct {
@@ -77,10 +82,11 @@ type Node struct {
 	TotalResources    ResourceAmount `bson:"total_resources" json:"total_resources"`
 	UsedResources     ResourceAmount `bson:"used_resources" json:"used_resources"`
 	ReservedResources ResourceAmount `bson:"reserved_resources" json:"reserved_resources"`
+	Workloads         WorkloadAmount `bson:"workloads" json:"workloads"`
 	Proofs            []Proof        `bson:"proofs" json:"proofs"`
 	Ifaces            []Iface        `bson:"ifaces" json:"ifaces"`
 	PublicConfig      *PublicIface   `bson:"public_config,omitempty" json:"public_config"`
-	ExitNode          bool           `bson:"exit_node" json:"exit_node"`
+	FreeToUse         bool           `bson:"free_to_use" json:"free_to_use"`
 	Approved          bool           `bson:"approved" json:"approved"`
 	PublicKeyHex      string         `bson:"public_key_hex" json:"public_key_hex"`
 	WgPorts           []int64        `bson:"wg_ports" json:"wg_ports"`
@@ -131,15 +137,32 @@ func NewPublicIface() (PublicIface, error) {
 }
 
 type ResourceAmount struct {
-	Cru int64 `bson:"cru" json:"cru"`
-	Mru int64 `bson:"mru" json:"mru"`
-	Hru int64 `bson:"hru" json:"hru"`
-	Sru int64 `bson:"sru" json:"sru"`
+	Cru uint64  `bson:"cru" json:"cru"`
+	Mru float64 `bson:"mru" json:"mru"`
+	Hru float64 `bson:"hru" json:"hru"`
+	Sru float64 `bson:"sru" json:"sru"`
 }
 
 func NewResourceAmount() (ResourceAmount, error) {
 	const value = "{}"
 	var object ResourceAmount
+	if err := json.Unmarshal([]byte(value), &object); err != nil {
+		return object, err
+	}
+	return object, nil
+}
+
+type WorkloadAmount struct {
+	Network      uint16 `bson:"network" json:"network"`
+	Volume       uint16 `bson:"volume" json:"volume"`
+	ZDBNamespace uint16 `bson:"zdb_namespace" json:"zdb_namespace"`
+	Container    uint16 `bson:"container" json:"container"`
+	K8sVM        uint16 `bson:"k8s_vm" json:"k8s_vm"`
+}
+
+func NewWorkloadAmount() (WorkloadAmount, error) {
+	const value = "{}"
+	var object WorkloadAmount
 	if err := json.Unmarshal([]byte(value), &object); err != nil {
 		return object, err
 	}

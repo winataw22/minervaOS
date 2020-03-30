@@ -14,18 +14,73 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/explorer/config"
 	"github.com/threefoldtech/zos/tools/explorer/models"
 	generated "github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
 	"github.com/threefoldtech/zos/tools/explorer/mw"
+	directory "github.com/threefoldtech/zos/tools/explorer/pkg/directory/types"
+	"github.com/threefoldtech/zos/tools/explorer/pkg/escrow"
+	escrowtypes "github.com/threefoldtech/zos/tools/explorer/pkg/escrow/types"
 	phonebook "github.com/threefoldtech/zos/tools/explorer/pkg/phonebook/types"
+	"github.com/threefoldtech/zos/tools/explorer/pkg/stellar"
 	"github.com/threefoldtech/zos/tools/explorer/pkg/workloads/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// API struct
-type API struct{}
+type (
+	// API struct
+	API struct {
+		escrow escrow.Escrow
+	}
+
+	// ReservationCreateResponse wraps reservation create response
+	ReservationCreateResponse struct {
+		ID                schema.ID                             `json:"reservation_id"`
+		EscrowInformation escrowtypes.CustomerEscrowInformation `json:"escrow_information"`
+	}
+)
+
+// freeTFT currency code
+const freeTFT = "FreeTFT"
+
+func (a *API) validAddresses(ctx context.Context, db *mongo.Database, res *types.Reservation) error {
+	if config.Config.Network == "" {
+		log.Info().Msg("escrow disabled, no validation of farmer wallet address needed")
+		return nil
+	}
+
+	workloads := res.Workloads("")
+	var nodes []string
+
+	for _, wl := range workloads {
+		nodes = append(nodes, wl.NodeID)
+	}
+
+	farms, err := directory.FarmsForNodes(ctx, db, nodes...)
+	if err != nil {
+		return err
+	}
+
+	for _, farm := range farms {
+		for _, a := range farm.WalletAddresses {
+			validator, err := stellar.NewAddressValidator(config.Config.Network, a.Asset)
+			if err != nil {
+				if errors.Is(err, stellar.ErrAssetCodeNotSupported) {
+					continue
+				}
+				return errors.Wrap(err, "could not initialize address validator")
+			}
+			if err := validator.Valid(a.Address); err != nil {
+				return err
+			}
+		}
+
+	}
+
+	return nil
+}
 
 func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 	defer r.Body.Close()
@@ -58,6 +113,49 @@ func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 	}
 
 	db := mw.Database(r)
+
+	if err := a.validAddresses(r.Context(), db, &reservation); err != nil {
+		return nil, mw.Error(err, http.StatusFailedDependency) //FIXME: what is this strange status ?
+	}
+
+	usedNodes := reservation.NodeIDs()
+	var freeNodes, paidNodes int
+	for _, nodeID := range usedNodes {
+		node, err := directory.NodeFilter{}.WithNodeID(nodeID).Get(r.Context(), db, false)
+		if err != nil {
+			return nil, mw.Error(err, http.StatusInternalServerError)
+		}
+		if node.FreeToUse {
+			freeNodes++
+		} else {
+			paidNodes++
+		}
+	}
+
+	// don't allow mixed nodes
+	if freeNodes > 0 && paidNodes > 0 {
+		return nil, mw.Error(errors.New("reservation can only contain either free nodes or paid nodes, not both"), http.StatusBadRequest)
+	}
+
+	currencies := []string{}
+	// filter out FreeTFT if its a paid reservation
+	if paidNodes > 0 {
+		for _, c := range reservation.DataReservation.Currencies {
+			if c != freeTFT {
+				currencies = append(currencies, c)
+			}
+		}
+	}
+
+	// filter out anything but FreeTFT for a free reservation
+	if freeNodes > 0 {
+		for _, c := range reservation.DataReservation.Currencies {
+			if c == freeTFT {
+				currencies = append(currencies, c)
+			}
+		}
+	}
+
 	var filter phonebook.UserFilter
 	filter = filter.WithID(schema.ID(reservation.CustomerTid))
 	user, err := filter.Get(r.Context(), db)
@@ -81,7 +179,20 @@ func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Error(err)
 	}
 
-	return id, mw.Created()
+	reservation, err = types.ReservationFilter{}.WithID(id).Get(r.Context(), db)
+	if err != nil {
+		return nil, mw.Error(err)
+	}
+
+	escrowDetails, err := a.escrow.RegisterReservation(generated.Reservation(reservation), currencies)
+	if err != nil {
+		return nil, mw.Error(err)
+	}
+
+	return ReservationCreateResponse{
+		ID:                reservation.ID,
+		EscrowInformation: escrowDetails,
+	}, mw.Created()
 }
 
 func (a *API) parseID(id string) (schema.ID, error) {
@@ -126,11 +237,10 @@ func (a *API) get(r *http.Request) (interface{}, mw.Response) {
 
 func (a *API) list(r *http.Request) (interface{}, mw.Response) {
 	var filter types.ReservationFilter
-	q := types.ReservationQuery{}
-	if err := q.Parse(r); err != nil {
-		return nil, err
+	filter, err := types.ApplyQueryFilter(r, filter)
+	if err != nil {
+		return nil, mw.BadRequest(err)
 	}
-	filter = filter.WithReservationQuery(q)
 
 	db := mw.Database(r)
 	pager := models.PageFromRequest(r)
@@ -310,8 +420,14 @@ func (a *API) workloads(r *http.Request) (interface{}, mw.Response) {
 			continue
 		}
 
+		if reservation.NextAction == types.Delete {
+			if err := a.setReservationDeleted(r.Context(), db, reservation.ID); err != nil {
+				return nil, mw.Error(err)
+			}
+		}
+
 		// only reservations that is in right status
-		if !reservation.IsAny(types.Deploy) {
+		if !reservation.IsAny(types.Deploy, types.Delete) {
 			continue
 		}
 
@@ -424,6 +540,23 @@ func (a *API) workloadPutResult(r *http.Request) (interface{}, mw.Response) {
 
 	if err := types.WorkloadPop(r.Context(), db, gwid); err != nil {
 		return nil, mw.Error(err)
+	}
+
+	if result.State == generated.ResultStateError {
+		if err := a.setReservationDeleted(r.Context(), db, rid); err != nil {
+			return nil, mw.Error(err)
+		}
+	} else if result.State == generated.ResultStateOK {
+		// check if entire reservation is deployed successfully
+		// fetch reservation from db again to have result appended in the model
+		reservation, err = a.pipeline(filter.Get(r.Context(), db))
+		if err != nil {
+			return nil, mw.NotFound(err)
+		}
+
+		if reservation.IsSuccessfullyDeployed() {
+			a.escrow.ReservationDeployed(rid)
+		}
 	}
 
 	return nil, mw.Created()
@@ -641,7 +774,7 @@ func (a *API) signDelete(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Created()
 	}
 
-	if err := types.ReservationSetNextAction(r.Context(), db, reservation.ID, generated.NextActionDelete); err != nil {
+	if err := a.setReservationDeleted(r.Context(), db, reservation.ID); err != nil {
 		return nil, mw.Error(err)
 	}
 
@@ -650,4 +783,10 @@ func (a *API) signDelete(r *http.Request) (interface{}, mw.Response) {
 	}
 
 	return nil, mw.Created()
+}
+
+func (a *API) setReservationDeleted(ctx context.Context, db *mongo.Database, id schema.ID) error {
+	// cancel reservation escrow in case the reservation has not yet been deployed
+	a.escrow.ReservationCanceled(id)
+	return types.ReservationSetNextAction(ctx, db, id, generated.NextActionDelete)
 }

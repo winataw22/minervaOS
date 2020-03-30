@@ -2,34 +2,41 @@
 title Provisioning a workload on the TFGrid
 
 autonumber
-actor "User 3Bot" as user
-actor "Farmer 3Bot" as farmer
-database "TF Directory" as directory
-database TFChain as tfchain
-database BCDB as bcdb
+actor "User" as user
+actor "Farmer" as farmer
+database "TF Explorer" as explorer
+database Blockchain as blockchain
 boundary Node as node
 
+== Price definition ==
+farmer -> explorer: Farmer set the price of its Resource units
 == Resource research ==
-user -> directory: User look where to deploy the workload
-activate directory
-user <- directory: Gives detail about the farmer owning the node selected
-deactivate directory
-== Price negotiation ==
-user -> farmer: Start negotiation
-activate farmer
-farmer <-> user: negotiate prices
-deactivate farmer
+activate explorer
+user -> explorer: User look where to deploy the workload
+user <- explorer: Gives detail about the farmer owning the node selected
 == Resource reservation  ==
-user -> tfchain: lock some TFT
-user -> bcdb: write description of the workload
-activate node
+user -> explorer: write description of the workload
+explorer -> user: return a list of transaction to execute on the blockchain
+== Reservation processing  ==
+user -> blockchain: execute transactions
+explorer <-> blockchain: verify transactions are done
+explorer -> explorer: reservation status changed to `deploy`
 == Resource provisioning  ==
-node -> bcdb: read description of the workload
+node <-> explorer: read description of the workloads
 node -> node: provision workload
-node -> bcdb: write result of the provisining
-user <- bcdb: read the connection information to his workload
-deactivate node
-tfchain -> farmer: TFT are unlock progresively to the farmer
+alt provision successfull
+    node -> explorer: write result of the provisining
+    explorer -> blockchain: forward token to the farmer
+    blockchain -> farmer: tokens are available to the farmer
+    user <- explorer: read the connection information to his workload
+else provision error
+    node -> explorer: write result of the provisining
+    explorer -> explorer: cancel reservation
+    node -> node: free up capacity
+    explorer -> blockchain: token refunded to user 
+    blockchain <-> user: tokens are available to the user again
+end
+deactivate explorer
 == Resource monitoring ==
 user <-> node: use / monitor workload
 @enduml

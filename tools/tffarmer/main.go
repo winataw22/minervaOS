@@ -13,11 +13,11 @@ import (
 )
 
 var (
-	db client.Directory
+	db     client.Directory
+	userid = &identity.UserIdentity{}
 )
 
 func main() {
-
 	app := cli.NewApp()
 	app.Usage = "Create and manage a Threefold farm"
 	app.Version = "0.0.1"
@@ -29,26 +29,34 @@ func main() {
 			Usage: "enable debug logging",
 		},
 		cli.StringFlag{
+			Name:  "seed",
+			Usage: "seed filename",
+			Value: "user.seed",
+		},
+		cli.StringFlag{
 			Name:   "bcdb, b",
 			Usage:  "URL of the BCDB",
-			Value:  "https://explorer.devnet.grid.tf",
+			Value:  "https://explorer.devnet.grid.tf/explorer",
 			EnvVar: "BCDB_URL",
 		},
 	}
+
 	app.Before = func(c *cli.Context) error {
+		var err error
+
 		debug := c.Bool("debug")
 		if !debug {
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		}
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-		kp, err := identity.LoadKeyPair("user.seed")
+		err = userid.Load(c.String("seed"))
 		if err != nil {
 			return err
 		}
 
 		url := c.String("bcdb")
-		cl, err := client.NewClient(url, kp)
+		cl, err := client.NewClient(url, userid)
 		if err != nil {
 			return errors.Wrap(err, "failed to create client to bcdb")
 		}
@@ -57,6 +65,7 @@ func main() {
 
 		return nil
 	}
+
 	app.Commands = []cli.Command{
 		{
 			Name:  "farm",
@@ -68,9 +77,25 @@ func main() {
 					Category:  "identity",
 					ArgsUsage: "farm_name",
 					Flags: []cli.Flag{
-						cli.Uint64Flag{
-							Name:  "tid",
-							Usage: "threebot id",
+						cli.StringSliceFlag{
+							Name:     "address",
+							Usage:    "wallet address",
+							Required: true,
+						},
+						cli.StringSliceFlag{
+							Name:     "asset",
+							Usage:    "wallet address asset (TFT, FreeTFT)",
+							Required: true,
+						},
+						cli.StringSliceFlag{
+							Name:     "email",
+							Usage:    "email address of the farmer. It is used to send communication to the farmer and for the minting",
+							Required: true,
+						},
+						cli.StringSliceFlag{
+							Name:     "iyo_organization",
+							Usage:    "the It'sYouOnline organization used by your farm in v1",
+							Required: false,
 						},
 					},
 					Action: registerFarm,

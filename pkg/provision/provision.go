@@ -54,33 +54,3 @@ var (
 		KubernetesReservation: kubernetesDecomission,
 	}
 )
-
-// ErrTemporary is return when a reservation source failed to contact the BCDB
-// user usually want to retry after getting this error
-type ErrTemporary struct {
-	err error
-}
-
-// NewErrTemporary wrap an error and mark it as temporary
-func NewErrTemporary(err error) error {
-	return ErrTemporary{err: err}
-}
-
-// Error implements the errors.Error interface
-func (e ErrTemporary) Error() string {
-	if e.err == nil {
-		return ""
-	}
-	return e.err.Error()
-}
-
-// Is implements errors.Is interface
-func (e ErrTemporary) Is(target error) bool {
-	_, ok := target.(ErrTemporary)
-	return ok
-}
-
-// Unwrap implements errors.Unwrap interface
-func (e ErrTemporary) Unwrap() error {
-	return e.err
-}

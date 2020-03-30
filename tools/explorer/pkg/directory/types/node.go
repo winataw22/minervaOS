@@ -2,12 +2,15 @@ package types
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
+	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/tools/explorer/models"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	generated "github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -34,6 +37,19 @@ func (n *Node) Validate() error {
 
 	if len(n.OsVersion) == 0 {
 		return fmt.Errorf("os_version is required")
+	}
+
+	if len(n.PublicKeyHex) == 0 {
+		return fmt.Errorf("public_key_hex is required")
+	}
+
+	pk, err := hex.DecodeString(n.PublicKeyHex)
+	if err != nil {
+		return errors.Wrap(err, "fail to decode public key")
+	}
+
+	if n.NodeId != base58.Encode(pk) {
+		return fmt.Errorf("nodeID and public key does not match")
 	}
 
 	// Unfortunately, jsx schema does not support nil types
@@ -175,6 +191,9 @@ func NodeCreate(ctx context.Context, db *mongo.Database, node Node) (schema.ID, 
 		node.Created = schema.Date{Time: time.Now()}
 	} else {
 		id = current.ID
+		// make sure we do NOT overwrite these field
+		node.Created = current.Created
+		node.FreeToUse = current.FreeToUse
 	}
 
 	node.ID = id
@@ -218,6 +237,11 @@ func NodeUpdateUsedResources(ctx context.Context, db *mongo.Database, nodeID str
 	return nodeUpdate(ctx, db, nodeID, bson.M{"used_resources": capacity})
 }
 
+// NodeUpdateWorkloadsAmount sets the node reserved resources
+func NodeUpdateWorkloadsAmount(ctx context.Context, db *mongo.Database, nodeID string, workloads generated.WorkloadAmount) error {
+	return nodeUpdate(ctx, db, nodeID, bson.M{"workloads": workloads})
+}
+
 // NodeUpdateUptime updates node uptime
 func NodeUpdateUptime(ctx context.Context, db *mongo.Database, nodeID string, uptime int64) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{
@@ -237,6 +261,13 @@ func NodeSetInterfaces(ctx context.Context, db *mongo.Database, nodeID string, i
 func NodeSetPublicConfig(ctx context.Context, db *mongo.Database, nodeID string, cfg generated.PublicIface) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{
 		"public_config": cfg,
+	})
+}
+
+// NodeUpdateFreeToUse sets node free to use flag
+func NodeUpdateFreeToUse(ctx context.Context, db *mongo.Database, nodeID string, freeToUse bool) error {
+	return nodeUpdate(ctx, db, nodeID, bson.M{
+		"free_to_use": freeToUse,
 	})
 }
 
@@ -263,4 +294,53 @@ func NodePushProof(ctx context.Context, db *mongo.Database, nodeID string, proof
 	})
 
 	return err
+}
+
+// FarmsForNodes return farm objects given node ids
+func FarmsForNodes(ctx context.Context, db *mongo.Database, nodeID ...string) (farms []directory.Farm, err error) {
+	// this pipline finds all farms from a list of nodes and return the list
+	if len(nodeID) == 0 {
+		return
+	}
+
+	pipeline := mongo.Pipeline{
+		{{
+			Key: "$match",
+			Value: bson.M{
+				"node_id": bson.M{
+					"$in": nodeID,
+				},
+			},
+		}},
+		{{
+			Key: "$group",
+			Value: bson.M{
+				"_id": "$farm_id",
+			},
+		}},
+		{{
+			Key: "$lookup",
+			Value: bson.M{
+				"from":         FarmCollection,
+				"localField":   "_id",
+				"foreignField": "_id",
+				"as":           "farm"},
+		}},
+		{{
+			Key: "$replaceRoot",
+			Value: bson.M{
+				"newRoot": bson.M{
+					"$arrayElemAt": []interface{}{"$farm", 0},
+				},
+			},
+		}},
+	}
+
+	cur, err := db.Collection(NodeCollection).Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cur.All(ctx, &farms)
+	return
 }

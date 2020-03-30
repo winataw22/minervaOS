@@ -8,9 +8,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/explorer/config"
 	"github.com/threefoldtech/zos/tools/explorer/models"
 	generated "github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/explorer/mw"
+	"github.com/threefoldtech/zos/tools/explorer/pkg/stellar"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -40,6 +42,28 @@ func (f *Farm) Validate() error {
 
 	if len(f.WalletAddresses) == 0 {
 		return fmt.Errorf("invalid wallet_addresses, is required")
+	}
+
+	if config.Config.Network != "" {
+		found := false
+		for _, a := range f.WalletAddresses {
+			validator, err := stellar.NewAddressValidator(config.Config.Network, a.Asset)
+			if err != nil {
+				if errors.Is(err, stellar.ErrAssetCodeNotSupported) {
+					continue
+				}
+				return errors.Wrap(err, "address validation failed")
+			}
+
+			found = true
+			if err := validator.Valid(a.Address); err != nil {
+				return err
+			}
+		}
+
+		if !found {
+			return errors.New("no wallet found with supported asset")
+		}
 	}
 
 	return nil
@@ -153,4 +177,18 @@ func FarmCreate(ctx context.Context, db *mongo.Database, farm Farm) (schema.ID, 
 	farm.ID = id
 	_, err = col.InsertOne(ctx, farm)
 	return id, err
+}
+
+// FarmUpdate update an existing farm
+func FarmUpdate(ctx context.Context, db *mongo.Database, id schema.ID, farm Farm) error {
+	farm.ID = id
+
+	if err := farm.Validate(); err != nil {
+		return err
+	}
+
+	col := db.Collection(FarmCollection)
+	f := FarmFilter{}.WithID(id)
+	_, err := col.UpdateOne(ctx, f, bson.M{"$set": farm})
+	return err
 }

@@ -1,0 +1,36 @@
+<section class="capacitymap">
+  <v-card style="width: 100%;">
+    <v-card-title primary-title class="primary py-3 mb-5 white--text">
+      <v-icon small color="white" left>fas fa-server</v-icon>
+      Capacity finder
+    </v-card-title>
+    <v-card-text>
+      <v-layout column align-content-space-between>
+        <geo-chart :colors="[$vuetify.theme.currentTheme.secondary]"
+          :data="nodeLocation">
+        </geo-chart>
+        <v-flex>
+          <v-select
+            @input="setSelected"
+            :items="allFarmsList"
+            prepend-icon="fas fa-digging"
+            v-model="select"
+          >
+        </v-select>
+        </v-flex>
+        <v-flex>
+          <capacityselector icon="fa-microchip" label="CRU" />
+        </v-flex>
+        <v-flex>
+          <capacityselector icon="fas fa-memory" label="MRU" />
+        </v-flex>
+        <v-flex>
+          <capacityselector icon="fad fa-hdd" label="HRU" />
+        </v-flex>
+        <v-flex>
+          <capacityselector icon="fas fa-hdd" label="SRU" />
+        </v-flex>
+      </v-layout>
+    </v-card-text>
+  </v-card>
+</section>

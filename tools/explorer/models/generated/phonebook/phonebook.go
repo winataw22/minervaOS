@@ -2,7 +2,6 @@ package phonebook
 
 import (
 	"encoding/json"
-	"net"
 
 	schema "github.com/threefoldtech/zos/pkg/schema"
 )
@@ -12,7 +11,7 @@ type User struct {
 	Name        string    `bson:"name" json:"name"`
 	Email       string    `bson:"email" json:"email"`
 	Pubkey      string    `bson:"pubkey" json:"pubkey"`
-	Ipaddr      net.IP    `bson:"ipaddr" json:"ipaddr"`
+	Host        string    `bson:"host" json:"host"`
 	Description string    `bson:"description" json:"description"`
 	Signature   string    `bson:"signature" json:"signature"`
 }

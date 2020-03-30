@@ -1,0 +1,19 @@
+.capacity {
+  height: 100%;
+}
+.content {
+  background: #fafafa !important;
+}
+.topround {
+  border-radius: 4px 4px 0 0 !important;
+}
+.rounded {
+  border-radius: 0 4px 4px 0 !important;
+}
+.v-menu__content,
+.v-card {
+  border-radius: 4px !important;
+}
+.v-card__title {
+  font-size: 18px !important;
+}

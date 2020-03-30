@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog/log"
+	"github.com/zaibon/httpsig"
 
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/tools/explorer/models"
@@ -41,6 +42,46 @@ func (s *FarmAPI) registerFarm(r *http.Request) (interface{}, mw.Response) {
 	}{
 		id,
 	}, mw.Created()
+}
+
+func (s *FarmAPI) updateFarm(r *http.Request) (interface{}, mw.Response) {
+	sid := mux.Vars(r)["farm_id"]
+
+	id, err := strconv.ParseInt(sid, 10, 64)
+	if err != nil {
+		return nil, mw.BadRequest(err)
+	}
+
+	db := mw.Database(r)
+
+	farm, err := s.GetByID(r.Context(), db, id)
+	if err != nil {
+		return nil, mw.NotFound(err)
+	}
+
+	sfarmerID := httpsig.KeyIDFromContext(r.Context())
+	requestFarmerID, err := strconv.ParseInt(sfarmerID, 10, 64)
+	if err != nil {
+		return nil, mw.BadRequest(err)
+	}
+
+	if farm.ThreebotId != requestFarmerID {
+		return nil, mw.Forbidden(fmt.Errorf("only the farm owner can update the information of its farm"))
+	}
+
+	var info directory.Farm
+	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
+		return nil, mw.BadRequest(err)
+	}
+
+	info.ID = schema.ID(id)
+
+	err = s.Update(r.Context(), db, info.ID, info)
+	if err != nil {
+		return nil, mw.Error(err)
+	}
+
+	return nil, mw.Ok()
 }
 
 func (s *FarmAPI) listFarm(r *http.Request) (interface{}, mw.Response) {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -16,7 +17,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/tools/explorer/models"
 	generated "github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
-	"github.com/threefoldtech/zos/tools/explorer/mw"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -45,26 +45,25 @@ const (
 	Deleted = generated.NextActionDeleted
 )
 
-// ReservationQuery type to parse reservation query string
-type ReservationQuery struct {
-	CustomerID int
-	NextAction int
-}
-
-// Parse parese the query string
-func (rq *ReservationQuery) Parse(r *http.Request) mw.Response {
+// ApplyQueryFilter parese the query string
+func ApplyQueryFilter(r *http.Request, filter ReservationFilter) (ReservationFilter, error) {
 	var err error
 	customerid, err := models.QueryInt(r, "customer_tid")
 	if err != nil {
-		return mw.BadRequest(errors.Wrap(err, "customer_tid should be an integer"))
+		return nil, errors.Wrap(err, "customer_tid should be an integer")
 	}
-	rq.CustomerID = int(customerid)
-	nextaction, err := models.QueryInt(r, "next_action")
-	if err != nil {
-		return mw.BadRequest(errors.Wrap(err, "next_action should be an integer"))
+	if customerid != 0 {
+		filter = filter.WithCustomerID(int(customerid))
 	}
-	rq.NextAction = int(nextaction)
-	return nil
+	sNextAction := r.FormValue("next_action")
+	if len(sNextAction) != 0 {
+		nextAction, err := strconv.ParseInt(sNextAction, 10, 0)
+		if err != nil {
+			return nil, errors.Wrap(err, "next_action should be an integer")
+		}
+		filter = filter.WithNextAction(generated.NextActionEnum(nextAction))
+	}
+	return filter, nil
 }
 
 // ReservationFilter type
@@ -122,17 +121,6 @@ func (f ReservationFilter) Or(o ReservationFilter) ReservationFilter {
 			Value: bson.A{f, o},
 		},
 	}
-}
-
-// WithReservationQuery add filter based in query string
-func (f ReservationFilter) WithReservationQuery(q ReservationQuery) ReservationFilter {
-	if q.CustomerID > 0 {
-		f = f.WithCustomerID(q.CustomerID)
-	}
-	if q.NextAction > 0 {
-		f = f.WithNextAction(generated.NextActionEnum(q.NextAction))
-	}
-	return f
 }
 
 // Get gets single reservation that matches the filter
@@ -420,6 +408,56 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 	}
 
 	return workloads
+}
+
+// IsSuccessfullyDeployed check if all the workloads defined in the reservation
+// have sent a positive result
+func (r *Reservation) IsSuccessfullyDeployed() bool {
+	succeeded := false
+	if len(r.Results) >= len(r.Workloads("")) {
+		succeeded = true
+		for _, result := range r.Results {
+			if result.State != generated.ResultStateOK {
+				succeeded = false
+				break
+			}
+		}
+	}
+	return succeeded
+}
+
+// NodeIDs used by this reservation
+func (r *Reservation) NodeIDs() []string {
+	ids := make(map[string]struct{})
+	for _, w := range r.DataReservation.Containers {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Networks {
+		for _, nr := range w.NetworkResources {
+			ids[nr.NodeId] = struct{}{}
+		}
+	}
+
+	for _, w := range r.DataReservation.Zdbs {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Volumes {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Kubernetes {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	nodeIDs := make([]string, 0, len(ids))
+
+	for nid := range ids {
+		nodeIDs = append(nodeIDs, nid)
+	}
+
+	return nodeIDs
 }
 
 // ReservationCreate save new reservation to database.

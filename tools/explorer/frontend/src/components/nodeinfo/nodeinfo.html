@@ -1,0 +1,132 @@
+<section class="nodeinfo">
+  <v-col>
+    <div class="title">
+      <v-icon small left>fa-info-circle</v-icon>
+      Node Information
+    </div>
+    <v-container fluid>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Node ID </v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.id}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Node version</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.version}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Farmer</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.farm_name}} ({{node.farm_id}})</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Location</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.location.country}}, {{node.location.city}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Uptime</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.uptime}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Status</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.status.status}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-flex xs3 class="text-left pr-2">Updated</v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <span>{{node.updated}}</span>
+        </v-flex>
+      </v-row>
+      <v-row>
+        <v-tooltip right>
+          <template v-slot:activator="{ on }">
+            <v-flex xs3 class="text-left pr-2">Free to use</v-flex>
+            <v-flex class="text-truncate font-weight-bold">
+              <span v-on="on"><v-icon :color="freeIcon.color">{{freeIcon.icon}}</v-icon> <v-icon x-small>fa-question-circle</v-icon></span>
+            </v-flex>
+          </template>
+          <span>
+            When free to use is true, you can paid for this node capacity using <a id='asd'
+              href="https://github.com/threefoldfoundation/tft-stellar/#testnet">FreeTFT</a>
+          </span>
+        </v-tooltip>
+      </v-row>
+    </v-container>
+  </v-col>
+  <v-col>
+    <div class="title">
+      <v-icon small left>fa-chart-bar</v-icon>Provisioned workloads
+    </div>
+    <v-container fluid>
+      <v-row>
+        <v-col>
+          <v-row>
+            <v-col>Network:</v-col> <v-col><span class="font-weight-bold text-right">{{node.workloads.network}}</span></v-col>
+          </v-row>
+          <v-row>
+            <v-col>0-DB namespace:</v-col> <v-col><span class="font-weight-bold text-right">{{node.workloads.zdb_namespace}}</span></v-col>
+          </v-row>
+        </v-col>
+        <v-col>
+          <v-row>
+            <v-col>Volume:</v-col> <v-col><span class="font-weight-bold text-right">{{node.workloads.volume}}</span></v-col>
+          </v-row>
+          <v-row>
+            <v-col>Container:</v-col> <v-col><span class="font-weight-bold text-right">{{node.workloads.container}}</span></v-col>
+          </v-row>
+        </v-col>
+        <v-col>
+          <v-row>
+            <v-col>Kubernetes VM:</v-col> <v-col><span class="font-weight-bold text-right">{{node.workloads.k8s_vm}}</span></v-col>
+          </v-row>
+        </v-col>
+      </v-row>
+    </v-container>
+    </div>
+  </v-col>
+
+  <v-col>
+    <div class="title">
+      <v-icon small left>fa-chart-pie</v-icon>Resource units reserved
+    </div>
+
+    <v-row>
+      <v-col v-for="(value, key) in node.totalResources" :key="key" align="center">
+        <v-flex class="text-center pr-2">
+          <span class="text-uppercase">{{ key }}</span>
+        </v-flex>
+        <v-flex class="text-truncate font-weight-bold">
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on }">
+              <v-progress-circular v-on="on" :rotate="-90" :size="100" :width="15" :value="getPercentage(key)"
+                color="light-green darken-2" />
+              <span>
+                {{ node.reservedResources[key] }} / {{ node.totalResources[key] }}
+              </span>
+            </template>
+            <span>
+              <v-row dense>
+                Total: {{ node.totalResources[key] }}
+              </v-row>
+              <v-row dense>
+                Reserved: {{ node.reservedResources[key] }}
+              </v-row>
+            </span>
+          </v-tooltip>
+        </v-flex>
+      </v-col>
+    </v-row>
+  </v-col>
+  </v-row>
+  </v-col>
+</section>
