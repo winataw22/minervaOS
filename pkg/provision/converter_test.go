@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg/container/logger"
-	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/provision"
 	schema "github.com/threefoldtech/zos/pkg/schema"
 	"gotest.tools/assert"
@@ -67,16 +66,15 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				StatsAggregator:   nil,
 			},
 			want: provision.Container{
-				FList:           "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
-				FlistStorage:    "zdb://hub.grid.tf:9900",
-				Env:             map[string]string{"FOO": "BAR"},
-				SecretEnv:       nil,
-				Entrypoint:      "/sbin/my_init",
-				Interactive:     false,
-				Mounts:          []provision.Mount{},
-				Network:         provision.Network{},
-				Logs:            []logger.Logs{},
-				StatsAggregator: []stats.Aggregator{},
+				FList:        "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
+				FlistStorage: "zdb://hub.grid.tf:9900",
+				Env:          map[string]string{"FOO": "BAR"},
+				SecretEnv:    nil,
+				Entrypoint:   "/sbin/my_init",
+				Interactive:  false,
+				Mounts:       []provision.Mount{},
+				Network:      provision.Network{},
+				Logs:         []logger.Logs{},
 			},
 			wantErr: false,
 		},
@@ -106,6 +104,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 						Ipaddress: net.ParseIP("10.0.0.1"),
 					},
 				},
+				StatsAggregator: nil,
 			},
 			want: provision.Container{
 				FList:        "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
@@ -128,8 +127,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 					NetworkID: "net1",
 					IPs:       []net.IP{net.ParseIP("10.0.0.1")},
 				},
-				Logs:            []logger.Logs{},
-				StatsAggregator: []stats.Aggregator{},
+				Logs: []logger.Logs{},
 			},
 			wantErr: false,
 		},

@@ -17,12 +17,17 @@ import (
 
 func cmdsLive(c *cli.Context) error {
 	var (
-		userID  = int64(mainui.ThreebotID)
+		userID  = c.Int64("id")
 		start   = c.Int("start")
 		end     = c.Int("end")
 		expired = c.Bool("expired")
 		deleted = c.Bool("deleted")
 	)
+
+	// keypair, err := identity.LoadKeyPair(seedPath)
+	// if err != nil {
+	// 	return errors.Wrapf(err, "could not find seed file at %s", seedPath)
+	// }
 
 	s := scraper{
 		poolSize: 10,

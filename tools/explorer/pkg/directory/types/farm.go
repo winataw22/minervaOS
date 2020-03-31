@@ -44,26 +44,21 @@ func (f *Farm) Validate() error {
 		return fmt.Errorf("invalid wallet_addresses, is required")
 	}
 
-	if config.Config.Network != "" {
-		found := false
-		for _, a := range f.WalletAddresses {
-			validator, err := stellar.NewAddressValidator(config.Config.Network, a.Asset)
-			if err != nil {
-				if errors.Is(err, stellar.ErrAssetCodeNotSupported) {
-					continue
-				}
-				return errors.Wrap(err, "address validation failed")
-			}
-
-			found = true
-			if err := validator.Valid(a.Address); err != nil {
-				return err
-			}
+	found := false
+	validator := stellar.NewAddressValidator(config.Config.Network, config.Config.Asset)
+	for _, a := range f.WalletAddresses {
+		if a.Asset != config.Config.Asset {
+			continue
 		}
 
-		if !found {
-			return errors.New("no wallet found with supported asset")
+		found = true
+		if err := validator.Valid(a.Address); err != nil {
+			return err
 		}
+	}
+
+	if !found {
+		return fmt.Errorf("no wallet address found for asset %s", config.Config.Asset)
 	}
 
 	return nil
@@ -177,18 +172,4 @@ func FarmCreate(ctx context.Context, db *mongo.Database, farm Farm) (schema.ID, 
 	farm.ID = id
 	_, err = col.InsertOne(ctx, farm)
 	return id, err
-}
-
-// FarmUpdate update an existing farm
-func FarmUpdate(ctx context.Context, db *mongo.Database, id schema.ID, farm Farm) error {
-	farm.ID = id
-
-	if err := farm.Validate(); err != nil {
-		return err
-	}
-
-	col := db.Collection(FarmCollection)
-	f := FarmFilter{}.WithID(id)
-	_, err := col.UpdateOne(ctx, f, bson.M{"$set": farm})
-	return err
 }

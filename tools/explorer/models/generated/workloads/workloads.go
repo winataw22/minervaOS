@@ -32,7 +32,6 @@ func NewReservation() (Reservation, error) {
 
 type ReservationData struct {
 	Description             string         `bson:"description" json:"description"`
-	Currencies              []string       `bson:"currencies" json:"currencies"`
 	SigningRequestProvision SigningRequest `bson:"signing_request_provision" json:"signing_request_provision"`
 	SigningRequestDelete    SigningRequest `bson:"signing_request_delete" json:"signing_request_delete"`
 	Containers              []Container    `bson:"containers" json:"containers"`
@@ -247,12 +246,9 @@ func NewResult() (Result, error) {
 }
 
 type StatsAggregator struct {
-	Type string     `bson:"type" json:"type"`
-	Data StatsRedis `bson:"data" json:"data"`
-}
-
-type StatsRedis struct {
-	Endpoint string `bson:"stdout" json:"endpoint"`
+	Addr   string `bson:"addr" json:"addr"`
+	Port   int64  `bson:"port" json:"port"`
+	Secret string `bson:"secret" json:"secret"`
 }
 
 func NewStatsAggregator() (StatsAggregator, error) {

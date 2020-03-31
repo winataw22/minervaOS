@@ -8,7 +8,6 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/container/logger"
-	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
 )
@@ -16,15 +15,14 @@ import (
 // ContainerToProvisionType converts TfgridReservationContainer1 to Container
 func ContainerToProvisionType(c workloads.Container) (Container, string, error) {
 	container := Container{
-		FList:           c.Flist,
-		FlistStorage:    c.HubUrl,
-		Env:             c.Environment,
-		SecretEnv:       c.SecretEnvironment,
-		Entrypoint:      c.Entrypoint,
-		Interactive:     c.Interactive,
-		Mounts:          make([]Mount, len(c.Volumes)),
-		Logs:            make([]logger.Logs, len(c.Logs)),
-		StatsAggregator: make([]stats.Aggregator, len(c.StatsAggregator)),
+		FList:        c.Flist,
+		FlistStorage: c.HubUrl,
+		Env:          c.Environment,
+		SecretEnv:    c.SecretEnvironment,
+		Entrypoint:   c.Entrypoint,
+		Interactive:  c.Interactive,
+		Mounts:       make([]Mount, len(c.Volumes)),
+		Logs:         make([]logger.Logs, len(c.Logs)),
 		Capacity: ContainerCapacity{
 			CPU:    uint(c.Capacity.Cpu),
 			Memory: uint64(c.Capacity.Memory),
@@ -35,7 +33,6 @@ func ContainerToProvisionType(c workloads.Container) (Container, string, error) 
 		container.Network = Network{
 			IPs:       []net.IP{c.NetworkConnection[0].Ipaddress},
 			NetworkID: pkg.NetID(c.NetworkConnection[0].NetworkId),
-			PublicIP6: c.NetworkConnection[0].PublicIp6,
 		}
 	}
 
@@ -63,25 +60,6 @@ func ContainerToProvisionType(c workloads.Container) (Container, string, error) 
 			Data: logger.LogsRedis{
 				Stdout: lg.Data.Stdout,
 				Stderr: lg.Data.Stderr,
-			},
-		}
-	}
-
-	for i, s := range c.StatsAggregator {
-		// Only support redis for now
-		if s.Type != stats.RedisType {
-			container.StatsAggregator[i] = stats.Aggregator{
-				Type: "unknown",
-				Data: stats.Redis{
-					Endpoint: "",
-				},
-			}
-		}
-
-		container.StatsAggregator[i] = stats.Aggregator{
-			Type: s.Type,
-			Data: stats.Redis{
-				Endpoint: s.Data.Endpoint,
 			},
 		}
 	}

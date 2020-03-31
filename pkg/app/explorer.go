@@ -1,8 +1,6 @@
 package app
 
 import (
-	"crypto/ed25519"
-
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/identity"
@@ -24,24 +22,10 @@ func ExplorerClient() (*client.Client, error) {
 		return nil, err
 	}
 
-	cl, err := client.NewClient(env.BcdbURL, nodeIdentity{
-		kp: kp,
-	})
+	cl, err := client.NewClient(env.BcdbURL, kp)
 	if err != nil {
 		return nil, err
 	}
 
 	return cl, nil
-}
-
-type nodeIdentity struct {
-	kp identity.KeyPair
-}
-
-func (n nodeIdentity) PrivateKey() ed25519.PrivateKey {
-	return n.kp.PrivateKey
-}
-
-func (n nodeIdentity) Identity() string {
-	return n.kp.Identity()
 }

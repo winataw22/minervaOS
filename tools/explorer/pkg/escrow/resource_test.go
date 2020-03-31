@@ -139,7 +139,7 @@ func TestProcessReservation(t *testing.T) {
 		},
 	}
 
-	escrow := Stellar{
+	escrow := Escrow{
 		wallet:             &stellar.Wallet{},
 		db:                 nil,
 		reservationChannel: nil,
@@ -504,7 +504,7 @@ func TestCalculateReservationCost(t *testing.T) {
 		},
 	}
 
-	escrow := Stellar{
+	escrow := Escrow{
 		wallet:             &stellar.Wallet{},
 		db:                 nil,
 		reservationChannel: nil,

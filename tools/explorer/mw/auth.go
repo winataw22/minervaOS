@@ -2,7 +2,6 @@ package mw
 
 import (
 	"context"
-	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -52,7 +51,7 @@ func (u UserKeyGetter) GetKey(id string) interface{} {
 	if err != nil {
 		return nil
 	}
-	return ed25519.PublicKey(pk)
+	return pk
 }
 
 // NodeKeyGetter implements httpsig.KeyGetter for the nodes collections
@@ -68,7 +67,7 @@ func NewNodeKeyGetter() NodeKeyGetter {
 func (m NodeKeyGetter) GetKey(id string) interface{} {
 	// the node ID is its public key base58 encoded, so we just need
 	// to decode it to get the []byte version of the key
-	return ed25519.PublicKey(base58.Decode(id))
+	return base58.Decode(id)
 }
 
 // requiredHeaders are the parameters to be used to generated the http signature
@@ -102,7 +101,7 @@ func (a *AuthMiddleware) Middleware(handler http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		keyID, err := a.verifier.Verify(req)
+		err := a.verifier.Verify(req)
 		if err != nil {
 			w.Header()["WWW-Authenticate"] = []string{challenge}
 			w.WriteHeader(http.StatusUnauthorized)
@@ -119,6 +118,6 @@ func (a *AuthMiddleware) Middleware(handler http.Handler) http.Handler {
 			}
 			return
 		}
-		handler.ServeHTTP(w, req.WithContext(httpsig.WithKeyID(req.Context(), keyID)))
+		handler.ServeHTTP(w, req)
 	})
 }

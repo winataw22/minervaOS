@@ -8,7 +8,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 
 	"github.com/threefoldtech/zos/pkg/container/logger"
-	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/urfave/cli"
 )
@@ -28,24 +27,6 @@ func generateContainer(c *cli.Context) error {
 	cap := provision.ContainerCapacity{
 		CPU:    c.Uint("cpu"),
 		Memory: c.Uint64("memory"),
-	}
-
-	var sts []stats.Aggregator
-	if s := c.String("stats"); s != "" {
-		// validating stdout argument
-		_, _, err := logger.RedisParseURL(s)
-		if err != nil {
-			return err
-		}
-
-		ss := stats.Aggregator{
-			Type: stats.RedisType,
-			Data: stats.Redis{
-				Endpoint: s,
-			},
-		}
-
-		sts = append(sts, ss)
 	}
 
 	var logs []logger.Logs
@@ -95,9 +76,8 @@ func generateContainer(c *cli.Context) error {
 			},
 			PublicIP6: c.Bool("public6"),
 		},
-		Capacity:        cap,
-		Logs:            logs,
-		StatsAggregator: sts,
+		Capacity: cap,
+		Logs:     logs,
 	}
 
 	if err := validateContainer(container); err != nil {

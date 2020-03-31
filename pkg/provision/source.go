@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"sort"
 	"sync"
 	"time"
 
@@ -41,17 +39,6 @@ type reservationPoller struct {
 	wl client.Workloads
 }
 
-// provisionOrder is used to sort the workload type
-// in the right order for provisiond
-var provisionOrder = map[ReservationType]int{
-	DebugReservation:      0,
-	NetworkReservation:    1,
-	ZDBReservation:        2,
-	VolumeReservation:     3,
-	ContainerReservation:  4,
-	KubernetesReservation: 5,
-}
-
 func (r *reservationPoller) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
 	list, err := r.wl.Workloads(nodeID.Identity(), from)
 	if err != nil {
@@ -67,11 +54,6 @@ func (r *reservationPoller) Poll(nodeID pkg.Identifier, from uint64) ([]*Reserva
 
 		result = append(result, r)
 	}
-
-	// sorts the workloads in the oder they need to be processed by provisiond
-	sort.Slice(result, func(i int, j int) bool {
-		return provisionOrder[result[i].Type] < provisionOrder[result[j].Type]
-	})
 
 	return result, nil
 }
@@ -109,17 +91,15 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 		for {
 			time.Sleep(time.Until(on))
 			on = time.Now().Add(s.maxSleep)
-			log.Info().Uint64("next", next).Msg("Polling for reservations")
+			log.Debug().Uint64("next", next).Msg("Polling for reservations")
 
 			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), next)
 			if err != nil && err != ErrPollEOS {
+				log.Error().Err(err).Msg("failed to get reservation")
 				// if this is not a temporary error, then skip the reservation entirely
 				// and try to get the next one
-				if !isNetworkErr(err) {
-					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation")
+				if !errors.Is(err, ErrTemporary{}) {
 					next++
-				} else {
-					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation, retry same")
 				}
 				continue
 			}
@@ -247,9 +227,4 @@ func (s *combinedSource) Reservations(ctx context.Context) <-chan *Reservation {
 	}()
 
 	return out
-}
-
-func isNetworkErr(err error) bool {
-	var perr *net.OpError
-	return errors.As(err, &perr)
 }

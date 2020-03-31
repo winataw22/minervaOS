@@ -31,11 +31,6 @@ func (u *UserAPI) create(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.BadRequest(err)
 	}
 
-	// https://github.com/threefoldtech/zos/issues/706
-	if err := user.Validate(); err != nil {
-		return nil, mw.BadRequest(err)
-	}
-
 	db := mw.Database(r)
 	user, err := types.UserCreate(r.Context(), db, user.Name, user.Email, user.Pubkey)
 	if err != nil && errors.Is(err, types.ErrUserExists) {

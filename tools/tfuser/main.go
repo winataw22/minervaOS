@@ -6,28 +6,17 @@ import (
 	"github.com/threefoldtech/zos/pkg/identity"
 	"github.com/threefoldtech/zos/tools/client"
 
-	"fmt"
 	"os"
 
 	"github.com/urfave/cli"
 )
 
 var (
-	bcdb     *client.Client
-	mainui   = &identity.UserIdentity{}
-	bcdbAddr string
-	mainSeed string
+	bcdb *client.Client
 )
 
-func requireSeed(c *cli.Context) error {
-	if mainSeed == "" {
-		return fmt.Errorf("seed required")
-	}
-
-	return nil
-}
-
 func main() {
+
 	app := cli.NewApp()
 	app.Version = "0.0.1"
 	app.Usage = "Let you provision capacity on the ThreefoldGrid 2.0"
@@ -41,17 +30,17 @@ func main() {
 		cli.StringFlag{
 			Name:   "bcdb, u",
 			Usage:  "URL of the BCDB",
-			Value:  "https://explorer.devnet.grid.tf/explorer",
+			Value:  "https://explorer.devnet.grid.tf",
 			EnvVar: "BCDB_URL",
 		},
 
 		cli.StringFlag{
-			Name:   "seed",
-			Usage:  "path to the file container the seed of the user private key",
-			EnvVar: "SEED_PATH",
+			Name:     "seed",
+			Usage:    "path to the file container the seed of the user private key",
+			EnvVar:   "SEED_PATH",
+			Required: true,
 		},
 	}
-
 	app.Before = func(c *cli.Context) error {
 		debug := c.Bool("debug")
 		if !debug {
@@ -60,111 +49,40 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 		var err error
-		bcdbAddr = c.String("bcdb")
-
-		if seed := c.String("seed"); seed != "" {
-			mainSeed = seed
-
-			err = mainui.Load(seed)
-			if err != nil {
-				return err
-			}
-
-			bcdb, err = client.NewClient(bcdbAddr, mainui)
-			if err != nil {
-				return err
-			}
+		bcdb, err = getClient(c.String("bcdb"), c.String("seed"))
+		if err != nil {
+			return err
 		}
 
 		return nil
 	}
-
 	app.Commands = []cli.Command{
 		{
 			Name:  "id",
-			Usage: "Group of command to generate provisioning schemas",
-			Subcommands: []cli.Command{
-				{
-					Name:  "create",
-					Usage: "generate a user identity",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "output,o",
-							Usage: "output path of the identity seed",
-							Value: "user.seed",
-						},
-						cli.StringFlag{
-							Name:     "name,n",
-							Usage:    "user name",
-							Required: true,
-						},
-						cli.StringFlag{
-							Name:     "email",
-							Usage:    "user email address",
-							Required: true,
-						},
-						cli.StringFlag{
-							Name:     "description",
-							Usage:    "user description",
-							Required: true,
-						},
-						cli.StringFlag{
-							Name:  "mnemonic",
-							Usage: "generate a key from given mnemonic",
-						},
-					},
-					Action: cmdsGenerateID,
+			Usage: "generate a user identity",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "output,o",
+					Usage: "output path of the identity seed",
+					Value: "user.seed",
 				},
-				{
-					Name:  "convert",
-					Usage: "convert an old user.seed to latest version",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:     "source",
-							Usage:    "original user.seed file",
-							Value:    "user.seed",
-							Required: true,
-						},
-						cli.StringFlag{
-							Name:     "target",
-							Usage:    "converted seedfile path",
-							Required: true,
-						},
-						cli.IntFlag{
-							Name:  "tid",
-							Usage: "threebot id",
-							Value: 0,
-						},
-					},
-					Action: cmdsConvertID,
+				cli.StringFlag{
+					Name:     "name,n",
+					Usage:    "user name",
+					Required: true,
 				},
-				{
-					Name:  "import",
-					Usage: "import an key using a mnemonic seed",
-					Flags: []cli.Flag{
-						cli.StringFlag{
-							Name:  "mnemonic",
-							Usage: "generate a key from given mnemonic",
-						},
-						cli.StringFlag{
-							Name:  "output,o",
-							Usage: "output path of the identity seed",
-							Value: "user.seed",
-						},
-						cli.IntFlag{
-							Name:  "tid",
-							Usage: "threebot id",
-							Value: 0,
-						},
-					},
-					Action: cmdsImportID,
+				cli.StringFlag{
+					Name:     "email",
+					Usage:    "user email address",
+					Required: true,
 				},
-				{
-					Name:   "show",
-					Usage:  "show user information from seed file",
-					Action: cmdsShowID,
+				cli.StringFlag{
+					Name:     "description",
+					Usage:    "user description",
+					Required: true,
 				},
 			},
+			Action: cmdsGenerateID,
 		},
 		{
 			Name:    "generate",
@@ -330,10 +248,6 @@ func main() {
 							Name:  "stderr",
 							Usage: "like stdout but for stderr, if only stdout is set, stderr will use the same",
 						},
-						cli.StringFlag{
-							Name:  "stats",
-							Usage: "like process logs, but for metrics (metrics are pushed as json)",
-						},
 					},
 					Action: generateContainer,
 				},
@@ -459,9 +373,8 @@ func main() {
 			},
 		},
 		{
-			Name:   "provision",
-			Usage:  "Provision a workload",
-			Before: requireSeed,
+			Name:  "provision",
+			Usage: "Provision a workload",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "schema",
@@ -472,9 +385,17 @@ func main() {
 					Name:  "duration",
 					Usage: "duration of the reservation. By default is number of days. But also support notation with duration suffix like m for minute or h for hours",
 				},
-				cli.StringSliceFlag{
-					Name:  "asset",
-					Usage: "add an asset which is acceptable to pay the reservation",
+				cli.StringFlag{
+					Name:     "seed",
+					Usage:    "path to the file container the seed of the user private key",
+					EnvVar:   "SEED_PATH",
+					Required: true,
+				},
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
 				},
 				cli.BoolFlag{
 					Name:  "dry-run",
@@ -484,10 +405,15 @@ func main() {
 			Action: cmdsProvision,
 		},
 		{
-			Name:   "delete",
-			Usage:  "Mark a workload as to be deleted",
-			Before: requireSeed,
+			Name:  "delete",
+			Usage: "Mark a workload as to be deleted",
 			Flags: []cli.Flag{
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
+				},
 				cli.Int64Flag{
 					Name:     "reservation",
 					Usage:    "reservation id",
@@ -503,10 +429,15 @@ func main() {
 			Action: cmdsDeleteReservation,
 		},
 		{
-			Name:   "live",
-			Usage:  "show you all the reservations that are still alive",
-			Before: requireSeed,
+			Name:  "live",
+			Usage: "show you all the reservations that are still alive",
 			Flags: []cli.Flag{
+				cli.Int64Flag{
+					Name:     "id",
+					Usage:    "user id associated with the seed",
+					EnvVar:   "TF_USER_ID",
+					Required: true,
+				},
 				cli.IntFlag{
 					Name:  "start",
 					Usage: "start scrapping at that reservation ID",
@@ -533,4 +464,12 @@ func main() {
 	if err != nil {
 		log.Fatal().Msg(err.Error())
 	}
+}
+
+func getClient(addr, path string) (*client.Client, error) {
+	kp, err := identity.LoadKeyPair(path)
+	if err != nil {
+		return nil, err
+	}
+	return client.NewClient(addr, kp)
 }

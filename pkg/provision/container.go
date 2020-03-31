@@ -13,7 +13,6 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/container/logger"
-	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -55,8 +54,6 @@ type Container struct {
 	Capacity ContainerCapacity `json:"capacity"`
 	// Logs contains a list of endpoint where to send containerlogs
 	Logs []logger.Logs `json:"logs,omitempty"`
-	// StatsAggregator container metrics backend
-	StatsAggregator []stats.Aggregator
 }
 
 // ContainerResult is the information return to the BCDB
@@ -111,19 +108,10 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	}
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
-	var mnt string
-	mnt, err = flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
+	mnt, err := flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
 	if err != nil {
 		return ContainerResult{}, err
 	}
-
-	defer func() {
-		if err != nil {
-			if err := flistClient.Umount(mnt); err != nil {
-				log.Error().Err(err).Str("mnt", mnt).Msg("failed to unmount container root")
-			}
-		}
-	}()
 
 	var env []string
 	for k, v := range config.Env {
@@ -140,8 +128,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 
 	var mounts []pkg.MountInfo
 	for _, mount := range config.Mounts {
-		var owner string
-		owner, err = cache.OwnerOf(mount.VolumeID)
+
+		owner, err := cache.OwnerOf(mount.VolumeID)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
 		}
@@ -156,8 +144,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		if err := os.MkdirAll(path.Join(mnt, mountpoint), 0755); err != nil {
 			return ContainerResult{}, err
 		}
-		var source string
-		source, err = storageClient.Path(mount.VolumeID)
+
+		source, err := storageClient.Path(mount.VolumeID)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
 		}
@@ -183,8 +171,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	for i, ip := range config.Network.IPs {
 		ips[i] = ip.String()
 	}
-	var join pkg.Member
-	join, err = networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
+
+	join, err := networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
 	if err != nil {
 		return ContainerResult{}, err
 	}
@@ -207,8 +195,7 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		Str("container", reservation.ID).
 		Msg("assigned an IP")
 
-	var id pkg.ContainerID
-	id, err = containerClient.Run(
+	id, err := containerClient.Run(
 		tenantNS,
 		pkg.Container{
 			Name:   containerID,
@@ -217,13 +204,12 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			Network: pkg.NetworkInfo{
 				Namespace: join.Namespace,
 			},
-			Mounts:          mounts,
-			Entrypoint:      config.Entrypoint,
-			Interactive:     config.Interactive,
-			CPU:             config.Capacity.CPU,
-			Memory:          config.Capacity.Memory * 1024 * 1024,
-			Logs:            config.Logs,
-			StatsAggregator: config.StatsAggregator,
+			Mounts:      mounts,
+			Entrypoint:  config.Entrypoint,
+			Interactive: config.Interactive,
+			CPU:         config.Capacity.CPU,
+			Memory:      config.Capacity.Memory * 1024 * 1024,
+			Logs:        config.Logs,
 		},
 	)
 	if err != nil {
