@@ -67,7 +67,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
 	github.com/xdg/stringprep v1.0.0 // indirect
-	github.com/zaibon/httpsig v0.0.0-20200330100750-92f51d8ee3ec
+	github.com/zaibon/httpsig v0.0.0-20200401133919-ea9cb57b0946
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.mongodb.org/mongo-driver v1.3.0
 	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4

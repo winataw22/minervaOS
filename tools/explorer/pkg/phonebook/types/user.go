@@ -118,7 +118,7 @@ func UserCreate(ctx context.Context, db *mongo.Database, name, email, pubkey str
 	}
 
 	if _, err := crypto.KeyFromHex(pubkey); err != nil {
-		return user, errors.Wrap(err, "invalid public key")
+		return user, errors.Wrapf(err, "invalid public key %s", pubkey)
 	}
 
 	var filter UserFilter

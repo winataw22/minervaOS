@@ -44,8 +44,10 @@ const (
 type assetCodeEnum string
 
 const (
-	tft     assetCodeEnum = "tft"
-	freeTFT assetCodeEnum = "freeTFT"
+	// TFT assetcode
+	TFT assetCodeEnum = TFTCode
+	// FreeTFT assetcode
+	FreeTFT assetCodeEnum = FreeTFTCode
 )
 
 // ErrInsuficientBalance is an error that is used when there is insufficient balance
@@ -432,7 +434,7 @@ func (w *Wallet) getHorizonClient() (*horizonclient.Client, error) {
 
 func (w *Wallet) getIssuer() string {
 	switch w.asset {
-	case tft:
+	case TFT:
 		switch w.network {
 		case "testnet":
 			return tftIssuerTestnet
@@ -441,7 +443,7 @@ func (w *Wallet) getIssuer() string {
 		default:
 			return tftIssuerTestnet
 		}
-	case freeTFT:
+	case FreeTFT:
 		switch w.network {
 		case "testnet":
 			return freeTftIssuerTestnet
@@ -468,9 +470,9 @@ func (w *Wallet) getNetworkPassPhrase() string {
 
 func (e assetCodeEnum) String() string {
 	switch e {
-	case tft:
+	case TFT:
 		return TFTCode
-	case freeTFT:
+	case FreeTFT:
 		return FreeTFTCode
 	}
 	return "UNKNOWN"

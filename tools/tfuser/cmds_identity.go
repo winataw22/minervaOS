@@ -32,7 +32,7 @@ func cmdsGenerateID(c *cli.Context) error {
 	user := phonebook.User{
 		Name:        name,
 		Email:       email,
-		Signature:   hex.EncodeToString(k.PublicKey),
+		Pubkey:      hex.EncodeToString(k.PublicKey),
 		Description: description,
 	}
 	id, err := bcdb.Phonebook.Create(user)

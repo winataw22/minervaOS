@@ -553,8 +553,10 @@ github.com/yudai/golcs v0.0.0-20150405163532-d1c525dea8ce h1:888GrqRxabUce7lj4Oa
 github.com/yudai/golcs v0.0.0-20150405163532-d1c525dea8ce/go.mod h1:lgjkn3NuSvDfVJdfcVVdX+jpBxNmX4rDAzaS45IcYoM=
 github.com/yudai/pp v2.0.1+incompatible h1:Q4//iY4pNF6yPLZIigmvcl7k/bPgrcTPIFIcmawg5bI=
 github.com/yudai/pp v2.0.1+incompatible/go.mod h1:PuxR/8QJ7cyCkFp/aUDS+JY727OFEZkTdatxwunjIkc=
-github.com/zaibon/httpsig v0.0.0-20200330100750-92f51d8ee3ec h1:JNIHUQ6N3GigAdy0Sy5kFn+lasb0ckCY6qLQHXbipx8=
-github.com/zaibon/httpsig v0.0.0-20200330100750-92f51d8ee3ec/go.mod h1:T2e9wAAQHKLB08ONx+0xxxrlAfUnRbwLOpO0WodNbQ4=
+github.com/zaibon/httpsig v0.0.0-20200401095359-2d1b87fa0e9b h1:x0NqD3GsYLNVVzvjsJrJm/S0EI5L1QuVtgCwaSrsxYE=
+github.com/zaibon/httpsig v0.0.0-20200401095359-2d1b87fa0e9b/go.mod h1:T2e9wAAQHKLB08ONx+0xxxrlAfUnRbwLOpO0WodNbQ4=
+github.com/zaibon/httpsig v0.0.0-20200401133919-ea9cb57b0946 h1:s12kADbuUVEJkYxqUojKvFR5JUpib9PCzARL1YR2ZDU=
+github.com/zaibon/httpsig v0.0.0-20200401133919-ea9cb57b0946/go.mod h1:T2e9wAAQHKLB08ONx+0xxxrlAfUnRbwLOpO0WodNbQ4=
 github.com/zenazn/goji v0.9.0/go.mod h1:7S9M489iMyHBNxwZnk9/EHS098H4/F6TATF2mIxtB1Q=
 github.com/ziutek/mymysql v1.5.4/go.mod h1:LMSpPZ6DbqWFxNCHW77HeMg9I646SAhApZ/wKdgO/C0=
 go.etcd.io/bbolt v1.3.3 h1:MUGmc65QhB3pIlaQ5bB4LwqSj6GIonVJXpZiaKNyaKk=
