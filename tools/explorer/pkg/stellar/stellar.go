@@ -61,6 +61,13 @@ type Wallet struct {
 	asset   assetCodeEnum
 }
 
+// PayoutInfo holds information about which address needs to receive how many funds
+// for payment commands which take multiple receivers
+type PayoutInfo struct {
+	Address string
+	Amount  xdr.Int64
+}
+
 // New from seed
 func New(seed string, network string, asset string) (*Wallet, error) {
 	kp, err := keypair.ParseFull(seed)
@@ -156,6 +163,13 @@ func (w *Wallet) KeyPairFromSeed(seed string) (*keypair.Full, error) {
 // GetBalance gets balance for an address and a given reservation id. It also returns
 // a list of addresses which funded the given address.
 func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, error) {
+
+	if address == "" {
+		err := fmt.Errorf("trying to get the balance of an empty address. this should never happen")
+		log.Warn().Err(err).Send()
+		return 0, nil, err
+	}
+
 	var total xdr.Int64
 	horizonClient, err := w.getHorizonClient()
 	if err != nil {
@@ -169,6 +183,7 @@ func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, 
 		Cursor:     cursor,
 	}
 
+	log.Info().Str("address", address).Msg("fetching balance for address")
 	txes, err := horizonClient.Transactions(txReq)
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "could not get transactions")
@@ -183,7 +198,7 @@ func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, 
 				}
 				effects, err := horizonClient.Effects(effectsReq)
 				if err != nil {
-					log.Debug().Msgf("failed to get transaction effects: %v", err)
+					log.Error().Err(err).Msgf("failed to get transaction effects")
 					continue
 				}
 				// first check if we have been paid
@@ -221,6 +236,7 @@ func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, 
 			cursor = tx.PagingToken()
 		}
 		txReq.Cursor = cursor
+		log.Info().Str("address", address).Msgf("fetching balance for address with cursor: %s", cursor)
 		txes, err = horizonClient.Transactions(txReq)
 		if err != nil {
 			return 0, nil, errors.Wrap(err, "could not get transactions")
@@ -231,12 +247,15 @@ func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, 
 	for donor := range donors {
 		donorList = append(donorList, donor)
 	}
-	log.Debug().Msgf("balance for %s - %v: %d", address, id, total)
+	log.Info().
+		Int64("balance", int64(total)).
+		Str("address", address).
+		Int64("id", int64(id)).Msgf("status of balance for reservation")
 	return total, donorList, nil
 }
 
 // Refund using a keypair
-// keypair is account assiociated with farmer - user
+// keypair is account associated with farmer - user
 // refund destination is the first address in the "funder" list as returned by
 // GetBalance
 // id is the reservation ID to refund for
@@ -279,6 +298,7 @@ func (w *Wallet) Refund(keypair keypair.Full, id schema.ID) error {
 		return errors.Wrap(err, "failed to fund transaction")
 	}
 
+	log.Debug().Int64("amount", int64(amount)).Str("destination", destination).Msg("refund")
 	err = w.signAndSubmitTx(&keypair, fundedTx)
 	if err != nil {
 		return errors.Wrap(err, "failed to sign and submit transaction")
@@ -286,11 +306,11 @@ func (w *Wallet) Refund(keypair keypair.Full, id schema.ID) error {
 	return nil
 }
 
-// PayoutFarmer using a keypair
+// PayoutFarmers using a keypair
 // keypair is account assiociated with farmer - user
 // destination is the farmer destination address
 // id is the reservation ID to pay for
-func (w *Wallet) PayoutFarmer(keypair keypair.Full, destination string, amount xdr.Int64, id schema.ID) error {
+func (w *Wallet) PayoutFarmers(keypair keypair.Full, destinations []PayoutInfo, id schema.ID) error {
 	sourceAccount, err := w.getAccountDetails(keypair.Address())
 	if err != nil {
 		return errors.Wrap(err, "failed to get source account")
@@ -299,35 +319,46 @@ func (w *Wallet) PayoutFarmer(keypair keypair.Full, destination string, amount x
 	if err != nil {
 		return errors.Wrap(err, "failed to get balance")
 	}
-	if balance < amount {
+	requiredAmount := xdr.Int64(0)
+	for _, pi := range destinations {
+		requiredAmount += pi.Amount
+	}
+	if balance < requiredAmount {
 		return ErrInsuficientBalance
 	}
 
-	// 10% cut for the foundation
-	/*
-		Based on the way we calculate the cost of reservation we know it has at most
-		6 digit precision whereas stellar has 7 digits precision.
-		This means that any valid reservation must necessarily have a "0" as least
-		significant digit (when expressed as `stropes` as is the case here).
-		With this knowledge it is safe to perform the 90% cut as regular integer operations
-		instead of using floating points which might lead to floating point errors
-	*/
-	if amount%10 != 0 {
-		return errors.New("invalid reservation cost")
-	}
-	foundationCut := amount / 10 * 1
-	amountDue := amount / 10 * 9
+	paymentOps := make([]txnbuild.Operation, 0, len(destinations)+1)
+	foundationCut := xdr.Int64(0)
 
-	farmerPaymentOP := txnbuild.Payment{
-		Destination: destination,
-		Amount:      big.NewRat(int64(amountDue), stellarPrecision).FloatString(stellarPrecisionDigits),
-		Asset: txnbuild.CreditAsset{
-			Code:   w.asset.String(),
-			Issuer: w.getIssuer(),
-		},
-		SourceAccount: &sourceAccount,
+	for _, pi := range destinations {
+		// 10% cut for the foundation
+		/*
+			Based on the way we calculate the cost of reservation we know it has at most
+			6 digit precision whereas stellar has 7 digits precision.
+			This means that any valid reservation must necessarily have a "0" as least
+			significant digit (when expressed as `stropes` as is the case here).
+			With this knowledge it is safe to perform the 90% cut as regular integer operations
+			instead of using floating points which might lead to floating point errors
+		*/
+		if pi.Amount%10 != 0 {
+			return errors.New("invalid reservation cost")
+		}
+		foundationCut += pi.Amount / 10 * 1
+		amountDue := pi.Amount / 10 * 9
+
+		paymentOps = append(paymentOps, &txnbuild.Payment{
+			Destination: pi.Address,
+			Amount:      big.NewRat(int64(amountDue), stellarPrecision).FloatString(stellarPrecisionDigits),
+			Asset: txnbuild.CreditAsset{
+				Code:   w.asset.String(),
+				Issuer: w.getIssuer(),
+			},
+			SourceAccount: &sourceAccount,
+		})
 	}
-	foundationPaymentOP := txnbuild.Payment{
+
+	// add foundation payment
+	paymentOps = append(paymentOps, &txnbuild.Payment{
 		Destination: w.keypair.Address(),
 		Amount:      big.NewRat(int64(foundationCut), stellarPrecision).FloatString(stellarPrecisionDigits),
 		Asset: txnbuild.CreditAsset{
@@ -335,12 +366,12 @@ func (w *Wallet) PayoutFarmer(keypair keypair.Full, destination string, amount x
 			Issuer: w.getIssuer(),
 		},
 		SourceAccount: &sourceAccount,
-	}
+	})
 
 	formattedMemo := fmt.Sprintf("%d", id)
 	memo := txnbuild.MemoText(formattedMemo)
 	tx := txnbuild.Transaction{
-		Operations: []txnbuild.Operation{&farmerPaymentOP, &foundationPaymentOP},
+		Operations: paymentOps,
 		Timebounds: txnbuild.NewTimeout(300),
 		Network:    w.getNetworkPassPhrase(),
 		Memo:       memo,
@@ -401,11 +432,14 @@ func (w *Wallet) signAndSubmitTx(keypair *keypair.Full, tx *txnbuild.Transaction
 		return errors.Wrap(err, "failed to sign transaction with keypair")
 	}
 
+	log.Info().Msg("submitting transaction to the stellar network")
 	// Submit the transaction
 	_, err = client.SubmitTransaction(*tx)
 	if err != nil {
 		hError := err.(*horizonclient.Error)
-		log.Debug().Msgf("%+v", hError.Problem.Extras)
+		log.Debug().
+			Err(fmt.Errorf("%+v", hError.Problem.Extras)).
+			Msg("error submitting transaction")
 		return errors.Wrap(hError.Problem, "error submitting transaction")
 	}
 	return nil
@@ -417,8 +451,12 @@ func (w *Wallet) getAccountDetails(address string) (account hProtocol.Account, e
 		return hProtocol.Account{}, err
 	}
 	ar := horizonclient.AccountRequest{AccountID: address}
+	log.Info().Str("address", address).Msgf("fetching account details for address: ")
 	account, err = client.AccountDetail(ar)
-	return
+	if err != nil {
+		return hProtocol.Account{}, errors.Wrapf(err, "failed to get account details for account: %s", address)
+	}
+	return account, nil
 }
 
 func (w *Wallet) getHorizonClient() (*horizonclient.Client, error) {

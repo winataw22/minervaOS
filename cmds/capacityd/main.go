@@ -12,8 +12,8 @@ import (
 	"github.com/threefoldtech/zos/pkg/monitord"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
-	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/client"
+	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 
 	"github.com/rs/zerolog/log"
 
@@ -30,6 +30,9 @@ func cap(ctx context.Context, client zbus.Client) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
 	}
+
+	// call this now so we block here until identityd is ready to serve us
+	nodeID := identity.NodeID().Identity()
 
 	r := capacity.NewResourceOracle(storage)
 
@@ -61,16 +64,25 @@ func cap(ctx context.Context, client zbus.Client) {
 		log.Fatal().Err(err).Msgf("failed to read virtualized state")
 	}
 
-	log.Info().Msg("sends capacity detail to BCDB")
-
-	if err := cl.NodeSetCapacity(identity.NodeID().Identity(), directory.ResourceAmount{
+	ru := directory.ResourceAmount{
 		Cru: int64(resources.CRU),
 		Mru: int64(resources.MRU),
 		Hru: int64(resources.HRU),
 		Sru: int64(resources.SRU),
-	}, *dmi, disks, hypervisor); err != nil {
-		log.Fatal().Err(err).Msgf("failed to write resources capacity on BCDB")
 	}
+
+	setCapacity := func() error {
+		log.Info().Msg("sends capacity detail to BCDB")
+		return cl.NodeSetCapacity(nodeID, ru, *dmi, disks, hypervisor)
+	}
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0 // retry forever
+	backoff.RetryNotify(setCapacity, bo, func(err error, d time.Duration) {
+		log.Error().
+			Err(err).
+			Str("sleep", d.String()).
+			Msgf("failed to write resources capacity on BCDB")
+	})
 
 	sendUptime := func() error {
 		uptime, err := r.Uptime()

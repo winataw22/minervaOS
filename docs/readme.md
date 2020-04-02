@@ -18,3 +18,5 @@
   - [Development environment](../qemu)
   - [tfuser](tfuser/readme.md)
   - [MacOS Development environment](macdev/readme.md)
+
+- [FAQ](faq/readme.md)

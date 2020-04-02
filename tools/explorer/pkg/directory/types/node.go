@@ -191,6 +191,9 @@ func NodeCreate(ctx context.Context, db *mongo.Database, node Node) (schema.ID, 
 		node.Created = schema.Date{Time: time.Now()}
 	} else {
 		id = current.ID
+		// make sure we do NOT overwrite these field
+		node.Created = current.Created
+		node.FreeToUse = current.FreeToUse
 	}
 
 	node.ID = id
@@ -253,6 +256,13 @@ func NodeSetInterfaces(ctx context.Context, db *mongo.Database, nodeID string, i
 func NodeSetPublicConfig(ctx context.Context, db *mongo.Database, nodeID string, cfg generated.PublicIface) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{
 		"public_config": cfg,
+	})
+}
+
+// NodeUpdateFreeToUse sets node free to use flag
+func NodeUpdateFreeToUse(ctx context.Context, db *mongo.Database, nodeID string, freeToUse bool) error {
+	return nodeUpdate(ctx, db, nodeID, bson.M{
+		"free_to_use": freeToUse,
 	})
 }
 

@@ -85,7 +85,7 @@ type Node struct {
 	Proofs            []Proof        `bson:"proofs" json:"proofs"`
 	Ifaces            []Iface        `bson:"ifaces" json:"ifaces"`
 	PublicConfig      *PublicIface   `bson:"public_config,omitempty" json:"public_config"`
-	ExitNode          bool           `bson:"exit_node" json:"exit_node"`
+	FreeToUse         bool           `bson:"free_to_use" json:"free_to_use"`
 	Approved          bool           `bson:"approved" json:"approved"`
 	PublicKeyHex      string         `bson:"public_key_hex" json:"public_key_hex"`
 	WgPorts           []int64        `bson:"wg_ports" json:"wg_ports"`

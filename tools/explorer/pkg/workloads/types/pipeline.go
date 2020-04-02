@@ -98,12 +98,20 @@ func (p *Pipeline) Next() (Reservation, bool) {
 		return p.r, false
 	}
 
+	slog := log.With().Int64("id", int64(p.r.ID)).Logger()
+
 	// reseration expiration time must be checked, once expiration time is exceeded
 	// the reservation must be deleted
 	if p.r.Expired() || p.checkDeleteSignatures() {
 		// reservation has expired
 		// set its status (next action) to delete
-		log.Debug().Int64("id", int64(p.r.ID)).Msg("expired or to be deleted")
+		slog.Debug().Msg("expired or to be deleted")
+		p.r.NextAction = generated.NextActionDelete
+		return p.r, true
+	}
+
+	if p.r.DataReservation.ExpirationProvisioning.Before(time.Now()) && !p.r.IsSuccessfullyDeployed() {
+		log.Debug().Msg("provision expiration reached and not fully provisionned")
 		p.r.NextAction = generated.NextActionDelete
 		return p.r, true
 	}
@@ -113,29 +121,20 @@ func (p *Pipeline) Next() (Reservation, bool) {
 	for {
 		switch p.r.NextAction {
 		case generated.NextActionCreate:
-			// provision expiration, if exceeded, the node should not
-			// try to deploy this reservation.
-			if time.Until(p.r.DataReservation.ExpirationProvisioning.Time) <= 0 {
-				// exceeded
-				// TODO: I think this should be set to "delete" not "invalid"
-				log.Debug().Int64("id", int64(p.r.ID)).Msg("expired")
-				p.r.NextAction = generated.NextActionInvalid
-			} else {
-				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to sign")
-				p.r.NextAction = generated.NextActionSign
-			}
+			slog.Debug().Msg("ready to sign")
+			p.r.NextAction = generated.NextActionSign
 		case generated.NextActionSign:
 			// this stage will not change unless all
 			if p.checkProvisionSignatures() {
-				log.Debug().Int64("id", int64(p.r.ID)).Msg("ready to pay")
+				slog.Debug().Msg("ready to pay")
 				p.r.NextAction = generated.NextActionPay
 			}
 		case generated.NextActionPay:
 			// Pay needs to block, until the escrow moves us past this point
-			log.Debug().Int64("id", int64(p.r.ID)).Msg("awaiting reservation payment")
+			slog.Debug().Msg("awaiting reservation payment")
 		case generated.NextActionDeploy:
 			//nothing to do
-			log.Debug().Int64("id", int64(p.r.ID)).Msg("let's deploy")
+			slog.Debug().Msg("let's deploy")
 		}
 
 		if current == p.r.NextAction {

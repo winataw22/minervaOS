@@ -144,6 +144,10 @@ func (s *NodeAPI) updateUptime(ctx context.Context, db *mongo.Database, nodeID s
 	return directory.NodeUpdateUptime(ctx, db, nodeID, uptime)
 }
 
+func (s *NodeAPI) updateFreeToUse(ctx context.Context, db *mongo.Database, nodeID string, freeToUse bool) error {
+	return directory.NodeUpdateFreeToUse(ctx, db, nodeID, freeToUse)
+}
+
 // StoreProof stores node hardware proof
 func (s *NodeAPI) StoreProof(ctx context.Context, db *mongo.Database, nodeID string, dmi dmi.DMI, disks capacity.Disks, hypervisor []string) error {
 	var err error

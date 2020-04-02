@@ -26,7 +26,7 @@ func Setup(ctx context.Context, db *mongo.Database) error {
 	addresses := db.Collection(AddressCollection)
 	_, err = addresses.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{
-			Keys:    bson.M{"farmer_id": 1, "customer_tid": 1},
+			Keys:    bson.M{"customer_tid": 1},
 			Options: options.Index().SetUnique(true),
 		},
 		{

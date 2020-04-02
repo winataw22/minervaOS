@@ -62,7 +62,7 @@ Next to the reservation data, there is also a reservation state. These fields de
   - user create the reservation, initial status is `created`
   - user sends the reservation to the explorer, status goes from `create` to `sign`
   - user sign the reservation, status goes from `sign` to `pay`
-  - as a result of registering the reservation on the explorer, the user got a list of transaction to do in other to pay the farmer involved in to the reservation. Once the user has actually executed the transactions, the explorer checks the token have actually arrived, the status goes from `pay` to `deploy`
+  - as a result of registering the reservation on the explorer, the user got a list of transaction to do in other to pay the farmer involved in to the reservation. Once the user has actually executed the transactions, the explorer checks the token have actually arrived, the status goes from `pay` to `deploy`. Check the [payment documentation](reservation_payment.md) for more detail information on how to pay for a reservation.
   - when a reservation is has a state `deploy`, the node can now pick it up and provision the workloads.  
 
   From here there are 2 possibility:  
