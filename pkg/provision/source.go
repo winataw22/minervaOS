@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -40,17 +39,6 @@ type reservationPoller struct {
 	wl client.Workloads
 }
 
-// provisionOrder is used to sort the workload type
-// in the right order for provisiond
-var provisionOrder = map[ReservationType]int{
-	DebugReservation:      0,
-	NetworkReservation:    1,
-	ZDBReservation:        2,
-	VolumeReservation:     3,
-	ContainerReservation:  4,
-	KubernetesReservation: 5,
-}
-
 func (r *reservationPoller) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error) {
 	list, err := r.wl.Workloads(nodeID.Identity(), from)
 	if err != nil {
@@ -66,11 +54,6 @@ func (r *reservationPoller) Poll(nodeID pkg.Identifier, from uint64) ([]*Reserva
 
 		result = append(result, r)
 	}
-
-	// sorts the workloads in the oder they need to be processed by provisiond
-	sort.Slice(result, func(i int, j int) bool {
-		return provisionOrder[result[i].Type] < provisionOrder[result[j].Type]
-	})
 
 	return result, nil
 }

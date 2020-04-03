@@ -29,7 +29,6 @@ func NewSigner(seed []byte) (*Signer, error) {
 // NewSignerFromFile loads signer from a seed file
 func NewSignerFromFile(path string) (*Signer, error) {
 	pair, err := identity.LoadKeyPair(path)
-
 	if err != nil {
 		return nil, err
 	}
