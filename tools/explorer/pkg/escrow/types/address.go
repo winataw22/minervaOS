@@ -22,18 +22,19 @@ var (
 )
 
 type (
-	// CustomerAddress holds the customer escrow address and key
-	CustomerAddress struct {
+	// FarmerCustomerAddress holds the farmer - customer key
+	FarmerCustomerAddress struct {
+		FarmerID    int64  `bson:"farmer_id" json:"farmer_id"`
 		CustomerTID int64  `bson:"customer_tid" json:"customer_tid"`
 		Address     string `bson:"address" json:"address"`
 		Secret      string `bson:"secret" json:"secret"`
 	}
 )
 
-// CustomerAddressCreate creates the reservation payment information
-func CustomerAddressCreate(ctx context.Context, db *mongo.Database, cAddress CustomerAddress) error {
+// FarmerCustomerAddressCreate creates the reservation payment information
+func FarmerCustomerAddressCreate(ctx context.Context, db *mongo.Database, fckAddress FarmerCustomerAddress) error {
 	col := db.Collection(AddressCollection)
-	_, err := col.InsertOne(ctx, cAddress)
+	_, err := col.InsertOne(ctx, fckAddress)
 	if err != nil {
 		if merr, ok := err.(mongo.WriteException); ok {
 			errCode := merr.WriteErrors[0].Code
@@ -46,24 +47,24 @@ func CustomerAddressCreate(ctx context.Context, db *mongo.Database, cAddress Cus
 	return nil
 }
 
-// CustomerAddressGet one address bycustomerTID
-func CustomerAddressGet(ctx context.Context, db *mongo.Database, customerTID int64) (CustomerAddress, error) {
-	var customerAddress CustomerAddress
-	doc := db.Collection(AddressCollection).FindOne(ctx, bson.M{"customer_tid": customerTID})
+// Get gets one address by farmerID and customerTID
+func Get(ctx context.Context, db *mongo.Database, farmerID int64, customerTID int64) (FarmerCustomerAddress, error) {
+	var farmerCustomerAddress FarmerCustomerAddress
+	doc := db.Collection(AddressCollection).FindOne(ctx, bson.M{"farmer_id": farmerID, "customer_tid": customerTID})
 	if errors.Is(doc.Err(), mongo.ErrNoDocuments) {
-		return CustomerAddress{}, ErrAddressNotFound
+		return FarmerCustomerAddress{}, ErrAddressNotFound
 	}
-	err := doc.Decode(&customerAddress)
-	return customerAddress, err
+	err := doc.Decode(&farmerCustomerAddress)
+	return farmerCustomerAddress, err
 }
 
-// CustomerAddressByAddress gets one address using the address
-func CustomerAddressByAddress(ctx context.Context, db *mongo.Database, address string) (CustomerAddress, error) {
-	var customerAddress CustomerAddress
+// GetByAddress gets one address using the address
+func GetByAddress(ctx context.Context, db *mongo.Database, address string) (FarmerCustomerAddress, error) {
+	var farmerCustomerAddress FarmerCustomerAddress
 	doc := db.Collection(AddressCollection).FindOne(ctx, bson.M{"address": address})
 	if errors.Is(doc.Err(), mongo.ErrNoDocuments) {
-		return CustomerAddress{}, ErrAddressNotFound
+		return FarmerCustomerAddress{}, ErrAddressNotFound
 	}
-	err := doc.Decode(&customerAddress)
-	return customerAddress, err
+	err := doc.Decode(&farmerCustomerAddress)
+	return farmerCustomerAddress, err
 }
