@@ -29,6 +29,7 @@ type (
 	// ReservationPaymentInformation stores the reservation payment information
 	ReservationPaymentInformation struct {
 		ReservationID schema.ID      `bson:"_id"`
+		Address       string         `bson:"address"`
 		Expiration    schema.Date    `bson:"expiration"`
 		Infos         []EscrowDetail `bson:"infos"`
 		// Paid indicates the reservation escrows have been fully funded, and
@@ -51,9 +52,15 @@ type (
 
 	// EscrowDetail hold the details of an escrow address
 	EscrowDetail struct {
-		FarmerID      schema.ID `bson:"farmer_id" json:"farmer_id"`
-		TotalAmount   xdr.Int64 `bson:"total_amount" json:"total_amount"`
-		EscrowAddress string    `bson:"escrow_address" json:"escrow_address"`
+		FarmerID    schema.ID `bson:"farmer_id" json:"farmer_id"`
+		TotalAmount xdr.Int64 `bson:"total_amount" json:"total_amount"`
+	}
+
+	// CustomerEscrowInformation is the escrow information which will get exposed
+	// to the customer once he creates a reservation
+	CustomerEscrowInformation struct {
+		Address string         `json:"address"`
+		Details []EscrowDetail `json:"details"`
 	}
 )
 

@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/rusart/muxprom"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -107,8 +110,16 @@ func createServer(listen, dbName string, client *mongo.Client, network, seed str
 	}
 
 	router := mux.NewRouter()
+	var prom *muxprom.MuxProm
+
+	prom = muxprom.New(
+		muxprom.Router(router),
+		muxprom.Namespace("explorer"),
+	)
+	prom.Instrument()
 
 	router.Use(db.Middleware)
+	router.Path("/metrics").Handler(promhttp.Handler()).Name("metrics")
 
 	if err := escrowdb.Setup(context.Background(), db.Database()); err != nil {
 		log.Fatal().Err(err).Msg("failed to create escrow database indexes")

@@ -33,6 +33,7 @@ func ContainerToProvisionType(c workloads.Container) (Container, string, error) 
 		container.Network = Network{
 			IPs:       []net.IP{c.NetworkConnection[0].Ipaddress},
 			NetworkID: pkg.NetID(c.NetworkConnection[0].NetworkId),
+			PublicIP6: c.NetworkConnection[0].PublicIp6,
 		}
 	}
 

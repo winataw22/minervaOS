@@ -36,8 +36,8 @@ type API struct {
 
 // ReservationCreateResponse wraps reservation create response
 type ReservationCreateResponse struct {
-	ID                schema.ID                  `json:"reservation_id"`
-	EscrowInformation []escrowtypes.EscrowDetail `json:"escrow_information"`
+	ID                schema.ID                             `json:"reservation_id"`
+	EscrowInformation escrowtypes.CustomerEscrowInformation `json:"escrow_information"`
 }
 
 func (a *API) validAddresses(ctx context.Context, db *mongo.Database, res *types.Reservation) error {
