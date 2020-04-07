@@ -410,6 +410,22 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 	return workloads
 }
 
+// isSuccessfullyDeployed check if all the workloads defined in the reservation
+// have sent a positive result
+func (r *Reservation) IsSuccessfullyDeployed() bool {
+	succeeded := false
+	if len(r.Results) >= len(r.Workloads("")) {
+		succeeded = true
+		for _, result := range r.Results {
+			if result.State != generated.ResultStateOK {
+				succeeded = false
+				break
+			}
+		}
+	}
+	return succeeded
+}
+
 // ReservationCreate save new reservation to database.
 // NOTE: use reservations only that are returned from calling Pipeline.Next()
 // no validation is done here, this is just a CRUD operation

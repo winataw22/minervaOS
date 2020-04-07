@@ -4,16 +4,23 @@ import (
 	"fmt"
 
 	"github.com/jbenet/go-base58"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/versioned"
 
 	"golang.org/x/crypto/ed25519"
 )
 
+// Version History:
+//   1.0.0: seed binary directly encoded
+//   1.1.0: json with key mnemonic and threebot id
+
 var (
-	//SeedVersion1 version
+	// SeedVersion1 (binary seed)
 	seedVersion1 = versioned.MustParse("1.0.0")
-	//SeedVersionLatest link to latest seed version
-	seedVersionLatest = seedVersion1
+	// SeedVersion11 (json mnemonic)
+	seedVersion11 = versioned.MustParse("1.1.0")
+	// SeedVersionLatest link to latest seed version
+	seedVersionLatest = seedVersion11
 )
 
 // KeyPair holds a public and private side of an ed25519 key pair
@@ -44,7 +51,7 @@ func GenerateKeyPair() (k KeyPair, err error) {
 func (k *KeyPair) Save(path string) error {
 	seed := k.PrivateKey.Seed()
 
-	return versioned.WriteFile(path, seedVersionLatest, seed, 0400)
+	return versioned.WriteFile(path, seedVersion1, seed, 0400)
 }
 
 // LoadSeed from path
@@ -59,7 +66,7 @@ func LoadSeed(path string) ([]byte, error) {
 		return nil, err
 	}
 
-	if version.NE(seedVersionLatest) {
+	if version.NE(seedVersion1) {
 		return nil, fmt.Errorf("unknown seed version")
 	}
 
@@ -69,6 +76,16 @@ func LoadSeed(path string) ([]byte, error) {
 // LoadKeyPair reads a seed from a file located at path and re-create a
 // KeyPair using the seed
 func LoadKeyPair(path string) (k KeyPair, err error) {
+	log.Warn().Msg("LoadKeyPair is deprecated, please use UserIdentity struct")
+	return loadKeyPair(path)
+}
+
+// LoadLegacyKeyPair load keypair without deprecated message for converted
+func LoadLegacyKeyPair(path string) (k KeyPair, err error) {
+	return loadKeyPair(path)
+}
+
+func loadKeyPair(path string) (k KeyPair, err error) {
 	seed, err := LoadSeed(path)
 	if err != nil {
 		return k, err

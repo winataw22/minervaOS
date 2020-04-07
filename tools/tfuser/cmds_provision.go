@@ -92,9 +92,9 @@ func cmdsProvision(c *cli.Context) error {
 	var (
 		schema   []byte
 		path     = c.String("schema")
-		seedPath = c.String("seed")
+		seedPath = mainSeed
 		d        = c.String("duration")
-		userID   = c.Int64("id")
+		userID   = int64(mainui.ThreebotID)
 		duration time.Duration
 		err      error
 	)
@@ -112,7 +112,7 @@ func cmdsProvision(c *cli.Context) error {
 		}
 	}
 
-	signer, err := client.NewSignerFromFile(seedPath)
+	signer, err := client.NewSigner(mainui.Key().PrivateKey.Seed())
 	if err != nil {
 		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
 	}
@@ -178,16 +178,22 @@ func cmdsProvision(c *cli.Context) error {
 		return errors.Wrap(err, "failed to send reservation")
 	}
 
+	totalAmount := xdr.Int64(0)
+	for _, detail := range response.EscrowInformation.Details {
+		totalAmount += detail.TotalAmount
+	}
+
 	fmt.Printf("Reservation for %v send to node bcdb\n", duration)
 	fmt.Printf("Resource: /reservations/%v\n", response.ID)
 	fmt.Println()
 
 	fmt.Printf("Reservation id: %d \n", response.ID)
+	fmt.Printf("Reservation escrow address: %s \n", response.EscrowInformation.Address)
+	fmt.Printf("Reservation amount: %s \n", formatCurrency(totalAmount))
 
-	for _, detail := range response.EscrowInformation {
+	for _, detail := range response.EscrowInformation.Details {
 		fmt.Println()
 		fmt.Printf("FarmerID: %v\n", detail.FarmerID)
-		fmt.Printf("Escrow address: %s\n", detail.EscrowAddress)
 		fmt.Printf("Amount: %s\n", formatCurrency(detail.TotalAmount))
 	}
 
@@ -216,7 +222,7 @@ func embed(schema interface{}, t provision.ReservationType, node string) (*provi
 func cmdsDeleteReservation(c *cli.Context) error {
 	var (
 		resID    = c.Int64("reservation")
-		userID   = c.Int64("id")
+		userID   = mainui.ThreebotID
 		seedPath = c.String("seed")
 	)
 

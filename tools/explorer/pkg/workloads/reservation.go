@@ -36,8 +36,8 @@ type API struct {
 
 // ReservationCreateResponse wraps reservation create response
 type ReservationCreateResponse struct {
-	ID                schema.ID                  `json:"reservation_id"`
-	EscrowInformation []escrowtypes.EscrowDetail `json:"escrow_information"`
+	ID                schema.ID                             `json:"reservation_id"`
+	EscrowInformation escrowtypes.CustomerEscrowInformation `json:"escrow_information"`
 }
 
 func (a *API) validAddresses(ctx context.Context, db *mongo.Database, res *types.Reservation) error {
@@ -366,8 +366,14 @@ func (a *API) workloads(r *http.Request) (interface{}, mw.Response) {
 			continue
 		}
 
+		if reservation.NextAction == types.Delete {
+			if err := a.setReservationDeleted(r.Context(), db, reservation.ID); err != nil {
+				return nil, mw.Error(err)
+			}
+		}
+
 		// only reservations that is in right status
-		if !reservation.IsAny(types.Deploy) {
+		if !reservation.IsAny(types.Deploy, types.Delete) {
 			continue
 		}
 
@@ -494,17 +500,8 @@ func (a *API) workloadPutResult(r *http.Request) (interface{}, mw.Response) {
 			return nil, mw.NotFound(err)
 		}
 
-		if len(reservation.Results) == len(reservation.Workloads("")) {
-			succeeded := true
-			for _, result := range reservation.Results {
-				if result.State != generated.ResultStateOK {
-					succeeded = false
-					break
-				}
-			}
-			if succeeded {
-				a.escrow.ReservationDeployed(rid)
-			}
+		if reservation.IsSuccessfullyDeployed() {
+			a.escrow.ReservationDeployed(rid)
 		}
 	}
 

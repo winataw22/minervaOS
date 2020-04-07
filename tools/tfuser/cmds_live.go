@@ -17,7 +17,7 @@ import (
 
 func cmdsLive(c *cli.Context) error {
 	var (
-		userID  = c.Int64("id")
+		userID  = int64(mainui.ThreebotID)
 		start   = c.Int("start")
 		end     = c.Int("end")
 		expired = c.Bool("expired")
