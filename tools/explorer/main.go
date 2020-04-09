@@ -50,8 +50,8 @@ func main() {
 	flag.StringVar(&dbConf, "mongo", "mongodb://localhost:27017", "connection string to mongo database")
 	flag.StringVar(&dbName, "name", "explorer", "database name")
 	flag.StringVar(&config.Config.Seed, "seed", "", "wallet seed")
-	flag.StringVar(&config.Config.Network, "network", "testnet", "tfchain network")
-	flag.StringVar(&config.Config.Asset, "asset", "TFT", "which asset to use")
+	flag.StringVar(&config.Config.Network, "network", "", "tfchain network")
+	flag.StringVar(&config.Config.Asset, "asset", "", "which asset to use")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 
 	flag.Parse()
@@ -110,9 +110,7 @@ func createServer(listen, dbName string, client *mongo.Client, network, seed str
 	}
 
 	router := mux.NewRouter()
-	var prom *muxprom.MuxProm
-
-	prom = muxprom.New(
+	prom := muxprom.New(
 		muxprom.Router(router),
 		muxprom.Namespace("explorer"),
 	)
@@ -121,21 +119,26 @@ func createServer(listen, dbName string, client *mongo.Client, network, seed str
 	router.Use(db.Middleware)
 	router.Path("/metrics").Handler(promhttp.Handler()).Name("metrics")
 
-	if err := escrowdb.Setup(context.Background(), db.Database()); err != nil {
-		log.Fatal().Err(err).Msg("failed to create escrow database indexes")
+	var e escrow.Escrow
+	if seed != "" && asset != "" {
+		log.Info().Msgf("escrow disabled on %s %s", config.Config.Network, config.Config.Asset)
+		if err := escrowdb.Setup(context.Background(), db.Database()); err != nil {
+			log.Fatal().Err(err).Msg("failed to create escrow database indexes")
+		}
+
+		wallet, err := stellar.New(config.Config.Seed, config.Config.Network, config.Config.Asset)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to create stellar wallet")
+		}
+
+		e = escrow.NewStellar(wallet, db.Database())
+
+	} else {
+		log.Info().Msg("escrow disabled")
+		e = escrow.NewFree(db.Database())
 	}
 
-	wallet, err := stellar.New(config.Config.Seed, config.Config.Network, config.Config.Asset)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create stellar wallet")
-	}
-
-	escrow := escrow.New(wallet, db.Database())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create escrow")
-	}
-
-	go escrow.Run(context.Background())
+	go e.Run(context.Background())
 
 	pkgs := []Pkg{
 		phonebook.Setup,
@@ -148,7 +151,7 @@ func createServer(listen, dbName string, client *mongo.Client, network, seed str
 		}
 	}
 
-	if err = workloads.Setup(router, db.Database(), escrow); err != nil {
+	if err = workloads.Setup(apiRouter, db.Database(), e); err != nil {
 		log.Error().Err(err).Msg("failed to register package")
 	}
 

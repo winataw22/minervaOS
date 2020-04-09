@@ -44,21 +44,23 @@ func (f *Farm) Validate() error {
 		return fmt.Errorf("invalid wallet_addresses, is required")
 	}
 
-	found := false
-	validator := stellar.NewAddressValidator(config.Config.Network, config.Config.Asset)
-	for _, a := range f.WalletAddresses {
-		if a.Asset != config.Config.Asset {
-			continue
+	if config.Config.Network != "" && config.Config.Asset != "" {
+		found := false
+		validator := stellar.NewAddressValidator(config.Config.Network, config.Config.Asset)
+		for _, a := range f.WalletAddresses {
+			if a.Asset != config.Config.Asset {
+				continue
+			}
+
+			found = true
+			if err := validator.Valid(a.Address); err != nil {
+				return err
+			}
 		}
 
-		found = true
-		if err := validator.Valid(a.Address); err != nil {
-			return err
+		if !found {
+			return fmt.Errorf("no wallet address found for asset %s", config.Config.Asset)
 		}
-	}
-
-	if !found {
-		return fmt.Errorf("no wallet address found for asset %s", config.Config.Asset)
 	}
 
 	return nil

@@ -12,7 +12,7 @@ import (
 )
 
 // Setup injects and initializes directory package
-func Setup(parent *mux.Router, db *mongo.Database, escrow *escrow.Escrow) error {
+func Setup(parent *mux.Router, db *mongo.Database, escrow escrow.Escrow) error {
 	if err := types.Setup(context.TODO(), db); err != nil {
 		return err
 	}

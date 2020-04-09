@@ -40,7 +40,7 @@ const (
 )
 
 // calculateReservationCost calculates the cost of reservation based on a resource per farmer map
-func (e *Escrow) calculateReservationCost(rsuPerFarmerMap rsuPerFarmer) (map[int64]xdr.Int64, error) {
+func (e Stellar) calculateReservationCost(rsuPerFarmerMap rsuPerFarmer) (map[int64]xdr.Int64, error) {
 	cloudUnitsPerFarmer := make(map[int64]cloudUnits)
 	for id, rsu := range rsuPerFarmerMap {
 		cloudUnitsPerFarmer[id] = rsuToCu(rsu)
@@ -70,7 +70,7 @@ func (e *Escrow) calculateReservationCost(rsuPerFarmerMap rsuPerFarmer) (map[int
 	return costPerFarmerMap, nil
 }
 
-func (e *Escrow) processReservationResources(resData workloads.ReservationData) (rsuPerFarmer, error) {
+func (e Stellar) processReservationResources(resData workloads.ReservationData) (rsuPerFarmer, error) {
 	rsuPerNodeMap := make(rsuPerNode)
 	for _, cont := range resData.Containers {
 		rsuPerNodeMap[cont.NodeId] = rsuPerNodeMap[cont.NodeId].add(processContainer(cont))

@@ -410,7 +410,7 @@ func (r *Reservation) Workloads(nodeID string) []Workload {
 	return workloads
 }
 
-// isSuccessfullyDeployed check if all the workloads defined in the reservation
+// IsSuccessfullyDeployed check if all the workloads defined in the reservation
 // have sent a positive result
 func (r *Reservation) IsSuccessfullyDeployed() bool {
 	succeeded := false
