@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/threefoldtech/zos/pkg/schema"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/urfave/cli"
 )
@@ -15,6 +16,8 @@ func registerFarm(c *cli.Context) error {
 
 	addrs := c.StringSlice("address")
 	assets := c.StringSlice("asset")
+	email := c.String("email")
+	iyo := c.String("iyo_organization")
 
 	addresses := make([]directory.WalletAddress, len(addrs))
 	for i := range addrs {
@@ -25,6 +28,8 @@ func registerFarm(c *cli.Context) error {
 	farmID, err := db.FarmRegister(directory.Farm{
 		Name:            name,
 		ThreebotId:      int64(userid.ThreebotID),
+		Email:           schema.Email(email),
+		IyoOrganization: iyo,
 		WalletAddresses: addresses,
 	})
 	if err != nil {

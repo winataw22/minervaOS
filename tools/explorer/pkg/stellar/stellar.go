@@ -82,20 +82,21 @@ func New(seed string, network string, asset string) (*Wallet, error) {
 	}, nil
 }
 
-// CreateAccount and activates
-func (w *Wallet) CreateAccount() (keypair.Full, error) {
+// CreateAccount and activate it, so that it is ready to be used
+// The encrypted seed of the wallet is returned, together with the public address
+func (w *Wallet) CreateAccount() (string, string, error) {
 	client, err := w.getHorizonClient()
 	if err != nil {
-		return keypair.Full{}, err
+		return "", "", err
 	}
 	newKp, err := keypair.Random()
 	if err != nil {
-		return keypair.Full{}, err
+		return "", "", err
 	}
 
 	sourceAccount, err := w.getAccountDetails(w.keypair.Address())
 	if err != nil {
-		return keypair.Full{}, errors.Wrap(err, "failed to get source account")
+		return "", "", errors.Wrap(err, "failed to get source account")
 	}
 	createAccountOp := txnbuild.CreateAccount{
 		Destination: newKp.Address(),
@@ -110,20 +111,20 @@ func (w *Wallet) CreateAccount() (keypair.Full, error) {
 
 	txeBase64, err := tx.BuildSignEncode(w.keypair)
 	if err != nil {
-		return keypair.Full{}, errors.Wrap(err, "failed to get build transaction")
+		return "", "", errors.Wrap(err, "failed to get build transaction")
 	}
 
 	// Submit the transaction
 	_, err = client.SubmitTransactionXDR(txeBase64)
 	if err != nil {
 		hError := err.(*horizonclient.Error)
-		return keypair.Full{}, errors.Wrap(hError, "error submitting transaction")
+		return "", "", errors.Wrap(hError, "error submitting transaction")
 	}
 
 	// Set the trustline
 	sourceAccount, err = w.getAccountDetails(newKp.Address())
 	if err != nil {
-		return keypair.Full{}, errors.Wrap(err, "failed to get account details")
+		return "", "", errors.Wrap(err, "failed to get account details")
 	}
 	changeTrustOp := txnbuild.ChangeTrust{
 		SourceAccount: &sourceAccount,
@@ -141,23 +142,23 @@ func (w *Wallet) CreateAccount() (keypair.Full, error) {
 
 	txeBase64, err = trustTx.BuildSignEncode(newKp)
 	if err != nil {
-		return keypair.Full{}, errors.Wrap(err, "failed to get build transaction")
+		return "", "", errors.Wrap(err, "failed to get build transaction")
 	}
 
 	// Submit the transaction
 	_, err = client.SubmitTransactionXDR(txeBase64)
 	if err != nil {
 		hError := err.(*horizonclient.Error)
-		return keypair.Full{}, errors.Wrap(hError.Problem, "error submitting transaction")
+		return "", "", errors.Wrap(hError.Problem, "error submitting transaction")
 	}
 
-	return *newKp, nil
-}
+	// encrypt the seed before it is returned
+	encryptedSeed, err := encrypt(newKp.Seed(), w.encryptionKey())
+	if err != nil {
+		return "", "", errors.Wrap(err, "could not encrypt new wallet seed")
+	}
 
-// KeyPairFromSeed parses a seed and creates a keypair for it, which can be
-// used to sign transactions
-func (w *Wallet) KeyPairFromSeed(seed string) (*keypair.Full, error) {
-	return keypair.ParseFull(seed)
+	return encryptedSeed, newKp.Address(), nil
 }
 
 // GetBalance gets balance for an address and a given reservation id. It also returns
@@ -254,12 +255,14 @@ func (w *Wallet) GetBalance(address string, id schema.ID) (xdr.Int64, []string, 
 	return total, donorList, nil
 }
 
-// Refund using a keypair
-// keypair is account associated with farmer - user
-// refund destination is the first address in the "funder" list as returned by
-// GetBalance
-// id is the reservation ID to refund for
-func (w *Wallet) Refund(keypair keypair.Full, id schema.ID) error {
+// Refund an escrow address for a reservation. This will transfer all funds
+// for this reservation that are currently on the address (if any), to (some of)
+// the addresses which these funds came from.
+func (w *Wallet) Refund(encryptedSeed string, id schema.ID) error {
+	keypair, err := w.keypairFromEncryptedSeed(encryptedSeed)
+	if err != nil {
+		return errors.Wrap(err, "could not get keypair from encrypted seed")
+	}
 	sourceAccount, err := w.getAccountDetails(keypair.Address())
 	if err != nil {
 		return errors.Wrap(err, "failed to get source account")
@@ -306,11 +309,13 @@ func (w *Wallet) Refund(keypair keypair.Full, id schema.ID) error {
 	return nil
 }
 
-// PayoutFarmers using a keypair
-// keypair is account assiociated with farmer - user
-// destination is the farmer destination address
-// id is the reservation ID to pay for
-func (w *Wallet) PayoutFarmers(keypair keypair.Full, destinations []PayoutInfo, id schema.ID) error {
+// PayoutFarmers pays a group of farmers, from an escrow account. The escrow
+// account must be provided as the encrypted string of the seed.
+func (w *Wallet) PayoutFarmers(encryptedSeed string, destinations []PayoutInfo, id schema.ID) error {
+	keypair, err := w.keypairFromEncryptedSeed(encryptedSeed)
+	if err != nil {
+		return errors.Wrap(err, "could not get keypair from encrypted seed")
+	}
 	sourceAccount, err := w.getAccountDetails(keypair.Address())
 	if err != nil {
 		return errors.Wrap(err, "failed to get source account")
@@ -457,6 +462,20 @@ func (w *Wallet) getAccountDetails(address string) (account hProtocol.Account, e
 		return hProtocol.Account{}, errors.Wrapf(err, "failed to get account details for account: %s", address)
 	}
 	return account, nil
+}
+
+func (w *Wallet) keypairFromEncryptedSeed(seed string) (keypair.Full, error) {
+	plainSeed, err := decrypt(seed, w.encryptionKey())
+	if err != nil {
+		return keypair.Full{}, errors.Wrap(err, "could not decrypt seed")
+	}
+
+	kp, err := keypair.ParseFull(plainSeed)
+	if err != nil {
+		return keypair.Full{}, errors.Wrap(err, "could not parse seed")
+	}
+
+	return *kp, nil
 }
 
 func (w *Wallet) getHorizonClient() (*horizonclient.Client, error) {

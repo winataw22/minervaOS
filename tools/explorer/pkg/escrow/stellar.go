@@ -280,9 +280,6 @@ func (e *Stellar) processReservation(reservation workloads.Reservation) (types.C
 
 	details := make([]types.EscrowDetail, 0, len(res))
 	for farmer, value := range res {
-		if err != nil {
-			return customerInfo, errors.Wrap(err, "failed to create or load account")
-		}
 		details = append(details, types.EscrowDetail{
 			FarmerID:    schema.ID(farmer),
 			TotalAmount: value,
@@ -372,17 +369,12 @@ func (e *Stellar) payoutFarmers(id schema.ID) error {
 		log.Error().Msgf("failed to load escrow address info: %s", err)
 		return errors.Wrap(err, "could not load escrow address info")
 	}
-	kp, err := e.wallet.KeyPairFromSeed(addressInfo.Secret)
-	if err != nil {
-		log.Error().Msgf("failed to parse escrow address secret: %s", err)
-		return errors.Wrap(err, "could not load escrow address info")
-	}
-	if err = e.wallet.PayoutFarmers(*kp, paymentInfo, id); err != nil {
+	if err = e.wallet.PayoutFarmers(addressInfo.Secret, paymentInfo, id); err != nil {
 		log.Error().Msgf("failed to pay farmer: %s for reservation %d", err, id)
 		return errors.Wrap(err, "could not pay farmer")
 	}
 	// now refund any possible overpayment
-	if err = e.wallet.Refund(*kp, id); err != nil {
+	if err = e.wallet.Refund(addressInfo.Secret, id); err != nil {
 		log.Error().Msgf("failed to refund overpayment farmer: %s", err)
 		return errors.Wrap(err, "could not refund overpayment")
 	}
@@ -411,12 +403,7 @@ func (e *Stellar) refundEscrow(escrowInfo types.ReservationPaymentInformation) e
 		return errors.Wrap(err, "failed to load escrow info")
 	}
 
-	kp, err := e.wallet.KeyPairFromSeed(addressInfo.Secret)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse escrow address secret")
-	}
-
-	if err = e.wallet.Refund(*kp, escrowInfo.ReservationID); err != nil {
+	if err = e.wallet.Refund(addressInfo.Secret, escrowInfo.ReservationID); err != nil {
 		return errors.Wrap(err, "failed to refund clients")
 	}
 
@@ -449,30 +436,30 @@ func (e *Stellar) ReservationCanceled(reservationID schema.ID) {
 	e.cancelledChannel <- reservationID
 }
 
-// createOrLoadAccount creates or loads account based on farmer - customer id
+// createOrLoadAccount creates or loads account based on  customer id
 func (e *Stellar) createOrLoadAccount(customerTID int64) (string, error) {
 	res, err := types.CustomerAddressGet(context.Background(), e.db, customerTID)
 	if err != nil {
 		if err == types.ErrAddressNotFound {
-			keypair, err := e.wallet.CreateAccount()
+			seed, address, err := e.wallet.CreateAccount()
 			if err != nil {
 				return "", errors.Wrapf(err, "failed to create a new account for customer %d", customerTID)
 			}
 			err = types.CustomerAddressCreate(context.Background(), e.db, types.CustomerAddress{
 				CustomerTID: customerTID,
-				Address:     keypair.Address(),
-				Secret:      keypair.Seed(),
+				Address:     address,
+				Secret:      seed,
 			})
 			if err != nil {
 				return "", errors.Wrapf(err, "failed to save a new account for customer %d", customerTID)
 			}
 			log.Debug().
 				Int64("customer", int64(customerTID)).
-				Str("address", keypair.Address()).
-				Msgf("created new escrow address for farmer-customer")
-			return keypair.Address(), nil
+				Str("address", address).
+				Msgf("created new escrow address for customer")
+			return address, nil
 		}
-		return "", errors.Wrap(err, "failed to get farmer - customer address")
+		return "", errors.Wrap(err, "failed to get customer address")
 	}
 	log.Debug().
 		Int64("customer", int64(customerTID)).

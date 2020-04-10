@@ -87,6 +87,16 @@ func main() {
 							Usage:    "wallet address asset (TFT, FreeTFT)",
 							Required: true,
 						},
+						cli.StringSliceFlag{
+							Name:     "email",
+							Usage:    "email address of the farmer. It is used to send communication to the farmer and for the minting",
+							Required: true,
+						},
+						cli.StringSliceFlag{
+							Name:     "iyo_organization",
+							Usage:    "the It'sYouOnline organization used by your farm in v1",
+							Required: false,
+						},
 					},
 					Action: registerFarm,
 				},
