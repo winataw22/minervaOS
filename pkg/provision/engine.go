@@ -100,18 +100,24 @@ func (e *defaultEngine) Run(ctx context.Context) error {
 					continue
 				}
 			}
-			counters := e.store.Counters()
-			amount := directory.ResourceAmount{
-				Sru: counters.SRU.Current(),
-				Hru: counters.MRU.Current(),
-				Cru: counters.CRU.Current(),
-				Mru: counters.MRU.Current(),
-			}
-			if err := e.cl.Directory.NodeUpdateUsedResources(e.nodeID, amount); err != nil {
+
+			if err := e.cl.Directory.NodeUpdateUsedResources(e.nodeID, e.resourceAmount()); err != nil {
 				log.Error().Err(err).Msg("failed to updated the used resources")
 			}
 		}
 	}
+}
+
+func (e *defaultEngine) resourceAmount() directory.ResourceAmount {
+	counters := e.store.Counters()
+	amount := directory.ResourceAmount{
+		Sru: counters.SRU.Current(),
+		Hru: counters.HRU.Current(),
+		Cru: counters.CRU.Current(),
+		Mru: counters.MRU.Current(),
+	}
+	log.Info().Msgf("%+v", amount)
+	return amount
 }
 
 func (e *defaultEngine) provision(ctx context.Context, r *Reservation) error {
