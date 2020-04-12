@@ -221,9 +221,9 @@ func embed(schema interface{}, t provision.ReservationType, node string) (*provi
 
 func cmdsDeleteReservation(c *cli.Context) error {
 	var (
-		resID    = c.Int64("reservation")
-		userID   = mainui.ThreebotID
-		seedPath = c.String("seed")
+		resID  = c.Int64("reservation")
+		userID = mainui.ThreebotID
+		//seedPath = c.GlobalString("seed")
 	)
 
 	reservation, err := bcdb.Workloads.Get(schema.ID(resID))
@@ -231,9 +231,9 @@ func cmdsDeleteReservation(c *cli.Context) error {
 		return errors.Wrap(err, "failed to get reservation info")
 	}
 
-	signer, err := client.NewSignerFromFile(seedPath)
+	signer, err := client.NewSigner(mainui.Key().PrivateKey.Seed())
 	if err != nil {
-		return errors.Wrapf(err, "could not find seed file at %s", seedPath)
+		return errors.Wrapf(err, "failed to load signer")
 	}
 
 	_, signature, err := signer.SignHex(resID, reservation.Json)

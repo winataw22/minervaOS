@@ -269,14 +269,20 @@ func (s *NodeAPI) updateReservedResources(r *http.Request) (interface{}, mw.Resp
 		return nil, mw.Forbidden(fmt.Errorf("trying to update reserved capacity for nodeID %s while you are %s", nodeID, hNodeID))
 	}
 
-	var resources generated.ResourceAmount
+	input := struct {
+		generated.ResourceAmount
+		generated.WorkloadAmount
+	}{}
 
-	if err := json.NewDecoder(r.Body).Decode(&resources); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		return nil, mw.BadRequest(err)
 	}
 
 	db := mw.Database(r)
-	if err := s.updateReservedCapacity(r.Context(), db, nodeID, resources); err != nil {
+	if err := s.updateReservedCapacity(r.Context(), db, nodeID, input.ResourceAmount); err != nil {
+		return nil, mw.NotFound(err)
+	}
+	if err := s.updateWorkloadsAmount(r.Context(), db, nodeID, input.WorkloadAmount); err != nil {
 		return nil, mw.NotFound(err)
 	}
 

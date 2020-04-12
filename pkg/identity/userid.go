@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/tyler-smith/go-bip39"
+	"golang.org/x/crypto/ed25519"
 
 	"github.com/threefoldtech/zos/pkg/versioned"
 )
@@ -95,4 +96,14 @@ func (u *UserIdentity) Save(path string) error {
 	versioned.WriteFile(path, seedVersion11, buf, 0400)
 
 	return nil
+}
+
+// PrivateKey implements the client.Identity interface
+func (u *UserIdentity) PrivateKey() ed25519.PrivateKey {
+	return u.Key().PrivateKey
+}
+
+// Identity implements the Identifier interface
+func (u *UserIdentity) Identity() string {
+	return fmt.Sprintf("%d", u.ThreebotID)
 }

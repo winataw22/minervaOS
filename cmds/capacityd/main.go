@@ -65,10 +65,10 @@ func cap(ctx context.Context, client zbus.Client) {
 	}
 
 	ru := directory.ResourceAmount{
-		Cru: int64(resources.CRU),
-		Mru: int64(resources.MRU),
-		Hru: int64(resources.HRU),
-		Sru: int64(resources.SRU),
+		Cru: resources.CRU,
+		Mru: float64(resources.MRU),
+		Hru: float64(resources.HRU),
+		Sru: float64(resources.SRU),
 	}
 
 	setCapacity := func() error {

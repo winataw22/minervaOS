@@ -14,7 +14,7 @@ import (
 
 var (
 	db     client.Directory
-	userid identity.UserIdentity
+	userid *identity.UserIdentity
 )
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "bcdb, b",
 			Usage:  "URL of the BCDB",
-			Value:  "https://explorer.devnet.grid.tf",
+			Value:  "https://explorer.devnet.grid.tf/explorer",
 			EnvVar: "BCDB_URL",
 		},
 	}
@@ -56,7 +56,7 @@ func main() {
 		}
 
 		url := c.String("bcdb")
-		cl, err := client.NewClient(url, userid.Key())
+		cl, err := client.NewClient(url, userid)
 		if err != nil {
 			return errors.Wrap(err, "failed to create client to bcdb")
 		}

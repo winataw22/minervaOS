@@ -109,6 +109,13 @@ func (d *httpDirectory) NodeUpdateUptime(id string, uptime uint64) error {
 	return d.post(d.url("nodes", id, "uptime"), input, nil, http.StatusOK)
 }
 
-func (d *httpDirectory) NodeUpdateUsedResources(id string, amount directory.ResourceAmount) error {
-	return d.post(d.url("nodes", id, "used_resources"), amount, nil, http.StatusOK)
+func (d *httpDirectory) NodeUpdateUsedResources(id string, resources directory.ResourceAmount, workloads directory.WorkloadAmount) error {
+	input := struct {
+		directory.ResourceAmount
+		directory.WorkloadAmount
+	}{
+		resources,
+		workloads,
+	}
+	return d.post(d.url("nodes", id, "used_resources"), input, nil, http.StatusOK)
 }

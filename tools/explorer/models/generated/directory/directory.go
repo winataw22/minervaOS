@@ -82,6 +82,7 @@ type Node struct {
 	TotalResources    ResourceAmount `bson:"total_resources" json:"total_resources"`
 	UsedResources     ResourceAmount `bson:"used_resources" json:"used_resources"`
 	ReservedResources ResourceAmount `bson:"reserved_resources" json:"reserved_resources"`
+	Workloads         WorkloadAmount `bson:"workloads" json:"workloads"`
 	Proofs            []Proof        `bson:"proofs" json:"proofs"`
 	Ifaces            []Iface        `bson:"ifaces" json:"ifaces"`
 	PublicConfig      *PublicIface   `bson:"public_config,omitempty" json:"public_config"`
@@ -136,15 +137,32 @@ func NewPublicIface() (PublicIface, error) {
 }
 
 type ResourceAmount struct {
-	Cru int64 `bson:"cru" json:"cru"`
-	Mru int64 `bson:"mru" json:"mru"`
-	Hru int64 `bson:"hru" json:"hru"`
-	Sru int64 `bson:"sru" json:"sru"`
+	Cru uint64  `bson:"cru" json:"cru"`
+	Mru float64 `bson:"mru" json:"mru"`
+	Hru float64 `bson:"hru" json:"hru"`
+	Sru float64 `bson:"sru" json:"sru"`
 }
 
 func NewResourceAmount() (ResourceAmount, error) {
 	const value = "{}"
 	var object ResourceAmount
+	if err := json.Unmarshal([]byte(value), &object); err != nil {
+		return object, err
+	}
+	return object, nil
+}
+
+type WorkloadAmount struct {
+	Network      uint16 `bson:"network" json:"network"`
+	Volume       uint16 `bson:"volume" json:"volume"`
+	ZDBNamespace uint16 `bson:"zdb_namespace" json:"zdb_namespace"`
+	Container    uint16 `bson:"container" json:"container"`
+	K8sVM        uint16 `bson:"k8s_vm" json:"k8s_vm"`
+}
+
+func NewWorkloadAmount() (WorkloadAmount, error) {
+	const value = "{}"
+	var object WorkloadAmount
 	if err := json.Unmarshal([]byte(value), &object); err != nil {
 		return object, err
 	}

@@ -3,7 +3,11 @@ package provision
 import (
 	"encoding/json"
 	"fmt"
-	"math"
+)
+
+const (
+	mib = uint64(1024 * 1024)
+	gib = uint64(mib * 1024)
 )
 
 func (s *FSStore) processResourceUnits(r *Reservation, addOrRemoveBool bool) error {
@@ -43,10 +47,10 @@ func (s *FSStore) processResourceUnits(r *Reservation, addOrRemoveBool bool) err
 }
 
 type resourceUnits struct {
-	SRU int64 `json:"sru,omitempty"`
-	HRU int64 `json:"hru,omitempty"`
-	MRU int64 `json:"mru,omitempty"`
-	CRU int64 `json:"cru,omitempty"`
+	SRU uint64 `json:"sru,omitempty"`
+	HRU uint64 `json:"hru,omitempty"`
+	MRU uint64 `json:"mru,omitempty"`
+	CRU uint64 `json:"cru,omitempty"`
 }
 
 func processVolume(r *Reservation) (u resourceUnits, err error) {
@@ -55,12 +59,12 @@ func processVolume(r *Reservation) (u resourceUnits, err error) {
 		return u, err
 	}
 
-	// volume.size and SRU is in GiB, not conversion needed
+	// volume.size and SRU is in GiB
 	switch volume.Type {
 	case SSDDiskType:
-		u.SRU = int64(volume.Size)
+		u.SRU = volume.Size * gib
 	case HDDDiskType:
-		u.HRU = int64(volume.Size)
+		u.HRU = volume.Size * gib
 	}
 
 	return u, nil
@@ -71,9 +75,10 @@ func processContainer(r *Reservation) (u resourceUnits, err error) {
 	if err = json.Unmarshal(r.Data, &cont); err != nil {
 		return u, err
 	}
-	u.CRU = int64(cont.Capacity.CPU)
-	// memory is in MiB, but MRU is in GiB
-	u.MRU = int64(math.Ceil(float64(cont.Capacity.Memory) / 1024.0))
+	u.CRU = uint64(cont.Capacity.CPU)
+	// memory is in MiB
+	u.MRU = cont.Capacity.Memory * mib
+	u.SRU = 256 * mib // 250MiB are allocated on SSD for the root filesystem used by the flist
 
 	return u, nil
 }
@@ -89,9 +94,9 @@ func processZdb(r *Reservation) (u resourceUnits, err error) {
 
 	switch zdbVolume.DiskType {
 	case "SSD":
-		u.SRU = int64(zdbVolume.Size)
+		u.SRU = zdbVolume.Size * gib
 	case "HDD":
-		u.HRU = int64(zdbVolume.Size)
+		u.HRU = zdbVolume.Size * gib
 	}
 
 	return u, nil
@@ -107,12 +112,12 @@ func processKubernetes(r *Reservation) (u resourceUnits, err error) {
 	switch k8s.Size {
 	case 1:
 		u.CRU = 1
-		u.MRU = 2
-		u.SRU = 50
+		u.MRU = 2 * gib
+		u.SRU = 50 * gib
 	case 2:
 		u.CRU = 2
-		u.MRU = 4
-		u.SRU = 100
+		u.MRU = 4 * gib
+		u.SRU = 100 * gib
 	}
 
 	return u, nil

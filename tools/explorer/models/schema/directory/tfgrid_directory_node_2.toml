@@ -13,6 +13,7 @@ location = (O) !tfgrid.directory.location.1
 total_resources = (O) !tfgrid.directory.node.resource.amount.1
 used_resources = (O) !tfgrid.directory.node.resource.amount.1
 reserved_resources = (O) !tfgrid.directory.node.resource.amount.1
+workloads = (O)!tfgrid.directory.node.resource.workloads.1
 proofs = (LO) !tfgrid.directory.node.proof.1
 ifaces = (LO) !tfgrid.directory.node.iface.1
 public_config = (O)!tfgrid.directory.node.public_iface.1
@@ -46,6 +47,13 @@ cru** = (I)
 mru** = (I)
 hru** = (I)
 sru** = (I)
+
+@url = tfgrid.directory.node.resource.workloads.1
+network = (I)
+volume = (I)
+zdb_namespace = (I)
+container = (I)
+k8s_vm = (I)
 
 @url = tfgrid.directory.node.proof.1
 created = (T)

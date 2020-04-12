@@ -237,6 +237,11 @@ func NodeUpdateUsedResources(ctx context.Context, db *mongo.Database, nodeID str
 	return nodeUpdate(ctx, db, nodeID, bson.M{"used_resources": capacity})
 }
 
+// NodeUpdateWorkloadsAmount sets the node reserved resources
+func NodeUpdateWorkloadsAmount(ctx context.Context, db *mongo.Database, nodeID string, workloads generated.WorkloadAmount) error {
+	return nodeUpdate(ctx, db, nodeID, bson.M{"workloads": workloads})
+}
+
 // NodeUpdateUptime updates node uptime
 func NodeUpdateUptime(ctx context.Context, db *mongo.Database, nodeID string, uptime int64) error {
 	return nodeUpdate(ctx, db, nodeID, bson.M{

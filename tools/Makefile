@@ -6,7 +6,7 @@ ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revisio
 
 _base: $(shell ls -d */)
 
-all: _base
+all: _base explorer
 	strip $(OUT)/*
 
 .PHONY: output clean
@@ -16,6 +16,7 @@ getdeps:
 	@echo "Installing gocyclo" && go install github.com/fzipp/gocyclo
 	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell
 	@echo "Installing ineffassign" && go install github.com/gordonklaus/ineffassign
+	@echo "Installing statik" && go install github.com/rakyll/statik
 
 verifiers: vet fmt lint cyclo spelling static
 
@@ -25,11 +26,11 @@ vet:
 
 fmt:
 	@echo "Running $@"
-	@gofmt -d .
+	@gofmt -d $(shell ls **/*.go | grep -v statik)
 
 lint:
 	@echo "Running $@"
-	golint -set_exit_status $(shell go list ./... | grep -v stubs | grep -v generated| grep -v migrations)
+	golint -set_exit_status $(shell go list ./... | grep -v stubs | grep -v generated| grep -v migrations | grep -v statik)
 
 ineffassign:
 	@echo "Running $@"
@@ -41,7 +42,7 @@ cyclo:
 
 
 spelling:
-	misspell -i monitord -error `find .`
+	misspell -i monitord -error $(shell ls **/*.go | grep -v statik)
 
 static:
 	go run honnef.co/go/tools/cmd/staticcheck -- ./...
@@ -62,4 +63,10 @@ testrace: verifiers
 
 
 %: %/*.go output
+	cd $(shell dirname $<) && go build -ldflags $(ldflags)
+
+explorer/: explorer/*.go output
+	cd $(shell dirname $<)/frontend && yarn install
+	cd $(shell dirname $<)/frontend && NODE_ENV=production yarn build
+	cd $(shell dirname $<) && go generate
 	cd $(shell dirname $<) && go build -ldflags $(ldflags)

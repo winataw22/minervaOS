@@ -148,6 +148,10 @@ func (s *NodeAPI) updateFreeToUse(ctx context.Context, db *mongo.Database, nodeI
 	return directory.NodeUpdateFreeToUse(ctx, db, nodeID, freeToUse)
 }
 
+func (s *NodeAPI) updateWorkloadsAmount(ctx context.Context, db *mongo.Database, nodeID string, workloads generated.WorkloadAmount) error {
+	return directory.NodeUpdateWorkloadsAmount(ctx, db, nodeID, workloads)
+}
+
 // StoreProof stores node hardware proof
 func (s *NodeAPI) StoreProof(ctx context.Context, db *mongo.Database, nodeID string, dmi dmi.DMI, disks capacity.Disks, hypervisor []string) error {
 	var err error

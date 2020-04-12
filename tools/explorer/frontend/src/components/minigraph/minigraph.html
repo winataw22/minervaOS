@@ -1,0 +1,18 @@
+<section class="minigraph">
+  <v-card v-if="!clickable" color="secondary darken-2 " dark style="height: 100%">
+    <v-card-text class="pb-3 fill-height">
+      <v-layout column align-center justify-center class="fill-height">
+        <span class="title font-weight-bold">{{val}} {{byte_head}}</span>
+        <span class="body-2 font-weight-bold" v-if="title">{{title}}</span>
+      </v-layout>
+    </v-card-text>
+  </v-card>
+  <v-card v-if="clickable" color="secondary darken-2 " dark style="height: 100%; style=cursor: pointer" @click="$emit('click')" >
+      <v-card-text class="pb-3 fill-height">
+        <v-layout column align-center justify-center class="fill-height">
+          <span class="title font-weight-bold">{{val}} {{byte_head}}</span>
+          <span class="body-2 font-weight-bold" v-if="title">{{title}}</span>
+        </v-layout>
+      </v-card-text>
+    </v-card>
+</section>

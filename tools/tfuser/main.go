@@ -14,7 +14,7 @@ import (
 
 var (
 	bcdb     *client.Client
-	mainui   identity.UserIdentity
+	mainui   *identity.UserIdentity
 	bcdbAddr string
 	mainSeed string
 )
@@ -41,7 +41,7 @@ func main() {
 		cli.StringFlag{
 			Name:   "bcdb, u",
 			Usage:  "URL of the BCDB",
-			Value:  "https://explorer.devnet.grid.tf",
+			Value:  "https://explorer.devnet.grid.tf/explorer",
 			EnvVar: "BCDB_URL",
 		},
 
@@ -70,7 +70,7 @@ func main() {
 				return err
 			}
 
-			bcdb, err = client.NewClient(bcdbAddr, mainui.Key())
+			bcdb, err = client.NewClient(bcdbAddr, mainui)
 			if err != nil {
 				return err
 			}
@@ -137,6 +137,27 @@ func main() {
 						},
 					},
 					Action: cmdsConvertID,
+				},
+				{
+					Name:  "import",
+					Usage: "import an key using a mnemonic seed",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "mnemonic",
+							Usage: "generate a key from given mnemonic",
+						},
+						cli.StringFlag{
+							Name:  "output,o",
+							Usage: "output path of the identity seed",
+							Value: "user.seed",
+						},
+						cli.IntFlag{
+							Name:  "tid",
+							Usage: "threebot id",
+							Value: 0,
+						},
+					},
+					Action: cmdsImportID,
 				},
 				{
 					Name:   "show",

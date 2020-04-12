@@ -56,7 +56,7 @@ func cmdsGenerateID(c *cli.Context) error {
 	}
 
 	log.Debug().Msg("initializing client with created key")
-	bcdb, err = client.NewClient(bcdbAddr, ui.Key())
+	bcdb, err = client.NewClient(bcdbAddr, ui)
 	if err != nil {
 		return err
 	}
@@ -120,6 +120,31 @@ func cmdsConvertID(c *cli.Context) error {
 	}
 
 	return nil
+}
+
+func cmdsImportID(c *cli.Context) error {
+	tid := c.Uint64("tid")
+	mnemonic := c.String("mnemonic")
+	ui := &identity.UserIdentity{ThreebotID: tid}
+
+	log.Info().Msgf("building key using existing mnemonic '%s'", mnemonic)
+
+	if err := ui.FromMnemonic(mnemonic); err != nil {
+		return err
+	}
+
+	// Saving new seed struct
+	output := c.String("output")
+	if err := ui.Save(output); err != nil {
+		return errors.Wrap(err, "failed to save seed")
+	}
+
+	fmt.Printf("ThreeBot ID  : %d\n", ui.ThreebotID)
+	fmt.Printf("Public Key   : %s\n", hex.EncodeToString(ui.Key().PublicKey))
+	fmt.Printf("Mnemonic     : %s\n", ui.Mnemonic)
+	fmt.Printf("Seed saved to: %s\n", output)
+	return nil
+
 }
 
 func cmdsShowID(c *cli.Context) error {

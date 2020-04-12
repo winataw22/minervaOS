@@ -108,10 +108,19 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	}
 
 	log.Debug().Str("flist", config.FList).Msg("mounting flist")
-	mnt, err := flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
+	var mnt string
+	mnt, err = flistClient.Mount(config.FList, config.FlistStorage, pkg.DefaultMountOptions)
 	if err != nil {
 		return ContainerResult{}, err
 	}
+
+	defer func() {
+		if err != nil {
+			if err := flistClient.Umount(mnt); err != nil {
+				log.Error().Err(err).Str("mnt", mnt).Msg("failed to unmount container root")
+			}
+		}
+	}()
 
 	var env []string
 	for k, v := range config.Env {
@@ -128,8 +137,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 
 	var mounts []pkg.MountInfo
 	for _, mount := range config.Mounts {
-
-		owner, err := cache.OwnerOf(mount.VolumeID)
+		var owner string
+		owner, err = cache.OwnerOf(mount.VolumeID)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
 		}
@@ -144,8 +153,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		if err := os.MkdirAll(path.Join(mnt, mountpoint), 0755); err != nil {
 			return ContainerResult{}, err
 		}
-
-		source, err := storageClient.Path(mount.VolumeID)
+		var source string
+		source, err = storageClient.Path(mount.VolumeID)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
 		}
@@ -171,8 +180,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 	for i, ip := range config.Network.IPs {
 		ips[i] = ip.String()
 	}
-
-	join, err := networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
+	var join pkg.Member
+	join, err = networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
 	if err != nil {
 		return ContainerResult{}, err
 	}
@@ -195,7 +204,8 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 		Str("container", reservation.ID).
 		Msg("assigned an IP")
 
-	id, err := containerClient.Run(
+	var id pkg.ContainerID
+	id, err = containerClient.Run(
 		tenantNS,
 		pkg.Container{
 			Name:   containerID,

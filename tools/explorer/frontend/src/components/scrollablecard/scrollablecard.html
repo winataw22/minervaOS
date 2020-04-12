@@ -1,0 +1,31 @@
+<section class="scrollablecard">
+  <v-card class="fill-height">
+    <v-card-title primary-title class="primary py-3 white--text">
+      <v-icon dark small left>{{icon}}</v-icon>
+      {{title}}
+      <v-spacer/>
+      <v-text-field v-if="!disableSearch" class="pt-0" dark  append-icon="fa-search" label="Search" single-line hide-details/>
+    </v-card-title>
+    <v-card-text class="pa-0 pb-3 fill-height" style="height: calc(100% - 56px); min-height: 300px;">
+      <div class="pa-0" style="position: relative; width: 100%; height: 100%; overflow: auto;">
+        <div style="position: absolute; height:100%; width: 100%;" class="pa-3">
+          <slot>
+            <v-card class="my-2" v-for="i in 100" :key="i">
+              <v-card-text>
+                <v-row class="px-2" align="center">
+                  <v-avatar color="secondary darken-2 ">
+                    <v-icon color="white">fas fa-exchange-alt</v-icon>
+                  </v-avatar>
+                  <v-col class="py-0">
+                    <div>Trade info</div>
+                    <div>Even more info</div>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+          </slot>
+        </div>
+      </div>
+    </v-card-text>
+  </v-card>
+</section>

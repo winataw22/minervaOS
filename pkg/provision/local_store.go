@@ -19,43 +19,43 @@ import (
 // Counter interface
 type Counter interface {
 	// Increment counter atomically by v
-	Increment(v int64) int64
+	Increment(v uint64) uint64
 	// Decrement counter atomically by v
-	Decrement(v int64) int64
+	Decrement(v uint64) uint64
 	// Current returns the current value
-	Current() int64
+	Current() uint64
 }
 
 type counterNop struct{}
 
-func (c *counterNop) Increment(v int64) int64 {
+func (c *counterNop) Increment(v uint64) uint64 {
 	return 0
 }
 
-func (c *counterNop) Decrement(v int64) int64 {
+func (c *counterNop) Decrement(v uint64) uint64 {
 	return 0
 }
 
-func (c *counterNop) Current() int64 {
+func (c *counterNop) Current() uint64 {
 	return 0
 }
 
 // counterImpl value for safe increment/decrement
-type counterImpl int64
+type counterImpl uint64
 
 // Increment counter atomically by one
-func (c *counterImpl) Increment(v int64) int64 {
-	return atomic.AddInt64((*int64)(c), v)
+func (c *counterImpl) Increment(v uint64) uint64 {
+	return atomic.AddUint64((*uint64)(c), v)
 }
 
 // Decrement counter atomically by one
-func (c *counterImpl) Decrement(v int64) int64 {
-	return atomic.AddInt64((*int64)(c), -v)
+func (c *counterImpl) Decrement(v uint64) uint64 {
+	return atomic.AddUint64((*uint64)(c), -v)
 }
 
 // Current returns the current value
-func (c *counterImpl) Current() int64 {
-	return atomic.LoadInt64((*int64)(c))
+func (c *counterImpl) Current() uint64 {
+	return atomic.LoadUint64((*uint64)(c))
 }
 
 type (
@@ -77,10 +77,10 @@ type (
 		vms        counterImpl
 		debugs     counterImpl
 
-		SRU counterImpl
-		HRU counterImpl
-		MRU counterImpl
-		CRU counterImpl
+		SRU counterImpl // SSD storage in bytes
+		HRU counterImpl // HDD storage in bytes
+		MRU counterImpl // Memory storage in bytes
+		CRU counterImpl // CPU count absolute
 	}
 )
 
@@ -109,6 +109,8 @@ func NewFSStore(root string) (*FSStore, error) {
 	return store, store.sync()
 }
 
+//TODO: i think both sync and removeAllButPersistent can be merged into
+// one method because now it scans the same directory twice.
 func (s *FSStore) removeAllButPersistent(rootPath string) error {
 	// if rootPath is not present on the filesystem, return
 	_, err := os.Stat(rootPath)
