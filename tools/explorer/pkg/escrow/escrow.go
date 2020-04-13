@@ -14,7 +14,7 @@ import (
 // Escrow are responsible for the payment flow of a reservation
 type Escrow interface {
 	Run(ctx context.Context) error
-	RegisterReservation(reservation workloads.Reservation) (types.CustomerEscrowInformation, error)
+	RegisterReservation(reservation workloads.Reservation, supportedCurrencies []string) (types.CustomerEscrowInformation, error)
 	ReservationDeployed(reservationID schema.ID)
 	ReservationCanceled(reservationID schema.ID)
 }
@@ -33,7 +33,7 @@ func (e *Free) Run(ctx context.Context) error {
 }
 
 // RegisterReservation implements the escrow interface
-func (e *Free) RegisterReservation(reservation workloads.Reservation) (detail types.CustomerEscrowInformation, err error) {
+func (e *Free) RegisterReservation(reservation workloads.Reservation, _ []string) (detail types.CustomerEscrowInformation, err error) {
 
 	if reservation.NextAction == workloads.NextActionPay {
 		if err = workloadstypes.ReservationSetNextAction(context.Background(), e.db, reservation.ID, workloads.NextActionDeploy); err != nil {

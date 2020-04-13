@@ -13,6 +13,7 @@ import (
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/container/logger"
+	"github.com/threefoldtech/zos/pkg/container/stats"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -54,6 +55,8 @@ type Container struct {
 	Capacity ContainerCapacity `json:"capacity"`
 	// Logs contains a list of endpoint where to send containerlogs
 	Logs []logger.Logs `json:"logs,omitempty"`
+	// StatsAggregator container metrics backend
+	StatsAggregator []stats.Aggregator
 }
 
 // ContainerResult is the information return to the BCDB
@@ -214,12 +217,13 @@ func containerProvisionImpl(ctx context.Context, reservation *Reservation) (Cont
 			Network: pkg.NetworkInfo{
 				Namespace: join.Namespace,
 			},
-			Mounts:      mounts,
-			Entrypoint:  config.Entrypoint,
-			Interactive: config.Interactive,
-			CPU:         config.Capacity.CPU,
-			Memory:      config.Capacity.Memory * 1024 * 1024,
-			Logs:        config.Logs,
+			Mounts:          mounts,
+			Entrypoint:      config.Entrypoint,
+			Interactive:     config.Interactive,
+			CPU:             config.Capacity.CPU,
+			Memory:          config.Capacity.Memory * 1024 * 1024,
+			Logs:            config.Logs,
+			StatsAggregator: config.StatsAggregator,
 		},
 	)
 	if err != nil {

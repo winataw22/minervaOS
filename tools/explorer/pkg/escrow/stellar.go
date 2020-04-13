@@ -3,13 +3,13 @@ package escrow
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/stellar/go/xdr"
 	"github.com/threefoldtech/zos/pkg/schema"
-	"github.com/threefoldtech/zos/tools/explorer/config"
 	gdirectory "github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 	"github.com/threefoldtech/zos/tools/explorer/models/generated/workloads"
 	"github.com/threefoldtech/zos/tools/explorer/pkg/directory"
@@ -23,8 +23,9 @@ import (
 type (
 	// Stellar service manages a dedicate wallet for payments for reservations.
 	Stellar struct {
-		wallet *stellar.Wallet
-		db     *mongo.Database
+		foundationAddress string
+		wallet            *stellar.Wallet
+		db                *mongo.Database
 
 		reservationChannel chan reservationRegisterJob
 		deployedChannel    chan schema.ID
@@ -49,8 +50,9 @@ type (
 	}
 
 	reservationRegisterJob struct {
-		reservation  workloads.Reservation
-		responseChan chan reservationRegisterJobResponse
+		reservation            workloads.Reservation
+		supportedCurrencyCodes []string
+		responseChan           chan reservationRegisterJobResponse
 	}
 
 	reservationRegisterJobResponse struct {
@@ -64,15 +66,35 @@ const (
 	balanceCheckInterval = time.Minute * 1
 )
 
+const (
+	// amount of digits of precision a calculated reservation cost has, at worst
+	costPrecision = 6
+)
+
+var (
+	// ErrNoCurrencySupported indicates a reservation was offered but none of the currencies
+	// the farmer wants to pay in are currently supported
+	ErrNoCurrencySupported = errors.New("none of the offered currencies are currently supported")
+	// ErrNoCurrencyShared indicates that none of the currencies offered in the reservation
+	// is supported by all farmers used
+	ErrNoCurrencyShared = errors.New("none of the provided currencies is supported by all farmers")
+)
+
 // NewStellar creates a new escrow object and fetches all addresses for the escrow wallet
-func NewStellar(wallet *stellar.Wallet, db *mongo.Database) *Stellar {
+func NewStellar(wallet *stellar.Wallet, db *mongo.Database, foundationAddress string) *Stellar {
 	jobChannel := make(chan reservationRegisterJob)
 	deployChannel := make(chan schema.ID)
 	cancelChannel := make(chan schema.ID)
 
+	addr := foundationAddress
+	if addr == "" {
+		addr = wallet.PublicAddress()
+	}
+
 	return &Stellar{
 		wallet:             wallet,
 		db:                 db,
+		foundationAddress:  addr,
 		nodeAPI:            &directory.NodeAPI{},
 		farmAPI:            &directory.FarmAPI{},
 		reservationChannel: jobChannel,
@@ -107,7 +129,7 @@ func (e *Stellar) Run(ctx context.Context) error {
 
 		case job := <-e.reservationChannel:
 			log.Info().Int64("reservation_id", int64(job.reservation.ID)).Msg("processing new reservation escrow for reservation")
-			details, err := e.processReservation(job.reservation)
+			details, err := e.processReservation(job.reservation, job.supportedCurrencyCodes)
 			if err != nil {
 				log.Error().
 					Err(err).
@@ -202,7 +224,7 @@ func (e *Stellar) checkReservationPaid(escrowInfo types.ReservationPaymentInform
 		requiredValue += escrowAccount.TotalAmount
 	}
 
-	balance, _, err := e.wallet.GetBalance(escrowInfo.Address, escrowInfo.ReservationID)
+	balance, _, err := e.wallet.GetBalance(escrowInfo.Address, escrowInfo.ReservationID, escrowInfo.Asset)
 	if err != nil {
 		return errors.Wrap(err, "failed to verify escrow account balance")
 	}
@@ -261,11 +283,62 @@ func (e *Stellar) checkReservationPaid(escrowInfo types.ReservationPaymentInform
 
 // processReservation processes a single reservation
 // calculates resources and their costs
-func (e *Stellar) processReservation(reservation workloads.Reservation) (types.CustomerEscrowInformation, error) {
+func (e *Stellar) processReservation(reservation workloads.Reservation, offeredCurrencyCodes []string) (types.CustomerEscrowInformation, error) {
 	var customerInfo types.CustomerEscrowInformation
+
+	// filter out unsupported currencies
+	currencies := []stellar.Asset{}
+	for _, offeredCurrency := range offeredCurrencyCodes {
+		asset, err := e.wallet.AssetFromCode(offeredCurrency)
+		if err != nil {
+			if err == stellar.ErrAssetCodeNotSupported {
+				continue
+			}
+			return customerInfo, err
+		}
+		// Sanity check
+		if _, exists := assetDistributions[asset]; !exists {
+			// no payout distribution info set, log error and treat as if the asset
+			// is not supported
+			log.Error().Msgf("asset %s supported by wallet but no payout distribution found in escrow", asset)
+			continue
+		}
+		currencies = append(currencies, asset)
+	}
+
+	if len(currencies) == 0 {
+		return customerInfo, ErrNoCurrencySupported
+	}
+
 	rsuPerFarmer, err := e.processReservationResources(reservation.DataReservation)
 	if err != nil {
 		return customerInfo, errors.Wrap(err, "failed to process reservation resources")
+	}
+
+	// check which currencies are accepted by all farmers
+	// the farm ids have conveniently been provided when checking the used rsu
+	farmIDs := make([]int64, 0, len(rsuPerFarmer))
+	var asset stellar.Asset
+	for _, currency := range currencies {
+		// if the farmer does not receive anything in the first place, they always
+		// all agree on this currency
+		if assetDistributions[currency].farmer == 0 {
+			asset = currency
+			break
+		}
+		// check if all used farms have an address for this asset set up
+		supported, err := e.checkAssetSupport(farmIDs, asset)
+		if err != nil {
+			return customerInfo, errors.Wrap(err, "could not verify asset support")
+		}
+		if supported {
+			asset = currency
+			break
+		}
+	}
+
+	if asset == "" {
+		return customerInfo, ErrNoCurrencyShared
 	}
 
 	res, err := e.calculateReservationCost(rsuPerFarmer)
@@ -290,6 +363,7 @@ func (e *Stellar) processReservation(reservation workloads.Reservation) (types.C
 		Address:       address,
 		ReservationID: reservation.ID,
 		Expiration:    reservation.DataReservation.ExpirationProvisioning,
+		Asset:         asset,
 		Paid:          false,
 		Canceled:      false,
 		Released:      false,
@@ -300,6 +374,7 @@ func (e *Stellar) processReservation(reservation workloads.Reservation) (types.C
 	}
 	log.Info().Int64("id", int64(reservation.ID)).Msg("processed reservation and created payment information")
 	customerInfo.Address = address
+	customerInfo.Asset = asset
 	customerInfo.Details = details
 	return customerInfo, nil
 }
@@ -337,31 +412,65 @@ func (e *Stellar) payoutFarmers(id schema.ID) error {
 		return nil
 	}
 
+	paymentDistribution, exists := assetDistributions[rpi.Asset]
+	if !exists {
+		return fmt.Errorf("no payment distribution found for asset %s", rpi.Asset)
+	}
+
+	// keep track of total amount to burn and to send to foundation
+	var toBurn, toFoundation xdr.Int64
+
 	// collect the farmer addresses and amount they should receive, we already
 	// have sufficient balance on the escrow to cover this
 	paymentInfo := make([]stellar.PayoutInfo, 0, len(rpi.Infos))
+
 	for _, escrowDetails := range rpi.Infos {
-		// in case of an error in this flow we continue, so we try to pay as much
-		// farmers as possible even if one fails
-		farm, err := e.farmAPI.GetByID(e.ctx, e.db, int64(escrowDetails.FarmerID))
-		if err != nil {
-			log.Error().Msgf("failed to load farm info: %s", err)
-			continue
-		}
+		farmerAmount, burnAmount, foundationAmount := e.splitPayout(escrowDetails.TotalAmount, paymentDistribution)
+		toBurn += burnAmount
+		toFoundation += foundationAmount
 
-		destination, err := addressByAsset(farm.WalletAddresses, config.Config.Asset)
-		if err != nil {
-			// FIXME: this is probably not ok, what do we do in this case ?
-			log.Error().Err(err).Msgf("failed to find address for %s for farmer %d", config.Config.Asset, farm.ID)
-			continue
-		}
+		if farmerAmount > 0 {
+			// in case of an error in this flow we continue, so we try to pay as much
+			// farmers as possible even if one fails
+			farm, err := e.farmAPI.GetByID(e.ctx, e.db, int64(escrowDetails.FarmerID))
+			if err != nil {
+				log.Error().Msgf("failed to load farm info: %s", err)
+				continue
+			}
 
+			destination, err := addressByAsset(farm.WalletAddresses, rpi.Asset)
+			if err != nil {
+				// FIXME: this is probably not ok, what do we do in this case ?
+				log.Error().Err(err).Msgf("failed to find address for %s for farmer %d", rpi.Asset.Code(), farm.ID)
+				continue
+			}
+
+			// farmerAmount can't be pooled so add an info immediately
+			paymentInfo = append(paymentInfo,
+				stellar.PayoutInfo{
+					Address: destination,
+					Amount:  farmerAmount,
+				},
+			)
+		}
+	}
+
+	// a burn is a transfer of tokens back to the issuer
+	if toBurn > 0 {
 		paymentInfo = append(paymentInfo,
 			stellar.PayoutInfo{
-				Address: destination,
-				Amount:  escrowDetails.TotalAmount,
-			},
-		)
+				Address: rpi.Asset.Issuer(),
+				Amount:  toBurn,
+			})
+	}
+
+	// ship remainder to the foundation
+	if toFoundation > 0 {
+		paymentInfo = append(paymentInfo,
+			stellar.PayoutInfo{
+				Address: e.foundationAddress,
+				Amount:  toFoundation,
+			})
 	}
 
 	addressInfo, err := types.CustomerAddressByAddress(e.ctx, e.db, rpi.Address)
@@ -369,12 +478,12 @@ func (e *Stellar) payoutFarmers(id schema.ID) error {
 		log.Error().Msgf("failed to load escrow address info: %s", err)
 		return errors.Wrap(err, "could not load escrow address info")
 	}
-	if err = e.wallet.PayoutFarmers(addressInfo.Secret, paymentInfo, id); err != nil {
+	if err = e.wallet.PayoutFarmers(addressInfo.Secret, paymentInfo, id, rpi.Asset); err != nil {
 		log.Error().Msgf("failed to pay farmer: %s for reservation %d", err, id)
 		return errors.Wrap(err, "could not pay farmer")
 	}
 	// now refund any possible overpayment
-	if err = e.wallet.Refund(addressInfo.Secret, id); err != nil {
+	if err = e.wallet.Refund(addressInfo.Secret, id, rpi.Asset); err != nil {
 		log.Error().Msgf("failed to refund overpayment farmer: %s", err)
 		return errors.Wrap(err, "could not refund overpayment")
 	}
@@ -403,7 +512,7 @@ func (e *Stellar) refundEscrow(escrowInfo types.ReservationPaymentInformation) e
 		return errors.Wrap(err, "failed to load escrow info")
 	}
 
-	if err = e.wallet.Refund(addressInfo.Secret, escrowInfo.ReservationID); err != nil {
+	if err = e.wallet.Refund(addressInfo.Secret, escrowInfo.ReservationID, escrowInfo.Asset); err != nil {
 		return errors.Wrap(err, "failed to refund clients")
 	}
 
@@ -412,10 +521,11 @@ func (e *Stellar) refundEscrow(escrowInfo types.ReservationPaymentInformation) e
 }
 
 // RegisterReservation registers a workload reservation
-func (e *Stellar) RegisterReservation(reservation workloads.Reservation) (types.CustomerEscrowInformation, error) {
+func (e *Stellar) RegisterReservation(reservation workloads.Reservation, supportedCurrencies []string) (types.CustomerEscrowInformation, error) {
 	job := reservationRegisterJob{
-		reservation:  reservation,
-		responseChan: make(chan reservationRegisterJobResponse),
+		reservation:            reservation,
+		supportedCurrencyCodes: supportedCurrencies,
+		responseChan:           make(chan reservationRegisterJobResponse),
 	}
 	e.reservationChannel <- job
 
@@ -469,9 +579,76 @@ func (e *Stellar) createOrLoadAccount(customerTID int64) (string, error) {
 	return res.Address, nil
 }
 
-func addressByAsset(addrs []gdirectory.WalletAddress, asset string) (string, error) {
+// splitPayout to a farmer in the amount the farmer receives, the amount to be burned,
+// and the amount the foundation receives
+func (e *Stellar) splitPayout(totalAmount xdr.Int64, distribution payoutDistribution) (xdr.Int64, xdr.Int64, xdr.Int64) {
+	// we can't just use big.Float for this calculation, since we need to verify
+	// the rounding afterwards
+
+	// calculate missing precision digits, to perform percentage division without
+	// floating point operations
+	requiredPrecision := 2 + costPrecision
+	missingPrecision := requiredPrecision - e.wallet.PrecisionDigits()
+
+	multiplier := int64(1)
+	if missingPrecision > 0 {
+		multiplier = int64(math.Pow10(missingPrecision))
+	}
+
+	amount := int64(totalAmount) * multiplier
+
+	baseAmount := amount / 100
+	farmerAmount := baseAmount * int64(distribution.farmer)
+	burnAmount := baseAmount * int64(distribution.burned)
+	foundationAmount := baseAmount * int64(distribution.foundation)
+
+	// collect parts which will be missing in division, if any
+	var change int64
+	change += farmerAmount % multiplier
+	change += burnAmount % multiplier
+	change += foundationAmount % multiplier
+
+	// change is now necessarily a multiple of multiplier
+	change /= multiplier
+	// we tracked all change which would be removed by the following integer
+	// devisions
+	farmerAmount /= multiplier
+	burnAmount /= multiplier
+	foundationAmount /= multiplier
+
+	// give change to whichever gets funds anyway, in the following order:
+	//  - farmer
+	//  - burned
+	//  - foundation
+	if farmerAmount != 0 {
+		farmerAmount += change
+	} else if burnAmount != 0 {
+		burnAmount += change
+	} else if foundationAmount != 0 {
+		foundationAmount += change
+	}
+
+	return xdr.Int64(farmerAmount), xdr.Int64(burnAmount), xdr.Int64(foundationAmount)
+}
+
+// checkAssetSupport for all unique farms in the reservation
+func (e *Stellar) checkAssetSupport(farmIDs []int64, asset stellar.Asset) (bool, error) {
+	for _, id := range farmIDs {
+		farm, err := e.farmAPI.GetByID(e.ctx, e.db, id)
+		if err != nil {
+			return false, errors.Wrap(err, "could not load farm")
+		}
+		if _, err := addressByAsset(farm.WalletAddresses, asset); err != nil {
+			// this only errors if the asset is not present
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func addressByAsset(addrs []gdirectory.WalletAddress, asset stellar.Asset) (string, error) {
 	for _, a := range addrs {
-		if a.Asset == asset && a.Address != "" {
+		if a.Asset == asset.Code() && a.Address != "" {
 			return a.Address, nil
 		}
 	}

@@ -19,6 +19,8 @@ results = (LO) !tfgrid.workloads.reservation.result.1
 @url = tfgrid.workloads.reservation.data.1
 #this one does not change over time
 description = "" (S)
+#list of acceptable currencies for this reservation
+currencies = (LS)
 #need toget to consensus
 signing_request_provision = (O) !tfgrid.workloads.reservation.signing.request.1
 signing_request_delete = (O) !tfgrid.workloads.reservation.signing.request.1

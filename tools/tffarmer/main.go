@@ -14,7 +14,7 @@ import (
 
 var (
 	db     client.Directory
-	userid *identity.UserIdentity
+	userid = &identity.UserIdentity{}
 )
 
 func main() {

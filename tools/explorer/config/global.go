@@ -10,8 +10,6 @@ import (
 // Settings struct
 type Settings struct {
 	Network string
-	Asset   string
-	Seed    string
 }
 
 var (
@@ -19,7 +17,6 @@ var (
 	Config Settings
 
 	possibleNetworks = []string{stellar.NetworkProduction, stellar.NetworkTest}
-	possibleAssets   = []string{stellar.TFTCode, stellar.FreeTFTCode}
 )
 
 // Valid checks if Config is filled with valid data
@@ -34,10 +31,6 @@ func Valid() error {
 	}
 	if Config.Network != "" && !in(Config.Network, possibleNetworks) {
 		return fmt.Errorf("invalid network '%s'", Config.Network)
-	}
-
-	if Config.Asset != "" && !in(Config.Asset, possibleAssets) {
-		return fmt.Errorf("invalid asset '%s'", Config.Asset)
 	}
 
 	return nil

@@ -714,15 +714,21 @@ func (n *networker) getAddresses(nsName, link string) ([]netlink.Addr, error) {
 	return addr, err
 }
 
-func (n *networker) monitorNS(ctx context.Context, name, link string) <-chan pkg.NetlinkAddresses {
+func (n *networker) monitorNS(ctx context.Context, name string, links ...string) <-chan pkg.NetlinkAddresses {
 	get := func() (pkg.NetlinkAddresses, error) {
 		var result pkg.NetlinkAddresses
-		values, err := n.getAddresses(name, link)
-		for _, value := range values {
-			result = append(result, pkg.NetlinkAddress(value))
+		for _, link := range links {
+			values, err := n.getAddresses(name, link)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, value := range values {
+				result = append(result, pkg.NetlinkAddress(value))
+			}
 		}
 
-		return result, err
+		return result, nil
 	}
 
 	addresses, _ := get()
@@ -772,7 +778,7 @@ func (n *networker) monitorNS(ctx context.Context, name, link string) <-chan pkg
 }
 
 func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.DMZPub4)
+	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.DMZPub4, ndmz.DMZPub6)
 }
 
 func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {

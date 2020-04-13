@@ -8,6 +8,7 @@ import (
 	"github.com/stellar/go/xdr"
 
 	"github.com/threefoldtech/zos/pkg/schema"
+	"github.com/threefoldtech/zos/tools/explorer/pkg/stellar"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -31,6 +32,7 @@ type (
 		ReservationID schema.ID      `bson:"_id"`
 		Address       string         `bson:"address"`
 		Expiration    schema.Date    `bson:"expiration"`
+		Asset         stellar.Asset  `bson:"asset"`
 		Infos         []EscrowDetail `bson:"infos"`
 		// Paid indicates the reservation escrows have been fully funded, and
 		// the reservation has been moved from the "PAY" state to the "DEPLOY"
@@ -60,6 +62,7 @@ type (
 	// to the customer once he creates a reservation
 	CustomerEscrowInformation struct {
 		Address string         `json:"address"`
+		Asset   stellar.Asset  `json:"asset"`
 		Details []EscrowDetail `json:"details"`
 	}
 )

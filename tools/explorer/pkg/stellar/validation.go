@@ -12,38 +12,20 @@ import (
 // AddressValidator validates stellar address
 type AddressValidator struct {
 	network string
-	asset   string
+	asset   Asset
 }
 
 // NewAddressValidator creates an address validator instance
-func NewAddressValidator(network, asset string) *AddressValidator {
-	return &AddressValidator{network: network, asset: asset}
-}
-
-func (a *AddressValidator) issuer() (string, error) {
-	switch a.asset {
-	case TFTCode:
-		switch a.network {
-		case NetworkProduction:
-			return tftIssuerProd, nil
-		case NetworkTest:
-			return tftIssuerTestnet, nil
-		default:
-			return "", fmt.Errorf("unsupported network %s for asset %s", a.network, a.asset)
-		}
-
-	case FreeTFTCode:
-		switch a.network {
-		case NetworkProduction:
-			return freeTftIssuerProd, nil
-		case NetworkTest:
-			return freeTftIssuerTestnet, nil
-		default:
-			return "", fmt.Errorf("unsupported network %s for asset %s", a.network, a.asset)
-		}
-	default:
-		return "", fmt.Errorf("unsupported network %s for asset %s", a.network, a.asset)
+func NewAddressValidator(network, assetCode string) (*AddressValidator, error) {
+	w, err := New("", network, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create wallet")
 	}
+	asset, err := w.AssetFromCode(assetCode)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not load asset code")
+	}
+	return &AddressValidator{network: network, asset: asset}, nil
 }
 
 // Valid validates a stellar address, and only return nil if address is valid
@@ -57,13 +39,10 @@ func (a *AddressValidator) Valid(address string) error {
 		return errors.Wrap(err, "invalid account address")
 	}
 
-	issuer, err := a.issuer()
-	if err != nil {
-		return err
-	}
+	issuer := a.asset.Issuer()
 
 	for _, balance := range account.Balances {
-		if balance.Code != a.asset || balance.Issuer != issuer {
+		if balance.Code != a.asset.Code() || balance.Issuer != issuer {
 			continue
 		}
 		limit, err := strconv.ParseFloat(balance.Limit, 64)

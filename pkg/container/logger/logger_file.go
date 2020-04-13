@@ -46,6 +46,15 @@ func NewFile(stdout string, stderr string) (io.Writer, io.Writer, error) {
 }
 
 // Write forwards write to underlaying layer
-func (c *File) Write(data []byte) (n int, err error) {
-	return c.target.Write(data)
+func (c *File) Write(data []byte) (int, error) {
+	n, err := c.target.Write(data)
+	if err != nil {
+		log.Error().Err(err).Msg("log file write")
+	}
+
+	if n != len(data) {
+		log.Error().Int("expected", len(data)).Int("written", n).Msg("log file write not complete")
+	}
+
+	return n, err
 }

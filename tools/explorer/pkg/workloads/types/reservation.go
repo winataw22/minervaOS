@@ -426,6 +426,40 @@ func (r *Reservation) IsSuccessfullyDeployed() bool {
 	return succeeded
 }
 
+// NodeIDs used by this reservation
+func (r *Reservation) NodeIDs() []string {
+	ids := make(map[string]struct{})
+	for _, w := range r.DataReservation.Containers {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Networks {
+		for _, nr := range w.NetworkResources {
+			ids[nr.NodeId] = struct{}{}
+		}
+	}
+
+	for _, w := range r.DataReservation.Zdbs {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Volumes {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	for _, w := range r.DataReservation.Kubernetes {
+		ids[w.NodeId] = struct{}{}
+	}
+
+	nodeIDs := make([]string, 0, len(ids))
+
+	for nid := range ids {
+		nodeIDs = append(nodeIDs, nid)
+	}
+
+	return nodeIDs
+}
+
 // ReservationCreate save new reservation to database.
 // NOTE: use reservations only that are returned from calling Pipeline.Next()
 // no validation is done here, this is just a CRUD operation

@@ -94,6 +94,7 @@ func cmdsProvision(c *cli.Context) error {
 		path     = c.String("schema")
 		seedPath = mainSeed
 		d        = c.String("duration")
+		assets   = c.StringSlice("asset")
 		userID   = int64(mainui.ThreebotID)
 		duration time.Duration
 		err      error
@@ -154,6 +155,9 @@ func cmdsProvision(c *cli.Context) error {
 	jsx.DataReservation.SigningRequestDelete.QuorumMin = 1
 	jsx.DataReservation.SigningRequestDelete.Signers = []int64{userID}
 
+	// set allowed the currencies as provided by the user
+	jsx.DataReservation.Currencies = assets
+
 	bytes, err := json.Marshal(jsx.DataReservation)
 	if err != nil {
 		return err
@@ -188,8 +192,9 @@ func cmdsProvision(c *cli.Context) error {
 	fmt.Println()
 
 	fmt.Printf("Reservation id: %d \n", response.ID)
+	fmt.Printf("Asset to pay: %s\n", response.EscrowInformation.Asset)
 	fmt.Printf("Reservation escrow address: %s \n", response.EscrowInformation.Address)
-	fmt.Printf("Reservation amount: %s \n", formatCurrency(totalAmount))
+	fmt.Printf("Reservation amount: %s %s\n", formatCurrency(totalAmount), response.EscrowInformation.Asset.Code())
 
 	for _, detail := range response.EscrowInformation.Details {
 		fmt.Println()

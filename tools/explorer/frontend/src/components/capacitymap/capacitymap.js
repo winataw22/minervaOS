@@ -27,7 +27,7 @@ export default {
     nodeLocation: function () {
       // Group nodes by country
       const groupedNodeLocations = groupBy(
-        this.nodes,
+        this.registeredNodes,
         node => node.location.country
       )
 

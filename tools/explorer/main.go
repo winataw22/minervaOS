@@ -43,23 +43,24 @@ func main() {
 	app.Initialize()
 
 	var (
-		listen       string
-		dbConf       string
-		dbName       string
-		seed         string
-		network      string
-		asset        string
-		ver          bool
-		flushEscrows bool
+		listen            string
+		dbConf            string
+		dbName            string
+		seed              string
+		foundationAddress string
+		ver               bool
+		flushEscrows      bool
+		backupSigners     stellar.Signers
 	)
 
 	flag.StringVar(&listen, "listen", ":8080", "listen address, default :8080")
 	flag.StringVar(&dbConf, "mongo", "mongodb://localhost:27017", "connection string to mongo database")
 	flag.StringVar(&dbName, "name", "explorer", "database name")
-	flag.StringVar(&config.Config.Seed, "seed", "", "wallet seed")
+	flag.StringVar(&seed, "seed", "", "wallet seed")
 	flag.StringVar(&config.Config.Network, "network", "", "tfchain network")
-	flag.StringVar(&config.Config.Asset, "asset", "", "which asset to use")
+	flag.StringVar(&foundationAddress, "foundation-address", "", "foundation address for the escrow foundation payment cut, if not set and the foundation should receive a cut from a resersvation payment, the wallet seed will receive the payment instead")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
+	flag.Var(&backupSigners, "backupsigner", "reusable flag which adds a signer to the escrow accounts, we need atleast 5 signers to activate multisig")
 	flag.BoolVar(&flushEscrows, "flush-escrows", false, "flush all escrows in the database, including currently active ones, and their associated addressses")
 
 	flag.Parse()
@@ -89,7 +90,7 @@ func main() {
 		log.Fatal().Err(err).Msg("fail to connect to database")
 	}
 
-	s, err := createServer(listen, dbName, client, network, seed, asset, dropEscrow)
+	s, err := createServer(listen, dbName, client, seed, foundationAddress, dropEscrow, backupSigners)
 	if err != nil {
 		log.Fatal().Err(err).Msg("fail to create HTTP server")
 	}
@@ -122,7 +123,7 @@ func connectDB(ctx context.Context, connectionURI string) (*mongo.Client, error)
 	return client, nil
 }
 
-func createServer(listen, dbName string, client *mongo.Client, network, seed string, asset string, dropEscrowData bool) (*http.Server, error) {
+func createServer(listen, dbName string, client *mongo.Client, seed string, foundationAddress string, dropEscrowData bool, backupSigners stellar.Signers) (*http.Server, error) {
 	db, err := mw.NewDatabaseMiddleware(dbName, client)
 	if err != nil {
 		return nil, err
@@ -171,18 +172,18 @@ func createServer(listen, dbName string, client *mongo.Client, network, seed str
 	}
 
 	var e escrow.Escrow
-	if seed != "" && asset != "" {
-		log.Info().Msgf("escrow disabled on %s %s", config.Config.Network, config.Config.Asset)
+	if seed != "" {
+		log.Info().Msgf("escrow enabled on %s", config.Config.Network)
 		if err := escrowdb.Setup(context.Background(), db.Database()); err != nil {
 			log.Fatal().Err(err).Msg("failed to create escrow database indexes")
 		}
 
-		wallet, err := stellar.New(config.Config.Seed, config.Config.Network, config.Config.Asset)
+		wallet, err := stellar.New(seed, config.Config.Network, backupSigners)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create stellar wallet")
 		}
 
-		e = escrow.NewStellar(wallet, db.Database())
+		e = escrow.NewStellar(wallet, db.Database(), foundationAddress)
 
 	} else {
 		log.Info().Msg("escrow disabled")

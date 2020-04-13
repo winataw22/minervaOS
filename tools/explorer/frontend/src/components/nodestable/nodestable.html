@@ -36,9 +36,9 @@
                 <template v-slot:item.farmer="{ item }">
                   <v-tooltip top>
                     <template v-slot:activator="{ on }">
-                      <span v-on="on">{{ truncateString(item.farmer.name) }}</span>
+                      <span v-on="on">{{ truncateString(item.farm_name) }}</span>
                     </template>
-                    <span>{{ item.farmer.name }} ({{item.farmer.id}})</span>
+                    <span>{{ item.farm_name }} ({{item.farm_id}})</span>
                   </v-tooltip>
                 </template>
 

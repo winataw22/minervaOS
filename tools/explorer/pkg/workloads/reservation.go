@@ -29,19 +29,24 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// API struct
-type API struct {
-	escrow escrow.Escrow
-}
+type (
+	// API struct
+	API struct {
+		escrow escrow.Escrow
+	}
 
-// ReservationCreateResponse wraps reservation create response
-type ReservationCreateResponse struct {
-	ID                schema.ID                             `json:"reservation_id"`
-	EscrowInformation escrowtypes.CustomerEscrowInformation `json:"escrow_information"`
-}
+	// ReservationCreateResponse wraps reservation create response
+	ReservationCreateResponse struct {
+		ID                schema.ID                             `json:"reservation_id"`
+		EscrowInformation escrowtypes.CustomerEscrowInformation `json:"escrow_information"`
+	}
+)
+
+// freeTFT currency code
+const freeTFT = "FreeTFT"
 
 func (a *API) validAddresses(ctx context.Context, db *mongo.Database, res *types.Reservation) error {
-	if config.Config.Network == "" || config.Config.Asset == "" {
+	if config.Config.Network == "" {
 		log.Info().Msg("escrow disabled, no validation of farmer wallet address needed")
 		return nil
 	}
@@ -58,10 +63,15 @@ func (a *API) validAddresses(ctx context.Context, db *mongo.Database, res *types
 		return err
 	}
 
-	validator := stellar.NewAddressValidator(config.Config.Network, config.Config.Asset)
-
 	for _, farm := range farms {
 		for _, a := range farm.WalletAddresses {
+			validator, err := stellar.NewAddressValidator(config.Config.Network, a.Asset)
+			if err != nil {
+				if errors.Is(err, stellar.ErrAssetCodeNotSupported) {
+					continue
+				}
+				return errors.Wrap(err, "could not initialize address validator")
+			}
 			if err := validator.Valid(a.Address); err != nil {
 				return err
 			}
@@ -108,6 +118,44 @@ func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Error(err, http.StatusFailedDependency) //FIXME: what is this strange status ?
 	}
 
+	usedNodes := reservation.NodeIDs()
+	var freeNodes, paidNodes int
+	for _, nodeID := range usedNodes {
+		node, err := directory.NodeFilter{}.WithNodeID(nodeID).Get(r.Context(), db, false)
+		if err != nil {
+			return nil, mw.Error(err, http.StatusInternalServerError)
+		}
+		if node.FreeToUse {
+			freeNodes++
+		} else {
+			paidNodes++
+		}
+	}
+
+	// don't allow mixed nodes
+	if freeNodes > 0 && paidNodes > 0 {
+		return nil, mw.Error(errors.New("reservation can only contain either free nodes or paid nodes, not both"), http.StatusBadRequest)
+	}
+
+	currencies := []string{}
+	// filter out FreeTFT if its a paid reservation
+	if paidNodes > 0 {
+		for _, c := range reservation.DataReservation.Currencies {
+			if c != freeTFT {
+				currencies = append(currencies, c)
+			}
+		}
+	}
+
+	// filter out anything but FreeTFT for a free reservation
+	if freeNodes > 0 {
+		for _, c := range reservation.DataReservation.Currencies {
+			if c == freeTFT {
+				currencies = append(currencies, c)
+			}
+		}
+	}
+
 	var filter phonebook.UserFilter
 	filter = filter.WithID(schema.ID(reservation.CustomerTid))
 	user, err := filter.Get(r.Context(), db)
@@ -136,7 +184,7 @@ func (a *API) create(r *http.Request) (interface{}, mw.Response) {
 		return nil, mw.Error(err)
 	}
 
-	escrowDetails, err := a.escrow.RegisterReservation(generated.Reservation(reservation))
+	escrowDetails, err := a.escrow.RegisterReservation(generated.Reservation(reservation), currencies)
 	if err != nil {
 		return nil, mw.Error(err)
 	}
