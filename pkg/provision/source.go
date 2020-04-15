@@ -115,11 +115,11 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 			if err != nil && err != ErrPollEOS {
 				// if this is not a temporary error, then skip the reservation entirely
 				// and try to get the next one
-				if !isNetworkErr(err) {
+				if shouldRetry(err) {
+					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation, retry same")
+				} else {
 					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation")
 					next++
-				} else {
-					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation, retry same")
 				}
 				continue
 			}
@@ -178,7 +178,6 @@ func (s *decommissionSource) Reservations(ctx context.Context) <-chan *Reservati
 		defer close(c)
 
 		for {
-			// <-time.After(time.Minute * 10) //TODO: make configuration ? default value ?
 			<-time.After(time.Second * 20) //TODO: make configuration ? default value ?
 			log.Debug().Msg("check for expired reservation")
 
@@ -249,7 +248,25 @@ func (s *combinedSource) Reservations(ctx context.Context) <-chan *Reservation {
 	return out
 }
 
-func isNetworkErr(err error) bool {
+// shouldRetry check if the error received from the reservation source
+// is an error that should make use retry to get the same reservation or
+// if we should skip it and ask the next one
+func shouldRetry(err error) bool {
 	var perr *net.OpError
-	return errors.As(err, &perr)
+
+	if ok := errors.As(err, &perr); ok {
+		// retry for any network IO error
+		return true
+	}
+
+	var hErr client.HTTPError
+	if ok := errors.As(err, &hErr); ok {
+		// retry for any response out of 2XX range
+		resp := hErr.Response()
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			return true
+		}
+	}
+
+	return false
 }

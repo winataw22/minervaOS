@@ -24,6 +24,10 @@ func (d *httpDirectory) FarmRegister(farm directory.Farm) (schema.ID, error) {
 	return output.ID, err
 }
 
+func (d *httpDirectory) FarmUpdate(farm directory.Farm) error {
+	return d.put(d.url("farms", fmt.Sprintf("%d", farm.ID)), farm, nil, http.StatusOK)
+}
+
 func (d *httpDirectory) FarmList(tid schema.ID, name string, page *Pager) (farms []directory.Farm, err error) {
 	query := url.Values{}
 	page.apply(query)

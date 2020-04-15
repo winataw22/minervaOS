@@ -78,13 +78,8 @@ func main() {
 					ArgsUsage: "farm_name",
 					Flags: []cli.Flag{
 						cli.StringSliceFlag{
-							Name:     "address",
+							Name:     "addresses",
 							Usage:    "wallet address",
-							Required: true,
-						},
-						cli.StringSliceFlag{
-							Name:     "asset",
-							Usage:    "wallet address asset (TFT, FreeTFT)",
 							Required: true,
 						},
 						cli.StringSliceFlag{
@@ -99,6 +94,34 @@ func main() {
 						},
 					},
 					Action: registerFarm,
+				},
+				{
+					Name:     "update",
+					Usage:    "update an existing farm",
+					Category: "identity",
+					Flags: []cli.Flag{
+						cli.Int64Flag{
+							Name:     "id",
+							Usage:    "farm ID",
+							Required: true,
+						},
+						cli.StringSliceFlag{
+							Name:     "addresses",
+							Usage:    "wallet address. the format is 'asset:address: e.g: 'TFT:GBUPOYJ7I4D4TYSFXPJNLSATHCCF2QDDQCIIIXBG7CV7S2U36UMAQENV'",
+							Required: false,
+						},
+						cli.StringSliceFlag{
+							Name:     "email",
+							Usage:    "email address of the farmer. It is used to send communication to the farmer and for the minting",
+							Required: false,
+						},
+						cli.StringSliceFlag{
+							Name:     "iyo_organization",
+							Usage:    "the It'sYouOnline organization used by your farm in v1",
+							Required: false,
+						},
+					},
+					Action: updateFarm,
 				},
 			},
 		},
