@@ -28,6 +28,8 @@ var (
 	ErrUserExists = errors.New("user with same name or email exists")
 	// ErrUserNotFound is returned if user is not found
 	ErrUserNotFound = errors.New("user not found")
+	// ErrBadUserUpdate is returned when invalid data is passed to update
+	ErrBadUserUpdate = errors.New("bad data during user update")
 	// ErrAuthorization returned if user is not allowed to do an operation
 	ErrAuthorization = errors.New("operation not allowed")
 )
@@ -39,6 +41,9 @@ type User generated.User
 func (u User) Validate() error {
 	if strings.ToLower(u.Name) != u.Name {
 		return fmt.Errorf("name should be all lower case")
+	}
+	if strings.ToLower(u.Email) != u.Email {
+		return fmt.Errorf("email should be all lower case")
 	}
 
 	if len(u.Name) < 3 {
@@ -194,7 +199,7 @@ func UserUpdate(ctx context.Context, db *mongo.Database, id schema.ID, signature
 	encoded := update.Encode()
 	log.Debug().Str("encoded", string(encoded)).Msg("encoded message")
 	if err := crypto.Verify(key, encoded, signature); err != nil {
-		return errors.Wrap(err, "payload verification failed")
+		return errors.Wrap(ErrBadUserUpdate, "payload verification failed")
 	}
 
 	// if public key update is required, we make sure
@@ -202,7 +207,7 @@ func UserUpdate(ctx context.Context, db *mongo.Database, id schema.ID, signature
 	if len(update.Pubkey) != 0 {
 		_, err := crypto.KeyFromHex(update.Pubkey)
 		if err != nil {
-			return fmt.Errorf("invalid public key")
+			return errors.Wrap(ErrBadUserUpdate, "invalid public key")
 		}
 
 		current.Pubkey = update.Pubkey
@@ -210,7 +215,7 @@ func UserUpdate(ctx context.Context, db *mongo.Database, id schema.ID, signature
 
 	// sanity check make sure user is not trying to update his name
 	if len(update.Name) != 0 && current.Name != update.Name {
-		return fmt.Errorf("can not update name")
+		return errors.Wrap(ErrBadUserUpdate, "can not update name")
 	}
 
 	// copy all modified fields.

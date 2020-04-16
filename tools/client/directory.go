@@ -123,3 +123,11 @@ func (d *httpDirectory) NodeUpdateUsedResources(id string, resources directory.R
 	}
 	return d.post(d.url("nodes", id, "used_resources"), input, nil, http.StatusOK)
 }
+
+func (d *httpDirectory) NodeSetFreeToUse(id string, free bool) error {
+	choice := struct {
+		FreeToUse bool `json:"free_to_use"`
+	}{FreeToUse: free}
+
+	return d.post(d.url("nodes", id, "configure_free"), choice, nil, http.StatusOK)
+}

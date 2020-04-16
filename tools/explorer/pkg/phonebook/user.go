@@ -83,6 +83,9 @@ func (u *UserAPI) register(r *http.Request) (interface{}, mw.Response) {
 	db := mw.Database(r)
 
 	if err := types.UserUpdate(r.Context(), db, schema.ID(id), signature, payload.User); err != nil {
+		if errors.Is(err, types.ErrBadUserUpdate) {
+			return nil, mw.BadRequest(err)
+		}
 		return nil, mw.Error(err)
 	}
 

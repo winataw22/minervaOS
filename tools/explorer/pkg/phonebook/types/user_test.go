@@ -27,6 +27,22 @@ func TestUser_Validate(t *testing.T) {
 			err: "name should be all lower case",
 		},
 		{
+			name: "lower.email",
+			u: User{
+				Name: "com",
+				Email: "user@example.com",
+			},
+			err: "",
+		},
+		{
+			name: "upper.email",
+			u: User{
+				Name: "com",
+				Email: "User@example.com",
+			},
+			err: "email should be all lower case",
+		},
+		{
 			name: "ab",
 			u: User{
 				Name: "ab",

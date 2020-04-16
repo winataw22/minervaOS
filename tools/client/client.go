@@ -35,6 +35,7 @@ type Directory interface {
 	NodeSetInterfaces(id string, ifaces []directory.Iface) error
 	NodeSetPorts(id string, ports []uint) error
 	NodeSetPublic(id string, pub directory.PublicIface) error
+	NodeSetFreeToUse(id string, free bool) error
 
 	//TODO: this method call uses types from zos that is not generated
 	//from the schema. Which is wrong imho.

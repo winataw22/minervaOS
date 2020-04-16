@@ -23,7 +23,7 @@ func (w *httpWorkloads) Create(reservation workloads.Reservation) (resp wrklds.R
 func (w *httpWorkloads) List(nextAction *workloads.NextActionEnum, customerTid int64, page *Pager) (reservation []workloads.Reservation, err error) {
 	query := url.Values{}
 	if nextAction != nil {
-		query.Set("next_action", fmt.Sprint(nextAction))
+		query.Set("next_action", fmt.Sprintf("%d", nextAction))
 	}
 	if customerTid != 0 {
 		query.Set("customer_tid", fmt.Sprint(customerTid))

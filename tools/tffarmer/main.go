@@ -153,6 +153,28 @@ You can specify multime time the ip and gw flag to configure multiple IP on the 
 				},
 			},
 		},
+		{
+			Name:  "nodes",
+			Usage: "Manage nodes from a farm",
+			Subcommands: []cli.Command{
+				{
+					Name:     "free",
+					Category: "nodes",
+					Usage:    "mark some nodes as free to use",
+					Flags: []cli.Flag{
+						cli.StringSliceFlag{
+							Name:  "nodes",
+							Usage: "node IDs. can be specified multiple time",
+						},
+						cli.BoolFlag{
+							Name:  "free",
+							Usage: "if set, the node is marked free, it not the node is mark not free",
+						},
+					},
+					Action: markFree,
+				},
+			},
+		},
 	}
 
 	err := app.Run(os.Args)
