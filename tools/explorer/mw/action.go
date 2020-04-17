@@ -28,6 +28,7 @@ func AsHandlerFunc(a Action) http.HandlerFunc {
 		object, result := a(r)
 
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("access-control-expose-headers", "pages")
 
 		if result == nil {
 			w.WriteHeader(http.StatusOK)

@@ -42,6 +42,9 @@ type (
 const (
 	stellarPrecision       = 1e7
 	stellarPrecisionDigits = 7
+	stellarPageLimit       = 200
+	stellarOneCoin         = 10000000
+
 
 	// NetworkProduction uses stellar production network
 	NetworkProduction = "production"
@@ -158,9 +161,11 @@ func (w *Wallet) CreateAccount() (string, string, error) {
 }
 
 func (w *Wallet) activateEscrowAccount(newKp *keypair.Full, sourceAccount hProtocol.Account, client *horizonclient.Client) error {
+	currency := big.NewRat(int64(w.getMinumumBalance()), stellarPrecision)
+	minimumBalance := currency.FloatString(stellarPrecisionDigits)
 	createAccountOp := txnbuild.CreateAccount{
 		Destination: newKp.Address(),
-		Amount:      "10",
+		Amount:      minimumBalance,
 	}
 	tx := txnbuild.Transaction{
 		SourceAccount: &sourceAccount,
@@ -292,6 +297,7 @@ func (w *Wallet) GetBalance(address string, id schema.ID, asset Asset) (xdr.Int6
 	txReq := horizonclient.TransactionRequest{
 		ForAccount: address,
 		Cursor:     cursor,
+		Limit:      stellarPageLimit,
 	}
 
 	log.Info().Str("address", address).Msg("fetching balance for address")
@@ -357,6 +363,14 @@ func (w *Wallet) GetBalance(address string, id schema.ID, asset Asset) (xdr.Int6
 			}
 			cursor = tx.PagingToken()
 		}
+
+		// if the amount of records fetched is smaller than the page limit
+		// we can assume we are on the last page and we break to prevent another
+		// call to horizon
+		if len(txes.Embedded.Records) < stellarPageLimit {
+			break
+		}
+
 		txReq.Cursor = cursor
 		log.Info().Str("address", address).Msgf("fetching balance for address with cursor: %s", cursor)
 		txes, err = horizonClient.Transactions(txReq)
@@ -384,10 +398,7 @@ func (w *Wallet) Refund(encryptedSeed string, id schema.ID, asset Asset) error {
 	if err != nil {
 		return errors.Wrap(err, "could not get keypair from encrypted seed")
 	}
-	sourceAccount, err := w.GetAccountDetails(keypair.Address())
-	if err != nil {
-		return errors.Wrap(err, "failed to get source account")
-	}
+
 	amount, funders, err := w.GetBalance(keypair.Address(), id, asset)
 	if err != nil {
 		return errors.Wrap(err, "failed to get balance")
@@ -396,6 +407,12 @@ func (w *Wallet) Refund(encryptedSeed string, id schema.ID, asset Asset) error {
 	if amount == 0 {
 		return nil
 	}
+
+	sourceAccount, err := w.GetAccountDetails(keypair.Address())
+	if err != nil {
+		return errors.Wrap(err, "failed to get source account")
+	}
+
 	destination := funders[0]
 
 	paymentOP := txnbuild.Payment{
@@ -440,17 +457,6 @@ func (w *Wallet) PayoutFarmers(encryptedSeed string, destinations []PayoutInfo, 
 	sourceAccount, err := w.GetAccountDetails(keypair.Address())
 	if err != nil {
 		return errors.Wrap(err, "failed to get source account")
-	}
-	balance, _, err := w.GetBalance(keypair.Address(), id, asset)
-	if err != nil {
-		return errors.Wrap(err, "failed to get balance")
-	}
-	requiredAmount := xdr.Int64(0)
-	for _, pi := range destinations {
-		requiredAmount += pi.Amount
-	}
-	if balance < requiredAmount {
-		return ErrInsuficientBalance
 	}
 
 	paymentOps := make([]txnbuild.Operation, 0, len(destinations)+1)
@@ -595,6 +601,13 @@ func (w *Wallet) GetNetworkPassPhrase() string {
 	default:
 		return network.TestNetworkPassphrase
 	}
+}
+
+// getMinumumBalance calculates minimum balance for an escrow account
+// following formula is used: minimum Balance = (2 + # of entries) * base reserve
+// entries is the amount of operations are required to setup the account
+func (w *Wallet) getMinumumBalance() int {
+	return (2 + len(w.assets) + len(w.signers)) * (stellarOneCoin / 2)
 }
 
 func (i *Signers) String() string {
