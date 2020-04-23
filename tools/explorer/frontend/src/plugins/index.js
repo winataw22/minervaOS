@@ -1,2 +1,0 @@
-import './chartkick'
-import './maps'

@@ -13,14 +13,14 @@ import (
 	"github.com/jbenet/go-base58"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/tfexplorer/client"
+	"github.com/threefoldtech/tfexplorer/models/generated/directory"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/flist"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
-	"github.com/threefoldtech/zos/tools/client"
-	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"

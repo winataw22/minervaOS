@@ -9,6 +9,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
@@ -19,7 +20,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 	"github.com/threefoldtech/zos/pkg/version"
-	"github.com/threefoldtech/zos/tools/client"
 )
 
 const redisSocket = "unix:///var/run/redis.sock"

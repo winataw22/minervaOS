@@ -4,9 +4,9 @@ import (
 	"crypto/ed25519"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/identity"
-	"github.com/threefoldtech/zos/tools/client"
 )
 
 const seedPath = "/var/cache/modules/identityd/seed.txt"

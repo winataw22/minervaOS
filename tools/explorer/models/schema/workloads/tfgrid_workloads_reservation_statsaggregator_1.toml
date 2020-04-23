@@ -1,6 +1,0 @@
-
-@url = tfgrid.workloads.reservation.statsaggregator.1
-#ipaddress of redis aggregator, can be hostname or ipaddr, string for now
-addr = (S)
-port = (I)
-secret = (S)

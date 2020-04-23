@@ -13,10 +13,10 @@ import (
 
 	"github.com/termie/go-shutil"
 
+	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
-	"github.com/threefoldtech/zos/tools/client"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"

@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 )
 
-const bootedPath = "/var/run/modules"
+// bootedPath is the path where to store the booted flag
+var bootedPath = "/var/run/modules"
 
 // MarkBooted creates a file in a memory
 // this file then can be used to check if "something" has been restared

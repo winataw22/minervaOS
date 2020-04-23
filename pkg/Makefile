@@ -1,8 +1,5 @@
 PWD := $(shell pwd)
 GOPATH := $(shell go env GOPATH)
-# LDFLAGS := $(shell go run buildscripts/gen-ldflags.go)
-
-# BUILD_LDFLAGS := '$(LDFLAGS)'
 
 all: build
 
@@ -45,7 +42,6 @@ spelling:
 static:
 	go run honnef.co/go/tools/cmd/staticcheck -- ./...
 
-# Builds minio, runs the verifiers then runs the tests.
 check: test
 test: verifiers build
 	# we already ran vet separately, so safe to turn it off here
@@ -55,12 +51,11 @@ test: verifiers build
 	done
 
 testrace: verifiers build
-	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
 	# we already ran vet separately, so safe to turn it off here
-	@CGO_ENABLED=1 go test -v -vet=off -race ./...
-
-coverage: verifiers build
-	@(env bash $(PWD)/buildscripts/go-coverage.sh)
+	@echo "Running unit tests with GOFLAGS=${GOFLAGS}"
+	for pkg in $(shell go list ./... | grep -Ev "stubs|network" ); do \
+		go test -v -vet=off -race $$pkg; \
+	done
 
 generate:
 	@echo "Generating modules client stubs"

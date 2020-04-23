@@ -10,6 +10,9 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/provision/explorer"
+	"github.com/threefoldtech/zos/pkg/provision/primitives"
+	"github.com/threefoldtech/zos/pkg/provision/primitives/cache"
 
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
@@ -81,40 +84,46 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to message broker")
 	}
-	client, err := zbus.NewRedisClient(msgBrokerCon)
+	zbusCl, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		log.Fatal().Err(err).Msg("fail to connect to message broker server")
 	}
 
-	identity := stubs.NewIdentityManagerStub(client)
+	identity := stubs.NewIdentityManagerStub(zbusCl)
 	nodeID := identity.NodeID()
 
 	// to get reservation from tnodb
-	cl, err := app.ExplorerClient()
+	e, err := app.ExplorerClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to instantiate BCDB client")
 	}
+
+	// keep track of resource unnits reserved and amount of workloads provisionned
+	statser := &primitives.Counters{}
+
 	// to store reservation locally on the node
-	localStore, err := provision.NewFSStore(filepath.Join(storageDir, "reservations"))
+	localStore, err := cache.NewFSStore(filepath.Join(storageDir, "reservations"))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create local reservation store")
 	}
-	// to get the user ID of a reservation
-	ownerCache := provision.NewCache(localStore, provision.ReservationGetterFromWorkloads(cl.Workloads))
+	// update stats from the local reservation cache
+	localStore.Sync(statser)
 
-	// create context and add middlewares
-	ctx := context.Background()
-	ctx = provision.WithZBus(ctx, client)
-	ctx = provision.WithOwnerCache(ctx, ownerCache)
+	provisioner := primitives.NewProvisioner(localStore, zbusCl)
 
-	// From here we start the real provision engine that will live
-	// for the rest of the life of the node
-	source := provision.CombinedSource(
-		provision.PollSource(provision.ReservationPollerFromWorkloads(cl.Workloads), nodeID),
-		provision.NewDecommissionSource(localStore),
-	)
-
-	engine := provision.New(nodeID.Identity(), source, localStore, cl)
+	engine := provision.New(provision.EngineOps{
+		NodeID: nodeID.Identity(),
+		Cache:  localStore,
+		Source: provision.CombinedSource(
+			provision.PollSource(explorer.NewPoller(e, primitives.WorkloadToProvisionType, primitives.ProvisionOrder), nodeID),
+			provision.NewDecommissionSource(localStore),
+		),
+		Provisioners:   provisioner.Provisioners,
+		Decomissioners: provisioner.Decommissioners,
+		Feedback:       explorer.NewFeedback(e, primitives.ResultToSchemaType),
+		Signer:         identity,
+		Statser:        statser,
+	})
 
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.ProvisionMonitor(engine))
 
@@ -122,6 +131,7 @@ func main() {
 		Str("broker", msgBrokerCon).
 		Msg("starting provision module")
 
+	ctx := context.Background()
 	ctx, _ = utils.WithSignal(ctx)
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
@@ -141,7 +151,6 @@ func main() {
 }
 
 type store interface {
-	provision.ReservationGetter
 	provision.ReservationPoller
 	provision.Feedbacker
 }

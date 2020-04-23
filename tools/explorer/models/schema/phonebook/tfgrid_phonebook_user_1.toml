@@ -1,8 +1,0 @@
-@url = tfgrid.phonebook.user.1
-@acl = false
-name** = (S)                               #e.g. kristof.ibiza or kristof.3bot
-email** = (S)                             #optional, not required
-pubkey = (S)                              #public key of the 3bot
-host = (S)                             #how to reach the digitalme (3bot)
-description = (S)                        #optional
-signature = (S)                          #proof that content is ok, is on id+name+email+pubkey+ipaddress+description

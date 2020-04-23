@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/threefoldtech/tfexplorer/client"
+	"github.com/threefoldtech/tfexplorer/models/generated/directory"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/types"
-	"github.com/threefoldtech/zos/pkg/schema"
-	"github.com/threefoldtech/zos/tools/client"
-	"github.com/threefoldtech/zos/tools/explorer/models/generated/directory"
+	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/vishvananda/netlink"
 )
 

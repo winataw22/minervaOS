@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,6 +27,8 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/container/logger"
 	"github.com/threefoldtech/zos/pkg/container/stats"
+
+	"github.com/containerd/containerd/cio"
 )
 
 const (
@@ -93,6 +96,10 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 	}
 	if data.CPU == 0 {
 		data.CPU = defaultCPU
+	}
+
+	if data.Logs == nil {
+		data.Logs = []logger.Logs{}
 	}
 
 	// we never allow any container to boot without a network namespace
@@ -169,42 +176,34 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		}
 	}()
 
-	logs := path.Join(c.root, "logs", ns)
-	if err = os.MkdirAll(logs, 0755); err != nil {
+	// creating logs config directories
+	cfgs := path.Join(c.root, "config", ns)
+	if err = os.MkdirAll(cfgs, 0755); err != nil {
 		return id, err
 	}
 
-	loggers := logger.NewLoggers()
+	// creating and serializing logs settings for external logger
+	confpath := path.Join(cfgs, fmt.Sprintf("%s-logs.json", container.ID()))
+	log.Info().Str("cfg", confpath).Msg("writing logs settings")
 
-	// hardcode local logfile
-	filepath := path.Join(logs, fmt.Sprintf("%s.log", container.ID()))
-	fileout, fileerr, err := logger.NewFile(filepath, filepath)
+	err = logger.Serialize(confpath, data.Logs)
 	if err != nil {
+		log.Error().Err(err).Msg("could not write logs settings")
 		return id, err
 	}
 
-	loggers.Add(fileout, fileerr)
-
-	// set user defined endpoint logging
-	for _, l := range data.Logs {
-		switch l.Type {
-		case logger.RedisType:
-			lo, le, err := logger.NewRedis(l.Data.Stdout, l.Data.Stderr)
-
-			if err != nil {
-				log.Error().Err(err).Msg("redis logger")
-				continue
-			}
-
-			loggers.Add(lo, le)
-
-		default:
-			log.Error().Str("type", l.Type).Msg("invalid logging type requested")
-		}
+	// setting external logger process
+	uri, err := url.Parse("binary:///bin/shim-logs")
+	if err != nil {
+		log.Error().Err(err).Msg("log uri")
+		return id, err
 	}
 
-	task, err := container.NewTask(ctx, loggers.Log())
+	log.Info().Str("loguri", uri.String()).Msg("external logging process")
+
+	task, err := container.NewTask(ctx, cio.LogURI(uri))
 	if err != nil {
+		log.Error().Err(err).Msg("logger new task")
 		return id, err
 	}
 

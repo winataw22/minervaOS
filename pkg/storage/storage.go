@@ -23,7 +23,8 @@ const (
 	// CacheTarget is the path where the cache disk is mounted
 	CacheTarget = "/var/cache"
 	cacheLabel  = "zos-cache"
-	cacheSize   = 20 * 1024 * 1024 * 1024 // 20GB
+	gib         = 1024 * 1024 * 1024
+	cacheSize   = 100 * gib
 )
 
 var (
@@ -424,6 +425,11 @@ func (s *storageModule) ensureCache() error {
 
 		// when everything failed, mount the Tmpfs
 		return syscall.Mount("", "/var/cache", "tmpfs", 0, "size=500M")
+	}
+
+	log.Info().Msgf("set cache quota to %d GiB", cacheSize/gib)
+	if err := cacheFs.Limit(cacheSize); err != nil {
+		log.Error().Err(err).Msg("failed to set cache quota")
 	}
 
 	log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)

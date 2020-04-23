@@ -1,58 +1,48 @@
 package provision
 
-import (
-	"crypto/rand"
-	"encoding/json"
-	"testing"
+// func TestVerifySignature(t *testing.T) {
+// 	keyPair, err := identity.GenerateKeyPair()
+// 	require.NoError(t, err)
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/threefoldtech/zos/pkg/identity"
-)
+// 	data, err := json.Marshal(Volume{
+// 		Type: SSDDiskType,
+// 		Size: 20,
+// 	})
+// 	require.NoError(t, err)
 
-func TestVerifySignature(t *testing.T) {
-	keyPair, err := identity.GenerateKeyPair()
-	require.NoError(t, err)
+// 	r := &Reservation{
+// 		ID:     "reservationID",
+// 		NodeID: "node1",
+// 		User:   keyPair.Identity(),
+// 		Type:   ContainerReservation,
+// 		Data:   data,
+// 	}
 
-	data, err := json.Marshal(Volume{
-		Type: SSDDiskType,
-		Size: 20,
-	})
-	require.NoError(t, err)
+// 	err = r.Sign(keyPair.PrivateKey)
+// 	require.NoError(t, err)
 
-	r := &Reservation{
-		ID:     "reservationID",
-		NodeID: "node1",
-		User:   keyPair.Identity(),
-		Type:   ContainerReservation,
-		Data:   data,
-	}
+// 	err = Verify(r)
+// 	assert.NoError(t, err)
 
-	err = r.Sign(keyPair.PrivateKey)
-	require.NoError(t, err)
+// 	validSignature := make([]byte, len(r.Signature))
+// 	copy(validSignature, r.Signature)
 
-	err = Verify(r)
-	assert.NoError(t, err)
+// 	// corrupt the signature
+// 	_, err = rand.Read(r.Signature)
+// 	require.NoError(t, err)
 
-	validSignature := make([]byte, len(r.Signature))
-	copy(validSignature, r.Signature)
+// 	err = Verify(r)
+// 	assert.Error(t, err)
 
-	// corrupt the signature
-	_, err = rand.Read(r.Signature)
-	require.NoError(t, err)
+// 	// restore signature
+// 	copy(r.Signature, validSignature)
 
-	err = Verify(r)
-	assert.Error(t, err)
+// 	// sanity test
+// 	err = Verify(r)
+// 	require.NoError(t, err)
 
-	// restore signature
-	copy(r.Signature, validSignature)
-
-	// sanity test
-	err = Verify(r)
-	require.NoError(t, err)
-
-	// change the reservation
-	r.User = "attackerID"
-	err = Verify(r)
-	assert.Error(t, err)
-}
+// 	// change the reservation
+// 	r.User = "attackerID"
+// 	err = Verify(r)
+// 	assert.Error(t, err)
+// }
