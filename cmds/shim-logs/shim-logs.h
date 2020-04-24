@@ -6,9 +6,6 @@
 
     #define MAXEVENTS   64
     #define CONFDIR     "/var/cache/modules/contd/config"
-    #define LOGSDIR     "/var/cache/modules/contd/logs"
-    // #define CONFDIR     "/tmp/logconf"
-    // #define LOGSDIR     "/tmp/logconf"
 
     //
     // stream
