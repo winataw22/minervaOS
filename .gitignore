@@ -17,3 +17,6 @@ tools/bcdb_mock/reservations.json
 qemu/node*
 qemu/*.efi
 .ssh
+
+# c object
+*.o

@@ -13,6 +13,27 @@ void diep(char *str) {
     exit(EXIT_FAILURE);
 }
 
+void attach_localfile(container_t *container) {
+    char path[512];
+
+    // we don't check if it works, let assume
+    // contd is running
+    mkdir(LOGSDIR, 0775);
+
+    sprintf(path, "%s/%s", LOGSDIR, container->namespace);
+    mkdir(path, 0775);
+
+    sprintf(path, "%s/%s/%s.log", LOGSDIR, container->namespace, container->id);
+
+    file_t *local;
+    if(!(local = file_new(path)))
+        return;
+
+    // attaching stdout and stderr to the same file
+    log_attach(container->logout, local, local->write);
+    log_attach(container->logerr, local, local->write);
+}
+
 int main() {
     printf("[+] initializing shim-logs\n");
 
@@ -32,23 +53,7 @@ int main() {
     //
     // debug file backend
     //
-
-    #if 0
-    file_t *lo;
-    if(!(lo = file_new("/tmp/log-stdout")))
-        exit(EXIT_FAILURE);
-
-    file_t *le;
-    if(!(le = file_new("/tmp/log-stderr")))
-        exit(EXIT_FAILURE);
-
-    log_attach(container->logout, lo, lo->write);
-    log_attach(container->logerr, le, le->write);
-    #endif
-
-    //
-    //
-    //
+    attach_localfile(container);
 
     //
     // initialize async
