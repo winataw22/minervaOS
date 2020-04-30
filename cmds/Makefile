@@ -5,12 +5,8 @@ dirty = $(shell test -n "`git diff --shortstat 2> /dev/null | tail -n1`" && echo
 version = github.com/threefoldtech/zos/pkg/version
 ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revision) -X $(version).Dirty=$(dirty)'
 
-all: $(shell ls -d */) logs
+all: $(shell ls -d */)
 	strip $(OUT)/*
-
-logs:
-	$(MAKE) -C shim-logs
-	cp shim-logs/shim-logs $(OUT)/
 
 .PHONY: output clean
 

@@ -91,6 +91,13 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 					if current >= next {
 						next = current + 1
 					}
+
+					if r.Type == NOOPReservation {
+						// special type of reservation that does nothing
+						// we just ignore it here.
+						continue
+					}
+
 					ch <- r
 				}
 			}

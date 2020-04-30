@@ -15,6 +15,11 @@ import (
 // ReservationType type
 type ReservationType string
 
+const (
+	//NOOPReservation type
+	NOOPReservation ReservationType = "noop"
+)
+
 // Reservation struct
 type Reservation struct {
 	// ID of the reservation
