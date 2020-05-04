@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
@@ -16,7 +17,7 @@ import (
 )
 
 // ContainerToProvisionType converts TfgridReservationContainer1 to Container
-func ContainerToProvisionType(c workloads.Container) (Container, string, error) {
+func ContainerToProvisionType(c workloads.Container, reservationID string) (Container, string, error) {
 	container := Container{
 		FList:           c.Flist,
 		FlistStorage:    c.HubUrl,
@@ -42,6 +43,9 @@ func ContainerToProvisionType(c workloads.Container) (Container, string, error) 
 	}
 
 	for i, mount := range c.Volumes {
+		if strings.HasPrefix(mount.VolumeId, "-") {
+			mount.VolumeId = reservationID + mount.VolumeId
+		}
 		container.Mounts[i] = Mount{
 			VolumeID:   mount.VolumeId,
 			Mountpoint: mount.Mountpoint,
@@ -218,6 +222,8 @@ func WorkloadToProvisionType(w workloads.ReservationWorkload) (*provision.Reserv
 		ToDelete: w.ToDelete,
 	}
 
+	reservationID := strings.Split(w.WorkloadId, "-")[0]
+
 	var (
 		data interface{}
 		err  error
@@ -240,7 +246,8 @@ func WorkloadToProvisionType(w workloads.ReservationWorkload) (*provision.Reserv
 			return nil, err
 		}
 	case workloads.Container:
-		data, reservation.NodeID, err = ContainerToProvisionType(tmp)
+
+		data, reservation.NodeID, err = ContainerToProvisionType(tmp, reservationID)
 		if err != nil {
 			return nil, err
 		}
