@@ -27,7 +27,7 @@ type ReservationPoller interface {
 	// from is the used as a filter to which reservation to use as
 	// reservation.ID >= from. So a client to the Poll method should make
 	// sure to call it with the last (MAX) reservation ID he receieved.
-	Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, error)
+	Poll(nodeID pkg.Identifier, from uint64) (reservations []*Reservation, lastID uint64, err error)
 }
 
 // PollSource does a long poll on address to get new and to be deleted
@@ -50,7 +50,6 @@ type pollSource struct {
 
 func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 	ch := make(chan *Reservation)
-
 	// on the first run we will get all the reservation
 	// ever made to this know, to make sure we provision
 	// everything at boot
@@ -65,7 +64,7 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 			on = time.Now().Add(s.maxSleep)
 			log.Info().Uint64("next", next).Msg("Polling for reservations")
 
-			res, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), next)
+			res, lastID, err := s.store.Poll(pkg.StrIdentifier(s.nodeID), next)
 			if err != nil && err != ErrPollEOS {
 				// if this is not a temporary error, then skip the reservation entirely
 				// and try to get the next one
@@ -73,31 +72,18 @@ func (s *pollSource) Reservations(ctx context.Context) <-chan *Reservation {
 					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation, retry same")
 				} else {
 					log.Error().Err(err).Uint64("next", next).Msg("failed to get reservation")
-					next++
+					next = lastID + 1
 				}
 				continue
 			}
+
+			next = lastID + 1
 
 			select {
 			case <-ctx.Done():
 				return
 			default:
 				for _, r := range res {
-					current, _, err := r.SplitID()
-					if err != nil {
-						log.Warn().Err(err).Str("id", r.ID).Msg("skipping reservation")
-						continue
-					}
-					if current >= next {
-						next = current + 1
-					}
-
-					if r.Type == NOOPReservation {
-						// special type of reservation that does nothing
-						// we just ignore it here.
-						continue
-					}
-
 					ch <- r
 				}
 			}

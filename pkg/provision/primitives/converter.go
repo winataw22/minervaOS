@@ -256,8 +256,6 @@ func WorkloadToProvisionType(w workloads.ReservationWorkload) (*provision.Reserv
 		if err != nil {
 			return nil, err
 		}
-	case nil:
-		// no content, no conversion
 	default:
 		return nil, fmt.Errorf("unknown workload type (%s) (%T)", w.Type.String(), tmp)
 	}
