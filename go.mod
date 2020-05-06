@@ -30,7 +30,7 @@ require (
 	github.com/shirou/gopsutil v2.19.11+incompatible
 	github.com/stretchr/testify v1.5.1
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	github.com/threefoldtech/tfexplorer v0.2.7-0.20200505141628-4d7a0c749784
+	github.com/threefoldtech/tfexplorer v0.2.7-0.20200506105748-dd92c058d776
 	github.com/threefoldtech/zbus v0.1.3
 	github.com/urfave/cli v1.22.3
 	github.com/vishvananda/netlink v1.0.0
