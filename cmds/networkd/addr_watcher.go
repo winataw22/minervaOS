@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog/log"
 
 	"time"
@@ -11,10 +12,12 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/tfexplorer/models/generated/directory"
+	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network/namespace"
+	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/types"
-	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/vishvananda/netlink"
 )
 
@@ -56,6 +59,13 @@ func (w WatchedLinks) callBack(update netlink.AddrUpdate) error {
 		return err
 	}
 
+	ndmzIfaces, err := getNdmzInterfaces()
+	if err != nil {
+		return err
+	}
+
+	ifaces = append(ifaces, ndmzIfaces...)
+
 	return publishIfaces(ifaces, w.nodeID, w.dir)
 }
 
@@ -94,6 +104,53 @@ func (w WatchedLinks) Forever(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func getNdmzInterfaces() ([]types.IfaceInfo, error) {
+	var output []types.IfaceInfo
+
+	f := func(_ ns.NetNS) error {
+		links, err := netlink.LinkList()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to list interfaces")
+			return err
+		}
+		for _, link := range links {
+			if link.Attrs().Name == ndmz.DMZPub4 || link.Attrs().Name == ndmz.DMZPub6 {
+				addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+				if err != nil {
+					return err
+				}
+
+				info := types.IfaceInfo{
+					Name:       link.Attrs().Name,
+					Addrs:      make([]types.IPNet, len(addrs)),
+					MacAddress: schema.MacAddress{link.Attrs().HardwareAddr},
+				}
+				for i, addr := range addrs {
+					info.Addrs[i] = types.NewIPNet(addr.IPNet)
+				}
+
+				output = append(output, info)
+			}
+
+		}
+		return nil
+	}
+
+	// get the ndmz network namespace
+	ndmz, err := namespace.GetByName(ndmz.NetNSNDMZ)
+	if err != nil {
+		return nil, err
+	}
+	defer ndmz.Close()
+
+	err = ndmz.Do(f)
+	if err != nil {
+		return nil, err
+	}
+
+	return output, nil
 }
 
 func getLocalInterfaces() ([]types.IfaceInfo, error) {
