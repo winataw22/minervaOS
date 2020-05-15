@@ -83,7 +83,11 @@ func newRedisPool(address string) (*redis.Pool, error) {
 	default:
 		return nil, fmt.Errorf("unknown scheme '%s' expecting tcp or unix", u.Scheme)
 	}
-	var opts []redis.DialOption
+	opts := []redis.DialOption{
+		redis.DialConnectTimeout(time.Second * 5),
+		redis.DialWriteTimeout(time.Second * 5),
+		redis.DialReadTimeout(time.Second * 5),
+	}
 
 	if u.User != nil {
 		opts = append(

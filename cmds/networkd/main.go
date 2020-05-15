@@ -68,6 +68,16 @@ func main() {
 		log.Info().Msg("shutting down")
 	})
 
+	// already sends all the interfaces detail we find
+	// this won't contains the ndmz IP yet, but this is OK.
+	ifaces, err := getLocalInterfaces()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read local network interfaces")
+	}
+	if err := publishIfaces(ifaces, nodeID, dir); err != nil {
+		log.Fatal().Err(err).Msg("failed to publish network interfaces to BCDB")
+	}
+
 	ifaceVersion := -1
 
 	exitIface, err := getPubIface(dir, nodeID.Identity())
@@ -115,16 +125,10 @@ func main() {
 		}
 	}(ctx, chIface)
 
-	ifaces, err := getLocalInterfaces()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read local network interfaces")
-	}
-
 	ndmzIfaces, err := getNdmzInterfaces()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read ndmz network interfaces")
 	}
-
 	ifaces = append(ifaces, ndmzIfaces...)
 
 	if err := publishIfaces(ifaces, nodeID, dir); err != nil {
