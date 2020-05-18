@@ -368,7 +368,7 @@ func applyStartup(data *pkg.Container, path string) error {
 			return nil
 		}
 
-		data.Env = mergeEnvs(entry.Envs(), data.Env)
+		data.Env = mergeEnvs(data.Env, entry.Envs())
 		if data.Entrypoint == "" && entry.Entrypoint() != "" {
 			data.Entrypoint = entry.Entrypoint()
 		}
