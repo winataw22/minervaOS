@@ -168,6 +168,19 @@ func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.Netlink
 	return ch, nil
 }
 
+func (s *NetworkerStub) Ready() (ret0 error) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "Ready", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) RemoveTap(arg0 pkg.NetID) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "RemoveTap", args...)

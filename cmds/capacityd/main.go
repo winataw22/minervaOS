@@ -26,6 +26,7 @@ const module = "monitor"
 func cap(ctx context.Context, client zbus.Client) {
 	storage := stubs.NewStorageModuleStub(client)
 	identity := stubs.NewIdentityManagerStub(client)
+	network := stubs.NewNetworkerStub(client)
 	cl, err := bcdbClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
@@ -33,6 +34,17 @@ func cap(ctx context.Context, client zbus.Client) {
 
 	// call this now so we block here until identityd is ready to serve us
 	nodeID := identity.NodeID().Identity()
+
+	// block until networkd is ready to serve request from zbus
+	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
+	// https://github.com/threefoldtech/zos/issues/632
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0
+	backoff.RetryNotify(func() error {
+		return network.Ready()
+	}, bo, func(err error, d time.Duration) {
+		log.Error().Err(err).Msgf("networkd is not ready yet")
+	})
 
 	r := capacity.NewResourceOracle(storage)
 
@@ -75,7 +87,7 @@ func cap(ctx context.Context, client zbus.Client) {
 		log.Info().Msg("sends capacity detail to BCDB")
 		return cl.NodeSetCapacity(nodeID, ru, *dmi, disks, hypervisor)
 	}
-	bo := backoff.NewExponentialBackOff()
+	bo = backoff.NewExponentialBackOff()
 	bo.MaxElapsedTime = 0 // retry forever
 	backoff.RetryNotify(setCapacity, bo, func(err error, d time.Duration) {
 		log.Error().

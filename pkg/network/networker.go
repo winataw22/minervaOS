@@ -210,6 +210,10 @@ func validatePeer(p pkg.Peer) error {
 	return nil
 }
 
+func (n *networker) Ready() error {
+	return nil
+}
+
 func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []string, publicIP6 bool) (join pkg.Member, err error) {
 	// TODO:
 	// 1- Make sure this network id is actually deployed

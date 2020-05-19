@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -91,6 +92,18 @@ func main() {
 
 	identity := stubs.NewIdentityManagerStub(zbusCl)
 	nodeID := identity.NodeID()
+
+	// block until networkd is ready to serve request from zbus
+	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
+	// https://github.com/threefoldtech/zos/issues/632
+	network := stubs.NewNetworkerStub(zbusCl)
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0
+	backoff.RetryNotify(func() error {
+		return network.Ready()
+	}, bo, func(err error, d time.Duration) {
+		log.Error().Err(err).Msgf("networkd is not ready yet")
+	})
 
 	// to get reservation from tnodb
 	e, err := app.ExplorerClient()

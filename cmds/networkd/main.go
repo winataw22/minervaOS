@@ -52,7 +52,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to zbus broker")
 	}
 
-	dir, err := bcdbClient()
+	directory, err := explorerClient()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to BCDB")
 	}
@@ -74,13 +74,13 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read local network interfaces")
 	}
-	if err := publishIfaces(ifaces, nodeID, dir); err != nil {
+	if err := publishIfaces(ifaces, nodeID, directory); err != nil {
 		log.Fatal().Err(err).Msg("failed to publish network interfaces to BCDB")
 	}
 
 	ifaceVersion := -1
 
-	exitIface, err := getPubIface(dir, nodeID.Identity())
+	exitIface, err := getPubIface(directory, nodeID.Identity())
 	if err == nil {
 		if err := configurePubIface(exitIface, nodeID); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
@@ -89,60 +89,39 @@ func main() {
 		ifaceVersion = exitIface.Version
 	}
 
-	if err := ndmz.Create(nodeID); err != nil {
-		log.Fatal().Err(err).Msgf("failed to create DMZ")
-	}
+	// Try to create ndmz. we retry forever since networkd cannot start without it
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0
+	backoff.RetryNotify(func() error {
+		return ndmz.Create(nodeID)
+	}, bo, func(err error, d time.Duration) {
+		log.Error().Err(err).Msgf("failed to create DMZ, rety in %s", d.String())
+	})
 
-	chIface := watchPubIface(ctx, nodeID, dir, ifaceVersion)
-	go func(ctx context.Context, ch <-chan *types.PubIface) {
-		for {
-			select {
-			case iface := <-ch:
-
-				// When changing public IP configuration, we need to also update how the NDMZ interfaces are plumbed together
-				// to achieve this any time a new public config is received, we first delete the NDMZ namespace
-				// create/update the public namespace and then re-create the NDMZ
-
-				log.Info().Str("config", fmt.Sprintf("%+v", iface)).Msg("public IP configuration received")
-
-				if err := ndmz.Delete(); err != nil {
-					log.Error().Err(err).Msg("error deleting ndmz during public ip configuration")
-					continue
-				}
-
-				if err = configurePubIface(iface, nodeID); err != nil {
-					log.Error().Err(err).Msg("error configuring public IP")
-					continue
-				}
-
-				if err := ndmz.Create(nodeID); err != nil {
-					log.Error().Err(err).Msg("error configuring ndmz during public ip configuration")
-					continue
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(ctx, chIface)
-
+	// send another detail of network interfaces now that ndmz is created
 	ndmzIfaces, err := getNdmzInterfaces()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read ndmz network interfaces")
 	}
 	ifaces = append(ifaces, ndmzIfaces...)
 
-	if err := publishIfaces(ifaces, nodeID, dir); err != nil {
+	if err := publishIfaces(ifaces, nodeID, directory); err != nil {
 		log.Fatal().Err(err).Msg("failed to publish ndmz network interfaces to BCDB")
 	}
 
-	go startAddrWatch(ctx, nodeID, dir, ifaces)
+	// Start watcher for public NICs configuration
+	go startPublicIfaceUpdate(ctx, nodeID, ifaceVersion, directory)
+
+	// watch modification of the adress on the nic so we can update the explorer
+	// with eventual new values
+	go startAddrWatch(ctx, nodeID, directory, ifaces)
 
 	log.Info().Msg("start zbus server")
 	if err := os.MkdirAll(root, 0750); err != nil {
 		log.Fatal().Err(err).Msgf("fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, dir, root)
+	networker, err := network.NewNetworker(identity, directory, root)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating network manager")
 	}
@@ -196,8 +175,42 @@ func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, cl client.Direct
 	backoff.Retry(f, bo)
 }
 
+func startPublicIfaceUpdate(ctx context.Context, nodeID pkg.Identifier, version int, directory client.Directory) {
+	ch := watchPubIface(ctx, nodeID, directory, version)
+
+	for {
+		select {
+		case iface := <-ch:
+
+			// When changing public IP configuration, we need to also update how the NDMZ interfaces are plumbed together
+			// to achieve this any time a new public config is received, we first delete the NDMZ namespace
+			// create/update the public namespace and then re-create the NDMZ
+
+			log.Info().Str("config", fmt.Sprintf("%+v", iface)).Msg("public IP configuration received")
+
+			if err := ndmz.Delete(); err != nil {
+				log.Error().Err(err).Msg("error deleting ndmz during public ip configuration")
+				continue
+			}
+
+			if err := configurePubIface(iface, nodeID); err != nil {
+				log.Error().Err(err).Msg("error configuring public IP")
+				continue
+			}
+
+			if err := ndmz.Create(nodeID); err != nil {
+				log.Error().Err(err).Msg("error configuring ndmz during public ip configuration")
+				continue
+			}
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 // instantiate the proper client based on the running mode
-func bcdbClient() (client.Directory, error) {
+func explorerClient() (client.Directory, error) {
 	client, err := app.ExplorerClient()
 	if err != nil {
 		return nil, err

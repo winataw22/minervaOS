@@ -20,6 +20,10 @@ type Member struct {
 
 //Networker is the interface for the network module
 type Networker interface {
+	// Ready return nil is networkd is ready to operate
+	// This function is used by other deamon to test if networkd is done booting
+	Ready() error
+
 	// Create a new network resource
 	CreateNR(Network) (string, error)
 	// Delete a network resource
