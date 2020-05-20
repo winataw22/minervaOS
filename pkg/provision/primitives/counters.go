@@ -132,7 +132,7 @@ func (c *Counters) Decrement(r *provision.Reservation) error {
 		c.volumes.Decrement(1)
 		u, err = processVolume(r)
 	case ContainerReservation:
-		c.volumes.Decrement(1)
+		c.containers.Decrement(1)
 		u, err = processContainer(r)
 	case ZDBReservation:
 		c.zdbs.Decrement(1)
