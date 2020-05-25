@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jbenet/go-base58"
+	"github.com/shirou/gopsutil/host"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfexplorer/client"
@@ -458,7 +459,12 @@ func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, stor
 
 	publicKeyHex := hex.EncodeToString(base58.Decode(nodeID.Identity()))
 
-	err := store.NodeRegister(directory.Node{
+	uptime, err := hostUptime()
+	if err != nil {
+		return errors.Wrap(err, "could not get node uptime")
+	}
+
+	err = store.NodeRegister(directory.Node{
 		NodeId:    nodeID.Identity(),
 		NodeIdV1:  v1ID,
 		FarmId:    int64(farmID),
@@ -471,6 +477,7 @@ func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, stor
 			Latitude:  loc.Latitude,
 		},
 		PublicKeyHex: publicKeyHex,
+		Uptime:       int64(uptime),
 	})
 
 	if err != nil {
@@ -479,4 +486,13 @@ func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, stor
 	}
 
 	return nil
+}
+
+// hostUptime returns the uptime of the node
+func hostUptime() (uint64, error) {
+	info, err := host.Info()
+	if err != nil {
+		return 0, err
+	}
+	return info.Uptime, nil
 }
