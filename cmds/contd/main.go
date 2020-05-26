@@ -4,7 +4,10 @@ import (
 	"context"
 	"flag"
 	"os"
+	"os/exec"
+	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
@@ -37,6 +40,18 @@ func main() {
 	if ver {
 		version.ShowAndExit(false)
 	}
+
+	// wait for shim-logs to be available before starting
+	log.Info().Msg("wait for shim-logs binary to be available")
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0 //forever
+	_ = backoff.RetryNotify(func() error {
+		_, err := exec.LookPath("shim-logs")
+		return err
+		// return fmt.Errorf("wait forever")
+	}, bo, func(err error, d time.Duration) {
+		log.Warn().Err(err).Msgf("shim-logs binary not found, retying in %s", d.String())
+	})
 
 	if err := os.MkdirAll(moduleRoot, 0750); err != nil {
 		log.Fatal().Msgf("fail to create module root: %s", err)

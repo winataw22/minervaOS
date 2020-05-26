@@ -29,8 +29,10 @@ func ContainerToProvisionType(c workloads.Container, reservationID string) (Cont
 		Logs:            make([]logger.Logs, len(c.Logs)),
 		StatsAggregator: make([]stats.Aggregator, len(c.StatsAggregator)),
 		Capacity: ContainerCapacity{
-			CPU:    uint(c.Capacity.Cpu),
-			Memory: uint64(c.Capacity.Memory),
+			CPU:      uint(c.Capacity.Cpu),
+			Memory:   uint64(c.Capacity.Memory),
+			DiskType: pkg.DeviceType(c.Capacity.DiskType),
+			DiskSize: uint64(c.Capacity.DiskSize),
 		},
 	}
 

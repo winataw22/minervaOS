@@ -177,10 +177,18 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 
 	var args []string
 	if !opts.ReadOnly {
-		path, err := f.storage.CreateFilesystem(name, opts.Limit*mib, pkg.SSDDevice)
+		sublog.Info().Msgf("check if subvolume %s already exists", name)
+		// check if the filesystem doesn't already exists
+		path, err := f.storage.Path(name)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
+			sublog.Info().Msgf("create new subvolume %s", name)
+			// and only create a new one if it doesn't exist
+			path, err = f.storage.CreateFilesystem(name, opts.Limit*mib, opts.Type)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
+			}
 		}
+
 		args = append(args, "-backend", path)
 	} else {
 		args = append(args, "-ro")
