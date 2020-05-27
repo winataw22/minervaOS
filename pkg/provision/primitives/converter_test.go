@@ -185,7 +185,7 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 			},
 			want: Volume{
 				Size: 10,
-				Type: HDDDiskType,
+				Type: pkg.HDDDevice,
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 			},
 			want: Volume{
 				Size: 10,
-				Type: SSDDiskType,
+				Type: pkg.SSDDevice,
 			},
 		},
 	}

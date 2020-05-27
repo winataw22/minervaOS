@@ -11,16 +11,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-// DiskType defines disk type
-type DiskType string
-
-const (
-	// HDDDiskType for hdd disks
-	HDDDiskType DiskType = "HDD"
-	// SSDDiskType for ssd disks
-	SSDDiskType DiskType = "SSD"
-)
-
 const (
 	// gigabyte to byte conversion
 	gigabyte uint64 = 1024 * 1024 * 1024
@@ -31,7 +21,7 @@ type Volume struct {
 	// Size of the volume in GiB
 	Size uint64 `json:"size"`
 	// Type of disk underneath the volume
-	Type DiskType `json:"type"`
+	Type pkg.DeviceType `json:"type"`
 }
 
 // VolumeResult is the information return to the BCDB

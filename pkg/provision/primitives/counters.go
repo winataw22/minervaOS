@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/threefoldtech/tfexplorer/models/generated/directory"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/provision"
 )
 
@@ -175,9 +176,9 @@ func processVolume(r *provision.Reservation) (u resourceUnits, err error) {
 
 	// volume.size and SRU is in GiB
 	switch volume.Type {
-	case SSDDiskType:
+	case pkg.SSDDevice:
 		u.SRU = volume.Size * gib
-	case HDDDiskType:
+	case pkg.HDDDevice:
 		u.HRU = volume.Size * gib
 	}
 

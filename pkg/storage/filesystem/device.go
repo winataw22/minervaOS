@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -243,7 +244,7 @@ func (l *lsblkDeviceManager) setDeviceType(device *Device, typ pkg.DeviceType, r
 }
 
 func (l *lsblkDeviceManager) deviceTypeFromString(typ string) pkg.DeviceType {
-	switch typ {
+	switch strings.ToLower(typ) {
 	case string(pkg.SSDDevice):
 		return pkg.SSDDevice
 	case string(pkg.HDDDevice):

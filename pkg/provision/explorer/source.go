@@ -1,12 +1,16 @@
 package explorer
 
 import (
+	"errors"
 	"fmt"
 	"sort"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/provision/primitives"
 )
 
 // Poller is an implementation of the provision.ReservationPoller
@@ -41,6 +45,10 @@ func (r *Poller) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservat
 	for _, wl := range list {
 		r, err := r.inputConv(wl)
 		if err != nil {
+			if errors.Is(err, primitives.ErrUnsupportedWorkload) {
+				log.Warn().Err(err).Msgf("received unsupported workload, skipping")
+				continue
+			}
 			return nil, 0, err
 		}
 
