@@ -459,6 +459,11 @@ func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, stor
 
 	publicKeyHex := hex.EncodeToString(base58.Decode(nodeID.Identity()))
 
+	hostName, err := os.Hostname()
+	if err != nil {
+		hostName = "unknown"
+	}
+
 	uptime, err := hostUptime()
 	if err != nil {
 		return errors.Wrap(err, "could not get node uptime")
@@ -466,6 +471,7 @@ func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, stor
 
 	err = store.NodeRegister(directory.Node{
 		NodeId:    nodeID.Identity(),
+		HostName:  hostName,
 		NodeIdV1:  v1ID,
 		FarmId:    int64(farmID),
 		OsVersion: version,
