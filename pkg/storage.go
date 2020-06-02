@@ -33,6 +33,15 @@ func (e ErrNotEnoughSpace) Error() string {
 	return fmt.Sprintf("Not enough space left in pools of this type %s", e.DeviceType)
 }
 
+// ErrInvalidDeviceType raised when trying to allocate space on unsupported device type
+type ErrInvalidDeviceType struct {
+	DeviceType DeviceType
+}
+
+func (e ErrInvalidDeviceType) Error() string {
+	return fmt.Sprintf("invalid device type '%s'. type unknown", e.DeviceType)
+}
+
 // DeviceType is the actual type of hardware that the storage device runs on,
 // i.e. SSD or HDD
 type DeviceType string

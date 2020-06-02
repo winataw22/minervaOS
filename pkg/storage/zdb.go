@@ -57,6 +57,10 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 		Str("mode", string(mode)).
 		Logger()
 
+	if diskType != pkg.HDDDevice && diskType != pkg.SSDDevice {
+		return allocation, pkg.ErrInvalidDeviceType{DeviceType: diskType}
+	}
+
 	log.Info().Msg("try to allocation space for 0-DB")
 
 	for _, pool := range s.volumes {

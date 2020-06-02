@@ -442,6 +442,10 @@ func (s *storageModule) ensureCache() error {
 func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	var err error
 
+	if poolType != pkg.HDDDevice && poolType != pkg.SSDDevice {
+		return nil, pkg.ErrInvalidDeviceType{DeviceType: poolType}
+	}
+
 	type Candidate struct {
 		Pool      filesystem.Pool
 		Available uint64
