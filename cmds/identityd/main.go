@@ -361,9 +361,22 @@ func upgradeLoop(
 				return
 			}
 
-			err = Safe(func() error {
-				return upgrader.Upgrade(from, *event)
-			})
+			exp := backoff.NewExponentialBackOff()
+			exp.MaxInterval = 3 * time.Minute
+			exp.MaxElapsedTime = 60 * time.Minute
+			err = backoff.Retry(func() error {
+				log.Debug().Str("version", version.String()).Msg("trying to update")
+
+				err := Safe(func() error {
+					return upgrader.Upgrade(from, *event)
+				})
+
+				if err == upgrade.ErrRestartNeeded {
+					return backoff.Permanent(err)
+				}
+
+				return err
+			}, exp)
 
 			if err == upgrade.ErrRestartNeeded {
 				log.Info().Msg("restarting upgraded")
