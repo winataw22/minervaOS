@@ -30,7 +30,22 @@ func (c *CounterUint64) Increment(v uint64) uint64 {
 
 // Decrement counter atomically by one
 func (c *CounterUint64) Decrement(v uint64) uint64 {
-	return atomic.AddUint64((*uint64)(c), -v)
+	// spinlock until the decrement succeeds
+	for {
+		current := c.Current()
+		// make sure we don't decrement below 0
+		dec := v
+		if dec > current {
+			dec = current
+		}
+		// compute new value
+		n := current - dec
+		// only swap if `current`, and therefore the above calculations,
+		// are still valid
+		if atomic.CompareAndSwapUint64((*uint64)(c), current, n) {
+			return n
+		}
+	}
 }
 
 // Current returns the current value

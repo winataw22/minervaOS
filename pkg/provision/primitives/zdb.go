@@ -80,17 +80,17 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 
 	cont, err := p.ensureZdbContainer(ctx, allocation, config.Mode)
 	if err != nil {
-		return ZDBResult{}, err
+		return ZDBResult{}, errors.Wrapf(err, "failed to ensure zdb containe running")
 	}
 
 	containerIP, err = p.getIfaceIP(ctx, nwmod.ZDBIface, cont.Network.Namespace)
 	if err != nil {
-		return ZDBResult{}, err
+		return ZDBResult{}, errors.Wrapf(err, "failed to get zdb container IP address")
 	}
 
 	// this call will actually configure the namespace in zdb and set the password
 	if err := p.createZDBNamespace(containerID, nsID, config); err != nil {
-		return ZDBResult{}, err
+		return ZDBResult{}, errors.Wrap(err, "failed to create zdb namespace")
 	}
 
 	return ZDBResult{
@@ -157,7 +157,7 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to allocate rootfs for zdb container: %s", err)
+		return errors.Wrap(err, "failed to allocate rootfs for zdb container")
 	}
 
 	cleanup := func() {
@@ -177,12 +177,12 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
 		}
 
-		return err
+		return errors.Wrap(err, "failed to prepare zdb network")
 	}
 
 	socketDir := socketDir(name)
 	if err := os.MkdirAll(socketDir, 0550); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to create directory: %s", socketDir)
 	}
 
 	cmd := fmt.Sprintf("/bin/zdb --data /data --index /data --mode %s  --listen :: --port %d --socket /socket/zdb.sock --dualnet", string(mode), zdbPort)
