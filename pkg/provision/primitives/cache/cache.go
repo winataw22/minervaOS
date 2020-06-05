@@ -83,7 +83,7 @@ func (s *Fs) removeAllButPersistent(rootPath string) error {
 		if err != nil {
 			return err
 		}
-		if reservationType != primitives.VolumeReservation && reservationType != primitives.ZDBReservation {
+		if reservationType != primitives.VolumeReservation {
 			log.Info().Msgf("Removing %s from cache", path)
 			return os.Remove(path)
 		}
