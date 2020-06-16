@@ -1,6 +1,6 @@
-CONTAINERD_VERSION="1.3.2"
-CONTAINERD_CHECKSUM="d28ec96dd7586f7a1763c54c5448921e"
-CONTAINERD_LINK="https://github.com/containerd/containerd/archive/v${CONTAINERD_VERSION}.tar.gz"
+CONTAINERD_VERSION="ae2f3fdfd1a435fe83fb083e4db9fa63a9e0a13e"
+CONTAINERD_CHECKSUM="73e6d4bad082e69e530c8ab5a9ee5118"
+CONTAINERD_LINK="https://github.com/containerd/containerd/archive/${CONTAINERD_VERSION}.tar.gz"
 
 dependencies_containerd() {
     apt-get install -y btrfs-tools libseccomp-dev build-essential pkg-config
@@ -22,7 +22,7 @@ dependencies_containerd() {
 }
 
 download_containerd() {
-    download_file ${CONTAINERD_LINK} ${CONTAINERD_CHECKSUM} containerd-v${CONTAINERD_VERSION}.tar.gz
+    download_file ${CONTAINERD_LINK} ${CONTAINERD_CHECKSUM} containerd-${CONTAINERD_VERSION}.tar.gz
 }
 
 extract_containerd() {
@@ -32,7 +32,7 @@ extract_containerd() {
     pushd ${CONTAINERD_HOME}
 
     echo "[+] extracting: containerd-${CONTAINERD_VERSION}"
-    tar -xf ${DISTDIR}/containerd-v${CONTAINERD_VERSION}.tar.gz -C .
+    tar -xf ${DISTDIR}/containerd-${CONTAINERD_VERSION}.tar.gz -C .
     mv containerd-${CONTAINERD_VERSION} containerd
 
     popd

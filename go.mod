@@ -9,7 +9,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/containerd/cgroups v0.0.0-20200327175542-b44481373989
-	github.com/containerd/containerd v1.3.2
+	github.com/containerd/containerd v1.4.0-beta.1.0.20200615192441-ae2f3fdfd1a4
 	github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd
 	github.com/containernetworking/cni v0.7.2-0.20190807151350-8c6c47d1c7fc
 	github.com/containernetworking/plugins v0.8.4
@@ -25,6 +25,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6
 	github.com/opencontainers/runtime-spec v1.0.1
+	github.com/opencontainers/selinux v1.5.2 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.18.0
 	github.com/shirou/gopsutil v2.19.11+incompatible
@@ -40,6 +41,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20191219145116-fa6499c8e75f
+	google.golang.org/grpc v1.29.1 // indirect
 	gopkg.in/yaml.v2 v2.2.7
 	gotest.tools v2.2.0+incompatible
 )

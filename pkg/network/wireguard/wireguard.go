@@ -86,6 +86,19 @@ func (w *Wireguard) SetAddr(cidr string) error {
 	return nil
 }
 
+// UnsetAddr removes an IP address from the interface
+func (w *Wireguard) UnsetAddr(cidr string) error {
+	addr, err := netlink.ParseAddr(cidr)
+	if err != nil {
+		return err
+	}
+
+	if err := netlink.AddrDel(w, addr); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // Peer represent a peer in a wireguard configuration
 type Peer struct {
 	PublicKey  string

@@ -114,6 +114,8 @@ func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, route
 		}
 
 		for _, route := range routes {
+			route.LinkIndex = link.Attrs().Index
+
 			if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
 				log.Error().
 					Str("route", route.String()).

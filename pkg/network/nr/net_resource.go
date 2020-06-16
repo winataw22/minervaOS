@@ -11,8 +11,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
 
-	"github.com/threefoldtech/zos/pkg/network/types"
-
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
@@ -37,6 +35,7 @@ type NetResource struct {
 }
 
 // New creates a new NetResource object
+// iprange is the full network subnet
 func New(networkID pkg.NetID, netResource *pkg.NetResource, ipRange *net.IPNet) (*NetResource, error) {
 
 	nr := &NetResource{
@@ -136,11 +135,6 @@ func wgIP(subnet *net.IPNet) *net.IPNet {
 // ConfigureWG sets the routes and IP addresses on the
 // wireguard interface of the network resources
 func (nr *NetResource) ConfigureWG(privateKey string) error {
-	routes, err := nr.routes()
-	if err != nil {
-		return errors.Wrap(err, "failed to generate routes for wireguard")
-	}
-
 	wgPeers, err := nr.wgPeers()
 	if err != nil {
 		return errors.Wrap(err, "failed to wireguard peer configuration")
@@ -201,25 +195,26 @@ func (nr *NetResource) ConfigureWG(privateKey string) error {
 		for addr := range toRemove.Iter() {
 			addr, _ := addr.(string)
 			log.Debug().Str("ip", addr).Msg("unset ip on wireguard interface")
-			// TODO: zaibon
-			// if err := wg.UsetAddr(addr); err != nil {
-			// 	return errors.Wrapf(err, "failed to set address %s on wireguard interface %s", addr, wg.Attrs().Name)
-			// }
+			if err := wg.UnsetAddr(addr); err != nil {
+				return errors.Wrapf(err, "failed to unset address %s on wireguard interface %s", addr, wg.Attrs().Name)
+			}
 		}
 
-		for _, route := range routes {
-			route.LinkIndex = wg.Attrs().Index
-			if err := netlink.RouteAdd(&route); err != nil && !os.IsExist(err) {
-				log.Error().
-					Err(err).
-					Str("route", route.String()).
-					Msg("fail to set route")
-				return errors.Wrapf(err, "failed to add route %s", route.String())
-			}
+		route := &netlink.Route{
+			LinkIndex: wg.Attrs().Index,
+			Dst:       nr.ipRange,
+		}
+		if err := netlink.RouteAdd(route); err != nil {
+			log.Error().
+				Err(err).
+				Str("route", route.String()).
+				Msg("fail to set route")
+			return errors.Wrapf(err, "failed to add route %s", route.String())
 		}
 
 		return nil
 	}
+
 	return netNS.Do(handler)
 }
 
@@ -259,31 +254,6 @@ func (nr *NetResource) Delete() error {
 	}
 
 	return nil
-}
-
-func isSubnet(n types.IPNet) bool {
-	ones, bits := n.IPNet.Mask.Size()
-	return ones < bits
-}
-
-func (nr *NetResource) routes() ([]netlink.Route, error) {
-	routes := make([]netlink.Route, 0)
-
-	peers := nr.resource.Peers
-	for i := range peers {
-		wgip := wgIP(&peers[i].Subnet.IPNet)
-		for j := range peers[i].AllowedIPs {
-			if !isSubnet(peers[i].AllowedIPs[j]) {
-				continue
-			}
-			routes = append(routes, netlink.Route{
-				Dst: &peers[i].AllowedIPs[j].IPNet,
-				Gw:  wgip.IP,
-			})
-		}
-	}
-
-	return routes, nil
 }
 
 func (nr *NetResource) wgPeers() ([]*wireguard.Peer, error) {

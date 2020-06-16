@@ -33,6 +33,7 @@ import (
 
 const (
 	containerdSock = "/run/containerd/containerd.sock"
+	binaryLogsShim = "/bin/shim-logs"
 )
 
 const (
@@ -150,6 +151,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 		// this ensure that the container/task will be restarted automatically
 		// if it gets killed for whatever reason (mostly OOM killer)
 		restart.WithStatus(containerd.Running),
+		restart.WithBinaryLogURI(binaryLogsShim, nil),
 	)
 	if err != nil {
 		return id, err
@@ -193,7 +195,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 	}
 
 	// setting external logger process
-	uri, err := url.Parse("binary:///bin/shim-logs")
+	uri, err := url.Parse("binary://" + binaryLogsShim)
 	if err != nil {
 		log.Error().Err(err).Msg("log uri")
 		return id, err
