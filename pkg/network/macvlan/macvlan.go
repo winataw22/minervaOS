@@ -38,16 +38,19 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 			MTU:         1500,
 			Name:        tmpName,
 			ParentIndex: m.Attrs().Index,
-			Namespace:   netlink.NsFd(int(netns.Fd())),
 		},
 		Mode: netlink.MACVLAN_MODE_BRIDGE,
+	}
+
+	if netns != nil {
+		mv.Namespace = netlink.NsFd(int(netns.Fd()))
 	}
 
 	if err := netlink.LinkAdd(mv); err != nil {
 		return nil, fmt.Errorf("failed to create macvlan: %v", err)
 	}
 
-	err = netns.Do(func(_ ns.NetNS) error {
+	f := func(_ ns.NetNS) error {
 		// TODO: duplicate following lines for ipv6 support, when it will be added in other places
 
 		// containernetworking sets it up in some ref code somewhere, we copied it. we were stoopit
@@ -78,17 +81,19 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 		}
 
 		return nil
-	})
-	if err != nil {
-		return nil, err
+	}
+	if netns != nil {
+		err = netns.Do(f)
+	} else {
+		f(nil)
 	}
 
-	return mv, nil
+	return mv, err
 }
 
 // Install configures a macvlan interfaces created with Create method
 func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
-	return netns.Do(func(_ ns.NetNS) error {
+	f := func(_ ns.NetNS) error {
 		if hw != nil && len(hw) != 0 {
 			if err := netlink.LinkSetHardwareAddr(link, hw); err != nil {
 				return err
@@ -126,7 +131,12 @@ func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, route
 		}
 
 		return nil
-	})
+	}
+	if netns != nil {
+		return netns.Do(f)
+	}
+
+	return f(nil)
 }
 
 // GetByName return a macvlan object by its name

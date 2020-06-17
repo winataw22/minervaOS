@@ -50,6 +50,11 @@ func (t *testIdentityManager) Decrypt(message []byte) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
+// PrivateKey sends the keypair
+func (t *testIdentityManager) PrivateKey() []byte {
+	return nil
+}
+
 func TestNamespace(t *testing.T) {
 	nr, err := New("networkd1", &pkg.NetResource{
 		NodeID: "node1",

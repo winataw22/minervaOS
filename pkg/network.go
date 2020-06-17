@@ -70,6 +70,9 @@ type Networker interface {
 	// DMZAddresses monitoring streams for dmz public interface
 	DMZAddresses(ctx context.Context) <-chan NetlinkAddresses
 
+	// YggAddresses monitoring streams for yggdrasil interface
+	YggAddresses(ctx context.Context) <-chan NetlinkAddresses
+
 	PublicAddresses(ctx context.Context) <-chan NetlinkAddresses
 }
 

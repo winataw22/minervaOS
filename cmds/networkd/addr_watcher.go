@@ -18,6 +18,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/vishvananda/netlink"
 )
 
@@ -116,14 +117,15 @@ func getNdmzInterfaces() ([]types.IfaceInfo, error) {
 			return err
 		}
 		for _, link := range links {
-			if link.Attrs().Name == ndmz.DMZPub4 || link.Attrs().Name == ndmz.DMZPub6 {
+			name := link.Attrs().Name
+			if name == ndmz.DMZPub4 || name == ndmz.DMZPub6 || name == yggdrasil.YggIface {
 				addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
 				if err != nil {
 					return err
 				}
 
 				info := types.IfaceInfo{
-					Name:       link.Attrs().Name,
+					Name:       name,
 					Addrs:      make([]types.IPNet, len(addrs)),
 					MacAddress: schema.MacAddress{link.Attrs().HardwareAddr},
 				}

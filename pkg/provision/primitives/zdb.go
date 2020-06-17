@@ -43,7 +43,7 @@ type ZDB struct {
 // after deploying a 0-db namespace
 type ZDBResult struct {
 	Namespace string
-	IP        string
+	IPs       []string
 	Port      uint
 }
 
@@ -55,9 +55,8 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 	var (
 		storage = stubs.NewZDBAllocaterStub(p.zbus)
 
-		nsID        = reservation.ID
-		config      ZDB
-		containerIP net.IP
+		nsID   = reservation.ID
+		config ZDB
 	)
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
 		return ZDBResult{}, errors.Wrap(err, "failed to decode reservation schema")
@@ -83,10 +82,11 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 		return ZDBResult{}, errors.Wrapf(err, "failed to ensure zdb containe running")
 	}
 
-	containerIP, err = p.getIfaceIP(ctx, nwmod.ZDBIface, cont.Network.Namespace)
+	containerIPs, err := p.getIfaceIP(ctx, nwmod.ZDBIface, cont.Network.Namespace)
 	if err != nil {
-		return ZDBResult{}, errors.Wrapf(err, "failed to get zdb container IP address")
+		return ZDBResult{}, errors.Wrap(err, "failed to find IP address on zdb0 interface")
 	}
+	log.Warn().Msgf("ip for zdb containers %s", containerIPs)
 
 	// this call will actually configure the namespace in zdb and set the password
 	if err := p.createZDBNamespace(containerID, nsID, config); err != nil {
@@ -95,8 +95,14 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 
 	return ZDBResult{
 		Namespace: nsID,
-		IP:        containerIP.String(),
-		Port:      zdbPort,
+		IPs: func() []string {
+			ips := make([]string, len(containerIPs))
+			for i, ip := range containerIPs {
+				ips[i] = ip.String()
+			}
+			return ips
+		}(),
+		Port: zdbPort,
 	}, nil
 }
 
@@ -228,40 +234,57 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	return nil
 }
 
-func (p *Provisioner) getIfaceIP(ctx context.Context, ifaceName, namespace string) (containerIP net.IP, err error) {
-	var network = stubs.NewNetworkerStub(p.zbus)
+func (p *Provisioner) getIfaceIP(ctx context.Context, ifaceName, namespace string) ([]net.IP, error) {
+	var (
+		network      = stubs.NewNetworkerStub(p.zbus)
+		containerIPs []net.IP
+	)
 
 	getIP := func() error {
+
 		ips, err := network.Addrs(ifaceName, namespace)
 		if err != nil {
 			log.Debug().Err(err).Msg("not ip public found, waiting")
 			return err
 		}
+
+		var (
+			public = false
+			ygg    = false
+		)
+		containerIPs = containerIPs[:0]
+
 		for _, ip := range ips {
-			if isPublic(ip) {
-				log.Debug().IPAddr("ip", ip).Msg("0-db container public ip found")
-				containerIP = ip
-				return nil
+			if isPublic(ip) && !isYgg(ip) {
+				log.Warn().IPAddr("ip", ip).Msg("0-db container public ip found")
+				public = true
+				containerIPs = append(containerIPs, ip)
+			}
+			if isYgg(ip) {
+				log.Warn().IPAddr("ip", ip).Msg("0-db container ygg ip found")
+				ygg = true
+				containerIPs = append(containerIPs, ip)
 			}
 		}
-		return fmt.Errorf("not up public found, waiting")
+
+		log.Warn().Msgf("public %v ygg: %v", public, ygg)
+		if public && ygg {
+			return nil
+		}
+		return fmt.Errorf("waiting for more addresses")
 	}
 
 	bo := backoff.NewExponentialBackOff()
-	bo.MaxInterval = time.Minute * 2
+	bo.MaxInterval = time.Minute
 	bo.MaxElapsedTime = time.Minute * 2
 
 	if err := backoff.RetryNotify(getIP, bo, func(err error, d time.Duration) {
 		log.Debug().Err(err).Str("duration", d.String()).Msg("failed to get zdb public IP")
-	}); err != nil {
+	}); err != nil && len(containerIPs) == 0 {
 		return nil, errors.Wrapf(err, "failed to get an IP for interface %s", ifaceName)
 	}
 
-	log.Info().
-		IPAddr("container IP", containerIP).
-		Str("iface", ifaceName).
-		Msgf("0-db container created")
-	return containerIP, nil
+	return containerIPs, nil
 }
 
 func (p *Provisioner) createZDBNamespace(containerID pkg.ContainerID, nsID string, config ZDB) error {
@@ -358,4 +381,14 @@ func isPublic(ip net.IP) bool {
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast())
+}
+
+// isPublic check if ip is a part of the yggdrasil 200::/7 range
+var yggNet = net.IPNet{
+	IP:   net.ParseIP("200::"),
+	Mask: net.CIDRMask(7, 128),
+}
+
+func isYgg(ip net.IP) bool {
+	return yggNet.Contains(ip)
 }

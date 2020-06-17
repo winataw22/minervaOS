@@ -17,6 +17,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
+	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -57,11 +58,13 @@ type networker struct {
 	ipamLeaseDir string
 	tnodb        client.Directory
 	portSet      *set.UintSet
+
+	ndmz ndmz.DMZ
+	ygg  *yggdrasil.Server
 }
 
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageDir string) (pkg.Networker, error) {
-
+func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageDir string, ndmz ndmz.DMZ, ygg *yggdrasil.Server) (pkg.Networker, error) {
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
@@ -97,6 +100,17 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 		networkDir:   nwDir,
 		ipamLeaseDir: ipamLease,
 		portSet:      set.NewUint(wgDir),
+
+		ygg:  ygg,
+		ndmz: ndmz,
+	}
+
+	// always add the reserved yggdrasil port to the port set so we make sure they are never
+	// picked for wireguard endpoints
+	for _, port := range []int{yggdrasil.YggListenTCP, yggdrasil.YggListenTLS, yggdrasil.YggListenLinkLocal} {
+		if err := nw.portSet.Add(uint(port)); err != nil && errors.Is(err, set.ErrConflict{}) {
+			return nil, err
+		}
 	}
 
 	return nw, nil
@@ -230,7 +244,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []strin
 	}
 
 	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	localNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return join, err
 	}
@@ -259,7 +273,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []strin
 
 		hw := ifaceutil.HardwareAddrFromInputBytes([]byte(containerID))
 
-		if err = createMacVlan("pub", hw, netNs); err != nil {
+		if err = n.createMacVlan("pub", hw, nil, nil, netNs); err != nil {
 			return join, errors.Wrap(err, "failed to create public macvlan interface")
 		}
 	}
@@ -276,7 +290,7 @@ func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 	}
 
 	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	localNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return err
 	}
@@ -303,36 +317,54 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	}
 	defer netNs.Close()
 
-	return netNSName, createMacVlan(ZDBIface, hw, netNs)
-}
-
-func createMacVlan(iface string, hw net.HardwareAddr, netNs ns.NetNS) error {
-	// find which interface to use as master for the macvlan
 	var (
-		pubIface string
-		err      error
+		ips    []*net.IPNet
+		routes []*netlink.Route
 	)
 
-	if namespace.Exists(types.PublicNamespace) {
-		pubIface, err = publicMasterIface()
+	if n.ygg != nil {
+		ip, err := n.ygg.SubnetFor(hw)
 		if err != nil {
-			return errors.Wrap(err, "failed to retrieve the master interface name of the public interface")
+			return "", err
 		}
-	} else {
-		pubIface, err = ifaceutil.HostIPV6Iface()
+
+		ips = []*net.IPNet{
+			{
+				IP:   ip,
+				Mask: net.CIDRMask(64, 128),
+			},
+		}
+
+		gw, err := n.ygg.Gateway()
 		if err != nil {
-			return errors.Wrap(err, "failed to found a valid network interface to use as parent for 0-db container")
+			return "", err
 		}
+
+		routes = []*netlink.Route{
+			{
+				Dst: &net.IPNet{
+					IP:   net.ParseIP("200::"),
+					Mask: net.CIDRMask(7, 128),
+				},
+				Gw: gw.IP,
+				// LinkIndex:... this is set by macvlan.Install
+			},
+		}
+
 	}
 
-	macVlan, err := macvlan.Create(iface, pubIface, netNs)
+	return netNSName, n.createMacVlan(ZDBIface, hw, ips, routes, netNs)
+}
+
+func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
+	macVlan, err := macvlan.Create(iface, n.ndmz.IP6PublicIface(), netNs)
 	if err != nil {
 		return errors.Wrap(err, "failed to create public mac vlan interface")
 	}
 
 	log.Debug().Str("HW", hw.String()).Str("macvlan", macVlan.Name).Msg("setting hw address on link")
 	// we don't set any route or ip
-	if err := macvlan.Install(macVlan, hw, []*net.IPNet{}, []*netlink.Route{}, netNs); err != nil {
+	if err := macvlan.Install(macVlan, hw, ips, routes, netNs); err != nil {
 		return err
 	}
 
@@ -350,7 +382,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 	}
 
 	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	localNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return "", err
 	}
@@ -395,7 +427,7 @@ func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	}
 
 	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	localNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return net.IPNet{}, err
 	}
@@ -412,7 +444,7 @@ func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, error) {
 	}
 
 	nodeID := n.identity.NodeID().Identity()
-	localNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	localNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return nil, err
 	}
@@ -486,15 +518,9 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", err
 	}
 
-	b, err := json.Marshal(network)
-	if err != nil {
-		panic(err)
-	}
-	log.Debug().
-		Str("network", string(b)).
-		Msg("create NR")
+	log.Info().Str("network", network.Name).Msg("create network resource")
 
-	netNR, err := ResourceByNodeID(nodeID, network.NetResources)
+	netNR, err := resourceByNodeID(nodeID, network.NetResources)
 	if err != nil {
 		return "", err
 	}
@@ -512,7 +538,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 	}
 
 	if err == nil {
-		storedNR, err := ResourceByNodeID(nodeID, storedNet.NetResources)
+		storedNR, err := resourceByNodeID(nodeID, storedNet.NetResources)
 		if err != nil {
 			return "", err
 		}
@@ -549,7 +575,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to create network resource")
 	}
 
-	if err := ndmz.AttachNR(string(network.NetID), netr, n.ipamLeaseDir); err != nil {
+	if err := n.ndmz.AttachNR(string(network.NetID), netr, n.ipamLeaseDir); err != nil {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
@@ -558,27 +584,70 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
-	// map the network ID to the network namespace
-	path := filepath.Join(n.networkDir, string(network.NetID))
-	file, err := os.Create(path)
-	if err != nil {
-		cleanup()
-		return "", err
-	}
-	defer file.Close()
-	writer, err := versioned.NewWriter(file, pkg.NetworkSchemaLatestVersion)
-	if err != nil {
-		cleanup()
-		return "", err
-	}
-
-	enc := json.NewEncoder(writer)
-	if err := enc.Encode(&network); err != nil {
+	if err := n.storeNetwork(network); err != nil {
 		cleanup()
 		return "", errors.Wrap(err, "failed to store network object")
 	}
 
 	return netr.Namespace()
+}
+
+func (n *networker) storeNetwork(network pkg.Network) error {
+	// map the network ID to the network namespace
+	path := filepath.Join(n.networkDir, string(network.NetID))
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer, err := versioned.NewWriter(file, pkg.NetworkSchemaLatestVersion)
+	if err != nil {
+		return err
+	}
+
+	enc := json.NewEncoder(writer)
+	if err := enc.Encode(&network); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteNR implements pkg.Networker interface
+func (n *networker) DeleteNR(network pkg.Network) error {
+	defer func() {
+		if err := n.publishWGPorts(); err != nil {
+			log.Warn().Msg("failed to publish wireguard port to BCDB")
+		}
+	}()
+
+	netNR, err := resourceByNodeID(n.identity.NodeID().Identity(), network.NetResources)
+	if err != nil {
+		return err
+	}
+
+	nr, err := nr.New(network.NetID, netNR, &network.IPRange.IPNet)
+	if err != nil {
+		return errors.Wrap(err, "failed to load network resource")
+	}
+
+	if err := nr.Delete(); err != nil {
+		return errors.Wrap(err, "failed to delete network resource")
+	}
+
+	if err := n.releasePort(netNR.WGListenPort); err != nil {
+		log.Error().Err(err).Msg("release wireguard port failed")
+		// TODO: should we return the error ?
+	}
+
+	// map the network ID to the network namespace
+	path := filepath.Join(n.networkDir, string(network.NetID))
+	if err := os.Remove(path); err != nil {
+		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
+	}
+
+	return nil
 }
 
 func (n *networker) networkOf(id string) (*pkg.Network, error) {
@@ -614,42 +683,6 @@ func (n *networker) networkOf(id string) (*pkg.Network, error) {
 	}
 
 	return &net, nil
-}
-
-// DeleteNR implements pkg.Networker interface
-func (n *networker) DeleteNR(network pkg.Network) error {
-	defer func() {
-		if err := n.publishWGPorts(); err != nil {
-			log.Warn().Msg("failed to publish wireguard port to BCDB")
-		}
-	}()
-
-	netNR, err := ResourceByNodeID(n.identity.NodeID().Identity(), network.NetResources)
-	if err != nil {
-		return err
-	}
-
-	nr, err := nr.New(network.NetID, netNR, &network.IPRange.IPNet)
-	if err != nil {
-		return errors.Wrap(err, "failed to load network resource")
-	}
-
-	if err := nr.Delete(); err != nil {
-		return errors.Wrap(err, "failed to delete network resource")
-	}
-
-	if err := n.releasePort(netNR.WGListenPort); err != nil {
-		log.Error().Err(err).Msg("release wireguard port failed")
-		// TODO: should we return the error ?
-	}
-
-	// map the network ID to the network namespace
-	path := filepath.Join(n.networkDir, string(network.NetID))
-	if err := os.Remove(path); err != nil {
-		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
-	}
-
-	return nil
 }
 
 func (n *networker) extractPrivateKey(hexKey string) (string, error) {
@@ -785,6 +818,10 @@ func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.DMZPub4, ndmz.DMZPub6)
 }
 
+func (n *networker) YggAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
+	return n.monitorNS(ctx, ndmz.NetNSNDMZ, yggdrasil.YggIface)
+}
+
 func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
 	return n.monitorNS(ctx, types.PublicNamespace, types.PublicIface)
 }
@@ -838,39 +875,6 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 
 }
 
-// publicMasterIface return the name of the master interface
-// of the public interface
-func publicMasterIface() (string, error) {
-	netns, err := namespace.GetByName(types.PublicNamespace)
-	if err != nil {
-		return "", err
-	}
-	defer netns.Close()
-
-	var index int
-	if err := netns.Do(func(_ ns.NetNS) error {
-		pl, err := netlink.LinkByName(types.PublicIface)
-		if err != nil {
-			return err
-		}
-		index = pl.Attrs().ParentIndex
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	if index == 0 {
-		return "", fmt.Errorf("public iface has not master")
-	}
-
-	ml, err := netlink.LinkByIndex(index)
-	if err != nil {
-		return "", err
-	}
-
-	return ml.Attrs().Name, nil
-}
-
 // createNetNS create a network namespace and set lo interface up
 func createNetNS(name string) (ns.NetNS, error) {
 
@@ -890,8 +894,8 @@ func createNetNS(name string) (ns.NetNS, error) {
 	return netNs, nil
 }
 
-// ResourceByNodeID return the net resource associated with a nodeID
-func ResourceByNodeID(nodeID string, resources []pkg.NetResource) (*pkg.NetResource, error) {
+// resourceByNodeID return the net resource associated with a nodeID
+func resourceByNodeID(nodeID string, resources []pkg.NetResource) (*pkg.NetResource, error) {
 	for _, resource := range resources {
 		if resource.NodeID == nodeID {
 			return &resource, nil

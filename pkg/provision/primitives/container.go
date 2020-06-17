@@ -242,10 +242,15 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 	}
 
 	if config.Network.PublicIP6 {
-		join.IPv6, err = p.getIfaceIP(ctx, "pub", join.Namespace)
+		//TODO
+		ips, err := p.getIfaceIP(ctx, "pub", join.Namespace)
 		if err != nil {
 			return ContainerResult{}, errors.Wrap(err, "error reading container ipv6")
 		}
+		if len(ips) <= 0 {
+			return ContainerResult{}, fmt.Errorf("no ipv6 found for container %s", id)
+		}
+		join.IPv6 = ips[0]
 	}
 
 	log.Info().Msgf("container created with id: '%s'", id)

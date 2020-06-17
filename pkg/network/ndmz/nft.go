@@ -28,6 +28,7 @@ table inet nat {
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
+    ip6 saddr 200::/7 accept
     oifname "npub4" masquerade fully-random;
     oifname "npub6" masquerade fully-random;
   }
@@ -45,6 +46,8 @@ table inet filter {
   chain input {
     type filter hook input priority 0; policy accept;
     jump base_checks
+    ip6 daddr ff02::/64 accept
+    tcp dport { {{.YggPorts}} } accept
     ip6 nexthdr icmpv6 accept
     iifname "npub6" counter drop
     iifname "npub4" counter drop

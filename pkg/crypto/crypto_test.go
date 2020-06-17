@@ -49,8 +49,8 @@ func TestPyNACLCompatibilityKeyGeneration(t *testing.T) {
 	singingKey := ed25519.NewKeyFromSeed(seed)
 	verifyKey := singingKey.Public().(ed25519.PublicKey)
 
-	privateKey := privateKeyToCurve25519(singingKey)
-	publicKey := publicKeyToCurve25519(verifyKey)
+	privateKey := PrivateKeyToCurve25519(singingKey)
+	publicKey := PublicKeyToCurve25519(verifyKey)
 
 	// in ed25519 library ed25519.PrivateKey is represented by the privateKey+publicKey, so we slice it to compare with
 	// what pynacl produces

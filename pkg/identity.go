@@ -38,6 +38,9 @@ type IdentityManager interface {
 
 	// Decrypt decrypts message with the private of the node
 	Decrypt(message []byte) ([]byte, error)
+
+	// PrivateKey sends the keypair
+	PrivateKey() []byte
 }
 
 // FarmID is the identification of a farm

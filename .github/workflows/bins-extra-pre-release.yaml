@@ -250,3 +250,41 @@ jobs:
         user: tf-zos-bins.test
         name: shim-logs.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+  yggdrasil:
+    name: 'Package: yggdrasil'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package yggdrasil
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/yggdrasil
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: crosslink flist (tf-zos-bins.test)
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.hub_jwt }}
+        action: crosslink
+        user: tf-zos-bins.test
+        name: yggdrasil.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
