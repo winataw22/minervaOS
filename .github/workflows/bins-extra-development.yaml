@@ -14,7 +14,7 @@ jobs:
     name: 'Package: containerd'
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.13
+    - name: Set up Go 1.14
       uses: actions/setup-go@v1
       with:
         go-version: 1.14
@@ -246,7 +246,6 @@ jobs:
         name: shim-logs.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
 
-
   yggdrasil:
     name: 'Package: yggdrasil'
     runs-on: ubuntu-latest
@@ -258,13 +257,11 @@ jobs:
       run: |
         cd bins
         sudo ./bins-extra.sh --package basesystem
-
     - name: Build package
       id: package
       run: |
         cd bins
         sudo ./bins-extra.sh --package yggdrasil
-
     - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
       if: success()
       uses: threefoldtech/publish-flist@master
@@ -284,3 +281,48 @@ jobs:
         user: tf-zos-bins.dev
         name: yggdrasil.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+  zufs:
+    name: 'Package: zufs (0-fs)'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+      id: go
+
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package zufs
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/zufs
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: 0-fs.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
