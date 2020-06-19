@@ -283,13 +283,13 @@ func HostIPV6Iface() (string, error) {
 				Str("addr", addr.String()).
 				Msg("search public ipv6 address")
 
-			if addr.IP.IsGlobalUnicast() {
+			if addr.IP.IsGlobalUnicast() && !isULA(addr.IP) {
 				return link.Attrs().Name, nil
 			}
 		}
 	}
 
-	return "", nil
+	return "", fmt.Errorf("no valid IPv6 address found in host namespace")
 }
 
 // ParentIface return the parent interface fof iface
@@ -320,4 +320,13 @@ func ParentIface(iface string, netNS ns.NetNS) (netlink.Link, error) {
 	}
 
 	return netlink.LinkByIndex(parentIndex)
+}
+
+var ulaPrefix = net.IPNet{
+	IP:   net.ParseIP("fc00::"),
+	Mask: net.CIDRMask(7, 128),
+}
+
+func isULA(ip net.IP) bool {
+	return ulaPrefix.Contains(ip)
 }

@@ -73,7 +73,6 @@ func New(opts EngineOps) *Engine {
 
 // Run starts reader reservation from the Source and handle them
 func (e *Engine) Run(ctx context.Context) error {
-
 	if err := e.cache.Sync(e.statser); err != nil {
 		return fmt.Errorf("failed to synchronize statser: %w", err)
 	}

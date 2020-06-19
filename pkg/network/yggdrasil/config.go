@@ -13,9 +13,9 @@ import (
 
 // List of port used by yggdrasil
 const (
-	YggListenTCP       = 943
-	YggListenTLS       = 944
-	YggListenLinkLocal = 945
+	YggListenTCP       = 9943
+	YggListenTLS       = 9944
+	YggListenLinkLocal = 9945
 
 	YggIface = "ygg0"
 )

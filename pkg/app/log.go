@@ -34,11 +34,11 @@ func formatLevel(i interface{}) string {
 	if ll, ok := i.(string); ok {
 		switch ll {
 		case "debug":
-			l = colorize(ll, colorYellow)
+			l = colorize(ll, colorBlue)
 		case "info":
 			l = colorize(ll, colorGreen)
 		case "warn":
-			l = colorize(ll, colorRed)
+			l = colorize(ll, colorYellow)
 		case "error":
 			l = colorize(colorize(ll, colorRed), colorBold)
 		case "fatal":

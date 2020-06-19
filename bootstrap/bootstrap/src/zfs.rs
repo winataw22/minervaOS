@@ -72,8 +72,14 @@ impl Zfs {
                 debug!("creating directory {:?}", dst);
                 std::fs::create_dir_all(dst)?;
             } else if typ.is_file() {
+                let mut tmp = dst.clone();
+                let mut tmp_name: std::ffi::OsString = dst.file_name().unwrap().into();
+                tmp_name.push(".partial");
+                tmp.set_file_name(tmp_name);
+
                 debug!("installing file {:?}", dst);
-                std::fs::copy(&src, &dst)?;
+                std::fs::copy(&src, &tmp)?;
+                std::fs::rename(&tmp, &dst)?;
             } else {
                 debug!("skipping: ({:?}): {:?}", src, typ)
             }

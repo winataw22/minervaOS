@@ -291,4 +291,66 @@ jobs:
         name: yggdrasil.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
 
-        
+  corex:
+    name: 'Package: corex (static)'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+        sudo ./bins-extra.sh --package base-musl
+
+    - name: Build dependency (zlib)
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package zlib-musl
+
+    - name: Build dependency (libcap)
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package libcap-musl
+
+    - name: Build dependency (libjson-c)
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package libjsonc-musl
+
+    - name: Build dependency (openssl)
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package openssl-musl
+
+    - name: Build dependency (libwebsockets)
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package libwebsockets-musl
+
+    - name: Build package (corex)
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package corex-musl
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/corex-musl
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins
+        name: corex.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist

@@ -103,7 +103,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey())
+	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmz)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("fail to start yggdrasil")
 	}
@@ -181,7 +181,8 @@ func waitYggdrasilBin() {
 	})
 }
 
-func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey) (*yggdrasil.Server, error) {
+func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz.DMZ) (*yggdrasil.Server, error) {
+
 	pl, err := yggdrasil.FetchPeerList()
 	if err != nil {
 		return nil, err
@@ -193,7 +194,8 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey) (*yggdra
 		endpoints[i] = p.Endpoint
 	}
 
-	ls := latency.NewSorter(endpoints, 5)
+	_, ipv4Only := dmz.(*ndmz.Hidden)
+	ls := latency.NewSorter(endpoints, 5, ipv4Only)
 	results := ls.Run(ctx)
 	if len(results) == 0 {
 		return nil, fmt.Errorf("cannot find public yggdrasil peer to connect to")
@@ -220,8 +222,13 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey) (*yggdra
 	go func() {
 		select {
 		case <-ctx.Done():
-			z.Close()
-			server.Stop()
+			if err := server.Stop(); err != nil {
+				log.Error().Err(err).Msg("error while stopping yggdrasil")
+			}
+			if err := z.Close(); err != nil {
+				log.Error().Err(err).Msg("error while closing zinit client")
+			}
+			log.Info().Msg("yggdrasil stopped")
 		}
 	}()
 
@@ -268,7 +275,6 @@ func explorerClient() (client.Directory, error) {
 func buildNDMZ(nodeID string) (ndmz.DMZ, error) {
 	var (
 		master string
-		err    error
 	)
 
 	notify := func(err error, d time.Duration) {
@@ -276,21 +282,16 @@ func buildNDMZ(nodeID string) (ndmz.DMZ, error) {
 	}
 
 	findMaster := func() error {
-		master = ""
+		var err error
 		master, err = ndmz.FindIPv6Master()
-		if err != nil {
-			return err
-		}
-		if master == "" {
-			return fmt.Errorf("ipv6 master iface not found")
-		}
-		return nil
+		return err
 	}
 
 	bo := backoff.NewExponentialBackOff()
 	// wait for 2 minute for public ipv6
 	bo.MaxElapsedTime = time.Minute * 2
-	err = backoff.RetryNotify(findMaster, bo, notify)
+	bo.MaxInterval = time.Second * 10
+	err := backoff.RetryNotify(findMaster, bo, notify)
 
 	// if ipv6 found, use dual stack ndmz
 	if err == nil && master != "" {

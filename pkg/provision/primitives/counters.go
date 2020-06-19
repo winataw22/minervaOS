@@ -223,9 +223,9 @@ func processZdb(r *provision.Reservation) (u resourceUnits, err error) {
 	}
 
 	switch zdbVolume.DiskType {
-	case "SSD":
+	case pkg.SSDDevice:
 		u.SRU = zdbVolume.Size * gib
-	case "HDD":
+	case pkg.HDDDevice:
 		u.HRU = zdbVolume.Size * gib
 	}
 

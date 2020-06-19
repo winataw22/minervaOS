@@ -112,6 +112,9 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 			return nil, err
 		}
 	}
+	if err := nw.publishWGPorts(); err != nil {
+		return nil, err
+	}
 
 	return nw, nil
 }

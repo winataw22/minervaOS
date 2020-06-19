@@ -16,6 +16,7 @@ import (
 type Sorter struct {
 	endpoints []string
 	worker    int
+	ipv4Only  bool
 }
 
 // Result is the struct return by the LatencySorter
@@ -26,10 +27,11 @@ type Result struct {
 
 // NewSorter create a new LatencySorter that will sort endpoints by latency
 // you can controle the concurrency by tuning the worker value
-func NewSorter(endpoints []string, worker int) *Sorter {
+func NewSorter(endpoints []string, worker int, ipv4Only bool) *Sorter {
 	return &Sorter{
 		endpoints: endpoints,
 		worker:    worker,
+		ipv4Only:  ipv4Only,
 	}
 }
 
@@ -47,10 +49,18 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 			if strings.Contains(endpoint, "://") {
 				addr, err = cleanupEndpoint(endpoint)
 				if err != nil {
-					out <- r
+					continue
 				}
 			} else {
 				addr = endpoint
+			}
+
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				continue
+			}
+			if l.ipv4Only && !isIPv4(host) {
+				continue
 			}
 
 			t, err := Latency(addr)
@@ -120,4 +130,9 @@ func cleanupEndpoint(endpoint string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("%s:%s", u.Hostname(), u.Port()), nil
+}
+
+func isIPv4(addr string) bool {
+	ip := net.ParseIP(addr)
+	return ip.To4() != nil
 }

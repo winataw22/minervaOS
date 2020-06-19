@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -81,7 +82,7 @@ func (s *Server) Stop() error {
 		return nil
 	}
 
-	return s.zinit.Stop(zinitService)
+	return s.zinit.StopWait(time.Second*5, zinitService)
 }
 
 // NodeID returns the yggdrasil node ID of s
@@ -171,6 +172,10 @@ func subnetFor(prefix net.IP, b []byte) (net.IP, error) {
 }
 
 func writeConfig(path string, cfg config.NodeConfig) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0770); err != nil {
+		return err
+	}
+
 	f, err := os.Create(path)
 	if err != nil {
 		return err
