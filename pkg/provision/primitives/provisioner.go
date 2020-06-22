@@ -1,7 +1,6 @@
 package primitives
 
 import (
-	"context"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/provision"
 )
@@ -40,9 +39,4 @@ func NewProvisioner(cache provision.ReservationCache, zbus zbus.Client) *Provisi
 	}
 
 	return p
-}
-
-// RuntimeUpgrade runs upgrade needed when provision daemon starts
-func (p *Provisioner) RuntimeUpgrade(ctx context.Context) {
-	p.upgradeRunningZdb(ctx)
 }
