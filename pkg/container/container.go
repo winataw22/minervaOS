@@ -288,6 +288,30 @@ func (c *containerModule) Inspect(ns string, id pkg.ContainerID) (result pkg.Con
 	return
 }
 
+// List returns running containers IDs for a specific namespace
+func (c *containerModule) List(ns string) ([]pkg.ContainerID, error) {
+	client, err := containerd.New(c.containerd)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := namespaces.WithNamespace(context.Background(), ns)
+
+	containers, err := client.Containers(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var ids []pkg.ContainerID
+	ids = make([]pkg.ContainerID, len(containers))
+
+	for _, c := range containers {
+		ids = append(ids, pkg.ContainerID(c.ID()))
+	}
+
+	return ids, nil
+}
+
 // Deletes stops and remove a container
 func (c *containerModule) Delete(ns string, id pkg.ContainerID) error {
 	client, err := containerd.New(c.containerd)

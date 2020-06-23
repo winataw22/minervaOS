@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	// TODO: make this configurable
-	zdbFlistURL    = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development.flist"
+	// https://hub.grid.tf/api/flist/tf-autobuilder/threefoldtech-0-db-development.flist/light
+	// To get the latest symlink pointer
+	zdbFlistURL    = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development-b5155357d5.flist"
 	zdbContainerNS = "zdb"
 	zdbPort        = 9900
 )
@@ -130,22 +131,11 @@ func (p *Provisioner) ensureZdbContainer(ctx context.Context, allocation pkg.All
 
 }
 
-func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.Allocation, mode pkg.ZDBMode) error {
-	var (
-		name       = pkg.ContainerID(allocation.VolumeID)
-		volumePath = allocation.VolumePath
-		cont       = stubs.NewContainerModuleStub(p.zbus)
-		flist      = stubs.NewFlisterStub(p.zbus)
-		network    = stubs.NewNetworkerStub(p.zbus)
-
-		slog = log.With().Str("containerID", string(name)).Logger()
-	)
-
-	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(allocation.VolumeID))
-
-	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
+func (p *Provisioner) zdbRootFS() (string, error) {
+	var flist = stubs.NewFlisterStub(p.zbus)
 	var err error
 	var rootFS string
+
 	for _, typ := range []pkg.DeviceType{pkg.HDDDevice, pkg.SSDDevice} {
 		rootFS, err = flist.Mount(zdbFlistURL, "", pkg.MountOptions{
 			Limit:    10,
@@ -163,7 +153,30 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "failed to allocate rootfs for zdb container")
+		return "", errors.Wrap(err, "failed to allocate rootfs for zdb container")
+	}
+
+	return rootFS, nil
+}
+
+func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.Allocation, mode pkg.ZDBMode) error {
+	var (
+		name       = pkg.ContainerID(allocation.VolumeID)
+		cont       = stubs.NewContainerModuleStub(p.zbus)
+		flist      = stubs.NewFlisterStub(p.zbus)
+		volumePath = allocation.VolumePath
+		network    = stubs.NewNetworkerStub(p.zbus)
+
+		slog = log.With().Str("containerID", string(name)).Logger()
+	)
+
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(allocation.VolumeID))
+
+	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
+
+	rootFS, err := p.zdbRootFS()
+	if err != nil {
+		return err
 	}
 
 	cleanup := func() {
@@ -192,26 +205,8 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	}
 
 	cmd := fmt.Sprintf("/bin/zdb --data /data --index /data --mode %s  --listen :: --port %d --socket /socket/zdb.sock --dualnet", string(mode), zdbPort)
-	_, err = cont.Run(
-		zdbContainerNS,
-		pkg.Container{
-			Name:        string(name),
-			RootFS:      rootFS,
-			Entrypoint:  cmd,
-			Interactive: false,
-			Network:     pkg.NetworkInfo{Namespace: netNsName},
-			Mounts: []pkg.MountInfo{
-				{
-					Source: volumePath,
-					Target: "/data",
-				},
-				{
-					Source: socketDir,
-					Target: "/socket",
-				},
-			},
-		})
 
+	err = p.zdbRun(string(name), rootFS, cmd, netNsName, volumePath, socketDir)
 	if err != nil {
 		cleanup()
 		return errors.Wrap(err, "failed to create container")
@@ -232,6 +227,32 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	}
 
 	return nil
+}
+
+func (p *Provisioner) zdbRun(name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
+	var cont = stubs.NewContainerModuleStub(p.zbus)
+
+	_, err := cont.Run(
+		zdbContainerNS,
+		pkg.Container{
+			Name:        name,
+			RootFS:      rootfs,
+			Entrypoint:  cmd,
+			Interactive: false,
+			Network:     pkg.NetworkInfo{Namespace: netns},
+			Mounts: []pkg.MountInfo{
+				{
+					Source: volumepath,
+					Target: "/data",
+				},
+				{
+					Source: socketdir,
+					Target: "/socket",
+				},
+			},
+		})
+
+	return err
 }
 
 func (p *Provisioner) getIfaceIP(ctx context.Context, ifaceName, namespace string) ([]net.IP, error) {
@@ -391,4 +412,110 @@ var yggNet = net.IPNet{
 
 func isYgg(ip net.IP) bool {
 	return yggNet.Contains(ip)
+}
+
+func (p *Provisioner) upgradeRunningZdb(ctx context.Context) error {
+	log.Info().Msg("checking for any outdated zdb running")
+
+	flistmod := stubs.NewFlisterStub(p.zbus)
+	contmod := stubs.NewContainerModuleStub(p.zbus)
+
+	// Listing running zdb containers
+	containers, err := contmod.List(zdbContainerNS)
+	if err != nil {
+		log.Error().Err(err).Msg("could not load containers list")
+		return err
+	}
+
+	// fetching extected hash
+	expected, err := flistmod.FlistHash(zdbFlistURL)
+	if err != nil {
+		log.Error().Err(err).Msg("could not load expected flist hash")
+		return err
+	}
+
+	// Checking if containers are running latest zdb version
+	for _, c := range containers {
+		if c == "" {
+			continue
+		}
+
+		log.Debug().Str("id", string(c)).Msg("inspecting container")
+
+		continfo, err := contmod.Inspect(zdbContainerNS, c)
+
+		if err != nil {
+			log.Error().Err(err).Msg("could not inspect container")
+			continue
+		}
+
+		hash, err := flistmod.HashFromRootPath(continfo.RootFS)
+		if err != nil {
+			log.Error().Err(err).Msg("could not find container running flist hash")
+			continue
+		}
+
+		log.Debug().Str("hash", hash).Msg("running container hash")
+
+		if expected != hash {
+			log.Info().Str("id", string(c)).Msg("restarting container, update found")
+
+			// extracting required informations
+			volumeid := continfo.Name // VolumeID is the Container Name
+			volumepath := ""          // VolumePath is /data mount on the container
+			socketdir := ""           // SocketDir is /socket on the container
+			zdbcmd := continfo.Entrypoint
+			netns := continfo.Network.Namespace
+
+			log.Info().Str("id", volumeid).Str("path", volumepath).Msg("rebuild zdb container")
+
+			for _, mnt := range continfo.Mounts {
+				if mnt.Target == "/data" {
+					volumepath = mnt.Source
+				}
+
+				if mnt.Target == "/socket" {
+					socketdir = mnt.Source
+				}
+			}
+
+			if volumepath == "" {
+				log.Error().Msg("could not grab container /data mountpoint")
+				continue
+			}
+
+			// stopping running zdb
+			err := contmod.Delete(zdbContainerNS, c)
+			if err != nil {
+				log.Error().Err(err).Msg("could not stop running zdb container")
+				continue
+			}
+
+			// cleanup old containers rootfs
+			if err = flistmod.Umount(continfo.RootFS); err != nil {
+				log.Error().Err(err).Str("path", continfo.RootFS).Msgf("failed to unmount old zdb container")
+			}
+
+			// restarting zdb
+
+			// mount the new flist
+			rootfs, err := p.zdbRootFS()
+			if err != nil {
+				log.Error().Err(err).Msg("could not initialize zdb rootfs")
+				continue
+			}
+
+			// respawn the container
+			err = p.zdbRun(volumeid, rootfs, zdbcmd, netns, volumepath, socketdir)
+			if err != nil {
+				log.Error().Err(err).Msg("could not restart zdb container")
+
+				if err = flistmod.Umount(rootfs); err != nil {
+					log.Error().Err(err).Str("path", rootfs).Msgf("failed to unmount zdb container")
+				}
+			}
+		}
+	}
+
+	return nil
 }

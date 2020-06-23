@@ -150,6 +150,9 @@ func main() {
 		log.Info().Msg("shutting down")
 	})
 
+	// call the runtime upgrade before running engine
+	provisioner.RuntimeUpgrade(ctx)
+
 	go func() {
 		if err := server.Run(ctx); err != nil && err != context.Canceled {
 			log.Fatal().Err(err).Msg("unexpected error")
