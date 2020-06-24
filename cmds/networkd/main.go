@@ -222,8 +222,13 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz
 	go func() {
 		select {
 		case <-ctx.Done():
-			z.Close()
-			server.Stop()
+			if err := server.Stop(); err != nil {
+				log.Error().Err(err).Msg("error while stopping yggdrasil")
+			}
+			if err := z.Close(); err != nil {
+				log.Error().Err(err).Msg("error while closing zinit client")
+			}
+			log.Info().Msg("yggdrasil stopped")
 		}
 	}()
 

@@ -82,7 +82,7 @@ func (s *Server) Stop() error {
 		return nil
 	}
 
-	return s.zinit.Stop(zinitService)
+	return s.zinit.StopWait(time.Second*5, zinitService)
 }
 
 // NodeID returns the yggdrasil node ID of s

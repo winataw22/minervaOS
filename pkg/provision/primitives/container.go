@@ -7,7 +7,9 @@ import (
 	"net"
 	"os"
 	"path"
+	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -242,15 +244,14 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 	}
 
 	if config.Network.PublicIP6 {
-		//TODO
-		ips, err := p.getIfaceIP(ctx, "pub", join.Namespace)
+		ip, err := p.waitContainerIP(ctx, "pub", join.Namespace)
 		if err != nil {
 			return ContainerResult{}, errors.Wrap(err, "error reading container ipv6")
 		}
 		if len(ips) <= 0 {
 			return ContainerResult{}, fmt.Errorf("no ipv6 found for container %s", id)
 		}
-		join.IPv6 = ips[0]
+		join.IPv6 = ip
 	}
 
 	log.Info().Msgf("container created with id: '%s'", id)
@@ -304,6 +305,45 @@ func (p *Provisioner) containerDecommission(ctx context.Context, reservation *pr
 	}
 
 	return nil
+}
+
+func (p *Provisioner) waitContainerIP(ctx context.Context, ifaceName, namespace string) (net.IP, error) {
+	var (
+		network     = stubs.NewNetworkerStub(p.zbus)
+		containerIP net.IP
+	)
+
+	getIP := func() error {
+
+		ips, err := network.Addrs(ifaceName, namespace)
+		if err != nil {
+			log.Debug().Err(err).Msg("not ip public found, waiting")
+			return err
+		}
+
+		for _, ip := range ips {
+			if isPublic(ip) {
+				containerIP = ip
+				return nil
+			}
+		}
+
+		return fmt.Errorf("waiting for more addresses")
+	}
+
+	notify := func(err error, d time.Duration) {
+		log.Debug().Err(err).Str("duration", d.String()).Msg("failed to get zdb public IP")
+	}
+
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxInterval = time.Second * 20
+	bo.MaxElapsedTime = time.Minute * 2
+
+	if err := backoff.RetryNotify(getIP, bo, notify); err != nil {
+		return nil, errors.Wrapf(err, "failed to get an IP for interface %s", ifaceName)
+	}
+
+	return containerIP, nil
 }
 
 func validateContainerConfig(config Container) error {

@@ -83,7 +83,7 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 		return ZDBResult{}, errors.Wrapf(err, "failed to ensure zdb containe running")
 	}
 
-	containerIPs, err := p.getIfaceIP(ctx, nwmod.ZDBIface, cont.Network.Namespace)
+	containerIPs, err := p.waitZDBIPs(ctx, nwmod.ZDBIface, cont.Network.Namespace)
 	if err != nil {
 		return ZDBResult{}, errors.Wrap(err, "failed to find IP address on zdb0 interface")
 	}
@@ -216,7 +216,7 @@ func (p *Provisioner) createZdbContainer(ctx context.Context, allocation pkg.All
 	defer cl.Close()
 
 	bo := backoff.NewExponentialBackOff()
-	bo.MaxInterval = time.Minute * 2
+	bo.MaxInterval = time.Second * 20
 	bo.MaxElapsedTime = time.Minute * 2
 
 	if err := backoff.RetryNotify(cl.Connect, bo, func(err error, d time.Duration) {
@@ -255,7 +255,7 @@ func (p *Provisioner) zdbRun(name string, rootfs string, cmd string, netns strin
 	return err
 }
 
-func (p *Provisioner) getIfaceIP(ctx context.Context, ifaceName, namespace string) ([]net.IP, error) {
+func (p *Provisioner) waitZDBIPs(ctx context.Context, ifaceName, namespace string) ([]net.IP, error) {
 	var (
 		network      = stubs.NewNetworkerStub(p.zbus)
 		containerIPs []net.IP
