@@ -231,19 +231,6 @@ func main() {
 	upgradeLoop(ctx, &boot, &upgrader, debug, monitor, register)
 }
 
-func getBinsRepo() string {
-	env, _ := environment.Get()
-
-	switch env.RunningMode {
-	case environment.RunningDev:
-		return "tf-zos-bins.dev"
-	case environment.RunningTest:
-		return "tf-zos-bins.test"
-	default:
-		return "tf-zos-bins"
-	}
-}
-
 // allow reinstall if receive signal USR1
 // only allowed in debug mode
 func debugReinstall(boot *upgrade.Boot, up *upgrade.Upgrader) {
@@ -273,8 +260,10 @@ func installBinaries(boot *upgrade.Boot, upgrader *upgrade.Upgrader) {
 
 	bins, _ := boot.CurrentBins()
 
+	env, _ := environment.Get()
+
 	repoWatcher := upgrade.FListRepoWatcher{
-		Repo:    getBinsRepo(),
+		Repo:    env.BinRepo,
 		Current: bins,
 	}
 
@@ -329,8 +318,10 @@ func upgradeLoop(
 		log.Warn().Err(err).Msg("could not load current binaries list")
 	}
 
+	env, _ := environment.Get()
+
 	repoWatcher := upgrade.FListRepoWatcher{
-		Repo:    getBinsRepo(),
+		Repo:    env.BinRepo,
 		Current: bins,
 	}
 

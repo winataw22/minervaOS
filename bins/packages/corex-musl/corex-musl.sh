@@ -1,6 +1,6 @@
 COREX_MUSL_PKGNAME="corex"
-COREX_MUSL_VERSION="2.1.2"
-COREX_MUSL_CHECKSUM="632fdf0638535a13022d70d57a000dca"
+COREX_MUSL_VERSION="2.1.3"
+COREX_MUSL_CHECKSUM="6d94357503fe123aac8c22b86c004bca"
 COREX_MUSL_LINK="https://github.com/threefoldtech/corex/archive/${COREX_MUSL_VERSION}.tar.gz"
 
 dependencies_corex-musl() {

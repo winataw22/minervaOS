@@ -21,11 +21,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/environment"
 )
 
 const (
-	defaultStorage = "zdb://hub.grid.tf:9900"
-	defaultRoot    = "/var/cache/modules/flist"
+	defaultRoot = "/var/cache/modules/flist"
 )
 
 const mib = 1024 * 1024
@@ -165,8 +165,13 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 		return "", err
 	}
 
+	env, err := environment.Get()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse node environment")
+	}
+
 	if storage == "" {
-		storage = defaultStorage
+		storage = env.FlistURL
 	}
 
 	flistPath, err := f.downloadFlist(url)

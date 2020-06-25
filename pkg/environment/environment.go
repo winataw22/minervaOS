@@ -18,11 +18,11 @@ type Environment struct {
 	BcdbURL      string
 	BcdbPassword string
 
+	FlistURL string
+	BinRepo  string
+
 	FarmerID pkg.FarmID
 	Orphan   bool
-
-	// ProvisionTimeout  int64
-	// ProvisionInterval int64
 }
 
 // RunningMode type
@@ -58,23 +58,23 @@ var (
 	envDev = Environment{
 		RunningMode: RunningDev,
 		BcdbURL:     "https://explorer.devnet.grid.tf/explorer",
-		// ProvisionTimeout:  60,
-		// ProvisionInterval: 10,
+		FlistURL:    "zdb://hub.grid.tf:9900",
+		BinRepo:     "tf-zos-bins.dev",
 	}
 
 	envTest = Environment{
 		RunningMode: RunningTest,
 		BcdbURL:     "https://explorer.testnet.grid.tf/explorer",
-		// ProvisionTimeout:  120,
-		// ProvisionInterval: 10,
+		FlistURL:    "zdb://hub.grid.tf:9900",
+		BinRepo:     "tf-zos-bins.test",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode: RunningMain,
 		BcdbURL:     "https://explorer.grid.tf/explorer",
-		// ProvisionTimeout:  240,
-		// ProvisionInterval: 20,
+		FlistURL:    "zdb://hub.grid.tf:9900",
+		BinRepo:     "tf-zos-bins",
 	}
 )
 
@@ -147,17 +147,13 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		env.BcdbPassword = e
 	}
 
-	// if e := os.Getenv("ZOS_PROVISION_INTERVAL"); e != "" {
-	// 	if i, err := strconv.ParseInt(e, 10, 64); err == nil {
-	// 		env.ProvisionInterval = i
-	// 	}
-	// }
+	if e := os.Getenv("ZOS_FLIST_URL"); e != "" {
+		env.FlistURL = e
+	}
 
-	// if e := os.Getenv("ZOS_PROVISION_TIMEOUT"); e != "" {
-	// 	if i, err := strconv.ParseInt(e, 10, 64); err == nil {
-	// 		env.ProvisionTimeout = i
-	// 	}
-	// }
+	if e := os.Getenv("ZOS_BIN_REPO"); e != "" {
+		env.BinRepo = e
+	}
 
 	return env, nil
 }
