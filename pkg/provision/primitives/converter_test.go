@@ -44,6 +44,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 		Volumes           []workloads.ContainerMount
 		NetworkConnection []workloads.NetworkConnection
 		StatsAggregator   []workloads.StatsAggregator
+		Capacity          workloads.ContainerCapacity
 	}
 	tests := []struct {
 		name    string
@@ -64,6 +65,12 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				Volumes:           nil,
 				NetworkConnection: nil,
 				StatsAggregator:   nil,
+				Capacity: workloads.ContainerCapacity{
+					Cpu:      2,
+					Memory:   1024,
+					DiskSize: 1024,
+					DiskType: workloads.DiskTypeSSD,
+				},
 			},
 			want: Container{
 				FList:           "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
@@ -76,6 +83,12 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				Network:         Network{},
 				Logs:            []logger.Logs{},
 				StatsAggregator: []stats.Aggregator{},
+				Capacity: ContainerCapacity{
+					CPU:      2,
+					Memory:   1024,
+					DiskSize: 1024,
+					DiskType: pkg.SSDDevice,
+				},
 			},
 			wantErr: false,
 		},
@@ -105,6 +118,12 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 						Ipaddress: net.ParseIP("10.0.0.1"),
 					},
 				},
+				Capacity: workloads.ContainerCapacity{
+					Cpu:      2,
+					Memory:   1024,
+					DiskSize: 1024,
+					DiskType: workloads.DiskTypeSSD,
+				},
 			},
 			want: Container{
 				FList:        "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
@@ -129,6 +148,12 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				},
 				Logs:            []logger.Logs{},
 				StatsAggregator: []stats.Aggregator{},
+				Capacity: ContainerCapacity{
+					CPU:      2,
+					Memory:   1024,
+					DiskSize: 1024,
+					DiskType: pkg.SSDDevice,
+				},
 			},
 			wantErr: false,
 		},
@@ -147,6 +172,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				Volumes:           tt.fields.Volumes,
 				NetworkConnection: tt.fields.NetworkConnection,
 				StatsAggregator:   tt.fields.StatsAggregator,
+				Capacity:          tt.fields.Capacity,
 			}
 			got, _, err := ContainerToProvisionType(c, "reservation")
 			if !tt.wantErr {
