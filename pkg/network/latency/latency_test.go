@@ -3,6 +3,7 @@ package latency
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ func TestLatencySorter(t *testing.T) {
 	ls := NewSorter([]string{
 		"explorer.grid.tf:80",
 		"google.com:80",
-	}, 2, false)
+	}, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -36,7 +37,7 @@ func TestLatencySorterIPV4Only(t *testing.T) {
 	ls := NewSorter([]string{
 		"tcp://[2a00:1450:400e:806::200e]:443",
 		"tcp://172.217.17.78:443",
-	}, 1, true)
+	}, 1, IPV4Only)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,7 +56,7 @@ func TestYggPeering(t *testing.T) {
 		endpoints[i] = p.Endpoint
 	}
 
-	ls := NewSorter(endpoints, 2, false)
+	ls := NewSorter(endpoints, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -66,22 +67,45 @@ func TestYggPeering(t *testing.T) {
 	}
 }
 
-func TestIsIPv4(t *testing.T) {
+func TestIPV4Only(t *testing.T) {
 	for _, tc := range []struct {
-		ip   string
+		ip   net.IP
 		ipv4 bool
 	}{
 		{
-			ip:   "2406:d500:6:beef:21a2:a10c:6aea",
+			ip:   net.ParseIP("2a00:1450:400e:80a::2004"),
 			ipv4: false,
 		},
 		{
-			ip:   "82.118.227.155",
+			ip:   net.ParseIP("82.118.227.155"),
 			ipv4: true,
 		},
 	} {
-		t.Run(tc.ip, func(t *testing.T) {
-			assert.Equal(t, tc.ipv4, isIPv4(tc.ip))
+		t.Run(tc.ip.String(), func(t *testing.T) {
+			assert.Equal(t, tc.ipv4, IPV4Only(tc.ip))
+		})
+	}
+}
+
+func TestExcludePrefix(t *testing.T) {
+	for _, tc := range []struct {
+		ip     net.IP
+		prefix []byte
+		expect bool
+	}{
+		{
+			ip:     net.ParseIP("2a00:1450:400e:80a::2004"),
+			prefix: net.ParseIP("2a02:1802:5e:0::"),
+			expect: true,
+		},
+		{
+			ip:     net.ParseIP("2a02:1802:5e:0:18d2:e2ff:fe44:17d2"),
+			prefix: net.ParseIP("2a02:1802:5e:0::"),
+			expect: false,
+		},
+	} {
+		t.Run(tc.ip.String(), func(t *testing.T) {
+			assert.Equal(t, tc.expect, ExcludePrefix(tc.prefix[:8])(tc.ip))
 		})
 	}
 

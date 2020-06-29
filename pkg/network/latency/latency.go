@@ -1,10 +1,9 @@
 package latency
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"net"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -16,7 +15,7 @@ import (
 type Sorter struct {
 	endpoints []string
 	worker    int
-	ipv4Only  bool
+	filters   []IPFilter
 }
 
 // Result is the struct return by the LatencySorter
@@ -25,13 +24,28 @@ type Result struct {
 	Latency  time.Duration
 }
 
+// IPFilter is function used by Sorted to filters out IP address during the latency test
+type IPFilter func(net.IP) bool
+
+// IPV4Only is an IPFilter function that filters out non IPv4 address
+func IPV4Only(ip net.IP) bool {
+	return ip.To4() != nil
+}
+
+// ExcludePrefix is a IPFilter function that filters IPs that start with prefix
+func ExcludePrefix(prefix []byte) IPFilter {
+	return func(ip net.IP) bool {
+		return !bytes.HasPrefix(ip, prefix)
+	}
+}
+
 // NewSorter create a new LatencySorter that will sort endpoints by latency
 // you can controle the concurrency by tuning the worker value
-func NewSorter(endpoints []string, worker int, ipv4Only bool) *Sorter {
+func NewSorter(endpoints []string, worker int, filters ...IPFilter) *Sorter {
 	return &Sorter{
 		endpoints: endpoints,
 		worker:    worker,
-		ipv4Only:  ipv4Only,
+		filters:   filters,
 	}
 }
 
@@ -46,20 +60,21 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 				err  error
 			)
 
-			if strings.Contains(endpoint, "://") {
-				addr, err = cleanupEndpoint(endpoint)
-				if err != nil {
-					continue
-				}
-			} else {
-				addr = endpoint
-			}
-
+			addr = cleanupEndpoint(endpoint)
 			host, _, err := net.SplitHostPort(addr)
 			if err != nil {
 				continue
 			}
-			if l.ipv4Only && !isIPv4(host) {
+
+			skip := false
+			for _, filter := range l.filters {
+				ip := net.ParseIP(host)
+				skip = !filter(ip)
+				if skip {
+					break
+				}
+			}
+			if skip {
 				continue
 			}
 
@@ -124,15 +139,9 @@ func Latency(host string) (time.Duration, error) {
 	return duration / (3 / 2), nil
 }
 
-func cleanupEndpoint(endpoint string) (string, error) {
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", err
+func cleanupEndpoint(endpoint string) string {
+	if strings.HasPrefix(endpoint, "tcp://") || strings.HasPrefix(endpoint, "tls://") {
+		return endpoint[6:]
 	}
-	return fmt.Sprintf("%s:%s", u.Hostname(), u.Port()), nil
-}
-
-func isIPv4(addr string) bool {
-	ip := net.ParseIP(addr)
-	return ip.To4() != nil
+	return endpoint
 }

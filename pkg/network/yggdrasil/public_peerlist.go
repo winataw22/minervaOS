@@ -5,6 +5,27 @@ import (
 	"net/http"
 )
 
+//PeerListFallback is an hardcoded list of public yggdrasil node
+// it is used to have some available peer to connect to when we failed to read the online public peer info
+var PeerListFallback = PeerList{
+	peers: map[string]map[string]NodeInfo{
+		"fallback.md": {
+			"tls://45.147.198.155:6010": {
+				Endpoint: "tls://45.147.198.155:6010",
+				Up:       true,
+			},
+			"tcp://85.17.15.221:35239": {
+				Endpoint: "tcp://85.17.15.221:35239",
+				Up:       true,
+			},
+			"tcp://51.255.223.60:64982": {
+				Endpoint: "tcp://51.255.223.60:64982",
+				Up:       true,
+			},
+		},
+	},
+}
+
 // NodeInfo is the know information about an yggdrasil public node
 type NodeInfo struct {
 	Endpoint  string

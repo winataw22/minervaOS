@@ -51,7 +51,7 @@ func withCoreX() oci.SpecOpts {
 		return nil
 	}
 
-	return oci.Compose(withMount, oci.WithProcessArgs("/corex", "--ipv6", "-d", "7"))
+	return oci.Compose(withMount, oci.WithProcessArgs("/corex", "--ipv6", "-d", "7", "--interface", "eth0"))
 }
 
 func withMounts(mounts []pkg.MountInfo) oci.SpecOpts {
