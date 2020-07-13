@@ -23,7 +23,7 @@ type DecomissionerFunc func(ctx context.Context, reservation *Reservation) error
 
 // ReservationConverterFunc is used to convert from the explorer workloads type into the
 // internal Reservation type
-type ReservationConverterFunc func(w workloads.ReservationWorkload) (*Reservation, error)
+type ReservationConverterFunc func(w workloads.Workloader) (*Reservation, error)
 
 //ResultConverterFunc is used to convert internal Result type to the explorer workload result
 type ResultConverterFunc func(result Result) (*workloads.Result, error)

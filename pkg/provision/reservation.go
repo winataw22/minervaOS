@@ -41,6 +41,13 @@ type Reservation struct {
 
 	// Tag object is mainly used for debugging.
 	Tag Tag `json:"-"`
+
+	// Reference is a pointer to an existing reservation
+	// this is used to allow a new type of workload to point to an existing one
+	// so the provision engine know both are linked
+	Reference string `json:"reference"`
+
+	Result Result `json:"result"`
 }
 
 // AppendTag appends tags

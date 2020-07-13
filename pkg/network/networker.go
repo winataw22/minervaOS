@@ -157,76 +157,6 @@ func copyNetworksToVolatile(src, dst string) error {
 
 var _ pkg.Networker = (*networker)(nil)
 
-func validateNetwork(n *pkg.Network) error {
-	if n.NetID == "" {
-		return fmt.Errorf("network ID cannot be empty")
-	}
-
-	if n.Name == "" {
-		return fmt.Errorf("network name cannot be empty")
-	}
-
-	if n.IPRange.Nil() {
-		return fmt.Errorf("network IP range cannot be empty")
-	}
-
-	if len(n.NetResources) < 1 {
-		return fmt.Errorf("network needs at least one network resource")
-	}
-
-	for _, nr := range n.NetResources {
-		if err := validateNR(nr); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-func validateNR(nr pkg.NetResource) error {
-
-	if nr.NodeID == "" {
-		return fmt.Errorf("network resource node ID cannot empty")
-	}
-	if nr.Subnet.IP == nil {
-		return fmt.Errorf("network resource subnet cannot empty")
-	}
-
-	if nr.WGPrivateKey == "" {
-		return fmt.Errorf("network resource wireguard private key cannot empty")
-	}
-
-	if nr.WGPublicKey == "" {
-		return fmt.Errorf("network resource wireguard public key cannot empty")
-	}
-
-	if nr.WGListenPort == 0 {
-		return fmt.Errorf("network resource wireguard listen port cannot empty")
-	}
-
-	for _, peer := range nr.Peers {
-		if err := validatePeer(peer); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func validatePeer(p pkg.Peer) error {
-	if p.WGPublicKey == "" {
-		return fmt.Errorf("peer wireguard public key cannot empty")
-	}
-
-	if p.Subnet.Nil() {
-		return fmt.Errorf("peer wireguard subnet cannot empty")
-	}
-
-	if len(p.AllowedIPs) <= 0 {
-		return fmt.Errorf("peer wireguard allowedIPs cannot empty")
-	}
-	return nil
-}
-
 func (n *networker) Ready() error {
 	return nil
 }
@@ -241,18 +171,12 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []strin
 
 	log.Info().Str("network-id", string(networkdID)).Msg("joining network")
 
-	network, err := n.networkOf(string(networkdID))
+	localNR, err := n.networkOf(string(networkdID))
 	if err != nil {
 		return join, errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
 	}
 
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return join, err
-	}
-
-	netRes, err := nr.New(networkdID, localNR, &network.IPRange.IPNet)
+	netRes, err := nr.New(localNR)
 	if err != nil {
 		return join, errors.Wrap(err, "failed to load network resource")
 	}
@@ -287,18 +211,12 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, addrs []strin
 func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 	log.Info().Str("network-id", string(networkdID)).Msg("leaving network")
 
-	network, err := n.networkOf(string(networkdID))
+	localNR, err := n.networkOf(string(networkdID))
 	if err != nil {
 		return errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
 	}
 
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return err
-	}
-
-	netRes, err := nr.New(networkdID, localNR, &network.IPRange.IPNet)
+	netRes, err := nr.New(localNR)
 	if err != nil {
 		return errors.Wrap(err, "failed to load network resource")
 	}
@@ -379,18 +297,12 @@ func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.I
 func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
 
-	network, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
 
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return "", err
-	}
-
-	netRes, err := nr.New(networkID, localNR, &network.IPRange.IPNet)
+	netRes, err := nr.New(localNR)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to load network resource")
 	}
@@ -424,15 +336,9 @@ func (n *networker) RemoveTap(networkID pkg.NetID) error {
 
 // GetSubnet of a local network resource identified by the network ID
 func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
-	network, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
-	}
-
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return net.IPNet{}, err
 	}
 
 	return localNR.Subnet.IPNet, nil
@@ -441,15 +347,9 @@ func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 // GetDefaultGwIP returns the IP(v4) of the default gateway inside the network
 // resource identified by the network ID on the local node
 func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, error) {
-	network, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
-	}
-
-	nodeID := n.identity.NodeID().Identity()
-	localNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return nil, err
 	}
 
 	// only IP4 atm
@@ -506,27 +406,14 @@ func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
 }
 
 // CreateNR implements pkg.Networker interface
-func (n *networker) CreateNR(network pkg.Network) (string, error) {
+func (n *networker) CreateNR(netNR pkg.NetResource) (string, error) {
 	defer func() {
 		if err := n.publishWGPorts(); err != nil {
 			log.Warn().Err(err).Msg("failed to publish wireguard port to BCDB")
 		}
 	}()
 
-	var err error
-	var nodeID = n.identity.NodeID().Identity()
-
-	if err := validateNetwork(&network); err != nil {
-		log.Error().Err(err).Msg("network object format invalid")
-		return "", err
-	}
-
-	log.Info().Str("network", network.Name).Msg("create network resource")
-
-	netNR, err := resourceByNodeID(nodeID, network.NetResources)
-	if err != nil {
-		return "", err
-	}
+	log.Info().Str("network", string(netNR.NetID)).Msg("create network resource")
 
 	privateKey, err := n.extractPrivateKey(netNR.WGPrivateKey)
 	if err != nil {
@@ -535,16 +422,12 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 
 	// check if there is a reserved wireguard port for this NR already
 	// or if we need to update it
-	storedNet, err := n.networkOf(string(network.NetID))
+	storedNR, err := n.networkOf(string(netNR.NetID))
 	if err != nil && !os.IsNotExist(err) {
 		return "", err
 	}
 
 	if err == nil {
-		storedNR, err := resourceByNodeID(nodeID, storedNet.NetResources)
-		if err != nil {
-			return "", err
-		}
 		if err := n.releasePort(storedNR.WGListenPort); err != nil {
 			return "", err
 		}
@@ -554,7 +437,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", err
 	}
 
-	netr, err := nr.New(network.NetID, netNR, &network.IPRange.IPNet)
+	netr, err := nr.New(netNR)
 	if err != nil {
 		return "", err
 	}
@@ -578,7 +461,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to create network resource")
 	}
 
-	if err := n.ndmz.AttachNR(string(network.NetID), netr, n.ipamLeaseDir); err != nil {
+	if err := n.ndmz.AttachNR(string(netNR.NetID), netr, n.ipamLeaseDir); err != nil {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
@@ -587,7 +470,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
-	if err := n.storeNetwork(network); err != nil {
+	if err := n.storeNetwork(netNR); err != nil {
 		cleanup()
 		return "", errors.Wrap(err, "failed to store network object")
 	}
@@ -595,7 +478,7 @@ func (n *networker) CreateNR(network pkg.Network) (string, error) {
 	return netr.Namespace()
 }
 
-func (n *networker) storeNetwork(network pkg.Network) error {
+func (n *networker) storeNetwork(network pkg.NetResource) error {
 	// map the network ID to the network namespace
 	path := filepath.Join(n.networkDir, string(network.NetID))
 	file, err := os.Create(path)
@@ -618,19 +501,14 @@ func (n *networker) storeNetwork(network pkg.Network) error {
 }
 
 // DeleteNR implements pkg.Networker interface
-func (n *networker) DeleteNR(network pkg.Network) error {
+func (n *networker) DeleteNR(netNR pkg.NetResource) error {
 	defer func() {
 		if err := n.publishWGPorts(); err != nil {
 			log.Warn().Msg("failed to publish wireguard port to BCDB")
 		}
 	}()
 
-	netNR, err := resourceByNodeID(n.identity.NodeID().Identity(), network.NetResources)
-	if err != nil {
-		return err
-	}
-
-	nr, err := nr.New(network.NetID, netNR, &network.IPRange.IPNet)
+	nr, err := nr.New(netNR)
 	if err != nil {
 		return errors.Wrap(err, "failed to load network resource")
 	}
@@ -645,7 +523,7 @@ func (n *networker) DeleteNR(network pkg.Network) error {
 	}
 
 	// map the network ID to the network namespace
-	path := filepath.Join(n.networkDir, string(network.NetID))
+	path := filepath.Join(n.networkDir, string(netNR.NetID))
 	if err := os.Remove(path); err != nil {
 		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
 	}
@@ -653,39 +531,39 @@ func (n *networker) DeleteNR(network pkg.Network) error {
 	return nil
 }
 
-func (n *networker) networkOf(id string) (*pkg.Network, error) {
+func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 	path := filepath.Join(n.networkDir, string(id))
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nr, err
 	}
 	defer file.Close()
 	reader, err := versioned.NewReader(file)
 	if versioned.IsNotVersioned(err) {
 		// old data that doesn't have any version information
 		if _, err := file.Seek(0, 0); err != nil {
-			return nil, err
+			return nr, err
 		}
 
 		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), file)
 	} else if err != nil {
-		return nil, err
+		return nr, err
 	}
 
-	var net pkg.Network
+	var net pkg.NetResource
 	dec := json.NewDecoder(reader)
 
 	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", pkg.NetworkSchemaV1))
 
 	if validV1(reader.Version()) {
 		if err := dec.Decode(&net); err != nil {
-			return nil, err
+			return nr, err
 		}
 	} else {
-		return nil, fmt.Errorf("unknown network object version (%s)", reader.Version())
+		return nr, fmt.Errorf("unknown network object version (%s)", reader.Version())
 	}
 
-	return &net, nil
+	return net, nil
 }
 
 func (n *networker) extractPrivateKey(hexKey string) (string, error) {
@@ -895,16 +773,6 @@ func createNetNS(name string) (ns.NetNS, error) {
 	}
 
 	return netNs, nil
-}
-
-// resourceByNodeID return the net resource associated with a nodeID
-func resourceByNodeID(nodeID string, resources []pkg.NetResource) (*pkg.NetResource, error) {
-	for _, resource := range resources {
-		if resource.NodeID == nodeID {
-			return &resource, nil
-		}
-	}
-	return nil, fmt.Errorf("not network resource for this node: %s", nodeID)
 }
 
 // tapName returns the name of the tap device for a network namespace

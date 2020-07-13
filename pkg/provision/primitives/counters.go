@@ -115,7 +115,7 @@ func (c *Counters) Increment(r *provision.Reservation) error {
 	case KubernetesReservation:
 		c.vms.Increment(1)
 		u, err = processKubernetes(r)
-	case NetworkReservation:
+	case NetworkReservation, NetworkResourceReservation:
 		c.networks.Increment(1)
 		u = resourceUnits{}
 		err = nil
@@ -156,7 +156,7 @@ func (c *Counters) Decrement(r *provision.Reservation) error {
 	case KubernetesReservation:
 		c.vms.Decrement(1)
 		u, err = processKubernetes(r)
-	case NetworkReservation:
+	case NetworkReservation, NetworkResourceReservation:
 		c.networks.Decrement(1)
 		u = resourceUnits{}
 		err = nil

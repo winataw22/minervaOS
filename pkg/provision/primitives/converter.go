@@ -3,9 +3,9 @@ package primitives
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
@@ -22,7 +22,12 @@ import (
 var ErrUnsupportedWorkload = errors.New("workload type not supported")
 
 // ContainerToProvisionType converts TfgridReservationContainer1 to Container
-func ContainerToProvisionType(c workloads.Container, reservationID string) (Container, string, error) {
+func ContainerToProvisionType(w workloads.Workloader, reservationID string) (Container, string, error) {
+	c, ok := w.(*workloads.Container)
+	if !ok {
+		return Container{}, "", fmt.Errorf("failed to convert container workload, wrong format")
+	}
+
 	var diskType pkg.DeviceType
 	switch strings.ToLower(c.Capacity.DiskType.String()) {
 	case "hdd":
@@ -113,7 +118,12 @@ func ContainerToProvisionType(c workloads.Container, reservationID string) (Cont
 }
 
 // VolumeToProvisionType converts TfgridReservationVolume1 to Volume
-func VolumeToProvisionType(v workloads.Volume) (Volume, string, error) {
+func VolumeToProvisionType(w workloads.Workloader) (Volume, string, error) {
+	v, ok := w.(*workloads.Volume)
+	if !ok {
+		return Volume{}, "", fmt.Errorf("failed to convert volume workload, wrong format")
+	}
+
 	volume := Volume{
 		Size: uint64(v.Size),
 	}
@@ -129,7 +139,12 @@ func VolumeToProvisionType(v workloads.Volume) (Volume, string, error) {
 }
 
 //ZDBToProvisionType converts TfgridReservationZdb1 to ZDB
-func ZDBToProvisionType(z workloads.ZDB) (ZDB, string, error) {
+func ZDBToProvisionType(w workloads.Workloader) (ZDB, string, error) {
+	z, ok := w.(*workloads.ZDB)
+	if !ok {
+		return ZDB{}, "", fmt.Errorf("failed to convert zdb workload, wrong format")
+	}
+
 	zdb := ZDB{
 		Size:     uint64(z.Size),
 		Password: z.Password,
@@ -157,7 +172,12 @@ func ZDBToProvisionType(z workloads.ZDB) (ZDB, string, error) {
 }
 
 // K8SToProvisionType converts type to internal provision type
-func K8SToProvisionType(k workloads.K8S) (Kubernetes, string, error) {
+func K8SToProvisionType(w workloads.Workloader) (Kubernetes, string, error) {
+	k, ok := w.(*workloads.K8S)
+	if !ok {
+		return Kubernetes{}, "", fmt.Errorf("failed to convert kubernetes workload, wrong format")
+	}
+
 	k8s := Kubernetes{
 		Size:          uint8(k.Size),
 		NetworkID:     pkg.NetID(k.NetworkId),
@@ -170,23 +190,35 @@ func K8SToProvisionType(k workloads.K8S) (Kubernetes, string, error) {
 	return k8s, k.NodeId, nil
 }
 
-// NetworkToProvisionType convert TfgridReservationNetwork1 to pkg.Network
-func NetworkToProvisionType(n workloads.Network) (pkg.Network, error) {
-	network := pkg.Network{
-		Name:         n.Name,
-		NetID:        pkg.NetID(n.Name),
-		IPRange:      types.NewIPNetFromSchema(n.Iprange),
-		NetResources: make([]pkg.NetResource, len(n.NetworkResources)),
+// NetworkResourceToProvisionType converts type to internal provision type
+func NetworkResourceToProvisionType(w workloads.Workloader) (pkg.NetResource, error) {
+	n, ok := w.(*workloads.NetworkResource)
+	if !ok {
+		return pkg.NetResource{}, fmt.Errorf("failed to convert kubernetes workload, wrong format")
 	}
 
-	var err error
-	for i, nr := range n.NetworkResources {
-		network.NetResources[i], err = NetResourceToProvisionType(nr)
-		if err != nil {
-			return network, err
-		}
+	nr := pkg.NetResource{
+		Name:    n.Name,
+		NetID:   pkg.NetID(n.Name),
+		IPRange: types.NewIPNetFromSchema(n.Iprange), //Fix me
+
+		NodeID:       n.GetNodeID(),
+		Subnet:       types.NewIPNetFromSchema(n.Iprange),
+		WGPrivateKey: n.WireguardPrivateKeyEncrypted,
+		WGPublicKey:  n.WireguardPublicKey,
+		WGListenPort: uint16(n.WireguardListenPort),
+		Peers:        make([]pkg.Peer, len(n.Peers)),
 	}
-	return network, nil
+
+	for i, peer := range n.Peers {
+		p, err := WireguardToProvisionType(peer)
+		if err != nil {
+			return nr, err
+		}
+		nr.Peers[i] = p
+	}
+
+	return nr, nil
 }
 
 //WireguardToProvisionType converts WireguardPeer1 to pkg.Peer
@@ -204,77 +236,55 @@ func WireguardToProvisionType(p workloads.WireguardPeer) (pkg.Peer, error) {
 	return peer, nil
 }
 
-//NetResourceToProvisionType converts TfgridNetworkNetResource1 to pkg.NetResource
-func NetResourceToProvisionType(r workloads.NetworkNetResource) (pkg.NetResource, error) {
-	nr := pkg.NetResource{
-		NodeID:       r.NodeId,
-		Subnet:       types.NewIPNetFromSchema(r.Iprange),
-		WGPrivateKey: r.WireguardPrivateKeyEncrypted,
-		WGPublicKey:  r.WireguardPublicKey,
-		WGListenPort: uint16(r.WireguardListenPort),
-		Peers:        make([]pkg.Peer, len(r.Peers)),
-	}
+// WorkloadToProvisionType converts from the explorer type to the internal provision.Reservation
+func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, error) {
 
-	for i, peer := range r.Peers {
-		p, err := WireguardToProvisionType(peer)
-		if err != nil {
-			return nr, err
-		}
-		nr.Peers[i] = p
-	}
-
-	return nr, nil
-}
-
-// WorkloadToProvisionType TfgridReservationWorkload1 to provision.Reservation
-func WorkloadToProvisionType(w workloads.ReservationWorkload) (*provision.Reservation, error) {
 	reservation := &provision.Reservation{
-		ID:        w.WorkloadId,
-		User:      w.User,
-		Type:      provision.ReservationType(w.Type.String()),
-		Created:   w.Created.Time,
-		Duration:  time.Duration(w.Duration) * time.Second,
-		Signature: []byte(w.Signature),
-		// Data:      w.Content,
-		ToDelete: w.ToDelete,
+		ID:        fmt.Sprintf("%d-%d", w.GetID(), w.WorkloadID()),
+		User:      fmt.Sprintf("%d", w.GetCustomerTid()),
+		Type:      provision.ReservationType(w.GetWorkloadType().String()),
+		Created:   w.GetEpoch().Time,
+		Duration:  math.MaxInt64, //ensure we never decomission based on expiration time. Since the capacity pool introduction this is not needed anymore
+		Signature: []byte(w.GetCustomerSignature()),
+		ToDelete:  w.GetNextAction() == workloads.NextActionDelete,
+		Reference: w.GetReference(),
+		// ToDelete: w.ToDelete, // TODO: fix this once the farmer can actually delete reservation when a pool has expired
+		Result: resultFromSchemaType(w.GetResult()),
 	}
-
-	reservationID := strings.Split(w.WorkloadId, "-")[0]
 
 	var (
 		data interface{}
 		err  error
 	)
 
-	switch tmp := w.Content.(type) {
-	case workloads.ZDB:
-		data, reservation.NodeID, err = ZDBToProvisionType(tmp)
+	switch w.GetWorkloadType() {
+	case workloads.WorkloadTypeZDB:
+		data, reservation.NodeID, err = ZDBToProvisionType(w)
 		if err != nil {
 			return nil, err
 		}
-	case workloads.Volume:
-		data, reservation.NodeID, err = VolumeToProvisionType(tmp)
+	case workloads.WorkloadTypeVolume:
+		data, reservation.NodeID, err = VolumeToProvisionType(w)
 		if err != nil {
 			return nil, err
 		}
-	case workloads.Network:
-		data, err = NetworkToProvisionType(tmp)
+	case workloads.WorkloadTypeNetworkResource:
+		data, err = NetworkResourceToProvisionType(w)
 		if err != nil {
 			return nil, err
 		}
-	case workloads.Container:
-
-		data, reservation.NodeID, err = ContainerToProvisionType(tmp, reservationID)
+	case workloads.WorkloadTypeContainer:
+		data, reservation.NodeID, err = ContainerToProvisionType(w, reservation.ID)
 		if err != nil {
 			return nil, err
 		}
-	case workloads.K8S:
-		data, reservation.NodeID, err = K8SToProvisionType(tmp)
+	case workloads.WorkloadTypeKubernetes:
+		data, reservation.NodeID, err = K8SToProvisionType(w)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("%w (%s) (%T)", ErrUnsupportedWorkload, w.Type.String(), tmp)
+		return nil, fmt.Errorf("%w (%s) (%T)", ErrUnsupportedWorkload, w.GetWorkloadType().String(), w)
 	}
 
 	reservation.Data, err = json.Marshal(data)
@@ -296,7 +306,7 @@ func ResultToSchemaType(r provision.Result) (*workloads.Result, error) {
 		rType = workloads.WorkloadTypeContainer
 	case ZDBReservation:
 		rType = workloads.WorkloadTypeZDB
-	case NetworkReservation:
+	case NetworkReservation, NetworkResourceReservation:
 		rType = workloads.WorkloadTypeNetwork
 	case KubernetesReservation:
 		rType = workloads.WorkloadTypeKubernetes
@@ -315,4 +325,19 @@ func ResultToSchemaType(r provision.Result) (*workloads.Result, error) {
 	}
 
 	return &result, nil
+}
+
+func resultFromSchemaType(r workloads.Result) provision.Result {
+
+	result := provision.Result{
+		Type:      provision.ReservationType(r.Category.String()),
+		Created:   r.Epoch.Time,
+		Data:      r.DataJson,
+		Error:     r.Message,
+		ID:        r.WorkloadId,
+		State:     provision.ResultState(r.State),
+		Signature: r.Signature,
+	}
+
+	return result
 }

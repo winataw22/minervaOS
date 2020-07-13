@@ -49,4 +49,10 @@ type Flister interface {
 
 	// NamedUmount unmounts the flist mounted via the NamedMount call, with the same name
 	NamedUmount(path string) error
+
+	// HashFromRootPath returns flist hash from a running g8ufs mounted with NamedMount
+	HashFromRootPath(name string) (string, error)
+
+	// FlistHash returns md5 of flist if available (requesting the hub)
+	FlistHash(url string) (string, error)
 }

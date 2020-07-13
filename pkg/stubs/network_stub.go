@@ -40,7 +40,7 @@ func (s *NetworkerStub) Addrs(arg0 string, arg1 string) (ret0 [][]uint8, ret1 er
 	return
 }
 
-func (s *NetworkerStub) CreateNR(arg0 pkg.Network) (ret0 string, ret1 error) {
+func (s *NetworkerStub) CreateNR(arg0 pkg.NetResource) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "CreateNR", args...)
 	if err != nil {
@@ -75,7 +75,7 @@ func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 	return ch, nil
 }
 
-func (s *NetworkerStub) DeleteNR(arg0 pkg.Network) (ret0 error) {
+func (s *NetworkerStub) DeleteNR(arg0 pkg.NetResource) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "DeleteNR", args...)
 	if err != nil {

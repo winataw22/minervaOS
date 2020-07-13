@@ -162,8 +162,10 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := workloads.Container{
-				WorkloadId:        tt.fields.WorkloadID,
-				NodeId:            tt.fields.NodeID,
+				ReservationInfo: workloads.ReservationInfo{
+					WorkloadId: tt.fields.WorkloadID,
+					NodeId:     tt.fields.NodeID,
+				},
 				Flist:             tt.fields.Flist,
 				HubUrl:            tt.fields.HubURL,
 				Environment:       tt.fields.Environment,
@@ -174,7 +176,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				StatsAggregator:   tt.fields.StatsAggregator,
 				Capacity:          tt.fields.Capacity,
 			}
-			got, _, err := ContainerToProvisionType(c, "reservation")
+			got, _, err := ContainerToProvisionType(&c, "reservation")
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)
@@ -232,13 +234,14 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := workloads.Volume{
-				WorkloadId:      tt.fields.WorkloadID,
-				NodeId:          tt.fields.NodeID,
-				Size:            tt.fields.Size,
-				Type:            tt.fields.Type,
-				StatsAggregator: tt.fields.StatsAggregator,
+				ReservationInfo: workloads.ReservationInfo{
+					WorkloadId: tt.fields.WorkloadID,
+					NodeId:     tt.fields.NodeID,
+				},
+				Size: tt.fields.Size,
+				Type: tt.fields.Type,
 			}
-			got, _, err := VolumeToProvisionType(v)
+			got, _, err := VolumeToProvisionType(&v)
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)
@@ -333,16 +336,17 @@ func TestTfgridReservationZdb1_ToProvisionType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			z := workloads.ZDB{
-				WorkloadId: tt.fields.WorkloadID,
-				NodeId:     tt.fields.NodeID,
-				//ReservationID: tt.fields.ReservationID,
+				ReservationInfo: workloads.ReservationInfo{
+					WorkloadId: tt.fields.WorkloadID,
+					NodeId:     tt.fields.NodeID,
+				},
 				Size:     tt.fields.Size,
 				Mode:     tt.fields.Mode,
 				Password: tt.fields.Password,
 				DiskType: tt.fields.DiskType,
 				Public:   tt.fields.Public,
 			}
-			got, _, err := ZDBToProvisionType(z)
+			got, _, err := ZDBToProvisionType(&z)
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)
@@ -355,56 +359,9 @@ func TestTfgridReservationZdb1_ToProvisionType(t *testing.T) {
 
 func TestTfgridReservationNetwork1_ToProvisionType(t *testing.T) {
 	type fields struct {
-		Name             string
-		WorkloadID       int64
-		Iprange          schema.IPRange
-		StatsAggregator  []workloads.StatsAggregator
-		NetworkResources []workloads.NetworkNetResource
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		want    pkg.Network
-		wantErr bool
-	}{
-		{
-			name: "main",
-			fields: fields{
-				Name:             "net1",
-				WorkloadID:       1,
-				Iprange:          schema.MustParseIPRange("192.168.0.0/16"),
-				NetworkResources: nil,
-			},
-			want: pkg.Network{
-				Name:         "net1",
-				NetID:        pkg.NetID("net1"),
-				IPRange:      types.MustParseIPNet("192.168.0.0/16"),
-				NetResources: []pkg.NetResource{},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := workloads.Network{
-				Name:             tt.fields.Name,
-				WorkloadId:       tt.fields.WorkloadID,
-				Iprange:          tt.fields.Iprange,
-				StatsAggregator:  tt.fields.StatsAggregator,
-				NetworkResources: tt.fields.NetworkResources,
-			}
-			got, err := NetworkToProvisionType(n)
-			if !tt.wantErr {
-				require.NoError(t, err)
-				assert.DeepEqual(t, tt.want, got)
-			} else {
-				require.Error(t, err)
-			}
-		})
-	}
-}
-
-func TestTfgridNetworkNetResource1_ToProvisionType(t *testing.T) {
-	type fields struct {
+		Name                         string
+		WorkloadID                   int64
+		Iprange                      schema.IPRange
 		NodeID                       string
 		IPRange                      schema.IPRange
 		WireguardPrivateKeyEncrypted string
@@ -421,6 +378,9 @@ func TestTfgridNetworkNetResource1_ToProvisionType(t *testing.T) {
 		{
 			name: "main",
 			fields: fields{
+				Name:                         "net1",
+				WorkloadID:                   1,
+				Iprange:                      schema.MustParseIPRange("192.168.0.0/16"),
 				NodeID:                       "node1",
 				IPRange:                      schema.MustParseIPRange("192.168.0.0/16"),
 				WireguardPrivateKeyEncrypted: "6C6C6568726F776FA646C",
@@ -428,6 +388,9 @@ func TestTfgridNetworkNetResource1_ToProvisionType(t *testing.T) {
 				WireguardListenPort:          6380,
 			},
 			want: pkg.NetResource{
+				Name:         "net1",
+				NetID:        pkg.NetID("net1"),
+				IPRange:      types.MustParseIPNet("192.168.0.0/16"),
 				NodeID:       "node1",
 				Subnet:       types.MustParseIPNet("192.168.0.0/16"),
 				WGPrivateKey: "6C6C6568726F776FA646C",
@@ -439,15 +402,18 @@ func TestTfgridNetworkNetResource1_ToProvisionType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := workloads.NetworkNetResource{
-				NodeId:                       tt.fields.NodeID,
-				Iprange:                      tt.fields.IPRange,
+			n := workloads.NetworkResource{
+				ReservationInfo: workloads.ReservationInfo{
+					WorkloadId: tt.fields.WorkloadID,
+					NodeId:     tt.fields.NodeID,
+				},
+				Name:                         tt.fields.Name,
+				Iprange:                      tt.fields.Iprange,
 				WireguardPrivateKeyEncrypted: tt.fields.WireguardPrivateKeyEncrypted,
 				WireguardPublicKey:           tt.fields.WireguardPublicKey,
 				WireguardListenPort:          tt.fields.WireguardListenPort,
-				Peers:                        tt.fields.Peers,
 			}
-			got, err := NetResourceToProvisionType(r)
+			got, err := NetworkResourceToProvisionType(&n)
 			if !tt.wantErr {
 				require.NoError(t, err)
 				assert.DeepEqual(t, tt.want, got)

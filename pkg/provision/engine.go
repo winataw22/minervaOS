@@ -1,6 +1,7 @@
 package provision
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -136,6 +137,12 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 		return fmt.Errorf("type of reservation not supported: %s", r.Type)
 	}
 
+	if r.Reference != "" {
+		if err := e.migrateToPool(ctx, r); err != nil {
+			return err
+		}
+	}
+
 	_, err := e.cache.Get(r.ID)
 	if err == nil {
 		log.Info().Str("id", r.ID).Msg("reservation already deployed")
@@ -233,6 +240,15 @@ func (e *Engine) reply(ctx context.Context, r *Reservation, err error, info inte
 	}
 	result.Data = br
 
+	if err := e.signResult(result); err != nil {
+		return err
+	}
+
+	return e.feedback.Feedback(e.nodeID, result)
+}
+
+func (e *Engine) signResult(result *Result) error {
+
 	b, err := result.Bytes()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert the result to byte for signature")
@@ -244,7 +260,7 @@ func (e *Engine) reply(ctx context.Context, r *Reservation, err error, info inte
 	}
 	result.Signature = hex.EncodeToString(sig)
 
-	return e.feedback.Feedback(e.nodeID, result)
+	return nil
 }
 
 func (e *Engine) updateStats() error {
@@ -297,4 +313,41 @@ func (e *Engine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {
 	}()
 
 	return ch
+}
+
+func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
+
+	oldRes, err := e.cache.Get(r.Reference)
+	if err == nil && oldRes.ID == r.Reference {
+		// we have received a reservation that reference another one.
+		// This is the sign user is trying to migrate his workloads to the new capacity pool system
+
+		log.Info().Str("reference", r.Reference).Msg("reservation referencing another one")
+
+		// first let make sure both are the same
+		if !bytes.Equal(oldRes.Data, r.Data) { //TODO: handle network
+			return fmt.Errorf("trying to upgrade workloads to new version. new workload content is different from the old one. upgrade refused")
+		}
+
+		// remove the old one from the cache and store the new one
+		if err := e.cache.Remove(oldRes.ID); err != nil {
+			return err
+		}
+		if err := e.cache.Add(r); err != nil {
+			return err
+		}
+
+		r.Result.ID = r.ID
+		if err := e.signResult(&r.Result); err != nil {
+			return errors.Wrap(err, "error while signing reservation result")
+		}
+
+		if err := e.feedback.Feedback(e.nodeID, &r.Result); err != nil {
+			return err
+		}
+
+		log.Info().Str("id", r.ID).Msg("reservation upgraded to new system")
+	}
+
+	return nil
 }

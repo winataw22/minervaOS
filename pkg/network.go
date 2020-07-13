@@ -25,9 +25,9 @@ type Networker interface {
 	Ready() error
 
 	// Create a new network resource
-	CreateNR(Network) (string, error)
+	CreateNR(NetResource) (string, error)
 	// Delete a network resource
-	DeleteNR(Network) error
+	DeleteNR(NetResource) error
 
 	// Join a network (with network id) will create a new isolated namespace
 	// that is hooked to the network bridge with a veth pair, and assign it a
@@ -76,19 +76,18 @@ type Networker interface {
 	PublicAddresses(ctx context.Context) <-chan NetlinkAddresses
 }
 
-// Network represent the description if a user private network
-type Network struct {
-	Name string `json:"name"`
+// // Network represent the description if a user private network
+// type Network struct {
+// }
+
+// NetResource is the description of a part of a network local to a specific node
+type NetResource struct {
+	Name string
 	//unique id inside the reservation is an autoincrement (USE AS NET_ID)
 	NetID NetID `json:"net_id"`
 	// IP range of the network, must be an IPv4 /16
 	IPRange types.IPNet `json:"ip_range"`
 
-	NetResources []NetResource `json:"net_resources"`
-}
-
-// NetResource is the description of a part of a network local to a specific node
-type NetResource struct {
 	NodeID string `json:"node_id"`
 	// IPV4 subnet from network IPRange
 	Subnet types.IPNet `json:"subnet"`
