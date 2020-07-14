@@ -361,7 +361,7 @@ func TestTfgridReservationNetwork1_ToProvisionType(t *testing.T) {
 	type fields struct {
 		Name                         string
 		WorkloadID                   int64
-		Iprange                      schema.IPRange
+		NetworkIPRange               schema.IPRange
 		NodeID                       string
 		IPRange                      schema.IPRange
 		WireguardPrivateKeyEncrypted string
@@ -380,23 +380,23 @@ func TestTfgridReservationNetwork1_ToProvisionType(t *testing.T) {
 			fields: fields{
 				Name:                         "net1",
 				WorkloadID:                   1,
-				Iprange:                      schema.MustParseIPRange("192.168.0.0/16"),
+				NetworkIPRange:               schema.MustParseIPRange("192.168.0.0/16"),
 				NodeID:                       "node1",
-				IPRange:                      schema.MustParseIPRange("192.168.0.0/16"),
+				IPRange:                      schema.MustParseIPRange("192.168.1.0/24"),
 				WireguardPrivateKeyEncrypted: "6C6C6568726F776FA646C",
 				WireguardPublicKey:           "0t11OkPwUBPe6m6wL6JTVzJHNjjReBJbEcnSZPs+pFo=",
 				WireguardListenPort:          6380,
 			},
 			want: pkg.NetResource{
-				Name:         "net1",
-				NetID:        pkg.NetID("net1"),
-				IPRange:      types.MustParseIPNet("192.168.0.0/16"),
-				NodeID:       "node1",
-				Subnet:       types.MustParseIPNet("192.168.0.0/16"),
-				WGPrivateKey: "6C6C6568726F776FA646C",
-				WGPublicKey:  "0t11OkPwUBPe6m6wL6JTVzJHNjjReBJbEcnSZPs+pFo=",
-				WGListenPort: 6380,
-				Peers:        []pkg.Peer{},
+				Name:           "net1",
+				NetID:          pkg.NetID("net1"),
+				NetworkIPRange: types.MustParseIPNet("192.168.0.0/16"),
+				NodeID:         "node1",
+				Subnet:         types.MustParseIPNet("192.168.1.0/24"),
+				WGPrivateKey:   "6C6C6568726F776FA646C",
+				WGPublicKey:    "0t11OkPwUBPe6m6wL6JTVzJHNjjReBJbEcnSZPs+pFo=",
+				WGListenPort:   6380,
+				Peers:          []pkg.Peer{},
 			},
 		},
 	}
@@ -408,7 +408,8 @@ func TestTfgridReservationNetwork1_ToProvisionType(t *testing.T) {
 					NodeId:     tt.fields.NodeID,
 				},
 				Name:                         tt.fields.Name,
-				Iprange:                      tt.fields.Iprange,
+				NetworkIprange:               tt.fields.NetworkIPRange,
+				Iprange:                      tt.fields.IPRange,
 				WireguardPrivateKeyEncrypted: tt.fields.WireguardPrivateKeyEncrypted,
 				WireguardPublicKey:           tt.fields.WireguardPublicKey,
 				WireguardListenPort:          tt.fields.WireguardListenPort,

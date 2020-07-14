@@ -136,6 +136,10 @@ func (f *flistModule) mountpath(name string) (string, error) {
 	return mountpath, nil
 }
 
+// ErrAlreadyMounted is returned when checking if a path has already
+// something mounted on it
+var ErrAlreadyMounted = errors.New("path is already mounted")
+
 // valid checks that this mount path is free, and can be used
 func (f *flistModule) valid(path string) error {
 	stat, err := os.Stat(path)
@@ -150,7 +154,7 @@ func (f *flistModule) valid(path string) error {
 	}
 
 	if err := exec.Command("mountpoint", path).Run(); err == nil {
-		return fmt.Errorf("mount point '%s' is used", path)
+		return ErrAlreadyMounted
 	}
 
 	return nil
@@ -204,7 +208,14 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 		args = append(args, "-ro")
 	}
 
-	if err := f.valid(mountpoint); err != nil {
+	err = f.valid(mountpoint)
+	if errors.Is(err, ErrAlreadyMounted) {
+		// if everything is already in place, just early return
+		log.Info().Msgf("flist is already mounted at %s, nothing more to do", mountpoint)
+		return mountpoint, nil
+	}
+
+	if err != nil {
 		return "", errors.Wrap(err, "invalid mount point")
 	}
 

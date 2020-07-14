@@ -86,10 +86,10 @@ type NetResource struct {
 	//unique id inside the reservation is an autoincrement (USE AS NET_ID)
 	NetID NetID `json:"net_id"`
 	// IP range of the network, must be an IPv4 /16
-	IPRange types.IPNet `json:"ip_range"`
+	NetworkIPRange types.IPNet `json:"ip_range"`
 
 	NodeID string `json:"node_id"`
-	// IPV4 subnet from network IPRange
+	// IPV4 subnet for this network resource
 	Subnet types.IPNet `json:"subnet"`
 
 	WGPrivateKey string `json:"wg_private_key"`

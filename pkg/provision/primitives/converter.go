@@ -198,9 +198,9 @@ func NetworkResourceToProvisionType(w workloads.Workloader) (pkg.NetResource, er
 	}
 
 	nr := pkg.NetResource{
-		Name:    n.Name,
-		NetID:   pkg.NetID(n.Name),
-		IPRange: types.NewIPNetFromSchema(n.Iprange), //Fix me
+		Name:           n.Name,
+		NetID:          pkg.NetID(n.Name),
+		NetworkIPRange: types.NewIPNetFromSchema(n.NetworkIprange),
 
 		NodeID:       n.GetNodeID(),
 		Subnet:       types.NewIPNetFromSchema(n.Iprange),
@@ -252,6 +252,12 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 		Result: resultFromSchemaType(w.GetResult()),
 	}
 
+	// to ensure old reservation workload that are already running
+	// keeps running as it is, we use the reference as new workload ID
+	if reservation.Reference != "" {
+		reservation.ID = reservation.Reference
+	}
+
 	var (
 		data interface{}
 		err  error
@@ -274,7 +280,8 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 			return nil, err
 		}
 	case workloads.WorkloadTypeContainer:
-		data, reservation.NodeID, err = ContainerToProvisionType(w, reservation.ID)
+		reservationID := strings.Split(reservation.ID, "-")[0]
+		data, reservation.NodeID, err = ContainerToProvisionType(w, reservationID)
 		if err != nil {
 			return nil, err
 		}

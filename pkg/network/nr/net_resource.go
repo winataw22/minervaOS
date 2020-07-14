@@ -31,16 +31,17 @@ type NetResource struct {
 	id pkg.NetID
 	// local network resources
 	resource pkg.NetResource
-	ipRange  net.IPNet
+	// network IP range, usually a /16
+	networkIPRange net.IPNet
 }
 
 // New creates a new NetResource object
 // iprange is the full network subnet
 func New(nr pkg.NetResource) (*NetResource, error) {
 	return &NetResource{
-		id:       nr.NetID,
-		resource: nr,
-		ipRange:  nr.IPRange.IPNet,
+		id:             nr.NetID,
+		resource:       nr,
+		networkIPRange: nr.NetworkIPRange.IPNet,
 	}, nil
 }
 
@@ -199,7 +200,7 @@ func (nr *NetResource) ConfigureWG(privateKey string) error {
 
 		route := &netlink.Route{
 			LinkIndex: wg.Attrs().Index,
-			Dst:       &nr.ipRange,
+			Dst:       &nr.networkIPRange,
 		}
 		if err := netlink.RouteAdd(route); err != nil && !os.IsExist(err) {
 			log.Error().
