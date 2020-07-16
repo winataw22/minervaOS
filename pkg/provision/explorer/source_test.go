@@ -35,16 +35,16 @@ func (c *clientMock) SignDelete(id schema.ID, user schema.ID, signature string) 
 	return nil
 }
 
-func (c *clientMock) Workloads(nodeID string, from uint64) ([]workloads.Workloader, uint64, error) {
+func (c *clientMock) NodeWorkloads(nodeID string, from uint64) ([]workloads.Workloader, uint64, error) {
 	return c.workloads, 0, nil
 }
-func (c *clientMock) WorkloadGet(gwid string) (result workloads.Workloader, err error) {
+func (c *clientMock) NodeWorkloadGet(gwid string) (result workloads.Workloader, err error) {
 	return
 }
-func (c *clientMock) WorkloadPutResult(nodeID, gwid string, result workloads.Result) error {
+func (c *clientMock) NodeWorkloadPutResult(nodeID, gwid string, result workloads.Result) error {
 	return nil
 }
-func (c *clientMock) WorkloadPutDeleted(nodeID, gwid string) error {
+func (c *clientMock) NodeWorkloadPutDeleted(nodeID, gwid string) error {
 	return nil
 }
 

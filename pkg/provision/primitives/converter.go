@@ -248,8 +248,7 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 		Signature: []byte(w.GetCustomerSignature()),
 		ToDelete:  w.GetNextAction() == workloads.NextActionDelete,
 		Reference: w.GetReference(),
-		// ToDelete: w.ToDelete, // TODO: fix this once the farmer can actually delete reservation when a pool has expired
-		Result: resultFromSchemaType(w.GetResult()),
+		Result:    resultFromSchemaType(w.GetResult()),
 	}
 
 	// to ensure old reservation workload that are already running
