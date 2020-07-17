@@ -149,6 +149,13 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 		return nil
 	}
 
+	// to ensure old reservation workload that are already running
+	// keeps running as it is, we use the reference as new workload ID
+	realID := r.ID
+	if r.Reference != "" {
+		r.ID = r.Reference
+	}
+
 	result, err := fn(ctx, r)
 	if err != nil {
 		log.Error().
@@ -160,6 +167,8 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 			Str("result", fmt.Sprintf("%v", result)).
 			Msgf("workload deployed")
 	}
+
+	r.ID = realID
 
 	if replyErr := e.reply(ctx, r, err, result); replyErr != nil {
 		log.Error().Err(replyErr).Msg("failed to send result to BCDB")
@@ -199,10 +208,19 @@ func (e *Engine) decommission(ctx context.Context, r *Reservation) error {
 		return nil
 	}
 
+	// to ensure old reservation can be deleted
+	// we use the reference as workload ID
+	realID := r.ID
+	if r.Reference != "" {
+		r.ID = r.Reference
+	}
+
 	err = fn(ctx, r)
 	if err != nil {
 		return errors.Wrap(err, "decommissioning of reservation failed")
 	}
+
+	r.ID = realID
 
 	if err := e.cache.Remove(r.ID); err != nil {
 		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
@@ -330,9 +348,11 @@ func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
 		}
 
 		// remove the old one from the cache and store the new one
+		log.Info().Msgf("migration: remove %v from cache", oldRes.ID)
 		if err := e.cache.Remove(oldRes.ID); err != nil {
 			return err
 		}
+		log.Info().Msgf("migration: add %v to cache", r.ID)
 		if err := e.cache.Add(r); err != nil {
 			return err
 		}
@@ -346,7 +366,7 @@ func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
 			return err
 		}
 
-		log.Info().Str("id", r.ID).Msg("reservation upgraded to new system")
+		log.Info().Str("old_id", oldRes.ID).Str("new_id", r.ID).Msg("reservation upgraded to new system")
 	}
 
 	return nil

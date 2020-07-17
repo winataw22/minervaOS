@@ -259,11 +259,14 @@ func (s *Fs) get(id string) (*provision.Reservation, error) {
 
 	defer f.Close()
 	reader, err := versioned.NewReader(f)
-	if versioned.IsNotVersioned(err) {
+	if err != nil && versioned.IsNotVersioned(err) {
 		if _, err := f.Seek(0, 0); err != nil { // make sure to read from start
 			return nil, err
 		}
 		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), f)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", reservationSchemaV1))

@@ -251,12 +251,6 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 		Result:    resultFromSchemaType(w.GetResult()),
 	}
 
-	// to ensure old reservation workload that are already running
-	// keeps running as it is, we use the reference as new workload ID
-	if reservation.Reference != "" {
-		reservation.ID = reservation.Reference
-	}
-
 	var (
 		data interface{}
 		err  error
