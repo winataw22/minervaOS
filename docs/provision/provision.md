@@ -33,6 +33,35 @@ type Data struct {
 }
 ```
 
+## ReservationInfo
+```go
+type ReservationInfo struct {
+	WorkloadId int64  
+	NodeId     string 
+	PoolId     int64  
+
+	// Referene to an old reservation, used in conversion
+	Reference string 
+
+	Description             string         
+	SigningRequestProvision SigningRequest 
+	SigningRequestDelete    SigningRequest 
+
+	ID                  schema.ID          
+	Json                string             
+	CustomerTid         int64              
+	CustomerSignature   string             
+	NextAction          NextActionEnum     
+	SignaturesProvision []SigningSignature 
+	SignatureFarmer     SigningSignature   
+	SignaturesDelete    []SigningSignature 
+	Epoch               schema.Date        
+	Metadata            string             
+	Result              Result             
+	WorkloadType        WorkloadTypeEnum   
+}
+```
+
 ### SigningRequest
 ```go
 type SigningRequest struct {
@@ -52,19 +81,19 @@ type SigningSignature struct {
 
 ```go
 type Container struct {
-	WorkloadId        int64
-	NodeId            string
-	Flist             string
-	HubUrl            string
-	Environment       map[string]interface{}
-	SecretEnvironment map[string]interface{}
-	Entrypoint        string
-	Interactive       bool
-	Volumes           []ContainerMount
-	NetworkConnection []NetworkConnection
-	StatsAggregator   []Statsaggregator
-	Logs              []Logs
-	FarmerTid         int64
+	ReservationInfo 
+
+	Flist             string              
+	HubUrl            string              
+	Environment       map[string]string   
+	SecretEnvironment map[string]string   
+	Entrypoint        string              
+	Interactive       bool                
+	Volumes           []ContainerMount    
+	NetworkConnection []NetworkConnection 
+	StatsAggregator   []StatsAggregator   
+	Logs              []Logs              
+	Capacity          ContainerCapacity   
 }
 ```
 
@@ -98,16 +127,15 @@ type NetworkConnection struct {
 
 ```go
 type K8S struct {
-	WorkloadId      int64
-	NodeId          string
-	Size            int64
-	NetworkId       string
-	Ipaddress       net.IP
-	ClusterSecret   string
-	MasterIps       []net.IP
-	SshKeys         []string
-	StatsAggregator []Statsaggregator
-	FarmerTid       int64
+	ReservationInfo 
+
+	Size            int64             
+	ClusterSecret   string            
+	NetworkId       string            
+	Ipaddress       net.IP            
+	MasterIps       []net.IP          
+	SshKeys         []string          
+	StatsAggregator []StatsAggregator 
 }
 ```
 
@@ -120,6 +148,22 @@ type Network struct {
 	NetworkResources []NetworkNetResource
 	FarmerTid        int64
 }
+```
+
+```go
+type NetworkResource struct {
+	ReservationInfo 
+
+	Name                         string            
+	NetworkIprange               schema.IPRange    
+	WireguardPrivateKeyEncrypted string            
+	WireguardPublicKey           string            
+	WireguardListenPort          int64             
+	Iprange                      schema.IPRange    
+	Peers                        []WireguardPeer   
+	StatsAggregator              []StatsAggregator 
+}
+
 ```
 
 ```go
@@ -166,12 +210,10 @@ type Statsaggregator struct {
 
 ```go
 type Volume struct {
-	WorkloadId      int64
-	NodeId          string
-	Size            int64
-	Type            VolumeTypeEnum
-	StatsAggregator []Statsaggregator
-	FarmerTid       int64
+	ReservationInfo 
+
+	Size int64          
+	Type VolumeTypeEnum 
 }
 ```
 
@@ -190,15 +232,14 @@ type Workload struct {
 
 ```go
 type Zdb struct {
-	WorkloadId      int64
-	NodeId          string
-	Size            int64
-	Mode            ZdbModeEnum
-	Password        string
-	DiskType        ZdbDiskTypeEnum
-	Public          bool
-	StatsAggregator []Statsaggregator
-	FarmerTid       int64
+	ReservationInfo 
+
+	Size            int64             
+	Mode            ZDBModeEnum       
+	Password        string            
+	DiskType        DiskTypeEnum      
+	Public          bool              
+	StatsAggregator []StatsAggregator 
 }
 ```
 
@@ -248,7 +289,7 @@ const (
 ```
 
 ```go
-type VolumeTypeEnum uint8
+type VolumeTypeEnum uint
 
 const (
 	VolumeTypeHDD VolumeTypeEnum = iota
@@ -275,4 +316,49 @@ const (
 	ZdbModeSeq ZdbModeEnum = iota
 	ZdbModeUser
 )
+```
+
+```go
+type GatewayProxy struct {
+	ReservationInfo 
+
+	Domain  string 
+	Addr    string 
+	Port    uint32 
+	PortTLS uint32 
+}
+```
+
+```go
+type GatewayReverseProxy struct {
+	ReservationInfo 
+
+	Domain string 
+	Secret string 
+}
+```
+
+```go
+type GatewaySubdomain struct {
+	ReservationInfo 
+
+	Domain string   
+	IPs    []string 
+}
+```
+
+```go
+type GatewayDelegate struct {
+	ReservationInfo 
+
+	Domain string 
+}
+```
+
+```go
+type Gateway4To6 struct {
+	ReservationInfo 
+
+	PublicKey string 
+}
 ```

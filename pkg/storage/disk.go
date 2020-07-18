@@ -76,7 +76,11 @@ func (d *vdiskModule) Deallocate(id string) error {
 		return err
 	}
 
-	return os.Remove(path)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
 }
 
 // DeallocateVDisk removes a virtual disk
