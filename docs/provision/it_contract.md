@@ -68,6 +68,10 @@ Next to the reservation data, there is also a reservation state. These fields
 describe the current state of the reservation, as well as the signatures provided
 by authorized threebots to advance the state of the reservation.
 
+- `PoolId`: The id of the pool to which this node is linked. A successfully deployed
+workload will take resources from the pool until it is empty, or the workload is
+deleted.
+
 - `NextAction`: This field describes what action should be performed next.
 Given the [enum values](provisiond.mdNextActionEnum), we can roughly describe a
 reservation life cycle as follows:
@@ -98,8 +102,7 @@ reservation life cycle as follows:
 - `SignaturesProvision`: A list of `signatures` needed to start the provisioning
 (deploy) step. i.e. after enough valid signatures are provided here, the nodes
 can start to deploy the workloads defined. Validity of signatures and  amount of
-valid signatures required is defined by the `SigningRequestProvision` field in
-the [data]((provisiond.md#reservation-data) object.
+valid signatures required is defined by the `SigningRequestProvision` field.
 
 ~~- `SignatureFarmer`: the [signatures](#signingsignature) of the farmer threebot,
 which declares that the farmer agrees to provision the workloads as defined by
@@ -107,7 +110,7 @@ the reservation once there is consensus about the provisioning (see previous fie
 
 - `SignaturesDelete`: Much like `SignaturesProvision`, however it is used when a
 currently deployed workload needs to be deleted (before it expires). It is tied
-to the `SignaturesDelete` field in the `data` object.
+to the `SignaturesDelete` field.
 - `epoch`: The date of the last modification
 - `results`: A list of [reservation results](#reservationresult). Every workload
 which is defined in the reservation

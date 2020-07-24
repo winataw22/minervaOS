@@ -39,7 +39,7 @@ func GenerateConfig(privateKey ed25519.PrivateKey) config.NodeConfig {
 		cfg.EncryptionPublicKey = hex.EncodeToString(encryptionPublicKey[:])
 
 		cfg.NodeInfo = map[string]interface{}{
-			"name": base58.Encode(signingPublicKey),
+			"name": base58.Encode(signingPublicKey)[:6],
 		}
 	}
 	cfg.MulticastInterfaces = []string{"npub6", "npub4"}
