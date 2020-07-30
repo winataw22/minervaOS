@@ -342,9 +342,11 @@ func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
 
 		log.Info().Str("reference", r.Reference).Msg("reservation referencing another one")
 
-		// first let make sure both are the same
-		if !bytes.Equal(oldRes.Data, r.Data) { //TODO: handle network
-			return fmt.Errorf("trying to upgrade workloads to new version. new workload content is different from the old one. upgrade refused")
+		if string(oldRes.Type) != "network" { //we skip network cause its a PITA
+			// first let make sure both are the same
+			if !bytes.Equal(oldRes.Data, r.Data) {
+				return fmt.Errorf("trying to upgrade workloads to new version. new workload content is different from the old one. upgrade refused")
+			}
 		}
 
 		// remove the old one from the cache and store the new one

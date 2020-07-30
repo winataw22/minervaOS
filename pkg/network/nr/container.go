@@ -30,7 +30,13 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 	}
 
 	join.Namespace = containerID
-	netspace, err := namespace.Create(containerID)
+
+	var netspace ns.NetNS
+	if namespace.Exists(containerID) {
+		netspace, err = namespace.GetByName(containerID)
+	} else {
+		netspace, err = namespace.Create(containerID)
+	}
 	if err != nil {
 		return join, err
 	}
@@ -100,7 +106,7 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 		ipnet.IP[len(ipnet.IP)-1] = 0x01
 
 		routes := []*netlink.Route{
-			&netlink.Route{
+			{
 				Dst: &net.IPNet{
 					IP:   net.ParseIP("0.0.0.0"),
 					Mask: net.CIDRMask(0, 32),

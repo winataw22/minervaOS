@@ -533,11 +533,12 @@ func (n *networker) DeleteNR(netNR pkg.NetResource) error {
 
 func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 	path := filepath.Join(n.networkDir, string(id))
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDWR, 0660)
 	if err != nil {
 		return nr, err
 	}
 	defer file.Close()
+
 	reader, err := versioned.NewReader(file)
 	if versioned.IsNotVersioned(err) {
 		// old data that doesn't have any version information
@@ -553,14 +554,48 @@ func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 	var net pkg.NetResource
 	dec := json.NewDecoder(reader)
 
-	validV1 := versioned.MustParseRange(fmt.Sprintf("<=%s", pkg.NetworkSchemaV1))
+	version := reader.Version()
+	validV1 := versioned.MustParseRange(fmt.Sprintf("=%s", pkg.NetworkSchemaV1))
+	validLatest := versioned.MustParseRange(fmt.Sprintf("<=%s", pkg.NetworkSchemaLatestVersion))
 
-	if validV1(reader.Version()) {
+	if validV1(version) {
+		// we found a v1 full network definition, let migrate it to v2 network resource
+		var network pkg.Network
+		if err := dec.Decode(&network); err != nil {
+			return nr, err
+		}
+
+		for _, nr := range network.NetResources {
+			if nr.NodeID == n.identity.NodeID().Identity() {
+				net = nr
+				break
+			}
+		}
+		net.Name = network.Name
+		net.NetworkIPRange = network.IPRange
+		net.NetID = network.NetID
+
+		// overwrite the old version network with latest version
+		// old data that doesn't have any version information
+		if _, err := file.Seek(0, 0); err != nil {
+			return nr, err
+		}
+
+		writer, err := versioned.NewWriter(file, pkg.NetworkSchemaLatestVersion)
+		if err != nil {
+			return nr, err
+		}
+
+		if err := json.NewEncoder(writer).Encode(&net); err != nil {
+			return nr, err
+		}
+
+	} else if validLatest(version) {
 		if err := dec.Decode(&net); err != nil {
 			return nr, err
 		}
 	} else {
-		return nr, fmt.Errorf("unknown network object version (%s)", reader.Version())
+		return nr, fmt.Errorf("unknown network object version (%s)", version)
 	}
 
 	return net, nil
