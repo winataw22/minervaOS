@@ -208,7 +208,11 @@ func processContainer(r *provision.Reservation) (u resourceUnits, err error) {
 	u.CRU = uint64(cont.Capacity.CPU)
 	// memory is in MiB
 	u.MRU = cont.Capacity.Memory * mib
-	u.SRU = 256 * mib // 250MiB are allocated on SSD for the root filesystem used by the flist
+	if cont.Capacity.DiskType == pkg.SSDDevice {
+		u.SRU = cont.Capacity.DiskSize * mib
+	} else if cont.Capacity.DiskType == pkg.HDDDevice {
+		u.HRU = cont.Capacity.DiskSize * mib
+	}
 
 	return u, nil
 }

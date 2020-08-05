@@ -524,7 +524,7 @@ func (n *networker) DeleteNR(netNR pkg.NetResource) error {
 
 	// map the network ID to the network namespace
 	path := filepath.Join(n.networkDir, string(netNR.NetID))
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
 	}
 

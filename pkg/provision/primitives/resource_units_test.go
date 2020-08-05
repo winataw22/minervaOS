@@ -138,8 +138,10 @@ func Test_processContainer(t *testing.T) {
 					Type: VolumeReservation,
 					Data: mustMarshalJSON(t, Container{
 						Capacity: ContainerCapacity{
-							CPU:    2,
-							Memory: 1024,
+							CPU:      2,
+							Memory:   1024,
+							DiskType: pkg.SSDDevice,
+							DiskSize: 256,
 						},
 					}),
 				},
@@ -157,8 +159,10 @@ func Test_processContainer(t *testing.T) {
 					Type: VolumeReservation,
 					Data: mustMarshalJSON(t, Container{
 						Capacity: ContainerCapacity{
-							CPU:    2,
-							Memory: 2048,
+							CPU:      2,
+							Memory:   2048,
+							DiskType: pkg.SSDDevice,
+							DiskSize: 1024,
 						},
 					}),
 				},
@@ -166,7 +170,7 @@ func Test_processContainer(t *testing.T) {
 			wantU: resourceUnits{
 				CRU: 2,
 				MRU: 2 * gib,
-				SRU: 256 * mib,
+				SRU: 1 * gib,
 			},
 		},
 	}
