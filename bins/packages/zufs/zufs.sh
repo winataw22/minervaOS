@@ -1,25 +1,20 @@
-ZUFS_VERSION="development"
-ZUFS_CHECKSUM="d28ec96dd7586f7a1763c54c5448921e"
-ZUFS_REPOSITORY="https://github.com/threefoldtech/0-fs"
+ZUFS_VERSION="2.0.2"
+ZUFS_CHECKSUM="40e348cadedd9dc5e501984b1d338369"
+ZUFS_LINK="https://github.com/threefoldtech/0-fs/archive/v${ZUFS_VERSION}.tar.gz"
 
 dependencies_zufs() {
     apt-get install -y git btrfs-tools libseccomp-dev build-essential pkg-config
 
     . ${PKGDIR}/../golang/golang.sh
     build_golang
-
-    TF_HOME="${GOPATH}/src/github.com/threefoldtech"
 }
 
 download_zufs() {
-    download_git ${ZUFS_REPOSITORY} ${ZUFS_VERSION}
+    download_file ${ZUFS_LINK} ${ZUFS_CHECKSUM} 0-fs-${ZUFS_VERSION}.tar.gz
 }
 
 extract_zufs() {
-    event "refreshing" "0-fs-${ZUFS_VERSION}"
-    mkdir -p ${TF_HOME}
-    rm -rf ${TF_HOME}/0-fs
-    cp -a ${DISTDIR}/0-fs ${TF_HOME}/
+    tar -xf ${DISTDIR}/0-fs-${ZUFS_VERSION}.tar.gz -C ${WORKDIR}
 }
 
 prepare_zufs() {
@@ -47,7 +42,7 @@ build_zufs() {
     extract_zufs
 
     popd
-    pushd ${TF_HOME}/0-fs
+    pushd ${WORKDIR}/0-fs-${ZUFS_VERSION}
 
     prepare_zufs
     compile_zufs
