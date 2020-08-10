@@ -1,8 +1,8 @@
-FIRECRACKER_BRANCH="master"
-FIRECRACKER_VERSION="1eb80f8d1bbe9287cafdedebaee3fb604095fac6"
-FIRECRACKER_REPOSITORY="https://github.com/firecracker-microvm/firecracker"
+FIRECRACKER_VERSION="0.22.0"
+FIRECRACKER_CHECKSUM="8f1d1c70a3416db7bb8f1d05a7c6cf0d"
+FIRECRACKER_LINK="https://github.com/firecracker-microvm/firecracker/archive/v${FIRECRACKER_VERSION}.tar.gz"
 FIRECRACKER_LIBC="musl"
-FIRECRACKER_RUST_TOOLCHAIN="1.39.0"
+FIRECRACKER_RUST_TOOLCHAIN="1.43.1"
 
 dependencies_firecracker() {
     # based on:
@@ -19,7 +19,7 @@ dependencies_firecracker() {
     python3 -m pip install boto3 nsenter pycodestyle pydocstyle retry \
         pylint pytest pytest-timeout pyyaml requests requests-unixsocket
 
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain "$FIRECRACKER_RUST_TOOLCHAIN"
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain "${FIRECRACKER_RUST_TOOLCHAIN}"
     . $HOME/.cargo/env
 
     rustup target add x86_64-unknown-linux-musl
@@ -32,23 +32,18 @@ dependencies_firecracker() {
 }
 
 download_firecracker() {
-    download_git ${FIRECRACKER_REPOSITORY} ${FIRECRACKER_BRANCH}
-
-    pushd firecracker
-    echo "[+] checking out revision: ${FIRECRACKER_VERSION}"
-    git checkout ${FIRECRACKER_VERSION}
-    popd
+    echo "down"
+    download_file ${FIRECRACKER_LINK} ${FIRECRACKER_CHECKSUM} firecracker-${FIRECRACKER_VERSION}.tar.gz
 }
 
 extract_firecracker() {
     echo "[+] extracting firecracker"
-    rm -rf ${WORKDIR}/*
-    cp -a firecracker/* ${WORKDIR}/
+    tar -xf ${DISTDIR}/firecracker-${FIRECRACKER_VERSION}.tar.gz -C ${WORKDIR}
 }
 
 prepare_firecracker() {
     echo "[+] prepare firecracker"
-    github_name "firecracker-${FIRECRACKER_VERSION:0:8}"
+    github_name "firecracker-${FIRECRACKER_VERSION}"
 }
 
 compile_firecracker() {
@@ -62,8 +57,10 @@ install_firecracker() {
 
     mkdir -p "${ROOTDIR}/usr/bin"
 
-    cp ${WORKDIR}/target/x86_64-unknown-linux-musl/release/firecracker ${ROOTDIR}/usr/bin/
-    cp ${WORKDIR}/target/x86_64-unknown-linux-musl/release/jailer ${ROOTDIR}/usr/bin/
+
+    RELEASEDIR="build/cargo_target/x86_64-unknown-linux-musl/release/"
+    cp "${RELEASEDIR}/firecracker" ${ROOTDIR}/usr/bin/
+    cp "${RELEASEDIR}/jailer" ${ROOTDIR}/usr/bin/
 
     chmod +x ${ROOTDIR}/usr/bin/*
 }
@@ -76,7 +73,7 @@ build_firecracker() {
     extract_firecracker
 
     popd
-    pushd ${WORKDIR}
+    pushd ${WORKDIR}/firecracker-${FIRECRACKER_VERSION}
 
     prepare_firecracker
     compile_firecracker
