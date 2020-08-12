@@ -83,6 +83,10 @@ func (p *testPool) Mount() (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
+func (p *testPool) MountWithoutScan() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
 func (p *testPool) UnMount() error {
 	return fmt.Errorf("not implemented")
 }
@@ -103,10 +107,6 @@ func (p *testPool) Reserved() (uint64, error) {
 	return p.reserved, nil
 }
 
-func (p *testPool) Maintenance() error {
-	return nil
-}
-
 func (p *testPool) Volumes() ([]filesystem.Volume, error) {
 	args := p.Called()
 	return args.Get(0).([]filesystem.Volume), args.Error(1)
@@ -124,6 +124,10 @@ func (p *testPool) RemoveVolume(name string) error {
 
 func (p *testPool) Devices() []*filesystem.Device {
 	return []*filesystem.Device{}
+}
+
+func (p *testPool) Shutdown() error {
+	return nil
 }
 
 func TestCreateSubvol(t *testing.T) {
@@ -160,19 +164,21 @@ func TestCreateSubvol(t *testing.T) {
 	}
 
 	mod := storageModule{
-		volumes: []filesystem.Pool{
+		pools: []filesystem.Pool{
 			pool1, pool2, pool3,
 		},
 	}
 
-	// from the data above the create subvol will prefer pool 2 because it
-	// after adding the subvol, it will still has more space.
 	sub := &testVolume{
 		name: "sub",
 	}
 
-	pool2.On("AddVolume", "sub").Return(sub, nil)
+	pool1.On("AddVolume", "sub").Return(sub, nil)
 	sub.On("Limit", uint64(500)).Return(nil)
+
+	pool1.On("Volumes").Return([]filesystem.Volume{}, nil)
+	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
+	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
 	_, err := mod.createSubvol(500, "sub", pkg.SSDDevice)
 
@@ -213,19 +219,21 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	}
 
 	mod := storageModule{
-		volumes: []filesystem.Pool{
+		pools: []filesystem.Pool{
 			pool1, pool2, pool3,
 		},
 	}
 
-	// from the data above the create subvol will prefer pool 2 because it
-	// after adding the subvol, it will still has more space.
 	sub := &testVolume{
 		name: "sub",
 	}
 
-	pool2.On("AddVolume", "sub").Return(sub, nil)
+	pool1.On("AddVolume", "sub").Return(sub, nil)
 	sub.On("Limit", uint64(0)).Return(nil)
+
+	pool1.On("Volumes").Return([]filesystem.Volume{}, nil)
+	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
+	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
 	_, err := mod.createSubvol(0, "sub", pkg.SSDDevice)
 
@@ -266,7 +274,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	}
 
 	mod := storageModule{
-		volumes: []filesystem.Pool{
+		pools: []filesystem.Pool{
 			pool1, pool2, pool3,
 		},
 	}

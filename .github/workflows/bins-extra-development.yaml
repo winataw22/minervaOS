@@ -14,10 +14,10 @@ jobs:
     name: 'Package: containerd'
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.14
+    - name: Set up Go 1.15
       uses: actions/setup-go@v1
       with:
-        go-version: 1.14
+        go-version: 1.15
       id: go
 
     - name: Checkout code into the Go module directory
@@ -288,10 +288,10 @@ jobs:
     name: 'Package: zufs (0-fs)'
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.14
+    - name: Set up Go 1.15
       uses: actions/setup-go@v1
       with:
-        go-version: 1.14
+        go-version: 1.15
       id: go
 
     - name: Checkout code into the Go module directory
@@ -326,6 +326,50 @@ jobs:
         action: crosslink
         user: tf-zos-bins.dev
         name: 0-fs.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+  hdparm:
+    name: 'Package: hdparm'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+      id: go
+
+    - name: Checkout code into the Go module directory
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package hdparm
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/hdparm
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: Crosslink flist (tf-zos-bins.dev)
+      if: success() && github.ref == 'refs/heads/master'
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins.dev
+        name: hdparm.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
 
   corex:

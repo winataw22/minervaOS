@@ -36,7 +36,7 @@ var (
 )
 
 type storageModule struct {
-	volumes       []filesystem.Pool
+	pools         []filesystem.Pool
 	brokenPools   []pkg.BrokenPool
 	devices       filesystem.DeviceManager
 	brokenDevices []pkg.BrokenDevice
@@ -57,7 +57,7 @@ func New() (pkg.StorageModule, error) {
 	}
 
 	s := &storageModule{
-		volumes:       []filesystem.Pool{},
+		pools:         []filesystem.Pool{},
 		brokenPools:   []pkg.BrokenPool{},
 		devices:       m,
 		brokenDevices: []pkg.BrokenDevice{},
@@ -74,10 +74,6 @@ func New() (pkg.StorageModule, error) {
 		log.Info().Msgf("Finished initializing storage module")
 	}
 
-	if err := s.Maintenance(); err != nil {
-		log.Error().Err(err).Msg("storage devices maintenance failed")
-	}
-
 	return s, err
 }
 
@@ -87,19 +83,37 @@ func (s *storageModule) Total(kind pkg.DeviceType) (uint64, error) {
 	defer s.mu.RUnlock()
 	var total uint64
 
-	for idx := range s.volumes {
+	for _, pool := range s.pools {
 		// ignore pools which don't have the right device type
-		if s.volumes[idx].Type() != kind {
+		if pool.Type() != kind {
 			continue
 		}
 
-		usage, err := s.volumes[idx].Usage()
+		unmountAfter := false
+		if _, mounted := pool.Mounted(); !mounted {
+			_, err := pool.MountWithoutScan()
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to mount pool %s", pool.Name())
+				return 0, err
+			}
+			unmountAfter = true
+		}
+
+		usage, err := pool.Usage()
 		if err != nil {
 			log.Error().Msgf("Failed to get current volume usage: %v", err)
 			return 0, err
 		}
 
 		total += usage.Size
+
+		if unmountAfter {
+			err := pool.UnMount()
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to unmount pool %s", pool.Name())
+				return 0, err
+			}
+		}
 	}
 	return total, nil
 }
@@ -119,13 +133,16 @@ func (s *storageModule) BrokenDevices() []pkg.BrokenDevice {
 }
 
 func (s *storageModule) Dump() {
-	log.Debug().Int("volumes", len(s.volumes)).Msg("dumping volumes")
+	log.Debug().Int("volumes", len(s.pools)).Msg("dumping volumes")
 
-	for i := range s.volumes {
-		devices := s.volumes[i].Devices()
-		for id := range devices {
-			d := devices[id]
-			log.Debug().Str("path", d.Path).Str("label", d.Label).Str("type", string(d.DiskType)).Send()
+	for _, pool := range s.pools {
+		path, mounted := pool.Mounted()
+		if mounted {
+			log.Debug().Msgf("pool %s is mounted at: %s", pool.Name(), path)
+		}
+		devices := pool.Devices()
+		for _, device := range devices {
+			log.Debug().Str("path", device.Path).Str("label", device.Label).Str("type", string(device.DiskType)).Send()
 		}
 	}
 
@@ -159,24 +176,14 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		return err
 	}
 
-	for _, volume := range existingPools {
-		if _, mounted := volume.Mounted(); mounted {
-			log.Debug().Msgf("Volume %s already mounted", volume.Name())
-			// volume is already mounted, skip mounting it again, make sure it is
-			// in the list of available pools. Since we are in the initialize method,
-			// we can safely assume the pool has not been added before, so no need
-			// to check for duplicate entries.
-			s.volumes = append(s.volumes, volume)
-			continue
-		}
-		_, err = volume.Mount()
+	for _, pool := range existingPools {
+		_, err := pool.Mount()
 		if err != nil {
-			s.brokenPools = append(s.brokenPools, pkg.BrokenPool{Label: volume.Name(), Err: err})
-			log.Warn().Msgf("Failed to mount volume %v", volume.Name())
+			s.brokenPools = append(s.brokenPools, pkg.BrokenPool{Label: pool.Name(), Err: err})
+			log.Warn().Msgf("Failed to mount pool %v", pool.Name())
 			continue
 		}
-		log.Debug().Msgf("Mounted volume %s", volume.Name())
-		s.volumes = append(s.volumes, volume)
+		s.pools = append(s.pools, pool)
 	}
 
 	// list disks
@@ -266,41 +273,53 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		}
 	}
 
-	// make sure new pools are mounted
-	log.Info().Msgf("Making sure new volumes are mounted")
-	for idx := range newPools {
-		if _, mounted := newPools[idx].Mounted(); !mounted {
-			log.Debug().Msgf("Mounting volume %s", newPools[idx].Name())
-			if _, err = newPools[idx].Mount(); err != nil {
-				s.brokenPools = append(s.brokenPools, pkg.BrokenPool{Label: newPools[idx].Name(), Err: err})
-				continue
-			}
-			s.volumes = append(s.volumes, newPools[idx])
+	// make sure new pools are added to the list
+	for _, pool := range newPools {
+		_, err := pool.Mount()
+		if err != nil {
+			return err
 		}
+		s.pools = append(s.pools, pool)
 	}
 
 	if err := filesystem.Partprobe(ctx); err != nil {
 		return err
 	}
 
-	return s.ensureCache()
+	if err := s.ensureCache(); err != nil {
+		log.Error().Err(err).Msg("Error ensuring cache")
+		return err
+	}
+
+	if err := s.shutdownUnusedPools(); err != nil {
+		log.Error().Err(err).Msg("Error shutting down unused pools")
+	}
+
+	return nil
 }
 
-func (s *storageModule) Maintenance() error {
-	for _, pool := range s.volumes {
-		log.Info().
-			Str("pool", pool.Name()).
-			Msg("start storage pool maintained")
-		if err := pool.Maintenance(); err != nil {
-			log.Error().
-				Err(err).
-				Str("pool", pool.Name()).
-				Msg("error during maintainace")
-			return err
+func (s *storageModule) shutdownUnusedPools() error {
+	for _, pool := range s.pools {
+		if _, mounted := pool.Mounted(); mounted {
+			volumes, err := pool.Volumes()
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to retrieve subvolumes on pool %s", pool.Name())
+				return err
+			}
+			log.Debug().Msgf("Pool %s has: %d subvolumes", pool.Name(), len(volumes))
+
+			if len(volumes) > 0 {
+				continue
+			}
+			err = pool.UnMount()
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to unmount volume %s", pool.Name())
+				return err
+			}
 		}
-		log.Info().
-			Str("pool", pool.Name()).
-			Msg("finished storage pool maintained")
+		if err := pool.Shutdown(); err != nil {
+			log.Error().Err(err).Msgf("Error shutting down pool %s", pool.Name())
+		}
 	}
 	return nil
 }
@@ -325,15 +344,36 @@ func (s *storageModule) CreateFilesystem(name string, size uint64, poolType pkg.
 func (s *storageModule) ReleaseFilesystem(name string) error {
 	log.Info().Msgf("Deleting volume %v", name)
 
-	for idx := range s.volumes {
-		filesystems, err := s.volumes[idx].Volumes()
+	for _, pool := range s.pools {
+		if _, mounted := pool.Mounted(); !mounted {
+			continue
+		}
+
+		volumes, err := pool.Volumes()
 		if err != nil {
 			return err
 		}
-		for jdx := range filesystems {
-			if filesystems[jdx].Name() == name {
-				log.Debug().Msgf("Removing filesystem %v in volume %v", filesystems[jdx].Name(), s.volumes[idx].Name())
-				return s.volumes[idx].RemoveVolume(filesystems[jdx].Name())
+		for _, vol := range volumes {
+			if vol.Name() == name {
+				log.Debug().Msgf("Removing filesystem %v in volume %v", vol.Name(), pool.Name())
+				err = pool.RemoveVolume(vol.Name())
+				if err != nil {
+					log.Err(err).Msgf("Error removing volume %s", vol.Name())
+					return err
+				}
+				// if there is only 1 volume, unmount and shutdown pool
+				if len(volumes) == 1 {
+					err = pool.UnMount()
+					if err != nil {
+						log.Err(err).Msgf("Error unmounting pool %s", pool.Name())
+						return err
+					}
+					err = pool.Shutdown()
+					if err != nil {
+						log.Err(err).Msgf("Error shutting down pool %s", pool.Name())
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -345,8 +385,8 @@ func (s *storageModule) ReleaseFilesystem(name string) error {
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *storageModule) Path(name string) (string, error) {
-	for idx := range s.volumes {
-		filesystems, err := s.volumes[idx].Volumes()
+	for idx := range s.pools {
+		filesystems, err := s.pools[idx].Volumes()
 		if err != nil {
 			return "", err
 		}
@@ -374,8 +414,8 @@ func (s *storageModule) ensureCache() error {
 	}
 
 	// check if cache volume available
-	for idx := range s.volumes {
-		filesystems, err := s.volumes[idx].Volumes()
+	for idx := range s.pools {
+		filesystems, err := s.pools[idx].Volumes()
 		if err != nil {
 			return err
 		}
@@ -446,48 +486,24 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.Devi
 		return nil, pkg.ErrInvalidDeviceType{DeviceType: poolType}
 	}
 
-	type Candidate struct {
-		Pool      filesystem.Pool
-		Available uint64
+	// Look for candidates in mounted pools first
+	candidates, err := s.checkForCandidates(size, poolType, true)
+	if err != nil {
+		log.Error().Err(err).Msgf("failed to search candidates on mounted pools")
+		return nil, err
 	}
 
-	var candidates []Candidate
+	log.Debug().Msgf("Found %d candidates in mounted pools", len(candidates))
 
-	// pick an appropriate pool
-	for _, pool := range s.volumes {
-		// ignore pools which don't have the right device type
-		if pool.Type() != poolType {
-			continue
-		}
-
-		usage, err := pool.Usage()
+	// If no candidates or found in mounted pools, we check the unmounted pools and get the first one that fits
+	if len(candidates) == 0 {
+		log.Debug().Msg("Checking unmounted pools")
+		candidates, err = s.checkForCandidates(size, poolType, false)
 		if err != nil {
-			log.Error().Msgf("Failed to get current volume usage: %v", err)
-			continue
+			log.Error().Err(err).Msgf("failed to search candidates on mounted pools")
+			return nil, err
 		}
-
-		reserved, err := pool.Reserved()
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to get size of pool %s", pool.Name())
-			continue
-		}
-
-		log.Debug().
-			Uint64("max size", usage.Size).
-			Uint64("reserved", reserved).
-			Uint64("new size", reserved+size).
-			Msgf("usage of pool %s", pool.Name())
-		// Make sure adding this filesystem would not bring us over the disk limit
-		if reserved+size > usage.Size {
-			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
-			continue
-		}
-
-		candidates = append(candidates, Candidate{
-			Pool:      pool,
-			Available: usage.Size - (reserved + size), // available after new subvolume
-		})
-
+		log.Debug().Msgf("Found %d candidates in unmounted pools", len(candidates))
 	}
 
 	if len(candidates) == 0 {
@@ -518,6 +534,85 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.Devi
 	return nil, fmt.Errorf("failed to create subvolume, logs might have more information")
 }
 
+type candidate struct {
+	Pool      filesystem.Pool
+	Available uint64
+}
+
+func (s *storageModule) checkForCandidates(size uint64, poolType pkg.DeviceType, mounted bool) ([]candidate, error) {
+	var candidates []candidate
+	for _, pool := range s.pools {
+		_, poolIsMounted := pool.Mounted()
+		if mounted != poolIsMounted {
+			continue
+		}
+
+		// ignore pools which don't have the right device type
+		if pool.Type() != poolType {
+			continue
+		}
+		log.Debug().Msgf("checking pool %s for space", pool.Name())
+
+		if !poolIsMounted && !mounted {
+			log.Debug().Msgf("Mounting pool %s...", pool.Name())
+			// if the pool is not mounted, and we are looking for not mounted pools, mount it first
+			_, err := pool.MountWithoutScan()
+			if err != nil {
+				log.Error().Err(err).Msgf("failed to mount pool %s", pool.Name())
+				return nil, err
+			}
+		}
+
+		usage, err := pool.Usage()
+		if err != nil {
+			log.Error().Msgf("Failed to get current volume usage: %v", err)
+			continue
+		}
+
+		reserved, err := pool.Reserved()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to get size of pool %s", pool.Name())
+			continue
+		}
+
+		log.Debug().
+			Uint64("max size", usage.Size).
+			Uint64("reserved", reserved).
+			Uint64("new size", reserved+size).
+			Msgf("usage of pool %s", pool.Name())
+		// Make sure adding this filesystem would not bring us over the disk limit
+		if reserved+size > usage.Size {
+			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
+
+			if !poolIsMounted && !mounted {
+				log.Info().Msgf("Previously unmounted pool shutting down again..")
+				err = pool.UnMount()
+				if err != nil {
+					log.Error().Err(err).Msgf("failed to unmount pool %s", pool.Name())
+					return nil, err
+				}
+				err = pool.Shutdown()
+				if err != nil {
+					log.Error().Err(err).Msgf("failed to shutdown pool %s", pool.Name())
+					return nil, err
+				}
+			}
+			continue
+		}
+
+		candidates = append(candidates, candidate{
+			Pool:      pool,
+			Available: usage.Size,
+		})
+
+		// if we are looking for not mounted pools, break here
+		if !mounted {
+			return candidates, nil
+		}
+	}
+	return candidates, nil
+}
+
 func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 	ch := make(chan pkg.PoolsStats)
 	values := make(pkg.PoolsStats)
@@ -531,7 +626,7 @@ func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 			case <-time.After(5 * time.Second):
 			}
 
-			for _, pool := range s.volumes {
+			for _, pool := range s.pools {
 				devices, err := s.devices.ByLabel(ctx, pool.Name())
 				if err != nil {
 					log.Error().Err(err).Str("pool", pool.Name()).Msg("failed to get devices for pool")

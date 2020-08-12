@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -217,6 +218,32 @@ func (p *btrfsPool) Mount() (string, error) {
 		return "", err
 	}
 
+	if err := p.maintenance(); err != nil {
+		return "", err
+	}
+
+	return mnt, p.utils.QGroupEnable(ctx, mnt)
+}
+
+// MountWithoutScan mounts the pool in it's default mount location under /mnt/name
+// This wont trigger a btrfs filesystem scan and leaves unused disks in standby mode
+// We mount the pool based on the path and the device it has saved
+func (p *btrfsPool) MountWithoutScan() (string, error) {
+	ctx := context.Background()
+
+	mnt := p.Path()
+	if err := os.MkdirAll(mnt, 0755); err != nil {
+		return "", err
+	}
+
+	if err := syscall.Mount(p.devices[0].Path, mnt, "btrfs", 0, ""); err != nil {
+		return "", err
+	}
+
+	if err := p.maintenance(); err != nil {
+		return "", err
+	}
+
 	return mnt, p.utils.QGroupEnable(ctx, mnt)
 }
 
@@ -422,7 +449,7 @@ func (p *btrfsPool) Reserved() (uint64, error) {
 	return total, nil
 }
 
-func (p *btrfsPool) Maintenance() error {
+func (p *btrfsPool) maintenance() error {
 	// this method cleans up all the unused
 	// qgroups that could exists on a filesystem
 
@@ -454,6 +481,21 @@ func (p *btrfsPool) Maintenance() error {
 		}
 	}
 
+	return nil
+}
+
+func (p *btrfsPool) Shutdown() error {
+	for _, device := range p.Devices() {
+		log.Info().Msgf("Shutting down disk %s ...", device.Path)
+		cmd := exec.Command("hdparm", "-y", device.Path)
+
+		err := cmd.Run()
+		if err != nil {
+			log.Error().Err(err).Msgf("Error shutting down device %s", device.Path)
+			return err
+		}
+		log.Info().Msgf("Disk %s is shutdown", device.Path)
+	}
 	return nil
 }
 

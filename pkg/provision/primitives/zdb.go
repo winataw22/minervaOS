@@ -344,7 +344,8 @@ func (p *Provisioner) createZDBNamespace(containerID pkg.ContainerID, nsID strin
 
 func (p *Provisioner) zdbDecommission(ctx context.Context, reservation *provision.Reservation) error {
 	var (
-		storage = stubs.NewZDBAllocaterStub(p.zbus)
+		storage       = stubs.NewZDBAllocaterStub(p.zbus)
+		storageClient = stubs.NewStorageModuleStub(p.zbus)
 
 		config ZDB
 		nsID   = reservation.ID
@@ -377,6 +378,58 @@ func (p *Provisioner) zdbDecommission(ctx context.Context, reservation *provisio
 	if err := zdbCl.DeleteNamespace(nsID); err != nil {
 		return errors.Wrapf(err, "failed to delete namespace in 0-db: %s", containerID)
 	}
+
+	ns, err := zdbCl.Namespaces()
+	if err != nil {
+		return errors.Wrap(err, "failed to retrieve zdb namespaces")
+	}
+
+	log.Info().Msgf("zdb has %d namespaces left", len(ns))
+
+	// If there are no more namespaces left except for the default namespace, we can delete this subvolume
+	if len(ns) == 1 && ns[0] == "default" {
+		log.Info().Msg("decommissioning zdb container because there are no more namespaces left")
+		err = p.deleteZdbContainer(containerID)
+		if err != nil {
+			return errors.Wrap(err, "failed to decommission zdb container")
+		}
+
+		log.Info().Msgf("deleting subvolumes of reservation: %s", allocation.VolumeID)
+		// we also need to delete the flist volume
+		return storageClient.ReleaseFilesystem(allocation.VolumeID)
+	}
+
+	return nil
+}
+
+func (p *Provisioner) deleteZdbContainer(containerID pkg.ContainerID) error {
+	container := stubs.NewContainerModuleStub(p.zbus)
+	flist := stubs.NewFlisterStub(p.zbus)
+	// networkMgr := stubs.NewNetworkerStub(p.zbus)
+
+	info, err := container.Inspect("zdb", containerID)
+	if err == nil {
+		if err := container.Delete("zdb", containerID); err != nil {
+			return errors.Wrapf(err, "failed to delete container %s", containerID)
+		}
+
+		rootFS := info.RootFS
+		if info.Interactive {
+			rootFS, err = findRootFS(info.Mounts)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err := flist.Umount(rootFS); err != nil {
+			return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
+		}
+
+	} else {
+		log.Error().Err(err).Str("container", string(containerID)).Msg("failed to inspect container for decomission")
+	}
+
+	// TODO: delete network?
 
 	return nil
 }

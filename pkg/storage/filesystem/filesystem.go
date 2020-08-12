@@ -37,6 +37,9 @@ type Pool interface {
 	Mounted() (string, bool)
 	// Mount the pool, the mountpoint is returned
 	Mount() (string, error)
+	// MountWithoutScan the pool, the mountpoint is returned.
+	// Does not scan for btrfs
+	MountWithoutScan() (string, error)
 	// UnMount the pool
 	UnMount() error
 	//AddDevice to the pool
@@ -47,13 +50,6 @@ type Pool interface {
 	Type() pkg.DeviceType
 	// Reserved is reserved size of the devices in bytes
 	Reserved() (uint64, error)
-	// Maintenance is a routine that is called at boot
-	// and that all implementer can use to do some clean up and
-	// other maintenance on the pool
-	Maintenance() error
-
-	// Health() ?
-
 	// Volumes are all subvolumes of this volume
 	Volumes() ([]Volume, error)
 	// AddVolume adds a new subvolume with the given name
@@ -62,6 +58,9 @@ type Pool interface {
 	RemoveVolume(name string) error
 	// Devices list attached devices
 	Devices() []*Device
+
+	// Shutdown spins down the device where the pool is mounted
+	Shutdown() error
 }
 
 // Filter closure for Filesystem list
