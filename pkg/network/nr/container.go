@@ -30,7 +30,13 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 	}
 
 	join.Namespace = containerID
-	netspace, err := namespace.Create(containerID)
+
+	var netspace ns.NetNS
+	if namespace.Exists(containerID) {
+		netspace, err = namespace.GetByName(containerID)
+	} else {
+		netspace, err = namespace.Create(containerID)
+	}
 	if err != nil {
 		return join, err
 	}
