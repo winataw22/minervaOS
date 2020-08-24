@@ -571,13 +571,13 @@ github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 h1:b6uOv7YOFK0TYG7HtkIgExQo+2RdLuwRft63jn2HWj8=
 github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
+github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 h1:kdXcSzyDtseVEc4yCz2qF8ZrQvIDBJLl4S1c3GCXmoI=
+github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae h1:vgGSvdW5Lqg+I1aZOlG32uyE6xHpLdKhZzcTEktz5wM=
 github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae/go.mod h1:quDq6Se6jlGwiIKia/itDZxqC5rj6/8OdFyMMAwTxCs=
 github.com/threefoldtech/tfexplorer v0.2.5/go.mod h1:TugylEDgMNKk4ZIzee9PpVmIcLNLaRLdiXuhHTt/AR0=
-github.com/threefoldtech/tfexplorer v0.3.2-0.20200713131646-d0479a0e84ca h1:EYcYpQchr0+dRf+a9qyNZFSiQXQHxIoOoz1rSut1jIQ=
-github.com/threefoldtech/tfexplorer v0.3.2-0.20200713131646-d0479a0e84ca/go.mod h1:oFtPBaRLW4c6YuEfTrWYzAGw+wb6I4+og133zjDOYP0=
-github.com/threefoldtech/tfexplorer v0.3.2-0.20200716125715-b13151dae8f0 h1:NNlni8J1a5Mkhk3nc2re+E9hDQoxhJsoHv18AaNr9fY=
-github.com/threefoldtech/tfexplorer v0.3.2-0.20200716125715-b13151dae8f0/go.mod h1:oFtPBaRLW4c6YuEfTrWYzAGw+wb6I4+og133zjDOYP0=
+github.com/threefoldtech/tfexplorer v0.3.2-0.20200824142536-b4319e0a006d h1:/4U3Td7mPrizg0xk5k09KBYQRCG98r6K2aCLiXHSv1E=
+github.com/threefoldtech/tfexplorer v0.3.2-0.20200824142536-b4319e0a006d/go.mod h1:oFtPBaRLW4c6YuEfTrWYzAGw+wb6I4+og133zjDOYP0=
 github.com/threefoldtech/zbus v0.1.3 h1:18DnIzximRbATle5ZdZz0i84n/bCYB8k/gkhr2dXayc=
 github.com/threefoldtech/zbus v0.1.3/go.mod h1:ZtiRpcqzEBJetVQDsEbw0p48h/AF3O1kf0tvd30I0BU=
 github.com/threefoldtech/zos v0.2.4-rc2/go.mod h1:7A2oflcmSVsHFC4slOcydWgJyFBMFMH9wsaTRv+CnTA=

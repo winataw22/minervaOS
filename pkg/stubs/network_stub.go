@@ -2,9 +2,10 @@ package stubs
 
 import (
 	"context"
+	"net"
+
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
-	"net"
 )
 
 type NetworkerStub struct {
@@ -120,8 +121,8 @@ func (s *NetworkerStub) GetSubnet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 []string, arg3 bool) (ret0 pkg.Member, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2, arg3}
+func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "Join", args...)
 	if err != nil {
 		panic(err)
@@ -189,6 +190,22 @@ func (s *NetworkerStub) RemoveTap(arg0 pkg.NetID) (ret0 error) {
 	}
 	ret0 = new(zbus.RemoteError)
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) TapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "TapExists", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return

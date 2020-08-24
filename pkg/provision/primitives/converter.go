@@ -58,9 +58,10 @@ func ContainerToProvisionType(w workloads.Workloader, reservationID string) (Con
 
 	if len(c.NetworkConnection) > 0 {
 		container.Network = Network{
-			IPs:       []net.IP{c.NetworkConnection[0].Ipaddress},
-			NetworkID: pkg.NetID(c.NetworkConnection[0].NetworkId),
-			PublicIP6: c.NetworkConnection[0].PublicIp6,
+			IPs:         []net.IP{c.NetworkConnection[0].Ipaddress},
+			NetworkID:   pkg.NetID(c.NetworkConnection[0].NetworkId),
+			PublicIP6:   c.NetworkConnection[0].PublicIp6,
+			YggdrasilIP: c.NetworkConnection[0].YggdrasilIP,
 		}
 	}
 

@@ -11,11 +11,19 @@ import (
 //go:generate mkdir -p stubs
 //go:generate zbusc -module network -version 0.0.1 -name network -package stubs github.com/threefoldtech/zos/pkg+Networker stubs/network_stub.go
 
-// Member holds information about a join operation
+// Member holds information about a the network namespace of a container
 type Member struct {
-	Namespace string
-	IPv6      net.IP
-	IPv4      net.IP
+	Namespace   string
+	IPv6        net.IP
+	IPv4        net.IP
+	YggdrasilIP net.IP
+}
+
+// ContainerNetworkConfig defines how to construct the network namespace of a container
+type ContainerNetworkConfig struct {
+	IPs         []string
+	PublicIP6   bool
+	YggdrasilIP bool
 }
 
 //Networker is the interface for the network module
@@ -35,7 +43,7 @@ type Networker interface {
 	// name.
 	// The member name specifies the name of the member, and must be unique
 	// The NetID is the network id to join
-	Join(networkdID NetID, containerID string, addrs []string, publicIP6 bool) (join Member, err error)
+	Join(networkdID NetID, containerID string, cfg ContainerNetworkConfig) (join Member, err error)
 	// Leave delete a container nameapce created by Join
 	Leave(networkdID NetID, containerID string) (err error)
 
@@ -48,6 +56,9 @@ type Networker interface {
 	// SetupTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
 	SetupTap(networkID NetID) (string, error)
+
+	// TapExists checks if the tap device exists already
+	TapExists(networkID NetID) (bool, error)
 
 	// RemoveTap removes the tap device from the network namespace
 	// of the networkID

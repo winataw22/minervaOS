@@ -31,8 +31,9 @@ require (
 	github.com/rs/zerolog v1.19.0
 	github.com/shirou/gopsutil v2.19.11+incompatible
 	github.com/stretchr/testify v1.6.1
+	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	github.com/threefoldtech/tfexplorer v0.3.2-0.20200716125715-b13151dae8f0
+	github.com/threefoldtech/tfexplorer v0.3.2-0.20200824142536-b4319e0a006d
 	github.com/threefoldtech/zbus v0.1.3
 	github.com/urfave/cli v1.22.4
 	github.com/vishvananda/netlink v1.1.0
