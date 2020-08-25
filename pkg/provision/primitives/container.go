@@ -88,12 +88,14 @@ func (p *Provisioner) containerProvision(ctx context.Context, reservation *provi
 
 // ContainerProvision is entry point to container reservation
 func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *provision.Reservation) (ContainerResult, error) {
-	containerClient := stubs.NewContainerModuleStub(p.zbus)
-	flistClient := stubs.NewFlisterStub(p.zbus)
-	storageClient := stubs.NewStorageModuleStub(p.zbus)
-
-	tenantNS := fmt.Sprintf("ns%s", reservation.User)
-	containerID := reservation.ID
+	var (
+		containerClient = stubs.NewContainerModuleStub(p.zbus)
+		flistClient     = stubs.NewFlisterStub(p.zbus)
+		storageClient   = stubs.NewStorageModuleStub(p.zbus)
+		networkMgr      = stubs.NewNetworkerStub(p.zbus)
+		tenantNS        = fmt.Sprintf("ns%s", reservation.User)
+		containerID     = reservation.ID
+	)
 
 	var config Container
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
@@ -114,8 +116,69 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
 
-	log.Debug().Str("flist", config.FList).Msg("mounting flist")
+	netID := networkID(reservation.User, string(config.Network.NetworkID))
+	log.Debug().
+		Str("network-id", string(netID)).
+		Str("config", fmt.Sprintf("%+v", config)).
+		Msg("deploying network")
 
+		// check to make sure the network is already installed on the node
+	if _, err := networkMgr.GetSubnet(netID); err != nil {
+		return ContainerResult{}, fmt.Errorf("network %s is not installed on this node", config.Network.NetworkID)
+	}
+
+	// check to make sure the requested volume are accessible
+	for _, mount := range config.Mounts {
+		volumeRes, err := p.cache.Get(mount.VolumeID)
+		if err != nil {
+			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
+		}
+
+		if volumeRes.User != reservation.User {
+			return ContainerResult{}, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, reservation.User)
+		}
+	}
+
+	// ensure we can decrypt all environment variables
+	var env []string
+	for k, v := range config.Env {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	for k, v := range config.SecretEnv {
+		v, err := decryptSecret(p.zbus, v)
+		if err != nil {
+			return ContainerResult{}, errors.Wrapf(err, "failed to decrypt secret env var '%s'", k)
+		}
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// prepare container network
+	ips := make([]string, len(config.Network.IPs))
+	for i, ip := range config.Network.IPs {
+		ips[i] = ip.String()
+	}
+	var join pkg.Member
+	join, err = networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
+	if err != nil {
+		return ContainerResult{}, err
+	}
+	log.Info().
+		Str("ipv6", join.IPv6.String()).
+		Str("ipv4", join.IPv4.String()).
+		Str("container", reservation.ID).
+		Msg("assigned an IP")
+
+	defer func() {
+		if err != nil {
+			if err := networkMgr.Leave(netID, containerID); err != nil {
+				log.Error().Err(err).Msgf("failed leave container network namespace")
+			}
+		}
+	}()
+
+	// mount root flist
+	log.Debug().Str("flist", config.FList).Msg("mounting flist")
 	rootfsMntOpt := pkg.MountOptions{
 		Limit:    config.Capacity.DiskSize,
 		ReadOnly: false,
@@ -131,38 +194,9 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		return ContainerResult{}, err
 	}
 
-	defer func() {
-		if err != nil {
-			if err := flistClient.Umount(mnt); err != nil {
-				log.Error().Err(err).Str("mnt", mnt).Msg("failed to unmount container root")
-			}
-		}
-	}()
-
-	var env []string
-	for k, v := range config.Env {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	for k, v := range config.SecretEnv {
-		v, err := decryptSecret(p.zbus, v)
-		if err != nil {
-			return ContainerResult{}, errors.Wrapf(err, "failed to decrypt secret env var '%s'", k)
-		}
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-
+	// prepare mount info for volumes
 	var mounts []pkg.MountInfo
 	for _, mount := range config.Mounts {
-		volumeRes, err := p.cache.Get(mount.VolumeID)
-		if err != nil {
-			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
-		}
-
-		if volumeRes.User != reservation.User {
-			return ContainerResult{}, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, reservation.User)
-		}
-
 		// we make sure that mountpoint in config doesn't have relative parts
 		mountpoint := path.Join("/", mount.Mountpoint)
 
@@ -184,28 +218,10 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		)
 	}
 
-	netID := networkID(reservation.User, string(config.Network.NetworkID))
-	log.Debug().
-		Str("network-id", string(netID)).
-		Str("config", fmt.Sprintf("%+v", config)).
-		Msg("deploying network")
-
-	networkMgr := stubs.NewNetworkerStub(p.zbus)
-
-	ips := make([]string, len(config.Network.IPs))
-	for i, ip := range config.Network.IPs {
-		ips[i] = ip.String()
-	}
-	var join pkg.Member
-	join, err = networkMgr.Join(netID, containerID, ips, config.Network.PublicIP6)
-	if err != nil {
-		return ContainerResult{}, err
-	}
-
 	defer func() {
 		if err != nil {
-			if err := networkMgr.Leave(netID, containerID); err != nil {
-				log.Error().Err(err).Msgf("failed leave containrt network namespace")
+			if err := containerClient.Delete(tenantNS, pkg.ContainerID(containerID)); err != nil {
+				log.Error().Err(err).Str("container_id", containerID).Msg("error during delete of container")
 			}
 
 			if err := flistClient.Umount(mnt); err != nil {
@@ -213,12 +229,6 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 			}
 		}
 	}()
-
-	log.Info().
-		Str("ipv6", join.IPv6.String()).
-		Str("ipv4", join.IPv4.String()).
-		Str("container", reservation.ID).
-		Msg("assigned an IP")
 
 	var id pkg.ContainerID
 	id, err = containerClient.Run(
@@ -351,8 +361,20 @@ func validateContainerConfig(config Container) error {
 		return fmt.Errorf("network ID cannot be empty")
 	}
 
+	if len(config.Network.IPs) == 0 {
+		return fmt.Errorf("missing container IP address")
+	}
+
 	if config.FList == "" {
 		return fmt.Errorf("missing flist url")
+	}
+
+	if config.Capacity.Memory < 1024 {
+		return fmt.Errorf("amount of memory allocated for the container cannot be lower then 1024 bytes")
+	}
+
+	if config.Capacity.CPU == 0 {
+		return fmt.Errorf("cannot create a container with 0 CPU allocated")
 	}
 
 	return nil
