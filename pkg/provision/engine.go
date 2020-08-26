@@ -3,11 +3,13 @@ package provision
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/jbenet/go-base58"
 	"github.com/threefoldtech/zos/pkg"
 
 	"github.com/pkg/errors"
@@ -180,6 +182,24 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 
 	if err := e.cache.Add(r); err != nil {
 		return errors.Wrapf(err, "failed to cache reservation %s locally", r.ID)
+	}
+
+	// If an update occurs on the network we don't increment the counter
+	if r.Type == "network_resource" {
+		nr := pkg.NetResource{}
+		if err := json.Unmarshal(r.Data, &nr); err != nil {
+			return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
+		}
+
+		uniqueID := NetworkID(r.User, nr.Name)
+		exists, err := e.cache.NetworkExists(string(uniqueID))
+		if err == nil {
+			log.Error().Err(err).Msg("failed to check if network exists")
+			return err
+		}
+		if exists {
+			return nil
+		}
 	}
 
 	if err := e.statser.Increment(r); err != nil {
@@ -372,4 +392,17 @@ func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
 	}
 
 	return nil
+}
+
+// NetworkID construct a network ID based on a userID and network name
+func NetworkID(userID, name string) pkg.NetID {
+	buf := bytes.Buffer{}
+	buf.WriteString(userID)
+	buf.WriteString(name)
+	h := md5.Sum(buf.Bytes())
+	b := base58.Encode(h[:])
+	if len(b) > 13 {
+		b = b[:13]
+	}
+	return pkg.NetID(string(b))
 }

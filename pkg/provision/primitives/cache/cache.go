@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/provision/primitives"
@@ -119,7 +120,7 @@ func (s *Fs) Sync(statser provision.Statser) error {
 		}
 
 		if !r.Expired() {
-			if err := statser.Increment(r); err != nil {
+			if err := s.incrementCounters(statser); err != nil {
 				return fmt.Errorf("fail to update stats:%w", err)
 			}
 		}
@@ -246,6 +247,96 @@ func (s *Fs) Exists(id string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// NetworkExists exists checks if a network exists in cache already
+func (s *Fs) NetworkExists(id string) (bool, error) {
+	reservations, err := s.list()
+	if err != nil {
+		return false, err
+	}
+
+	for _, r := range reservations {
+		if r.Type == primitives.NetworkReservation {
+			nr := pkg.NetResource{}
+			if err := json.Unmarshal(r.Data, &nr); err != nil {
+				return false, fmt.Errorf("failed to unmarshal network from reservation: %w", err)
+			}
+
+			// Check if the combination of network id and user is the same
+			if string(provision.NetworkID(r.User, nr.Name)) == id {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func (s *Fs) list() ([]*provision.Reservation, error) {
+	s.RLock()
+	defer s.RUnlock()
+
+	infos, err := ioutil.ReadDir(s.root)
+	if err != nil {
+		return nil, err
+	}
+	reservations := make([]*provision.Reservation, 0, len(infos))
+
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
+		}
+
+		r, err := s.get(info.Name())
+		if err != nil {
+			return nil, fmt.Errorf("failed get reservation: %w", err)
+		}
+
+		reservations = append(reservations, r)
+	}
+	return reservations, nil
+}
+
+// incrementCounters will increment counters for all workloads
+// for network workloads it will only increment those that have a unique name
+func (s *Fs) incrementCounters(statser provision.Statser) error {
+	uniqueNetworkReservations := make(map[pkg.NetID]*provision.Reservation)
+
+	reservations, err := s.list()
+	if err != nil {
+		return err
+	}
+
+	for _, r := range reservations {
+		if r.Type == primitives.NetworkReservation {
+			nr := pkg.NetResource{}
+			if err := json.Unmarshal(r.Data, &nr); err != nil {
+				return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
+			}
+
+			netID := provision.NetworkID(r.User, nr.Name)
+			// if the network name + user exsists in the list, we skip it.
+			// else we add it to the list
+			if _, ok := uniqueNetworkReservations[netID]; ok {
+				continue
+			}
+
+			uniqueNetworkReservations[netID] = r
+			continue
+		} else {
+			if err := statser.Increment(r); err != nil {
+				return fmt.Errorf("fail to update stats:%w", err)
+			}
+		}
+	}
+
+	for _, r := range uniqueNetworkReservations {
+		if err := statser.Increment(r); err != nil {
+			return fmt.Errorf("fail to update stats:%w", err)
+		}
+	}
+	return nil
 }
 
 func (s *Fs) get(id string) (*provision.Reservation, error) {

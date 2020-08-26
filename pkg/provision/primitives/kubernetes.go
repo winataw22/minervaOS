@@ -68,7 +68,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 		return result, errors.Wrap(err, "failed to decode reservation schema")
 	}
 
-	netID := networkID(reservation.User, string(config.NetworkID))
+	netID := provision.NetworkID(reservation.User, string(config.NetworkID))
 
 	// check if the network tap already exists
 	// if it does, it's most likely that a vm with the same network id and node id already exists
@@ -266,7 +266,7 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 		}
 	}
 
-	netID := networkID(reservation.User, string(cfg.NetworkID))
+	netID := provision.NetworkID(reservation.User, string(cfg.NetworkID))
 	if err := network.RemoveTap(netID); err != nil {
 		return errors.Wrap(err, "could not clean up tap device")
 	}
@@ -285,7 +285,7 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
-	netID := networkID(userID, string(cfg.NetworkID))
+	netID := provision.NetworkID(userID, string(cfg.NetworkID))
 	subnet, err := network.GetSubnet(netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource subnet")

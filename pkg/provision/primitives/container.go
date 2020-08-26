@@ -118,7 +118,7 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
 
-	netID := networkID(reservation.User, string(config.Network.NetworkID))
+	netID := provision.NetworkID(reservation.User, string(config.Network.NetworkID))
 	log.Debug().
 		Str("network-id", string(netID)).
 		Str("config", fmt.Sprintf("%+v", config)).
@@ -315,7 +315,7 @@ func (p *Provisioner) containerDecommission(ctx context.Context, reservation *pr
 		log.Error().Err(err).Str("container", string(containerID)).Msg("failed to inspect container for decomission")
 	}
 
-	netID := networkID(reservation.User, string(config.Network.NetworkID))
+	netID := provision.NetworkID(reservation.User, string(config.Network.NetworkID))
 	if _, err := networkMgr.GetSubnet(netID); err == nil { // simple check to make sure the network still exists on the node
 		if err := networkMgr.Leave(netID, string(containerID)); err != nil {
 			return errors.Wrap(err, "failed to delete container network namespace")

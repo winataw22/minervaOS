@@ -1,13 +1,9 @@
 package primitives
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
-
-	"github.com/jbenet/go-base58"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -28,7 +24,7 @@ func (p *Provisioner) networkProvisionImpl(ctx context.Context, reservation *pro
 		return fmt.Errorf("validation of the network resource failed: %w", err)
 	}
 
-	nr.NetID = networkID(reservation.User, nr.Name)
+	nr.NetID = provision.NetworkID(reservation.User, nr.Name)
 
 	mgr := stubs.NewNetworkerStub(p.zbus)
 	log.Debug().Str("network", fmt.Sprintf("%+v", nr)).Msg("provision network")
@@ -53,24 +49,12 @@ func (p *Provisioner) networkDecommission(ctx context.Context, reservation *prov
 		return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
 	}
 
-	network.NetID = networkID(reservation.User, network.Name)
+	network.NetID = provision.NetworkID(reservation.User, network.Name)
 
 	if err := mgr.DeleteNR(*network); err != nil {
 		return fmt.Errorf("failed to delete network resource: %w", err)
 	}
 	return nil
-}
-
-func networkID(userID, name string) pkg.NetID {
-	buf := bytes.Buffer{}
-	buf.WriteString(userID)
-	buf.WriteString(name)
-	h := md5.Sum(buf.Bytes())
-	b := base58.Encode(h[:])
-	if len(b) > 13 {
-		b = b[:13]
-	}
-	return pkg.NetID(string(b))
 }
 
 func validateNR(nr pkg.NetResource) error {
