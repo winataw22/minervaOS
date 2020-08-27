@@ -1,6 +1,7 @@
 package zinit
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -11,6 +12,8 @@ import (
 
 var (
 	statusRegex = regexp.MustCompile(`^(\w+)(?:\((.+)\))?$`)
+	// ErrUnknownService is an error that is returned when a service is unknown to zinit
+	ErrUnknownService = errors.New("unknown service")
 )
 
 // PossibleState represents the state of a service managed by zinit
@@ -146,6 +149,9 @@ func parseList(s string) (map[string]ServiceState, error) {
 func (c *Client) Status(service string) (ServiceStatus, error) {
 	resp, err := c.cmd(fmt.Sprintf("status %s", service))
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "unknown service") {
+			return ServiceStatus{}, ErrUnknownService
+		}
 		return ServiceStatus{}, err
 	}
 

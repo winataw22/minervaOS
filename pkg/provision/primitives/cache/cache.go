@@ -99,34 +99,10 @@ func (s *Fs) removeAllButPersistent(rootPath string) error {
 
 // Sync update the statser with all the reservation present in the cache
 func (s *Fs) Sync(statser provision.Statser) error {
-	//this should probably be reversed and moved to the Statser object instead
-
 	s.RLock()
 	defer s.RUnlock()
 
-	infos, err := ioutil.ReadDir(s.root)
-	if err != nil {
-		return err
-	}
-
-	for _, info := range infos {
-		if info.IsDir() {
-			continue
-		}
-
-		r, err := s.get(info.Name())
-		if err != nil {
-			return err
-		}
-
-		if !r.Expired() {
-			if err := s.incrementCounters(statser); err != nil {
-				return fmt.Errorf("fail to update stats:%w", err)
-			}
-		}
-	}
-
-	return nil
+	return s.incrementCounters(statser)
 }
 
 // Add a reservation to the store
@@ -309,7 +285,10 @@ func (s *Fs) incrementCounters(statser provision.Statser) error {
 	}
 
 	for _, r := range reservations {
-		if r.Type == primitives.NetworkReservation {
+		if r.Expired() {
+			continue
+		}
+		if r.Type == primitives.NetworkResourceReservation || r.Type == primitives.NetworkReservation {
 			nr := pkg.NetResource{}
 			if err := json.Unmarshal(r.Data, &nr); err != nil {
 				return fmt.Errorf("failed to unmarshal network from reservation: %w", err)

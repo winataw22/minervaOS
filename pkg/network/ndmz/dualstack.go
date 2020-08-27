@@ -82,6 +82,7 @@ func (d *DualStack) Create() error {
 		if err := waitIP4(); err != nil {
 			return err
 		}
+
 		if err := waitIP6(); err != nil {
 			return err
 		}
@@ -93,6 +94,10 @@ func (d *DualStack) Create() error {
 func (d *DualStack) Delete() error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err == nil {
+		if err := stopBackgroundProbe(); err != nil {
+			return errors.Wrap(err, "failed to stop dmz pub4 background probe")
+		}
+
 		if err := namespace.Delete(netNS); err != nil {
 			return errors.Wrap(err, "failed to delete ndmz network namespace")
 		}
@@ -189,12 +194,24 @@ func (d *DualStack) IP6PublicIface() string {
 // waitIPS waits to receives some IP from DHCP and Router advertisement
 func waitIP4() error {
 	// run DHCP to interface public in ndmz
-	probe := dhcp.NewProbe()
-
-	if err := probe.Start(DMZPub4); err != nil {
+	probe, err := dhcp.NewBackgroundProbe(DMZPub4)
+	if err != nil {
 		return err
 	}
-	defer probe.Stop()
+
+	running, err := probe.IsRunning()
+	if err != nil {
+		return err
+	}
+
+	// this means this process is already running, stop here
+	if running {
+		return nil
+	}
+
+	if err := probe.Start(); err != nil {
+		return err
+	}
 
 	link, err := netlink.LinkByName(DMZPub4)
 	if err != nil {
@@ -266,4 +283,21 @@ func waitIP6() error {
 		}
 	}
 	return nil
+}
+
+func stopBackgroundProbe() error {
+	probe, err := dhcp.NewBackgroundProbe(DMZPub4)
+	if err != nil {
+		return err
+	}
+
+	running, err := probe.IsRunning()
+	if err != nil {
+		return err
+	}
+
+	if !running {
+		return nil
+	}
+	return probe.Stop()
 }

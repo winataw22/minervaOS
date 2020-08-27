@@ -73,6 +73,10 @@ func (d *Hidden) Create() error {
 func (d *Hidden) Delete() error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err == nil {
+		if err := stopBackgroundProbe(); err != nil {
+			return errors.Wrap(err, "failed to stop dmz pub4 background probe")
+		}
+
 		if err := namespace.Delete(netNS); err != nil {
 			return errors.Wrap(err, "failed to delete ndmz network namespace")
 		}
