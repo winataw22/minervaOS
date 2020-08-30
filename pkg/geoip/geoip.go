@@ -20,9 +20,9 @@ func Fetch() (Location, error) {
 	l := Location{
 		Longitute: 0.0,
 		Latitude:  0.0,
-		Continent: "Uknown",
-		Country:   "Uknown",
-		City:      "Uknown",
+		Continent: "Unknown",
+		Country:   "Unknown",
+		City:      "Unknown",
 	}
 
 	resp, err := http.Get("https://geoip.grid.tf")
