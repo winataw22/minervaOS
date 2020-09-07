@@ -20,7 +20,7 @@ func (p *Provisioner) networkProvisionImpl(ctx context.Context, reservation *pro
 		return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
 	}
 
-	if err := validateNR(nr); err != nil {
+	if err := nr.Valid(); err != nil {
 		return fmt.Errorf("validation of the network resource failed: %w", err)
 	}
 
@@ -53,63 +53,6 @@ func (p *Provisioner) networkDecommission(ctx context.Context, reservation *prov
 
 	if err := mgr.DeleteNR(*network); err != nil {
 		return fmt.Errorf("failed to delete network resource: %w", err)
-	}
-	return nil
-}
-
-func validateNR(nr pkg.NetResource) error {
-
-	if nr.NetID == "" {
-		return fmt.Errorf("network ID cannot be empty")
-	}
-
-	if nr.Name == "" {
-		return fmt.Errorf("network name cannot be empty")
-	}
-
-	if nr.NetworkIPRange.Nil() {
-		return fmt.Errorf("network IP range cannot be empty")
-	}
-
-	if nr.NodeID == "" {
-		return fmt.Errorf("network resource node ID cannot empty")
-	}
-	if nr.Subnet.IP == nil {
-		return fmt.Errorf("network resource subnet cannot empty")
-	}
-
-	if nr.WGPrivateKey == "" {
-		return fmt.Errorf("network resource wireguard private key cannot empty")
-	}
-
-	if nr.WGPublicKey == "" {
-		return fmt.Errorf("network resource wireguard public key cannot empty")
-	}
-
-	if nr.WGListenPort == 0 {
-		return fmt.Errorf("network resource wireguard listen port cannot empty")
-	}
-
-	for _, peer := range nr.Peers {
-		if err := validatePeer(peer); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func validatePeer(p pkg.Peer) error {
-	if p.WGPublicKey == "" {
-		return fmt.Errorf("peer wireguard public key cannot empty")
-	}
-
-	if p.Subnet.Nil() {
-		return fmt.Errorf("peer wireguard subnet cannot empty")
-	}
-
-	if len(p.AllowedIPs) <= 0 {
-		return fmt.Errorf("peer wireguard allowedIPs cannot empty")
 	}
 	return nil
 }

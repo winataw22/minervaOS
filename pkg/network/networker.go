@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/termie/go-shutil"
@@ -266,10 +267,10 @@ func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
 func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
-	netNSName, err := ifaceutil.RandomName("zdb-ns-")
-	if err != nil {
-		return "", err
-	}
+	netNSName := fmt.Sprintf(
+		"zdb-ns-%s",
+		strings.Replace(hw.String(), ":", "", -1),
+	)
 
 	netNs, err := createNetNS(netNSName)
 	if err != nil {
@@ -285,7 +286,7 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	if n.ygg != nil {
 		ip, err := n.ygg.SubnetFor(hw)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to generate ygg subnet IP: %w", err)
 		}
 
 		ips = []*net.IPNet{
@@ -297,7 +298,7 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 
 		gw, err := n.ygg.Gateway()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to get ygg gateway IP: %w", err)
 		}
 
 		routes = []*netlink.Route{
@@ -317,9 +318,21 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 }
 
 func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
-	macVlan, err := macvlan.Create(iface, n.ndmz.IP6PublicIface(), netNs)
-	if err != nil {
-		return errors.Wrap(err, "failed to create public mac vlan interface")
+	var macVlan *netlink.Macvlan
+	err := netNs.Do(func(_ ns.NetNS) error {
+		var err error
+		macVlan, err = macvlan.GetByName(iface)
+		return err
+	})
+
+	if _, ok := err.(netlink.LinkNotFoundError); ok {
+		macVlan, err = macvlan.Create(iface, n.ndmz.IP6PublicIface(), netNs)
+
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
 	}
 
 	log.Debug().Str("HW", hw.String()).Str("macvlan", macVlan.Name).Msg("setting hw address on link")
@@ -648,6 +661,10 @@ func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 		return nr, fmt.Errorf("unknown network object version (%s)", version)
 	}
 
+	if err := net.Valid(); err != nil {
+		return net, errors.Wrapf(err, "failed to validate cached network resource: %s", net.NetID)
+	}
+
 	return net, nil
 }
 
@@ -843,18 +860,25 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 
 // createNetNS create a network namespace and set lo interface up
 func createNetNS(name string) (ns.NetNS, error) {
+	var netNs ns.NetNS
+	var err error
+	if namespace.Exists(name) {
+		netNs, err = namespace.GetByName(name)
+	} else {
+		netNs, err = namespace.Create(name)
+	}
 
-	netNs, err := namespace.Create(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fail to create network namespace %s: %w", name, err)
 	}
 
 	err = netNs.Do(func(_ ns.NetNS) error {
 		return ifaceutil.SetLoUp()
 	})
+
 	if err != nil {
 		namespace.Delete(netNs)
-		return nil, err
+		return nil, fmt.Errorf("failed to bring lo interface up in namespace %s: %w", name, err)
 	}
 
 	return netNs, nil

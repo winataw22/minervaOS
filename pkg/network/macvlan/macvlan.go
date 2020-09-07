@@ -96,7 +96,7 @@ func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, route
 	f := func(_ ns.NetNS) error {
 		if hw != nil && len(hw) != 0 {
 			if err := netlink.LinkSetHardwareAddr(link, hw); err != nil {
-				return err
+				return fmt.Errorf("failed to set MAC address on interface %s: %w", link.Attrs().Name, err)
 			}
 		}
 

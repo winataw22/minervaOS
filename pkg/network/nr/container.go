@@ -97,6 +97,12 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 		}
 
 		ipnet := nr.resource.Subnet
+		//sanity check this should be already handle by validate.
+		//but in case something went wrong.
+		if len(ipnet.IP) == 0 {
+			return fmt.Errorf("invalid network resource (%s): empty subnet", nr.id)
+		}
+
 		ipnet.IP[len(ipnet.IP)-1] = 0x01
 
 		routes := []*netlink.Route{
