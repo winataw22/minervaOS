@@ -2,10 +2,9 @@ package stubs
 
 import (
 	"context"
-	"net"
-
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	"net"
 )
 
 type NetworkerStub struct {
@@ -195,9 +194,9 @@ func (s *NetworkerStub) RemoveTap(arg0 pkg.NetID) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) TapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
+func (s *NetworkerStub) SetupTap(arg0 pkg.NetID) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "TapExists", args...)
+	result, err := s.client.Request(s.module, s.object, "SetupTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -211,9 +210,9 @@ func (s *NetworkerStub) TapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) SetupTap(arg0 pkg.NetID) (ret0 string, ret1 error) {
+func (s *NetworkerStub) TapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "SetupTap", args...)
+	result, err := s.client.Request(s.module, s.object, "TapExists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -244,6 +243,19 @@ func (s *NetworkerStub) YggAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 		}
 	}()
 	return ch, nil
+}
+
+func (s *NetworkerStub) ZDBDestroy(arg0 string) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "ZDBDestroy", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (s *NetworkerStub) ZDBPrepare(arg0 []uint8) (ret0 string, ret1 error) {

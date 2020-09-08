@@ -421,28 +421,24 @@ func (p *Provisioner) deleteZdbContainer(containerID pkg.ContainerID) error {
 	// networkMgr := stubs.NewNetworkerStub(p.zbus)
 
 	info, err := container.Inspect("zdb", containerID)
-	if err == nil {
-		if err := container.Delete("zdb", containerID); err != nil {
-			return errors.Wrapf(err, "failed to delete container %s", containerID)
-		}
-
-		rootFS := info.RootFS
-		if info.Interactive {
-			rootFS, err = findRootFS(info.Mounts)
-			if err != nil {
-				return err
-			}
-		}
-
-		if err := flist.Umount(rootFS); err != nil {
-			return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
-		}
-
-	} else {
-		log.Error().Err(err).Str("container", string(containerID)).Msg("failed to inspect container for decomission")
+	if err != nil && strings.Contains(err.Error(), "not found") {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to inspect container '%s'", containerID)
 	}
 
-	// TODO: delete network?
+	if err := container.Delete("zdb", containerID); err != nil {
+		return errors.Wrapf(err, "failed to delete container %s", containerID)
+	}
+
+	network := stubs.NewNetworkerStub(p.zbus)
+	if err := network.ZDBDestroy(info.Network.Namespace); err != nil {
+		return errors.Wrapf(err, "failed to destroy zdb network namespace")
+	}
+
+	if err := flist.Umount(info.RootFS); err != nil {
+		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
+	}
 
 	return nil
 }

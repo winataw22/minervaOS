@@ -42,11 +42,12 @@ import (
 
 const (
 	// ZDBIface is the name of the interface used in the 0-db network namespace
-	ZDBIface     = "zdb0"
-	wgPortDir    = "wireguard_ports"
-	networkDir   = "networks"
-	ipamLeaseDir = "ndmz-lease"
-	ipamPath     = "/var/cache/modules/networkd/lease"
+	ZDBIface           = "zdb0"
+	wgPortDir          = "wireguard_ports"
+	networkDir         = "networks"
+	ipamLeaseDir       = "ndmz-lease"
+	ipamPath           = "/var/cache/modules/networkd/lease"
+	zdbNamespacePrefix = "zdb-ns-"
 )
 
 const (
@@ -267,10 +268,7 @@ func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
 func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
-	netNSName := fmt.Sprintf(
-		"zdb-ns-%s",
-		strings.Replace(hw.String(), ":", "", -1),
-	)
+	netNSName := zdbNamespacePrefix + strings.Replace(hw.String(), ":", "", -1)
 
 	netNs, err := createNetNS(netNSName)
 	if err != nil {
@@ -315,6 +313,27 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	}
 
 	return netNSName, n.createMacVlan(ZDBIface, hw, ips, routes, netNs)
+}
+
+// ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
+// for zdb is rewind. ns param is the namespace return by the ZDBPrepare
+func (n networker) ZDBDestroy(ns string) error {
+	if !strings.HasPrefix(ns, zdbNamespacePrefix) {
+		return fmt.Errorf("invalid zdb namespace name '%s'", ns)
+	}
+
+	if !namespace.Exists(ns) {
+		return nil
+	}
+
+	nSpace, err := namespace.GetByName(ns)
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to get namespace '%s'", ns)
+	}
+
+	return namespace.Delete(nSpace)
 }
 
 func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {

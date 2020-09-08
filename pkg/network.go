@@ -54,6 +54,10 @@ type Networker interface {
 	// hw is an optional hardware address that will be set on the new interface
 	ZDBPrepare(hw net.HardwareAddr) (string, error)
 
+	// ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
+	// for zdb is rewind. ns param is the namespace return by the ZDBPrepare
+	ZDBDestroy(ns string) error
+
 	// SetupTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
 	SetupTap(networkID NetID) (string, error)
