@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -254,7 +256,7 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 				poolDevices = append(poolDevices, &fdisks[idx][i*int(policy.Disks)+j])
 			}
 
-			pool, err := fs.Create(ctx, uuid.New().String(), policy.Raid, poolDevices...)
+			pool, err := fs.CreateForce(ctx, uuid.New().String(), policy.Raid, poolDevices...)
 			if err != nil {
 				log.Info().Err(err).Msg("create filesystem")
 
@@ -282,6 +284,13 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 		s.pools = append(s.pools, pool)
 	}
 
+	// add expvar variables
+	for _, pool := range s.pools {
+		for _, device := range pool.Devices() {
+			device.ShutdownCount = expvar.NewInt(device.Path)
+		}
+	}
+
 	if err := filesystem.Partprobe(ctx); err != nil {
 		return err
 	}
@@ -294,6 +303,8 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 	if err := s.shutdownUnusedPools(); err != nil {
 		log.Error().Err(err).Msg("Error shutting down unused pools")
 	}
+
+	s.periodicallyCheckDiskShutdown()
 
 	return nil
 }
@@ -667,4 +678,65 @@ func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 	}()
 
 	return ch
+}
+
+func (s *storageModule) periodicallyCheckDiskShutdown() {
+	ticker := time.NewTicker(5 * time.Minute)
+
+	go func() {
+		for {
+			<-ticker.C
+			log.Info().Msg("Checking pools for disks that should be shutdown...")
+			s.shutdownDisks()
+		}
+	}()
+}
+
+// shutdownDisks will check the disks power status.
+// If a disk is on and it is not mounted then it is not supposed to be on, turn it off
+func (s *storageModule) shutdownDisks() {
+	for _, pool := range s.pools {
+		for _, device := range pool.Devices() {
+			log.Debug().Msgf("checking device: %s", device.Path)
+			on, err := checkDiskPowerStatus(device.Path)
+			if err != nil {
+				log.Err(err).Msgf("error occurred while checking disk power status")
+				continue
+			}
+
+			_, mounted := pool.Mounted()
+			if mounted || !on {
+				continue
+			}
+
+			log.Debug().Msgf("shutting down device %s because it is not mounted and the device is on", device.Path)
+			err = pool.Shutdown()
+			if err != nil {
+				log.Err(err).Msgf("failed to shutdown device %s", device.Path)
+				continue
+			}
+		}
+	}
+}
+
+func checkDiskPowerStatus(path string) (bool, error) {
+	output, err := exec.Command("smartctl", "-i", "-n", "standby", path).Output()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); ok {
+			return false, nil
+		}
+		return false, err
+	}
+
+	blocks := strings.Split(string(output), "\n\n")
+	for _, block := range blocks {
+		if strings.TrimSpace(block) == "" {
+			continue
+		}
+		if strings.Contains(block, "ACTIVE") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

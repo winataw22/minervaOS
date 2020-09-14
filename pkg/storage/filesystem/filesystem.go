@@ -79,6 +79,10 @@ type Filesystem interface {
 	// devices: list of devices to use in the filesystem
 	// profile: Raid profile of the filesystem
 	Create(ctx context.Context, name string, profile pkg.RaidProfile, devices ...*Device) (Pool, error)
+
+	// CreateForce creates a new filesystem with force
+	// It will delete existing data and partition tables
+	CreateForce(ctx context.Context, name string, profile pkg.RaidProfile, devices ...*Device) (Pool, error)
 	// List all existing filesystems on the node
 	List(ctx context.Context, filter Filter) ([]Pool, error)
 }

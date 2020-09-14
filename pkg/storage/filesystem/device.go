@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"expvar"
+
 	"github.com/pkg/errors"
 	log "github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
@@ -55,7 +57,8 @@ type Device struct {
 	//devices are flattend in the device, cache, the children list is
 	//zeroed (since all devices are flat), then has partions is set to
 	//make sure the device is not altered.
-	HasPartions bool `json:"-"`
+	HasPartions   bool `json:"-"`
+	ShutdownCount *expvar.Int
 }
 
 // Used assumes that the device is used if it has custom label or fstype or children

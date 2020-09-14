@@ -54,6 +54,14 @@ func NewBtrfs(manager DeviceManager) Filesystem {
 }
 
 func (b *btrfs) Create(ctx context.Context, name string, policy pkg.RaidProfile, devices ...*Device) (Pool, error) {
+	return b.create(ctx, name, policy, false, devices)
+}
+
+func (b *btrfs) CreateForce(ctx context.Context, name string, policy pkg.RaidProfile, devices ...*Device) (Pool, error) {
+	return b.create(ctx, name, policy, true, devices)
+}
+
+func (b *btrfs) create(ctx context.Context, name string, policy pkg.RaidProfile, force bool, devices []*Device) (Pool, error) {
 	name = strings.TrimSpace(name)
 	if len(name) == 0 {
 		return nil, fmt.Errorf("invalid name")
@@ -81,6 +89,10 @@ func (b *btrfs) Create(ctx context.Context, name string, policy pkg.RaidProfile,
 		"-L", name,
 		"-d", string(policy),
 		"-m", string(policy),
+	}
+
+	if force {
+		args = append(args, "-f")
 	}
 
 	args = append(args, paths...)
@@ -218,11 +230,11 @@ func (p *btrfsPool) Mount() (string, error) {
 		return "", err
 	}
 
-	if err := p.maintenance(); err != nil {
-		return "", err
+	if err := p.utils.QGroupEnable(ctx, mnt); err != nil {
+		return "", fmt.Errorf("failed to enable qgroup: %w", err)
 	}
 
-	return mnt, p.utils.QGroupEnable(ctx, mnt)
+	return mnt, p.maintenance()
 }
 
 // MountWithoutScan mounts the pool in it's default mount location under /mnt/name
@@ -240,11 +252,11 @@ func (p *btrfsPool) MountWithoutScan() (string, error) {
 		return "", err
 	}
 
-	if err := p.maintenance(); err != nil {
-		return "", err
+	if err := p.utils.QGroupEnable(ctx, mnt); err != nil {
+		return "", fmt.Errorf("failed to enable qgroup: %w", err)
 	}
 
-	return mnt, p.utils.QGroupEnable(ctx, mnt)
+	return mnt, p.maintenance()
 }
 
 func (p *btrfsPool) UnMount() error {
@@ -494,6 +506,8 @@ func (p *btrfsPool) Shutdown() error {
 			log.Error().Err(err).Msgf("Error shutting down device %s", device.Path)
 			return err
 		}
+
+		device.ShutdownCount.Add(1)
 		log.Info().Msgf("Disk %s is shutdown", device.Path)
 	}
 	return nil

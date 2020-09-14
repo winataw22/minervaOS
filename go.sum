@@ -94,6 +94,7 @@ github.com/containernetworking/cni v0.7.2-0.20190807151350-8c6c47d1c7fc/go.mod h
 github.com/containernetworking/plugins v0.8.2/go.mod h1:TxALKWZpWL79BC3GOYKJzzXr7U8R23PdhwaLp6F3adc=
 github.com/containernetworking/plugins v0.8.4 h1:rOtM8umH7EGqtkFwP9RtmY/Q+PoZ7MRM2mAltEHoIHE=
 github.com/containernetworking/plugins v0.8.4/go.mod h1:UZ2539umj8djuRQmBxuazHeJbYrLV8BSBejkk+she6o=
+github.com/containernetworking/plugins v0.8.6 h1:npZTLiMa4CRn6m5P9+1Dz4O1j0UeFbm8VYN6dlsw568=
 github.com/coreos/go-iptables v0.4.2/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
 github.com/coreos/go-iptables v0.4.5 h1:DpHb9vJrZQEFMcVLFKAAGMUVX0XoRC0ptCthinRYm38=
 github.com/coreos/go-iptables v0.4.5/go.mod h1:/mVI274lEDI2ns62jHCDnCyBF9Iwsmekav8Dbxlm1MU=
