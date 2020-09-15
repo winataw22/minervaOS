@@ -141,9 +141,21 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 		}
 	}
 
-	_, err := e.cache.Get(r.ID)
-	if err == nil {
-		log.Info().Str("id", r.ID).Msg("reservation already deployed")
+	if cached, err := e.cache.Get(r.ID); err == nil {
+		log.Info().Str("id", r.ID).Msg("reservation have already been processed")
+		if cached.Result.IsNil() {
+			// this is probably an older reservation that is cached BEFORE
+			// we start caching the result along with the reservation
+			// then we just need to return here.
+			return nil
+		}
+
+		// otherwise, it's safe to resend the same result
+		// back to the grid.
+		if err := e.reply(ctx, &cached.Result); err != nil {
+			log.Error().Err(err).Msg("failed to send result to BCDB")
+		}
+
 		return nil
 	}
 
@@ -154,30 +166,40 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 		r.ID = r.Reference
 	}
 
-	result, err := fn(ctx, r)
-	if err != nil {
+	returned, provisionError := fn(ctx, r)
+	if provisionError != nil {
 		log.Error().
-			Err(err).
+			Err(provisionError).
 			Str("id", r.ID).
 			Msgf("failed to apply provision")
 	} else {
 		log.Info().
-			Str("result", fmt.Sprintf("%v", result)).
+			Str("result", fmt.Sprintf("%v", returned)).
 			Msgf("workload deployed")
 	}
 
-	r.ID = realID
-
-	if replyErr := e.reply(ctx, r, err, result); replyErr != nil {
-		log.Error().Err(replyErr).Msg("failed to send result to BCDB")
-	}
-
+	result, err := e.buildResult(realID, r.Type, provisionError, returned)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to build result object for reservation: %s", result.ID)
 	}
 
+	// we make sure we store the reservation in cache first before
+	// returning the reply back to the grid, this is to make sure
+	// if the reply failed for any reason, the node still doesn't
+	// try to redeploy that reservation.
+	r.ID = realID
+	r.Result = *result
 	if err := e.cache.Add(r); err != nil {
 		return errors.Wrapf(err, "failed to cache reservation %s locally", r.ID)
+	}
+
+	if err := e.reply(ctx, result); err != nil {
+		log.Error().Err(err).Msg("failed to send result to BCDB")
+	}
+
+	// we skip the counting.
+	if provisionError != nil {
+		return provisionError
 	}
 
 	// If an update occurs on the network we don't increment the counter
@@ -252,14 +274,23 @@ func (e *Engine) decommission(ctx context.Context, r *Reservation) error {
 	return nil
 }
 
-func (e *Engine) reply(ctx context.Context, r *Reservation, err error, info interface{}) error {
-	log.Debug().Str("id", r.ID).Msg("sending reply for reservation")
+func (e *Engine) reply(ctx context.Context, result *Result) error {
+	log.Debug().Str("id", result.ID).Msg("sending reply for reservation")
 
-	result := &Result{
-		Type:    r.Type,
-		Created: time.Now(),
-		ID:      r.ID,
+	if err := e.signResult(result); err != nil {
+		return err
 	}
+
+	return e.feedback.Feedback(e.nodeID, result)
+}
+
+func (e *Engine) buildResult(id string, typ ReservationType, err error, info interface{}) (*Result, error) {
+	result := &Result{
+		Type:    typ,
+		Created: time.Now(),
+		ID:      id,
+	}
+
 	if err != nil {
 		result.Error = err.Error()
 		result.State = StateError
@@ -269,15 +300,11 @@ func (e *Engine) reply(ctx context.Context, r *Reservation, err error, info inte
 
 	br, err := json.Marshal(info)
 	if err != nil {
-		return errors.Wrap(err, "failed to encode result")
+		return nil, errors.Wrap(err, "failed to encode result")
 	}
 	result.Data = br
 
-	if err := e.signResult(result); err != nil {
-		return err
-	}
-
-	return e.feedback.Feedback(e.nodeID, result)
+	return result, nil
 }
 
 func (e *Engine) signResult(result *Result) error {
