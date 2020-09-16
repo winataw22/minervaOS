@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"time"
 
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -48,15 +49,20 @@ func main() {
 		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)
 	}
 
-	flist := flist.New(moduleRoot, storage)
-	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, flist)
+	mod := flist.New(moduleRoot, storage)
+	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, mod)
+
+	ctx, _ := utils.WithSignal(context.Background())
+
+	if cleaner, ok := mod.(flist.Cleaner); ok {
+		go cleaner.Cleaner(ctx, time.Minute)
+	}
 
 	log.Info().
 		Str("broker", msgBrokerCon).
 		Uint("worker nr", workerNr).
 		Msg("starting flist module")
 
-	ctx, _ := utils.WithSignal(context.Background())
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
