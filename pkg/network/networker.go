@@ -18,15 +18,16 @@ import (
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
+	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 
-	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 
 	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
 	"github.com/threefoldtech/zos/pkg/network/nr"
 	"github.com/threefoldtech/zos/pkg/network/types"
@@ -59,7 +60,7 @@ type networker struct {
 	networkDir   string
 	ipamLeaseDir string
 	tnodb        client.Directory
-	portSet      *set.UintSet
+	portSet      *set.UIntSet
 
 	ndmz ndmz.DMZ
 	ygg  *yggdrasil.Server
@@ -70,11 +71,6 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
-	}
-
-	wgDir := filepath.Join(vd, wgPortDir)
-	if err := os.MkdirAll(wgDir, 0700); err != nil {
-		return nil, fmt.Errorf("failed to create wireguard port cache directory: %w", err)
 	}
 
 	nwDir := filepath.Join(vd, networkDir)
@@ -101,7 +97,7 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 		tnodb:        tnodb,
 		networkDir:   nwDir,
 		ipamLeaseDir: ipamLease,
-		portSet:      set.NewUint(wgDir),
+		portSet:      set.NewInt(),
 
 		ygg:  ygg,
 		ndmz: ndmz,
@@ -114,6 +110,11 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 			return nil, err
 		}
 	}
+
+	if err := nw.syncWGPorts(); err != nil {
+		return nil, err
+	}
+
 	if err := nw.publishWGPorts(); err != nil {
 		return nil, err
 	}
@@ -875,6 +876,55 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 
 	return ch
 
+}
+
+func (n *networker) syncWGPorts() error {
+	names, err := namespace.List("n-")
+	if err != nil {
+		return err
+	}
+
+	readPort := func(name string) (int, error) {
+		netNS, err := namespace.GetByName(name)
+		if err != nil {
+			return 0, err
+		}
+		defer netNS.Close()
+
+		ifaceName := strings.Replace(name, "n-", "w-", 1)
+
+		var port int
+		err = netNS.Do(func(_ ns.NetNS) error {
+			link, err := wireguard.GetByName(ifaceName)
+			if err != nil {
+				return err
+			}
+			d, err := link.Device()
+			if err != nil {
+				return err
+			}
+
+			port = d.ListenPort
+			return nil
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		return port, nil
+	}
+
+	for _, name := range names {
+		port, err := readPort(name)
+		if err != nil {
+			log.Error().Err(err).Str("namespace", name).Msgf("failed to read port for network namespace")
+			continue
+		}
+		//skip error cause we don't care if there are some duplicate at this point
+		_ = n.portSet.Add(uint(port))
+	}
+
+	return nil
 }
 
 // createNetNS create a network namespace and set lo interface up

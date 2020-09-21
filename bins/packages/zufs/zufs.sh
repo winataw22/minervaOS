@@ -1,5 +1,5 @@
-ZUFS_VERSION="2.0.4"
-ZUFS_CHECKSUM="6f42aaee6449556ab7d5ea9567c54347"
+ZUFS_VERSION="2.0.5"
+ZUFS_CHECKSUM="39b5ac929253a9c92147c2a6862cc68c"
 ZUFS_LINK="https://github.com/threefoldtech/0-fs/archive/v${ZUFS_VERSION}.tar.gz"
 
 dependencies_zufs() {

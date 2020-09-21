@@ -433,7 +433,7 @@ jobs:
         name: ${{ steps.package.outputs.name }}.flist
 
     - name: Crosslink flist (tf-zos-bins.dev)
-      if: success() && github.ref == 'refs/heads/master'
+      if: success()
       uses: threefoldtech/publish-flist@master
       with:
         token: ${{ secrets.HUB_JWT }}

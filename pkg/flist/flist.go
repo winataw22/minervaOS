@@ -1,6 +1,7 @@
 package flist
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/md5"
@@ -258,6 +259,18 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 		return "", err
 	}
 
+	// wait for the daemon to be ready
+	// we check the pid file is created
+	if err := waitPidFile(time.Second*5, pidPath, true); err != nil {
+		sublog.Error().Err(err).Msg("pid file of 0-fs daemon not created")
+		return "", err
+	}
+
+	// and scan the logs after "mount ready"
+	if err := waitMountedLog(time.Second*5, logPath); err != nil {
+		sublog.Error().Err(err).Msg("0-fs daemon did not start properly")
+		return "", err
+	}
 	// the track file is a symlink to the process pid
 	// if the link is broken, then the fs has exited gracefully
 	// otherwise we can get the fs pid from the track path
@@ -517,6 +530,50 @@ func waitPidFile(timeout time.Duration, path string, exists bool) error {
 			}
 		}
 	}
+}
+
+func waitMountedLog(timeout time.Duration, logfile string) error {
+	const target = "mount ready"
+	const delay = time.Millisecond * 500
+
+	f, err := os.Open(logfile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	br := bufio.NewReader(f)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// this goroutine looks for "mount ready"
+	// in the logs of the 0-fs
+	cErr := make(chan error)
+	go func(ctx context.Context, r io.Reader, cErr chan<- error) {
+		for {
+			select {
+			case <-ctx.Done():
+				// ensure we don't leak the goroutine
+				cErr <- ctx.Err()
+			default:
+				line, err := br.ReadString('\n')
+				if err != nil {
+					time.Sleep(delay)
+					continue
+				}
+
+				if !strings.Contains(line, target) {
+					time.Sleep(delay)
+					continue
+				}
+				// found
+				cErr <- nil
+				return
+			}
+		}
+	}(ctx, br, cErr)
+
+	return <-cErr
 }
 
 var _ pkg.Flister = (*flistModule)(nil)

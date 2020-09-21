@@ -3,6 +3,7 @@ package namespace
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -169,6 +170,29 @@ func Exists(name string) bool {
 func GetByName(name string) (ns.NetNS, error) {
 	nsPath := filepath.Join(netNSPath, name)
 	return ns.GetNS(nsPath)
+}
+
+// List returns a list of all the names of the network namespaces
+func List(prefix string) ([]string, error) {
+	infos, err := ioutil.ReadDir(netNSPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read network namespace directory: %w", err)
+	}
+
+	names := make([]string, 0, len(infos))
+	for _, info := range infos {
+		if info.IsDir() {
+			continue
+		}
+
+		if prefix != "" && !strings.HasPrefix(info.Name(), prefix) {
+			continue
+		}
+
+		names = append(names, info.Name())
+	}
+
+	return names, nil
 }
 
 func isNamespaceMounted(name string) (bool, error) {
