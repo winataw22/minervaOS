@@ -378,10 +378,21 @@ func (f *flistModule) Umount(path string) error {
 
 	if err := syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("fail to umount flist")
+
 	}
 
 	if err := waitPidFile(time.Second*2, pidPath, false); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stop properly")
+
+		pid, err := f.getPid(pidPath)
+		if err != nil {
+			return err
+		}
+
+		if err := forceStop(int(pid)); err != nil {
+			log.Error().Int64("pid", pid).Err(err).Msg("failed to kill 0-fs process")
+		}
+
 		return err
 	}
 
@@ -574,6 +585,35 @@ func waitMountedLog(timeout time.Duration, logfile string) error {
 	}(ctx, br, cErr)
 
 	return <-cErr
+}
+
+func forceStop(pid int) error {
+	slog := log.With().Int("pid", pid).Logger()
+	slog.Info().Msg("trying to force stop by killing the process")
+
+	p, err := os.FindProcess(int(pid))
+	if err != nil {
+		return err
+	}
+
+	if err := p.Signal(syscall.SIGTERM); err != nil {
+		slog.Error().Err(err).Msg("failed to send SIGTERM to process")
+	}
+
+	time.Sleep(time.Second)
+	if pidExist(p) {
+		slog.Info().Msgf("process didn't stop gracefully, lets kill it")
+		if err := p.Signal(syscall.SIGKILL); err != nil {
+			slog.Error().Err(err).Msg("failed to send SIGKILL to process")
+		}
+	}
+
+	return nil
+}
+
+func pidExist(p *os.Process) bool {
+	// https://github.com/golang/go/issues/14146#issuecomment-176888204
+	return p.Signal(syscall.Signal(0)) == nil
 }
 
 var _ pkg.Flister = (*flistModule)(nil)

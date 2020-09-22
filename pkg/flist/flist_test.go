@@ -256,3 +256,23 @@ func TestWaitPIDFileTimeout(t *testing.T) {
 	err := <-out
 	require.Equal(context.DeadlineExceeded, err)
 }
+
+func Test_forceStop(t *testing.T) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+
+	cmd := exec.CommandContext(ctx, "sleep", "50")
+	err := cmd.Start()
+	require.NoError(t, err)
+
+	go func() {
+		cmd.Wait()
+	}()
+
+	go func() {
+		<-ctx.Done()
+		t.Error("didn't stop the process in time")
+	}()
+
+	err = forceStop(cmd.Process.Pid)
+	assert.NoError(t, err)
+}

@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	schema "github.com/threefoldtech/tfexplorer/schema"
-	"github.com/threefoldtech/zos/pkg/container/logger"
 	"github.com/threefoldtech/zos/pkg/container/stats"
 	"gotest.tools/assert"
 )
@@ -43,7 +42,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 		Interactive       bool
 		Volumes           []workloads.ContainerMount
 		NetworkConnection []workloads.NetworkConnection
-		StatsAggregator   []workloads.StatsAggregator
+		Stats             []workloads.Stats
 		Capacity          workloads.ContainerCapacity
 	}
 	tests := []struct {
@@ -64,7 +63,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				Interactive:       false,
 				Volumes:           nil,
 				NetworkConnection: nil,
-				StatsAggregator:   nil,
+				Stats:             nil,
 				Capacity: workloads.ContainerCapacity{
 					Cpu:      2,
 					Memory:   1024,
@@ -73,16 +72,16 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				},
 			},
 			want: Container{
-				FList:           "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
-				FlistStorage:    "zdb://hub.grid.tf:9900",
-				Env:             map[string]string{"FOO": "BAR"},
-				SecretEnv:       nil,
-				Entrypoint:      "/sbin/my_init",
-				Interactive:     false,
-				Mounts:          []Mount{},
-				Network:         Network{},
-				Logs:            []logger.Logs{},
-				StatsAggregator: []stats.Aggregator{},
+				FList:        "https://hub.grid.tf/tf-official-apps/ubuntu-bionic-build.flist",
+				FlistStorage: "zdb://hub.grid.tf:9900",
+				Env:          map[string]string{"FOO": "BAR"},
+				SecretEnv:    nil,
+				Entrypoint:   "/sbin/my_init",
+				Interactive:  false,
+				Mounts:       []Mount{},
+				Network:      Network{},
+				Logs:         []Logs{},
+				Stats:        []stats.Stats{},
 				Capacity: ContainerCapacity{
 					CPU:      2,
 					Memory:   1024,
@@ -146,8 +145,8 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 					NetworkID: "net1",
 					IPs:       []net.IP{net.ParseIP("10.0.0.1")},
 				},
-				Logs:            []logger.Logs{},
-				StatsAggregator: []stats.Aggregator{},
+				Logs:  []Logs{},
+				Stats: []stats.Stats{},
 				Capacity: ContainerCapacity{
 					CPU:      2,
 					Memory:   1024,
@@ -173,7 +172,7 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 				Interactive:       tt.fields.Interactive,
 				Volumes:           tt.fields.Volumes,
 				NetworkConnection: tt.fields.NetworkConnection,
-				StatsAggregator:   tt.fields.StatsAggregator,
+				Stats:             tt.fields.Stats,
 				Capacity:          tt.fields.Capacity,
 			}
 			got, _, err := ContainerToProvisionType(&c, "reservation")
@@ -189,12 +188,12 @@ func TestTfgridReservationContainer1_ToProvisionType(t *testing.T) {
 
 func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 	type fields struct {
-		WorkloadID      int64
-		NodeID          string
-		ReservationID   int64
-		Size            int64
-		Type            workloads.VolumeTypeEnum
-		StatsAggregator []workloads.StatsAggregator
+		WorkloadID    int64
+		NodeID        string
+		ReservationID int64
+		Size          int64
+		Type          workloads.VolumeTypeEnum
+		Stats         []workloads.Stats
 	}
 	tests := []struct {
 		name    string
@@ -205,11 +204,11 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 		{
 			name: "HDD",
 			fields: fields{
-				WorkloadID:      1,
-				NodeID:          "node1",
-				Size:            10,
-				Type:            workloads.VolumeTypeHDD,
-				StatsAggregator: nil,
+				WorkloadID: 1,
+				NodeID:     "node1",
+				Size:       10,
+				Type:       workloads.VolumeTypeHDD,
+				Stats:      nil,
 			},
 			want: Volume{
 				Size: 10,
@@ -219,11 +218,11 @@ func TestTfgridReservationVolume1_ToProvisionType(t *testing.T) {
 		{
 			name: "SSD",
 			fields: fields{
-				WorkloadID:      1,
-				NodeID:          "node1",
-				Size:            10,
-				Type:            workloads.VolumeTypeSSD,
-				StatsAggregator: nil,
+				WorkloadID: 1,
+				NodeID:     "node1",
+				Size:       10,
+				Type:       workloads.VolumeTypeSSD,
+				Stats:      nil,
 			},
 			want: Volume{
 				Size: 10,

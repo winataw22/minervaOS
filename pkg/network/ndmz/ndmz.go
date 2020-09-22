@@ -2,6 +2,7 @@ package ndmz
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -45,7 +46,7 @@ const (
 // DMZ is an interface used to create an DMZ network namespace
 type DMZ interface {
 	// create the ndmz network namespace and all requires network interfaces
-	Create() error
+	Create(ctx context.Context) error
 	// delete the ndmz network namespace and clean up all network interfaces
 	Delete() error
 	// link a network resource from a user network to ndmz
@@ -96,15 +97,7 @@ func createPubIface6(name, master, nodeID string, netNS ns.NetNS) error {
 			Str("interface", name).
 			Msg("set mac on ipv6 ndmz public iface")
 
-		if err := ifaceutil.SetMAC(name, mac, nil); err != nil {
-			return err
-		}
-
-		link, err := netlink.LinkByName(name)
-		if err != nil {
-			return err
-		}
-		return netlink.LinkSetUp(link)
+		return ifaceutil.SetMAC(name, mac, nil)
 	})
 }
 
@@ -237,9 +230,12 @@ func configureYggdrasil(subnetIP net.IPNet) error {
 		if err != nil {
 			return err
 		}
-		return netlink.AddrAdd(link, &netlink.Addr{
+		if err := netlink.AddrAdd(link, &netlink.Addr{
 			IPNet: &subnetIP,
-		})
+		}); err != nil && !os.IsExist(err) {
+			return err
+		}
+		return nil
 	})
 	return err
 }

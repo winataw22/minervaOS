@@ -199,30 +199,30 @@ func GetMAC(name string, netNS ns.NetNS) (net.HardwareAddr, error) {
 // if netNS is not nil switch in the network namespace
 // before setting
 func SetMAC(name string, mac net.HardwareAddr, netNS ns.NetNS) error {
+	f := func(_ ns.NetNS) error {
+		link, err := netlink.LinkByName(name)
+		if err != nil {
+			return err
+		}
+
+		// early return if the mac address if already properly set
+		actualMac := link.Attrs().HardwareAddr
+		if bytes.Equal(actualMac, mac) {
+			return nil
+		}
+
+		if err := netlink.LinkSetDown(link); err != nil {
+			return err
+		}
+		defer netlink.LinkSetUp(link)
+
+		return netlink.LinkSetHardwareAddr(link, mac)
+	}
+
 	if netNS != nil {
-		return netNS.Do(func(_ ns.NetNS) error {
-			link, err := netlink.LinkByName(name)
-			if err != nil {
-				return err
-			}
-			if err := netlink.LinkSetDown(link); err != nil {
-				return err
-			}
-			defer netlink.LinkSetUp(link)
-
-			return netlink.LinkSetHardwareAddr(link, mac)
-
-		})
+		return netNS.Do(f)
 	}
-	link, err := netlink.LinkByName(name)
-	if err != nil {
-		return err
-	}
-	if err := netlink.LinkSetDown(link); err != nil {
-		return err
-	}
-	defer netlink.LinkSetUp(link)
-	return netlink.LinkSetHardwareAddr(link, mac)
+	return f(nil)
 }
 
 // Delete deletes the named interface

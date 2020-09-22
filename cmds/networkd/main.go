@@ -104,7 +104,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
-	if err := ndmz.Create(); err != nil {
+	if err := ndmz.Create(ctx); err != nil {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 

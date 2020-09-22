@@ -35,6 +35,27 @@ type Mount struct {
 	Mountpoint string `json:"mountpoint"`
 }
 
+// Logs defines a custom backend with variable settings
+type Logs struct {
+	Type string   `json:"type"`
+	Data LogsData `json:"data"`
+}
+
+// LogsData structure
+type LogsData struct {
+	// Stdout is the redis url for stdout (redis://host/channel)
+	Stdout string `json:"stdout"`
+
+	// Stderr is the redis url for stderr (redis://host/channel)
+	Stderr string `json:"stderr"`
+
+	// SecretStdout like stdout but encrypted with node public key
+	SecretStdout string `json:"secret_stdout"`
+
+	// SecretStderr like stderr but encrypted with node public key
+	SecretStderr string `json:"secret_stderr"`
+}
+
 //Container creation info
 type Container struct {
 	// URL of the flist
@@ -58,9 +79,9 @@ type Container struct {
 	// ContainerCapacity is the amount of resource to allocate to the container
 	Capacity ContainerCapacity `json:"capacity"`
 	// Logs contains a list of endpoint where to send containerlogs
-	Logs []logger.Logs `json:"logs,omitempty"`
-	// StatsAggregator container metrics backend
-	StatsAggregator []stats.Aggregator
+	Logs []Logs `json:"logs,omitempty"`
+	// Stats container metrics backend
+	Stats []stats.Stats `json:"stats,omitempty"`
 }
 
 // ContainerResult is the information return to the BCDB
@@ -155,6 +176,33 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	var logs []logger.Logs
+	for _, log := range config.Logs {
+		stdout := log.Data.Stdout
+		stderr := log.Data.Stderr
+
+		if len(log.Data.SecretStdout) > 0 {
+			stdout, err = decryptSecret(p.zbus, log.Data.SecretStdout)
+			if err != nil {
+				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
+			}
+		}
+
+		if len(log.Data.SecretStderr) > 0 {
+			stderr, err = decryptSecret(p.zbus, log.Data.SecretStderr)
+			if err != nil {
+				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
+			}
+		}
+		logs = append(logs, logger.Logs{
+			Type: log.Type,
+			Data: logger.LogsRedis{
+				Stdout: stdout,
+				Stderr: stderr,
+			},
+		})
+	}
+
 	// prepare container network
 	ips := make([]string, len(config.Network.IPs))
 	for i, ip := range config.Network.IPs {
@@ -247,13 +295,13 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 			Network: pkg.NetworkInfo{
 				Namespace: join.Namespace,
 			},
-			Mounts:          mounts,
-			Entrypoint:      config.Entrypoint,
-			Interactive:     config.Interactive,
-			CPU:             config.Capacity.CPU,
-			Memory:          config.Capacity.Memory * mib,
-			Logs:            config.Logs,
-			StatsAggregator: config.StatsAggregator,
+			Mounts:      mounts,
+			Entrypoint:  config.Entrypoint,
+			Interactive: config.Interactive,
+			CPU:         config.Capacity.CPU,
+			Memory:      config.Capacity.Memory * mib,
+			Logs:        logs,
+			Stats:       config.Stats,
 		},
 	)
 	if err != nil {
