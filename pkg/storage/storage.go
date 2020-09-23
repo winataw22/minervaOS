@@ -419,6 +419,11 @@ func (s *storageModule) ensureCache() error {
 
 	var cacheFs filesystem.Volume
 
+	if filesystem.IsMountPoint(CacheTarget) {
+		log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
+		return nil
+	}
+
 	// check if cache volume available
 	for idx := range s.pools {
 		filesystems, err := s.pools[idx].Volumes()
@@ -478,13 +483,8 @@ func (s *storageModule) ensureCache() error {
 		log.Error().Err(err).Msg("failed to set cache quota")
 	}
 
-	if !filesystem.IsMountPoint(CacheTarget) {
-		log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
-		return filesystem.BindMount(cacheFs, CacheTarget)
-	}
-
-	log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
-	return nil
+	log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
+	return filesystem.BindMount(cacheFs, CacheTarget)
 }
 
 // createSubvol creates a subvolume with the given name and limits it to the given size

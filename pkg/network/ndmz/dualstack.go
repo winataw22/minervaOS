@@ -1,7 +1,6 @@
 package ndmz
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
-	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"github.com/threefoldtech/zos/pkg/network/nr"
 
@@ -39,7 +37,7 @@ func NewDualStack(nodeID string) *DualStack {
 }
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
-func (d *DualStack) Create(ctx context.Context) error {
+func (d *DualStack) Create() error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {
 		netNS, err = namespace.Create(NetNSNDMZ)
@@ -76,8 +74,8 @@ func (d *DualStack) Create(ctx context.Context) error {
 		return err
 	}
 
-	err = netNS.Do(func(_ ns.NetNS) error {
-		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
+	return netNS.Do(func(_ ns.NetNS) error {
+		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.all.forwarding"), "1"); err != nil {
 			return errors.Wrapf(err, "failed to enable forwarding in ndmz")
 		}
 
@@ -90,24 +88,16 @@ func (d *DualStack) Create(ctx context.Context) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	z, err := zinit.New("")
-	if err != nil {
-		return err
-	}
-	dhcpMon := NewDHCPMon(DMZPub4, NetNSNDMZ, z)
-	go dhcpMon.Start(ctx)
-
-	return nil
 }
 
 // Delete deletes the NDMZ network namespace
 func (d *DualStack) Delete() error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err == nil {
+		if err := stopBackgroundProbe(); err != nil {
+			return errors.Wrap(err, "failed to stop dmz pub4 background probe")
+		}
+
 		if err := namespace.Delete(netNS); err != nil {
 			return errors.Wrap(err, "failed to delete ndmz network namespace")
 		}
@@ -201,16 +191,27 @@ func (d *DualStack) IP6PublicIface() string {
 	return d.ipv6Master
 }
 
-// waitIP4 waits to receives some IPv4 from DHCP
-// it returns the pid of the dhcp process or an error
+// waitIPS waits to receives some IP from DHCP and Router advertisement
 func waitIP4() error {
 	// run DHCP to interface public in ndmz
-	probe := dhcp.NewProbe()
-
-	if err := probe.Start(DMZPub4); err != nil {
+	probe, err := dhcp.NewBackgroundProbe(DMZPub4)
+	if err != nil {
 		return err
 	}
-	defer probe.Stop()
+
+	running, err := probe.IsRunning()
+	if err != nil {
+		return err
+	}
+
+	// this means this process is already running, stop here
+	if running {
+		return nil
+	}
+
+	if err := probe.Start(); err != nil {
+		return err
+	}
 
 	link, err := netlink.LinkByName(DMZPub4)
 	if err != nil {
@@ -282,4 +283,21 @@ func waitIP6() error {
 		}
 	}
 	return nil
+}
+
+func stopBackgroundProbe() error {
+	probe, err := dhcp.NewBackgroundProbe(DMZPub4)
+	if err != nil {
+		return err
+	}
+
+	running, err := probe.IsRunning()
+	if err != nil {
+		return err
+	}
+
+	if !running {
+		return nil
+	}
+	return probe.Stop()
 }

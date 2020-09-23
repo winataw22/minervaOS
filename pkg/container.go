@@ -53,8 +53,8 @@ type Container struct {
 	Memory uint64
 	// Logs backends
 	Logs []logger.Logs
-	// Stats container metrics backend
-	Stats []stats.Stats
+	// StatsAggregator container metrics backend
+	StatsAggregator []stats.Aggregator
 }
 
 // ContainerModule defines rpc interface to containerd
