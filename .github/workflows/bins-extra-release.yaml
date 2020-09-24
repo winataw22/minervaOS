@@ -34,11 +34,24 @@ jobs:
         cd bins
         sudo ./bins-extra.sh --package basesystem
 
-    - name: Build package
+    - name: Build package (containerd)
       id: package
       run: |
         cd bins
         sudo ./bins-extra.sh --package containerd
+
+    - name: Build package (runc)
+      id: sub-package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package runc
+
+    - name: Merging packages
+      id: packages
+      run: |
+        mkdir bins/releases/rootfs
+        sudo cp -av bins/releases/containerd/* bins/releases/rootfs/
+        sudo cp -av bins/releases/runc/* bins/releases/rootfs/
 
     - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
       if: success()
@@ -47,7 +60,7 @@ jobs:
         token: ${{ secrets.HUB_JWT }}
         action: publish
         user: tf-autobuilder
-        root: bins/releases/containerd
+        root: bins/releases/rootfs
         name: ${{ steps.package.outputs.name }}.flist
 
     - name: crosslink flist (tf-zos-bins)
