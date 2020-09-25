@@ -1,12 +1,13 @@
 package ndmz
 
 import (
-	"fmt"
+	"context"
 	"net"
 	"os"
 
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"github.com/threefoldtech/zos/pkg/network/nr"
 
@@ -34,7 +35,7 @@ func NewHidden(nodeID string) *Hidden {
 }
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
-func (d *Hidden) Create() error {
+func (d *Hidden) Create(ctx context.Context) error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {
 		netNS, err = namespace.Create(NetNSNDMZ)
@@ -60,23 +61,31 @@ func (d *Hidden) Create() error {
 		return err
 	}
 
-	return netNS.Do(func(_ ns.NetNS) error {
-		if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.all.forwarding"), "1"); err != nil {
+	err = netNS.Do(func(_ ns.NetNS) error {
+		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
 			return errors.Wrapf(err, "failed to enable forwarding in ndmz")
 		}
 
 		return waitIP4()
 	})
+	if err != nil {
+		return err
+	}
+
+	z, err := zinit.New("")
+	if err != nil {
+		return err
+	}
+	dhcpMon := NewDHCPMon(DMZPub4, NetNSNDMZ, z)
+	go dhcpMon.Start(ctx)
+
+	return nil
 }
 
 // Delete deletes the NDMZ network namespace
 func (d *Hidden) Delete() error {
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err == nil {
-		if err := stopBackgroundProbe(); err != nil {
-			return errors.Wrap(err, "failed to stop dmz pub4 background probe")
-		}
-
 		if err := namespace.Delete(netNS); err != nil {
 			return errors.Wrap(err, "failed to delete ndmz network namespace")
 		}
