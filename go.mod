@@ -60,7 +60,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	github.com/threefoldtech/tfexplorer v0.4.1-0.20200923122946-a429c33ade21
+	github.com/threefoldtech/tfexplorer v0.4.1-0.20200925140208-64f1857969f1
 	github.com/threefoldtech/zbus v0.1.3
 	github.com/urfave/cli v1.22.4
 	github.com/vishvananda/netlink v1.1.0

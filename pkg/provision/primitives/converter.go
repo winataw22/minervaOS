@@ -39,15 +39,15 @@ func ContainerToProvisionType(w workloads.Workloader, reservationID string) (Con
 	}
 
 	container := Container{
-		FList:           c.Flist,
-		FlistStorage:    c.HubUrl,
-		Env:             c.Environment,
-		SecretEnv:       c.SecretEnvironment,
-		Entrypoint:      c.Entrypoint,
-		Interactive:     c.Interactive,
-		Mounts:          make([]Mount, len(c.Volumes)),
-		Logs:            make([]Logs, len(c.Logs)),
-		StatsAggregator: make([]stats.Aggregator, len(c.StatsAggregator)),
+		FList:        c.Flist,
+		FlistStorage: c.HubUrl,
+		Env:          c.Environment,
+		SecretEnv:    c.SecretEnvironment,
+		Entrypoint:   c.Entrypoint,
+		Interactive:  c.Interactive,
+		Mounts:       make([]Mount, len(c.Volumes)),
+		Logs:         make([]Logs, len(c.Logs)),
+		Stats:        make([]stats.Stats, len(c.Stats)),
 		Capacity: ContainerCapacity{
 			CPU:      uint(c.Capacity.Cpu),
 			Memory:   uint64(c.Capacity.Memory),
@@ -94,21 +94,31 @@ func ContainerToProvisionType(w workloads.Workloader, reservationID string) (Con
 		}
 	}
 
-	for i, s := range c.StatsAggregator {
+	unknstats := stats.Stats{
+		Type: "unknown",
+		Data: stats.Redis{
+			Endpoint: "",
+		},
+	}
+
+	for i, s := range c.Stats {
 		// Only support redis for now
 		if s.Type != stats.RedisType {
-			container.StatsAggregator[i] = stats.Aggregator{
-				Type: "unknown",
-				Data: stats.Redis{
-					Endpoint: "",
-				},
-			}
+			container.Stats[i] = unknstats
+			continue
 		}
 
-		container.StatsAggregator[i] = stats.Aggregator{
+		data := stats.Redis{}
+		err := json.Unmarshal(s.Data, &data)
+		if err != nil {
+			container.Stats[i] = unknstats
+			continue
+		}
+
+		container.Stats[i] = stats.Stats{
 			Type: s.Type,
 			Data: stats.Redis{
-				Endpoint: s.Data.Endpoint,
+				Endpoint: data.Endpoint,
 			},
 		}
 	}

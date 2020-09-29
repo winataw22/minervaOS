@@ -17,8 +17,17 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// ContainerConfig is an object used to pass the required network configuration
+// for a container
+type ContainerConfig struct {
+	ContainerID string
+	IPs         []net.IP
+	PublicIP6   bool //true if the container must have a public ipv6
+	IPv4Only    bool // describe the state of the node, true mean it runs in ipv4 only mode
+}
+
 // Join make a network namespace of a container join a network resource network
-func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) (join pkg.Member, err error) {
+func (nr *NetResource) Join(cfg ContainerConfig) (join pkg.Member, err error) {
 	name, err := nr.BridgeName()
 	if err != nil {
 		return join, err
@@ -29,15 +38,15 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 		return join, err
 	}
 
-	join.Namespace = containerID
-	netspace, err := namespace.Create(containerID)
+	join.Namespace = cfg.ContainerID
+	netspace, err := namespace.Create(cfg.ContainerID)
 	if err != nil {
 		return join, err
 	}
 
 	slog := log.With().
-		Str("namespace", containerID).
-		Str("container", containerID).
+		Str("namespace", cfg.ContainerID).
+		Str("container", cfg.ContainerID).
 		Logger()
 
 	defer func() {
@@ -67,7 +76,7 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 			return err
 		}
 
-		for _, addr := range addrs {
+		for _, addr := range cfg.IPs {
 			slog.Info().
 				Str("ip", addr.String()).
 				Msgf("set ip to container")
@@ -81,8 +90,11 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 			join.IPv4 = addr
 		}
 
-		if !publicIP6 {
-			ipv6 := convert4to6(nr.ID(), addrs[0])
+		// if the node is IPv6 enabled and the user do not requires a public IPv6
+		// then we create derive one to allow IPv6 traffic to go out
+		// if the user ask for a public IPv6, then the all config comes from SLAAC so we don't have to do anything ourself
+		if !cfg.IPv4Only && !cfg.PublicIP6 {
+			ipv6 := convert4to6(nr.ID(), cfg.IPs[0])
 			slog.Info().
 				Str("ip", ipv6.String()).
 				Msgf("set ip to container")
@@ -115,7 +127,9 @@ func (nr *NetResource) Join(containerID string, addrs []net.IP, publicIP6 bool) 
 				LinkIndex: eth0.Attrs().Index,
 			},
 		}
-		if !publicIP6 {
+
+		// same logic as before, we set ipv6 routes only if this is required
+		if !cfg.IPv4Only && !cfg.PublicIP6 {
 			routes = append(routes,
 				&netlink.Route{
 					Dst: &net.IPNet{

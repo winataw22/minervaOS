@@ -210,7 +210,7 @@ func (c *containerModule) Run(ns string, data pkg.Container) (id pkg.ContainerID
 	}
 
 	// set user defined endpoint stats
-	for _, l := range data.StatsAggregator {
+	for _, l := range data.Stats {
 		switch l.Type {
 		case stats.RedisType:
 			s, err := stats.NewRedis(l.Data.Endpoint)

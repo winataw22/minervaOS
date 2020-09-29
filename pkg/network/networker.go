@@ -164,19 +164,29 @@ func (n *networker) Ready() error {
 	return nil
 }
 
+func (n *networker) ipv4Only() bool {
+	_, ipv4Only := n.ndmz.(*ndmz.Hidden)
+	return ipv4Only
+}
+
 func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.ContainerNetworkConfig) (join pkg.Member, err error) {
 	// TODO:
 	// 1- Make sure this network id is actually deployed
-	// 2- Create a new namespace, then create a veth pair inside this namespace
-	// 3- Hook one end to the NR bridge
-	// 4- Assign IP to the veth endpoint inside the namespace.
-	// 5- return the namespace name
+	// 2- Check if the requested network config is doable
+	// 3- Create a new namespace, then create a veth pair inside this namespace
+	// 4- Hook one end to the NR bridge
+	// 5- Assign IP to the veth endpoint inside the namespace.
+	// 6- return the namespace name
 
 	log.Info().Str("network-id", string(networkdID)).Msg("joining network")
 
 	localNR, err := n.networkOf(string(networkdID))
 	if err != nil {
 		return join, errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
+	}
+
+	if cfg.PublicIP6 && n.ipv4Only() {
+		return join, errors.Errorf("this node runs in IPv4 only mode and you asked for a public IPv6. Impossible to fulfill the request")
 	}
 
 	netRes, err := nr.New(localNR)
@@ -189,7 +199,12 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 		ips[i] = net.ParseIP(addr)
 	}
 
-	join, err = netRes.Join(containerID, ips, cfg.PublicIP6)
+	join, err = netRes.Join(nr.ContainerConfig{
+		ContainerID: containerID,
+		IPs:         ips,
+		PublicIP6:   cfg.PublicIP6,
+		IPv4Only:    n.ipv4Only(),
+	})
 	if err != nil {
 		return join, errors.Wrap(err, "failed to load network resource")
 	}
