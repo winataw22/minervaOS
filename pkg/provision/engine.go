@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/jbenet/go-base58"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+
+	"gopkg.in/robfig/cron.v2"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -27,6 +30,7 @@ type Engine struct {
 	decomissioners map[ReservationType]DecomissionerFunc
 	signer         Signer
 	statser        Statser
+	zbusCl         zbus.Client
 }
 
 // EngineOps are the configuration of the engine
@@ -53,6 +57,8 @@ type EngineOps struct {
 	// are reserved on the system running the engine
 	// After each provision/decomission the engine sends statistics update to the staster
 	Statser Statser
+	// ZbusCl is a client to Zbus
+	ZbusCl zbus.Client
 }
 
 // New creates a new engine. Once started, the engine
@@ -71,15 +77,25 @@ func New(opts EngineOps) *Engine {
 		decomissioners: opts.Decomissioners,
 		signer:         opts.Signer,
 		statser:        opts.Statser,
+		zbusCl:         opts.ZbusCl,
 	}
 }
 
 // Run starts reader reservation from the Source and handle them
 func (e *Engine) Run(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	cReservation := e.source.Reservations(ctx)
+
+	isAllWorkloadsProcessed := false
+	// run a cron task that will fire the cleanup at midnight
+	cleanUp := make(chan struct{}, 2)
+	c := cron.New()
+	_, err := c.AddFunc("@midnight", func() {
+		cleanUp <- struct{}{}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to setup cron task: %w", err)
+	}
+	defer c.Stop()
 
 	for {
 		select {
@@ -91,6 +107,13 @@ func (e *Engine) Run(ctx context.Context) error {
 			if !ok {
 				log.Info().Msg("reservation source is emptied. stopping engine")
 				return nil
+			}
+
+			if reservation.last {
+				isAllWorkloadsProcessed = true
+				// Trigger cleanup by sending a struct onto the channel
+				cleanUp <- struct{}{}
+				continue
 			}
 
 			expired := reservation.Expired()
@@ -105,13 +128,13 @@ func (e *Engine) Run(ctx context.Context) error {
 
 			if expired || reservation.ToDelete {
 				slog.Info().Msg("start decommissioning reservation")
-				if err := e.decommission(ctx, reservation); err != nil {
+				if err := e.decommission(ctx, &reservation.Reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to decommission reservation %s", reservation.ID)
 					continue
 				}
 			} else {
 				slog.Info().Msg("start provisioning reservation")
-				if err := e.provision(ctx, reservation); err != nil {
+				if err := e.provision(ctx, &reservation.Reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
 					continue
 				}
@@ -121,6 +144,18 @@ func (e *Engine) Run(ctx context.Context) error {
 				log.Error().Err(err).Msg("failed to updated the capacity counters")
 			}
 
+		case <-cleanUp:
+			if !isAllWorkloadsProcessed {
+				// only allow cleanup triggered by the cron to run once
+				// we are sure all the workloads from the cache/explorer have been processed
+				log.Info().Msg("all workloads not yet processed, delay cleanup")
+				continue
+			}
+			log.Info().Msg("start cleaning up resources")
+			if err := CleanupResources(ctx, e.zbusCl); err != nil {
+				log.Error().Err(err).Msg("failed to cleanup resources")
+				continue
+			}
 		}
 	}
 }

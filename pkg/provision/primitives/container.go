@@ -244,7 +244,7 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 	}
 
 	var mnt string
-	mnt, err = flistClient.NamedMount(reservation.ID, config.FList, config.FlistStorage, rootfsMntOpt)
+	mnt, err = flistClient.NamedMount(provision.FilesystemName(*reservation), config.FList, config.FlistStorage, rootfsMntOpt)
 	if err != nil {
 		return ContainerResult{}, err
 	}
@@ -258,7 +258,7 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		if err := os.MkdirAll(path.Join(mnt, mountpoint), 0755); err != nil {
 			return ContainerResult{}, err
 		}
-		var source string
+		var source pkg.Filesystem
 		source, err = storageClient.Path(mount.VolumeID)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
@@ -267,7 +267,7 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		mounts = append(
 			mounts,
 			pkg.MountInfo{
-				Source: source,
+				Source: source.Path,
 				Target: mountpoint,
 			},
 		)

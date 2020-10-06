@@ -13,6 +13,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/provision/common"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
 	"github.com/pkg/errors"
@@ -416,31 +417,7 @@ func (p *Provisioner) zdbDecommission(ctx context.Context, reservation *provisio
 }
 
 func (p *Provisioner) deleteZdbContainer(containerID pkg.ContainerID) error {
-	container := stubs.NewContainerModuleStub(p.zbus)
-	flist := stubs.NewFlisterStub(p.zbus)
-	// networkMgr := stubs.NewNetworkerStub(p.zbus)
-
-	info, err := container.Inspect("zdb", containerID)
-	if err != nil && strings.Contains(err.Error(), "not found") {
-		return nil
-	} else if err != nil {
-		return errors.Wrapf(err, "failed to inspect container '%s'", containerID)
-	}
-
-	if err := container.Delete("zdb", containerID); err != nil {
-		return errors.Wrapf(err, "failed to delete container %s", containerID)
-	}
-
-	network := stubs.NewNetworkerStub(p.zbus)
-	if err := network.ZDBDestroy(info.Network.Namespace); err != nil {
-		return errors.Wrapf(err, "failed to destroy zdb network namespace")
-	}
-
-	if err := flist.Umount(info.RootFS); err != nil {
-		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
-	}
-
-	return nil
+	return common.DeleteZdbContainer(containerID, p.zbus)
 }
 
 func socketDir(containerID pkg.ContainerID) string {

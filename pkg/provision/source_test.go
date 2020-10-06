@@ -34,7 +34,7 @@ func TestHTTPReservationSource(t *testing.T) {
 			&Reservation{ID: "1-2"},
 		}, 1, ErrPollEOS)
 
-	reservations := []*Reservation{}
+	reservations := []*ReservationJob{}
 	for res := range chn {
 		reservations = append(reservations, res)
 	}
@@ -68,7 +68,7 @@ func TestHTTPReservationSourceMultiple(t *testing.T) {
 			&Reservation{ID: "4-1"},
 		}, 6, ErrPollEOS)
 
-	reservations := []*Reservation{}
+	reservations := []*ReservationJob{}
 	for res := range chn {
 		reservations = append(reservations, res)
 	}
@@ -88,20 +88,20 @@ type TestTrackSource struct {
 
 func (s *TestTrackSource) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, uint64, error) {
 	if s.ID == s.Max {
-		return nil, 0, ErrPollEOS
+		return nil, s.Max, ErrPollEOS
 	}
 
 	s.Calls = append(s.Calls, time.Now().Unix())
 
-	defer func() {
-		s.ID++
-	}()
-
-	return []*Reservation{
-		&Reservation{
+	reservations := make([]*Reservation, s.Max)
+	for i := uint64(0); i < s.Max; i++ {
+		reservations[i] = &Reservation{
 			ID: fmt.Sprint(s.ID, "-", "0"),
-		},
-	}, s.ID, nil
+		}
+		s.ID++
+	}
+
+	return reservations, s.Max, nil
 }
 
 func TestHTTPReservationSourceSleep(t *testing.T) {
@@ -118,18 +118,23 @@ func TestHTTPReservationSourceSleep(t *testing.T) {
 
 	chn := source.Reservations(context.Background())
 
-	reservations := []*Reservation{}
+	reservations := []*ReservationJob{}
 	for res := range chn {
 		reservations = append(reservations, res)
 	}
 
-	require.Len(reservations, 4)
+	require.Len(reservations, 5)
 	require.Equal("0-0", reservations[0].ID)
+	require.False(reservations[0].last)
 	require.Equal("1-0", reservations[1].ID)
+	require.False(reservations[1].last)
 	require.Equal("2-0", reservations[2].ID)
+	require.False(reservations[2].last)
 	require.Equal("3-0", reservations[3].ID)
+	require.False(reservations[3].last)
+	require.True(reservations[4].last)
 
-	require.Len(store.Calls, 4)
+	require.Len(store.Calls, 1)
 	for i := 1; i < len(store.Calls); i++ {
 		require.Equal(int64(3), store.Calls[i]-store.Calls[i-1])
 	}

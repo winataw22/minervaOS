@@ -31,9 +31,11 @@ type StorageMock struct {
 }
 
 // CreateFilesystem create filesystem mock
-func (s *StorageMock) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (string, error) {
+func (s *StorageMock) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
 	args := s.Called(name, size, poolType)
-	return args.String(0), args.Error(1)
+	return pkg.Filesystem{
+		Path: args.String(0),
+	}, args.Error(1)
 }
 
 // ReleaseFilesystem releases filesystem mock
@@ -42,10 +44,28 @@ func (s *StorageMock) ReleaseFilesystem(name string) error {
 	return args.Error(0)
 }
 
+// ListFilesystems list filesystem mock
+func (s *StorageMock) ListFilesystems() ([]pkg.Filesystem, error) {
+	args := s.Called()
+	return nil, args.Error(1)
+}
+
 // Path implements the pkg.StorageModules interfaces
-func (s *StorageMock) Path(name string) (path string, err error) {
+func (s *StorageMock) Path(name string) (pkg.Filesystem, error) {
 	args := s.Called(name)
-	return args.String(0), args.Error(1)
+	return pkg.Filesystem{
+		Path: args.String(0),
+	}, args.Error(1)
+}
+
+// GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
+func (s *StorageMock) GetCacheFS() (pkg.Filesystem, error) {
+	return pkg.Filesystem{}, nil
+}
+
+// GetVdiskFS return the filesystem used to store the vdisk file for the VM module
+func (s *StorageMock) GetVdiskFS() (pkg.Filesystem, error) {
+	return pkg.Filesystem{}, nil
 }
 
 type testCommander struct {
@@ -188,8 +208,7 @@ func TestDownloadFlist(t *testing.T) {
 
 	root, err := ioutil.TempDir("", "flist_root")
 	require.NoError(err)
-
-	//defer os.RemoveAll(root)
+	defer os.RemoveAll(root)
 
 	x := newFlister(root, strg, cmder)
 
@@ -211,6 +230,17 @@ func TestDownloadFlist(t *testing.T) {
 	info2, err := os.Stat(path2)
 	require.NoError(err)
 	assert.Equal(info1.ModTime(), info2.ModTime())
+
+	// now corrupt the flist
+	err = os.Truncate(path1, 512)
+	require.NoError(err)
+
+	path3, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
+	require.NoError(err)
+
+	info3, err := os.Stat(path3)
+	require.NoError(err)
+	assert.NotEqual(info2.ModTime(), info3.ModTime())
 }
 
 func TestWaitPIDFileExists(t *testing.T) {
@@ -255,4 +285,24 @@ func TestWaitPIDFileTimeout(t *testing.T) {
 
 	err := <-out
 	require.Equal(context.DeadlineExceeded, err)
+}
+
+func Test_forceStop(t *testing.T) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+
+	cmd := exec.CommandContext(ctx, "sleep", "50")
+	err := cmd.Start()
+	require.NoError(t, err)
+
+	go func() {
+		cmd.Wait()
+	}()
+
+	go func() {
+		<-ctx.Done()
+		t.Error("didn't stop the process in time")
+	}()
+
+	err = forceStop(cmd.Process.Pid)
+	assert.NoError(t, err)
 }

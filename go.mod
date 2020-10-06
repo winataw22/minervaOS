@@ -60,7 +60,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	github.com/threefoldtech/tfexplorer v0.4.1-0.20200925140208-64f1857969f1
+	github.com/threefoldtech/tfexplorer v0.4.1-0.20201006092040-c7f28e901ea5
 	github.com/threefoldtech/zbus v0.1.3
 	github.com/urfave/cli v1.22.4
 	github.com/vishvananda/netlink v1.1.0
@@ -71,10 +71,12 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.3.15-0.20200526002434-ed3bf5ef0736
 	go.etcd.io/bbolt v1.3.4 // indirect
 	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
+	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20191219145116-fa6499c8e75f
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.29.1 // indirect
+	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/yaml.v2 v2.2.7
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2 // indirect

@@ -65,7 +65,11 @@ type ContainerModule interface {
 	// data: Container info
 	Run(ns string, data Container) (ContainerID, error)
 
-	//List all the existing container IDs from a certain namespace ns
+	// ListNS list the name of all the container namespaces
+	ListNS() ([]string, error)
+
+	// List all the existing container IDs from a certain namespace ns
+	// if ns is empty, then the container IDs from all existing namespaces will be return
 	List(ns string) ([]ContainerID, error)
 
 	// Inspect, return information about the container, given its container id

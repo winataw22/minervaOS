@@ -112,6 +112,26 @@ type StoragePolicy struct {
 	MaxPools uint8
 }
 
+// Usage struct
+type Usage struct {
+	Size uint64
+	Used uint64
+}
+
+// Filesystem represents a storage space that can be used as a filesystem
+type Filesystem struct {
+	// Filesystem ID
+	ID int
+	// Path of the Filesystem
+	Path string
+	// Usage reports the current usage of the Filesystem
+	Usage Usage
+	// Name of the Filesystem
+	Name string
+	// FsType of the Filesystem
+	FsType string
+}
+
 // VolumeAllocater is the zbus interface of the storage module responsible
 // for volume allocation
 type VolumeAllocater interface {
@@ -121,7 +141,7 @@ type VolumeAllocater interface {
 	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
 	// It is up to the caller to handle such a situation and decide if he wants
 	// to try again on a different devicetype
-	CreateFilesystem(name string, size uint64, poolType DeviceType) (string, error)
+	CreateFilesystem(name string, size uint64, poolType DeviceType) (Filesystem, error)
 
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
@@ -129,9 +149,22 @@ type VolumeAllocater interface {
 	// space which has been reserved for this filesystem will be reclaimed.
 	ReleaseFilesystem(name string) error
 
-	// Path return the path of the mountpoint of the named filesystem
-	// if no volume with name exists, an empty path and an error is returned
-	Path(name string) (path string, err error)
+	// ListFilesystems return all the filesystem managed by storeaged present on the nodes
+	// this can be an expensive call on server with a lot of disk, don't use it in a
+	// intensive loop
+	// Special filesystem like internal cache and vdisk are not return by this function
+	// to access them use the GetCacheFS or GetVdiskFS
+	ListFilesystems() ([]Filesystem, error)
+
+	// Path return the filesystem named name
+	// if no filesystem with this name exists, an error is returned
+	Path(name string) (Filesystem, error)
+
+	// GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
+	GetCacheFS() (Filesystem, error)
+
+	// GetVdiskFS return the filesystem used to store the vdisk file for the VM module
+	GetVdiskFS() (Filesystem, error)
 }
 
 // VDisk info returned by a call to inspect

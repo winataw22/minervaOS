@@ -101,7 +101,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}
 
 	var imagePath string
-	imagePath, err = flist.NamedMount(reservation.ID, k3osFlistURL, "", pkg.ReadOnlyMountOptions)
+	imagePath, err = flist.NamedMount(provision.FilesystemName(*reservation), k3osFlistURL, "", pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return result, errors.Wrap(err, "could not mount k3os flist")
 	}
@@ -113,7 +113,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}()
 
 	var diskPath string
-	diskName := fmt.Sprintf("%s-%s", reservation.ID, "vda")
+	diskName := fmt.Sprintf("%s-%s", provision.FilesystemName(*reservation), "vda")
 	if storage.Exists(diskName) {
 		needsInstall = false
 		info, err := storage.Inspect(diskName)

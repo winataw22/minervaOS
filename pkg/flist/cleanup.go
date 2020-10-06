@@ -78,13 +78,13 @@ func (f *flistModule) cleanupMount(name string) error {
 		log.Warn().Err(err).Str("path", path).Msg("fail to unmount flist")
 	}
 
-	volume, err := f.storage.Path(name)
+	fs, err := f.storage.Path(name)
 	if err != nil {
 		log.Warn().Err(err).Str("subvolume", name).Msg("subvolume does not exist")
 		return nil
 	}
 
-	ro := filepath.Join(volume, "ro")
+	ro := filepath.Join(fs.Path, "ro")
 	if err := syscall.Unmount(ro, syscall.MNT_DETACH); err != nil {
 		log.Warn().Err(err).Str("path", ro).Msg("fail to unmount ro layer")
 	}

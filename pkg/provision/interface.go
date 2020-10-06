@@ -12,7 +12,7 @@ import (
 // then reservations are applied to the node to deploy
 // a resource of the given Reservation.Type
 type ReservationSource interface {
-	Reservations(ctx context.Context) <-chan *Reservation
+	Reservations(ctx context.Context) <-chan *ReservationJob
 }
 
 // ProvisionerFunc is the function called by the Engine to provision a workload
