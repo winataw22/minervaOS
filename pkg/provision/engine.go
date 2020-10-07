@@ -13,7 +13,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 
-	"gopkg.in/robfig/cron.v2"
+	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -92,6 +92,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	_, err := c.AddFunc("@midnight", func() {
 		cleanUp <- struct{}{}
 	})
+	c.Start()
 	if err != nil {
 		return fmt.Errorf("failed to setup cron task: %w", err)
 	}

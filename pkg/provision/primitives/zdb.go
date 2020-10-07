@@ -66,7 +66,7 @@ func (p *Provisioner) zdbProvisionImpl(ctx context.Context, reservation *provisi
 	}
 
 	var err error
-	config.PlainPassword, err = decryptSecret(p.zbus, config.Password)
+	config.PlainPassword, err = decryptSecret(config.Password, reservation.User, reservation.Version, p.zbus)
 	if err != nil {
 		return ZDBResult{}, errors.Wrap(err, "failed to decrypt namespace password")
 	}

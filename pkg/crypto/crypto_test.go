@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -86,4 +87,45 @@ func TestPyNACLCompatibilityEncryption(t *testing.T) {
 	x, err := Encrypt([]byte("hello world"), sk.Public().(ed25519.PublicKey))
 	require.NoError(t, err)
 	fmt.Printf("%x\n", x)
+}
+
+func TestECDH(t *testing.T) {
+	alicePubkey, alicePrivkey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	bobPubkey, bobPrivkey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	msg := []byte("hello world")
+	encrypted, err := EncryptECDH(msg, alicePrivkey, bobPubkey)
+	require.NoError(t, err)
+
+	msg2, err := DecryptECDH(encrypted, bobPrivkey, alicePubkey)
+	require.NoError(t, err)
+
+	assert.Equal(t, msg, msg2)
+}
+
+func TestECDHPyNACLCompatibility(t *testing.T) {
+	// import nacl.public
+	// import nacl.encoding
+	// from nacl.secret import SecretBox
+	// from nacl.bindings import crypto_scalarmult
+	// alice_private = nacl.public.PrivateKey.from_seed(b"11111111111111111111111111111111")
+	// bob_private = nacl.public.PrivateKey.from_seed(b"22222222222222222222222222222222")
+	// shared_secret = crypto_scalarmult(alice_private.encode(), bob_private.public_key.encode())
+	// box = SecretBox(shared_secret)
+	// encrypted = box.encrypt(b'hello world')
+	// print(nacl.encoding.HexEncoder().encode(encrypted))
+	// b'74bb3109ad0a1947473ba6bccd3f44a8d735d6a99f8d046dff6e3853b664ad09148a2bf427a95d502c8222b62e4fc8603b2407'
+
+	alicePrivate := ed25519.NewKeyFromSeed([]byte("11111111111111111111111111111111"))
+	bobPrivate := ed25519.NewKeyFromSeed([]byte("22222222222222222222222222222222"))
+
+	encrypted, err := hex.DecodeString("74bb3109ad0a1947473ba6bccd3f44a8d735d6a99f8d046dff6e3853b664ad09148a2bf427a95d502c8222b62e4fc8603b2407")
+	require.NoError(t, err)
+
+	decrypted, err := DecryptECDH(encrypted, bobPrivate, alicePrivate.Public().(ed25519.PublicKey))
+	require.NoError(t, err)
+	assert.Equal(t, []byte("hello world"), decrypted)
 }

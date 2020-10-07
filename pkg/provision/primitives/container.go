@@ -169,7 +169,7 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 	}
 
 	for k, v := range config.SecretEnv {
-		v, err := decryptSecret(p.zbus, v)
+		v, err := decryptSecret(v, reservation.User, reservation.Version, p.zbus)
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to decrypt secret env var '%s'", k)
 		}
@@ -182,14 +182,14 @@ func (p *Provisioner) containerProvisionImpl(ctx context.Context, reservation *p
 		stderr := log.Data.Stderr
 
 		if len(log.Data.SecretStdout) > 0 {
-			stdout, err = decryptSecret(p.zbus, log.Data.SecretStdout)
+			stdout, err = decryptSecret(log.Data.SecretStdout, reservation.User, reservation.Version, p.zbus)
 			if err != nil {
 				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
 			}
 		}
 
 		if len(log.Data.SecretStderr) > 0 {
-			stderr, err = decryptSecret(p.zbus, log.Data.SecretStderr)
+			stderr, err = decryptSecret(log.Data.SecretStderr, reservation.User, reservation.Version, p.zbus)
 			if err != nil {
 				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
 			}

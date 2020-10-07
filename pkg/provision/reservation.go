@@ -48,6 +48,8 @@ type Reservation struct {
 	Reference string `json:"reference"`
 
 	Result Result `json:"result"`
+
+	Version int `json:"version"`
 }
 
 // AppendTag appends tags

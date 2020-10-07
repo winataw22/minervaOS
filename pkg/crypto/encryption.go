@@ -1,9 +1,14 @@
 package crypto
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"fmt"
+
 	"github.com/agl/ed25519/extra25519"
 	box "github.com/whs/nacl-sealed-box"
-	"golang.org/x/crypto/ed25519"
+	"golang.org/x/crypto/curve25519"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // Encrypt encrypts msg with a cure25519 public key derived from an ed25519 public key
@@ -38,4 +43,57 @@ func PublicKeyToCurve25519(pk ed25519.PublicKey) [32]byte {
 	copy(edPriv[:], pk)
 	extra25519.PublicKeyToCurve25519(&curvePub, &edPriv)
 	return curvePub
+}
+
+// DecryptECDH decrypt aes encrypted msg using a shared key derived from sk and pk using Elliptic curve Diffie Helman algorithm
+func DecryptECDH(msg []byte, sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
+
+	sharedSecretBytes, err := sharedSecret(sk, pk)
+	if err != nil {
+		return nil, err
+	}
+	var key [32]byte
+	copy(key[:], sharedSecretBytes)
+
+	var nonce [24]byte
+	copy(nonce[:], msg[:24])
+
+	descrypted, ok := secretbox.Open(nil, msg[24:], &nonce, &key)
+	if !ok {
+		return nil, fmt.Errorf("decryption error")
+	}
+
+	return descrypted, nil
+}
+
+// EncryptECDH aes encrypt msg using a shared key derived from sk and pk using Elliptic curve Diffie Helman algorithm
+// the nonce if prepended to the encrypted message
+func EncryptECDH(msg []byte, sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
+
+	sharedSecretBytes, err := sharedSecret(sk, pk)
+	if err != nil {
+		return nil, err
+	}
+	var key [32]byte
+	copy(key[:], sharedSecretBytes)
+
+	var nonce [24]byte
+	if _, err = rand.Read(nonce[:]); err != nil {
+		return nil, err
+	}
+
+	encrypted := secretbox.Seal(nonce[:], msg, &nonce, &key)
+	return encrypted, nil
+
+}
+
+func sharedSecret(sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
+	private := PrivateKeyToCurve25519(sk)
+	public := PublicKeyToCurve25519(pk)
+
+	shareSecret, err := curve25519.X25519(private[:], public[:])
+	if err != nil {
+		return nil, err
+	}
+	return shareSecret, nil
 }

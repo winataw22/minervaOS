@@ -85,7 +85,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	result.ID = reservation.ID
 	result.IP = config.IP.String()
 
-	config.PlainClusterSecret, err = decryptSecret(p.zbus, config.ClusterSecret)
+	config.PlainClusterSecret, err = decryptSecret(config.ClusterSecret, reservation.User, reservation.Version, p.zbus)
 	if err != nil {
 		return result, errors.Wrap(err, "failed to decrypt namespace password")
 	}

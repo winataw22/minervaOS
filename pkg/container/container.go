@@ -313,8 +313,7 @@ func (c *containerModule) List(ns string) ([]pkg.ContainerID, error) {
 		return nil, err
 	}
 
-	var ids []pkg.ContainerID
-	ids = make([]pkg.ContainerID, len(containers))
+	ids := make([]pkg.ContainerID, 0, len(containers))
 
 	for _, c := range containers {
 		ids = append(ids, pkg.ContainerID(c.ID()))

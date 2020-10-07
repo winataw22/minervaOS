@@ -39,6 +39,13 @@ type IdentityManager interface {
 	// Decrypt decrypts message with the private of the node
 	Decrypt(message []byte) ([]byte, error)
 
+	// EncryptECDH aes encrypt msg using a shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+	// the nonce if prepended to the encrypted message
+	EncryptECDH(msg []byte, publicKey []byte) ([]byte, error)
+
+	// DecryptECDH decrypt aes encrypted msg using a shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+	DecryptECDH(msg []byte, publicKey []byte) ([]byte, error)
+
 	// PrivateKey sends the keypair
 	PrivateKey() []byte
 }

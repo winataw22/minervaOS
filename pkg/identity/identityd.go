@@ -74,6 +74,17 @@ func (d *identityManager) Decrypt(message []byte) ([]byte, error) {
 	return crypto.Decrypt(message, d.key.PrivateKey)
 }
 
+// EncryptECDH encrypt msg using AES with shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+// the nonce if prepended to the encrypted message
+func (d *identityManager) EncryptECDH(msg []byte, pk []byte) ([]byte, error) {
+	return crypto.EncryptECDH(msg, d.key.PrivateKey, pk)
+}
+
+// DecryptECDH decrypt AES encrypted msg using a shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+func (d *identityManager) DecryptECDH(msg []byte, pk []byte) ([]byte, error) {
+	return crypto.DecryptECDH(msg, d.key.PrivateKey, pk)
+}
+
 // PrivateKey returns the private key of the node
 func (d *identityManager) PrivateKey() []byte {
 	return d.key.PrivateKey

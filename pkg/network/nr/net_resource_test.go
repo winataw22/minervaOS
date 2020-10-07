@@ -50,6 +50,17 @@ func (t *testIdentityManager) Decrypt(message []byte) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
+// EncryptECDH aes encrypt msg using a shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+// the nonce if prepended to the encrypted message
+func (t *testIdentityManager) EncryptECDH(msg []byte, publicKey []byte) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// DecryptECDH decrypt aes encrypted msg using a shared key derived from private key of the node and public key of the other party using Elliptic curve Diffie Helman algorithm
+func (t *testIdentityManager) DecryptECDH(msg []byte, publicKey []byte) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // PrivateKey sends the keypair
 func (t *testIdentityManager) PrivateKey() []byte {
 	return nil

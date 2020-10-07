@@ -38,9 +38,41 @@ func (s *IdentityManagerStub) Decrypt(arg0 []uint8) (ret0 []uint8, ret1 error) {
 	return
 }
 
+func (s *IdentityManagerStub) DecryptECDH(arg0 []uint8, arg1 []uint8) (ret0 []uint8, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "DecryptECDH", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *IdentityManagerStub) Encrypt(arg0 []uint8) (ret0 []uint8, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "Encrypt", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *IdentityManagerStub) EncryptECDH(arg0 []uint8, arg1 []uint8) (ret0 []uint8, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "EncryptECDH", args...)
 	if err != nil {
 		panic(err)
 	}

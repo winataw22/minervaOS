@@ -54,13 +54,14 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.1
 	github.com/opencontainers/selinux v1.5.2 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/robfig/cron/v3 v3.0.0
 	github.com/rs/zerolog v1.19.0
 	github.com/shirou/gopsutil v2.19.11+incompatible
 	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	github.com/threefoldtech/tfexplorer v0.4.1-0.20201006092040-c7f28e901ea5
+	github.com/threefoldtech/tfexplorer v0.4.1-0.20201008114938-260c3694ef48
 	github.com/threefoldtech/zbus v0.1.3
 	github.com/urfave/cli v1.22.4
 	github.com/vishvananda/netlink v1.1.0
@@ -76,7 +77,6 @@ require (
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20191219145116-fa6499c8e75f
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.29.1 // indirect
-	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 	gopkg.in/yaml.v2 v2.2.7
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2 // indirect
