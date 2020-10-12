@@ -73,7 +73,7 @@ func (s *Fs) removeAllButPersistent(rootPath string) error {
 		}
 		// if a file with size 0 is present we can assume its empty and remove it
 		if info.Size() == 0 {
-			log.Warn().Str("filename", info.Name()).Msg("cached reservation %d found, but file is empty, removing.")
+			log.Warn().Str("filename", info.Name()).Msg("cached reservation found, but file is empty, removing.")
 			return os.Remove(path)
 		}
 
@@ -171,7 +171,7 @@ func (s *Fs) GetExpired() ([]*provision.Reservation, error) {
 		// if the file is empty, remove it and return.
 		if info.Size() == 0 {
 			if info.Size() == 0 {
-				log.Warn().Str("filename", info.Name()).Msg("cached reservation %d found, but file is empty, removing.")
+				log.Warn().Str("filename", info.Name()).Msg("cached reservation found, but file is empty, removing.")
 				return nil, os.Remove(path.Join(s.root, info.Name()))
 			}
 		}

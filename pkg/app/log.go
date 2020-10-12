@@ -67,3 +67,12 @@ func Initialize() {
 	})
 
 }
+
+// SampledLogger return a sampled logger that allow 1 log entry per hour
+// use this for logs used in loop when you do not want to overload the zint log ring buffer
+func SampledLogger() zerolog.Logger {
+	return log.Sample(&zerolog.BurstSampler{
+		Burst:  1,
+		Period: time.Hour,
+	})
+}
