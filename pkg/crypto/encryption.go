@@ -7,6 +7,7 @@ import (
 
 	"github.com/agl/ed25519/extra25519"
 	box "github.com/whs/nacl-sealed-box"
+	"golang.org/x/crypto/blake2b"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/secretbox"
 )
@@ -48,34 +49,30 @@ func PublicKeyToCurve25519(pk ed25519.PublicKey) [32]byte {
 // DecryptECDH decrypt aes encrypted msg using a shared key derived from sk and pk using Elliptic curve Diffie Helman algorithm
 func DecryptECDH(msg []byte, sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
 
-	sharedSecretBytes, err := sharedSecret(sk, pk)
+	key, err := sharedSecret(sk, pk)
 	if err != nil {
 		return nil, err
 	}
-	var key [32]byte
-	copy(key[:], sharedSecretBytes)
 
 	var nonce [24]byte
 	copy(nonce[:], msg[:24])
 
-	descrypted, ok := secretbox.Open(nil, msg[24:], &nonce, &key)
+	decrypted, ok := secretbox.Open(nil, msg[24:], &nonce, &key)
 	if !ok {
 		return nil, fmt.Errorf("decryption error")
 	}
 
-	return descrypted, nil
+	return decrypted, nil
 }
 
 // EncryptECDH aes encrypt msg using a shared key derived from sk and pk using Elliptic curve Diffie Helman algorithm
 // the nonce if prepended to the encrypted message
 func EncryptECDH(msg []byte, sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
 
-	sharedSecretBytes, err := sharedSecret(sk, pk)
+	key, err := sharedSecret(sk, pk)
 	if err != nil {
 		return nil, err
 	}
-	var key [32]byte
-	copy(key[:], sharedSecretBytes)
 
 	var nonce [24]byte
 	if _, err = rand.Read(nonce[:]); err != nil {
@@ -87,13 +84,14 @@ func EncryptECDH(msg []byte, sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byt
 
 }
 
-func sharedSecret(sk ed25519.PrivateKey, pk ed25519.PublicKey) ([]byte, error) {
+func sharedSecret(sk ed25519.PrivateKey, pk ed25519.PublicKey) ([32]byte, error) {
 	private := PrivateKeyToCurve25519(sk)
 	public := PublicKeyToCurve25519(pk)
 
 	shareSecret, err := curve25519.X25519(private[:], public[:])
 	if err != nil {
-		return nil, err
+		return [32]byte{}, err
 	}
-	return shareSecret, nil
+
+	return blake2b.Sum256(shareSecret), nil
 }

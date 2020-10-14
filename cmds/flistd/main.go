@@ -16,7 +16,12 @@ import (
 	"github.com/threefoldtech/zos/pkg/version"
 )
 
-const module = "flist"
+const (
+	module = "flist"
+
+	cacheAge     = time.Hour * 24 * 30 // 30 days
+	cacheCleanup = time.Hour * 24
+)
 
 func main() {
 	app.Initialize()
@@ -55,7 +60,8 @@ func main() {
 	ctx, _ := utils.WithSignal(context.Background())
 
 	if cleaner, ok := mod.(flist.Cleaner); ok {
-		go cleaner.Cleaner(ctx, time.Minute)
+		go cleaner.MountsCleaner(ctx, time.Minute)
+		go cleaner.CacheCleaner(ctx, cacheCleanup, cacheAge)
 	}
 
 	log.Info().
