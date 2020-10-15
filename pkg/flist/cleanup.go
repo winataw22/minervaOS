@@ -148,7 +148,7 @@ func (f *flistModule) CacheCleaner(ctx context.Context, every time.Duration, age
 
 	// we need to run it at least one time on
 	// entry
-	if err := f.cleanCache(age); err != nil {
+	if err := f.cleanCache(time.Now(), age); err != nil {
 		log.Error().Err(err).Msg("failed to cleanup cache")
 	}
 
@@ -157,15 +157,14 @@ func (f *flistModule) CacheCleaner(ctx context.Context, every time.Duration, age
 		case <-ctx.Done():
 		case <-time.After(every):
 			log.Debug().Msg("running cache cleaner job")
-			if err := f.cleanCache(age); err != nil {
+			if err := f.cleanCache(time.Now(), age); err != nil {
 				log.Error().Err(err).Msg("failed to clean cache")
 			}
 		}
 	}
 }
 
-func (f *flistModule) cleanCache(age time.Duration) error {
-	now := time.Now()
+func (f *flistModule) cleanCache(now time.Time, age time.Duration) error {
 	return filepath.Walk(f.cache, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
