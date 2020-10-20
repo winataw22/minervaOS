@@ -46,6 +46,17 @@ func CleanupResources(ctx context.Context, zbus zbus.Client) error {
 			continue
 		}
 
+		if len(fs.Name) == 64 {
+			// if the fs is not used by any container and its name is 64 character long
+			// they are left over of old containers when flistd used to generate random names
+			// for the container root flist subvolumes
+			log.Info().Msgf("delete root container flist subvolume '%s'", fs.Path)
+			if err := storaged.ReleaseFilesystem(fs.Name); err != nil {
+				log.Err(err).Msgf("failed to delete subvol '%s'", fs.Path)
+			}
+			continue
+		}
+
 		// Is this subvol not in toSave?
 		// Check the explorer if it needs to be deleted
 		delete := checkReservationToDelete(fs, explorer)
@@ -63,6 +74,7 @@ func CleanupResources(ctx context.Context, zbus zbus.Client) error {
 }
 
 func checkReservationToDelete(fs pkg.Filesystem, cl *client.Client) bool {
+
 	wid, err := WorkloadIDFromFilesystem(fs)
 	if err != nil {
 		log.Err(err).Msgf("failed to convert workload id %d", wid)

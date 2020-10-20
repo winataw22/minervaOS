@@ -34,7 +34,7 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *Flag) error {
 
 	ctx := context.Background()
 
-	monitor := stubs.NewProvisionMonitorStub(client)
+	monitor := stubs.NewProvisionStub(client)
 	counters, err := monitor.Counters(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to start net monitor stream")

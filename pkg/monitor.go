@@ -4,7 +4,6 @@ package pkg
 //go:generate zbusc -module monitor -version 0.0.1 -name system -package stubs github.com/threefoldtech/zos/pkg+SystemMonitor stubs/system_monitor_stub.go
 //go:generate zbusc -module monitor -version 0.0.1 -name host -package stubs github.com/threefoldtech/zos/pkg+HostMonitor stubs/host_monitor_stub.go
 //go:generate zbusc -module identityd -version 0.0.1 -name monitor -package stubs github.com/threefoldtech/zos/pkg+VersionMonitor stubs/version_monitor_stub.go
-//go:generate zbusc -module provision -version 0.0.1 -name provision -package stubs github.com/threefoldtech/zos/pkg+ProvisionMonitor stubs/provision_monitor_stub.go
 
 import (
 	"context"
@@ -96,19 +95,4 @@ type HostMonitor interface {
 // VersionMonitor interface (provided by identityd)
 type VersionMonitor interface {
 	Version(ctx context.Context) <-chan semver.Version
-}
-
-// ProvisionCounters struct
-type ProvisionCounters struct {
-	Container int64 `json:"container"`
-	Volume    int64 `jons:"volume"`
-	Network   int64 `json:"network"`
-	ZDB       int64 `json:"zdb"`
-	VM        int64 `json:"vm"`
-	Debug     int64 `json:"debug"`
-}
-
-// ProvisionMonitor interface
-type ProvisionMonitor interface {
-	Counters(ctx context.Context) <-chan ProvisionCounters
 }

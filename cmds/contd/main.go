@@ -62,7 +62,12 @@ func main() {
 		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
 	}
 
-	containerd := container.New(moduleRoot, containerdCon)
+	client, err := zbus.NewRedisClient(msgBrokerCon)
+	if err != nil {
+		log.Fatal().Msgf("fail to connect to message broker server: %v", err)
+	}
+
+	containerd := container.New(client, moduleRoot, containerdCon)
 
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, containerd)
 
@@ -75,6 +80,9 @@ func main() {
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
+
+	// start watching for events
+	go containerd.Watch(ctx)
 
 	if err := server.Run(ctx); err != nil && err != context.Canceled {
 		log.Fatal().Err(err).Msg("unexpected error")

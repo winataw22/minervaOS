@@ -139,7 +139,7 @@ func main() {
 		ZbusCl:         zbusCl,
 	})
 
-	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.ProvisionMonitor(engine))
+	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.Provision(engine))
 
 	log.Info().
 		Str("broker", msgBrokerCon).
