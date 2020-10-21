@@ -227,13 +227,14 @@ func (s *storageModule) checkForZDBCandidateVolumes(size uint64, poolType pkg.De
 	return candidates, nil
 }
 
-const zdbPoolPrefix = "zdb"
+// ZDBPoolPrefix is the prefix used for the subvolume create for 0-DB containers
+const ZDBPoolPrefix = "zdb"
 
 func genZDBPoolName() (string, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return "", err
 	}
-	name := zdbPoolPrefix + id.String()
+	name := ZDBPoolPrefix + id.String()
 	return name, nil
 }

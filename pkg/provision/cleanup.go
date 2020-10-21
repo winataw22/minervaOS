@@ -2,6 +2,7 @@ package provision
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -12,6 +13,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/provision/common"
+	"github.com/threefoldtech/zos/pkg/storage"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/zdb"
 	"golang.org/x/net/context"
@@ -51,6 +53,25 @@ func CleanupResources(ctx context.Context, zbus zbus.Client) error {
 			// they are left over of old containers when flistd used to generate random names
 			// for the container root flist subvolumes
 			log.Info().Msgf("delete root container flist subvolume '%s'", fs.Path)
+			if err := storaged.ReleaseFilesystem(fs.Name); err != nil {
+				log.Err(err).Msgf("failed to delete subvol '%s'", fs.Path)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(fs.Name, storage.ZDBPoolPrefix) {
+			// we can safely delete this one because it is not used by any container
+			// this is ensured line 46
+			log.Info().Msgf("delete left over 0-DB subvolume '%s'", fs.Path)
+			if err := storaged.ReleaseFilesystem(fs.Name); err != nil {
+				log.Err(err).Msgf("failed to delete subvol '%s'", fs.Path)
+			}
+			continue
+		}
+
+		if fs.Name == "fcvms" {
+			// left over from testing during vm module development
+			log.Info().Msgf("delete fcvm subvolume '%s'", fs.Path)
 			if err := storaged.ReleaseFilesystem(fs.Name); err != nil {
 				log.Err(err).Msgf("failed to delete subvol '%s'", fs.Path)
 			}
