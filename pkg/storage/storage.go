@@ -423,7 +423,6 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 			return nil, err
 		}
 		for _, v := range volumes {
-
 			// Do not return "special" volumes here
 			// instead the GetCacheFS and GetVdiskFS to access them
 			if v.Name() == cacheLabel ||
@@ -445,6 +444,7 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 					Size: usage.Size,
 					Used: usage.Used,
 				},
+				DiskType: pool.Type(),
 			})
 		}
 	}
@@ -455,27 +455,28 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *storageModule) Path(name string) (pkg.Filesystem, error) {
-	for idx := range s.pools {
-		filesystems, err := s.pools[idx].Volumes()
+	for _, pool := range s.pools {
+		filesystems, err := pool.Volumes()
 		if err != nil {
 			return pkg.Filesystem{}, err
 		}
-		for jdx := range filesystems {
-			if filesystems[jdx].Name() == name {
-				usage, err := filesystems[jdx].Usage()
+		for _, fs := range filesystems {
+			if fs.Name() == name {
+				usage, err := fs.Usage()
 				if err != nil {
 					return pkg.Filesystem{}, err
 				}
 
 				return pkg.Filesystem{
-					ID:     filesystems[jdx].ID(),
-					FsType: filesystems[jdx].FsType(),
-					Name:   filesystems[jdx].Name(),
-					Path:   filesystems[jdx].Path(),
+					ID:     fs.ID(),
+					FsType: fs.FsType(),
+					Name:   fs.Name(),
+					Path:   fs.Path(),
 					Usage: pkg.Usage{
 						Size: usage.Size,
 						Used: usage.Used,
 					},
+					DiskType: pool.Type(),
 				}, nil
 			}
 		}
@@ -503,15 +504,15 @@ func (s *storageModule) ensureCache() error {
 	var cacheFs filesystem.Volume
 
 	// check if cache volume available
-	for idx := range s.pools {
-		filesystems, err := s.pools[idx].Volumes()
+	for _, pool := range s.pools {
+		filesystems, err := pool.Volumes()
 		if err != nil {
 			return err
 		}
-		for jdx := range filesystems {
-			if filesystems[jdx].Name() == cacheLabel {
-				log.Debug().Msgf("Found existing cache at %v", filesystems[jdx].Path())
-				cacheFs = filesystems[jdx]
+		for _, fs := range filesystems {
+			if fs.Name() == cacheLabel {
+				log.Debug().Msgf("Found existing cache at %v", fs.Path())
+				cacheFs = fs
 				break
 			}
 		}

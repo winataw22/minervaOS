@@ -130,6 +130,8 @@ type Filesystem struct {
 	Name string
 	// FsType of the Filesystem
 	FsType string
+	// DiskType of the Filesystem
+	DiskType DeviceType
 }
 
 // VolumeAllocater is the zbus interface of the storage module responsible

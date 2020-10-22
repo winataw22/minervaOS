@@ -53,7 +53,58 @@ func NewFSStore(root string) (*Fs, error) {
 
 	log.Info().Msg("restart detected, keep reservation cache intact")
 
+	if err := store.updateReservationResults(root); err != nil {
+		log.Err(err).Msgf("error while updating reservation results")
+		// Don't return error, a cache is still valid even without the results
+		return nil, nil
+	}
+
 	return store, nil
+}
+
+// Updates reservation results for reservations in cache that don't have a result set.
+func (s *Fs) updateReservationResults(rootPath string) error {
+	log.Info().Msg("updating reservation results")
+	reservations, err := s.list()
+	if err != nil {
+		return err
+	}
+
+	client, err := app.ExplorerClient()
+	if err != nil {
+		return err
+	}
+
+	for _, reservation := range reservations {
+		if !reservation.Result.IsNil() {
+			continue
+		}
+
+		log.Info().Msgf("updating reservation result for %s", reservation.ID)
+
+		result, err := client.Workloads.NodeWorkloadGet(reservation.ID)
+		if err != nil {
+			return errors.Wrapf(err, "error occurred while requesting reservation result for %s", reservation.ID)
+		}
+
+		provisionResult := result.GetResult()
+		reservation.Result = provision.Result{
+			Type:      reservation.Type,
+			Created:   provisionResult.Epoch.Time,
+			State:     provision.ResultState(provisionResult.State),
+			Data:      provisionResult.DataJson,
+			Error:     provisionResult.Message,
+			ID:        provisionResult.WorkloadId,
+			Signature: provisionResult.Signature,
+		}
+
+		err = s.add(reservation, true)
+		if err != nil {
+			return errors.Wrapf(err, "error while updating reservation in cache")
+		}
+	}
+
+	return nil
 }
 
 //TODO: i think both sync and removeAllButPersistent can be merged into
@@ -107,6 +158,11 @@ func (s *Fs) Sync(statser provision.Statser) error {
 
 // Add a reservation to the store
 func (s *Fs) Add(r *provision.Reservation) error {
+	return s.add(r, false)
+}
+
+// Add a reservation to the store
+func (s *Fs) add(r *provision.Reservation, update bool) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -115,7 +171,11 @@ func (s *Fs) Add(r *provision.Reservation) error {
 		return err
 	}
 
-	f, err := os.OpenFile(filepath.Join(s.root, r.ID), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
+	flags := os.O_CREATE | os.O_WRONLY
+	if !update {
+		flags |= os.O_EXCL
+	}
+	f, err := os.OpenFile(filepath.Join(s.root, r.ID), flags, 0660)
 	if err != nil {
 		if os.IsExist(err) {
 			return fmt.Errorf("reservation %s already in the store", r.ID)
@@ -285,7 +345,7 @@ func (s *Fs) incrementCounters(statser provision.Statser) error {
 	}
 
 	for _, r := range reservations {
-		if r.Expired() {
+		if r.Expired() || r.Result.State != provision.StateOk {
 			continue
 		}
 		if r.Type == primitives.NetworkResourceReservation || r.Type == primitives.NetworkReservation {

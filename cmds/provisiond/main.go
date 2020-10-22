@@ -111,7 +111,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to instantiate BCDB client")
 	}
 
-	// keep track of resource unnits reserved and amount of workloads provisionned
+	// keep track of resource units reserved and amount of workloads provisionned
 	statser := &primitives.Counters{}
 
 	// to store reservation locally on the node

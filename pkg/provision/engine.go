@@ -13,12 +13,15 @@ import (
 	"github.com/jbenet/go-base58"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/stubs"
 
 	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
+
+const gib = 1024 * 1024 * 1024
 
 // Engine is the core of this package
 // The engine is responsible to manage provision and decomission of workloads on the system
@@ -396,6 +399,20 @@ func (e *Engine) signResult(result *Result) error {
 func (e *Engine) updateStats() error {
 	wl := e.statser.CurrentWorkloads()
 	r := e.statser.CurrentUnits()
+
+	storaged := stubs.NewStorageModuleStub(e.zbusCl)
+
+	cache, err := storaged.GetCacheFS()
+	if err != nil {
+		return err
+	}
+
+	switch cache.DiskType {
+	case pkg.SSDDevice:
+		r.Sru += float64(cache.Usage.Size / gib)
+	case pkg.HDDDevice:
+		r.Hru += float64(cache.Usage.Size / gib)
+	}
 
 	log.Info().
 		Uint16("network", wl.Network).

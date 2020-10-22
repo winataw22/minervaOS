@@ -17,6 +17,10 @@ import (
 
 func (s *storageModule) Find(nsID string) (allocation pkg.Allocation, err error) {
 	for _, pool := range s.pools {
+		if _, mounted := pool.Mounted(); !mounted {
+			continue
+		}
+
 		volumes, err := pool.Volumes()
 		if err != nil {
 			return allocation, errors.Wrapf(err, "failed to list volume on pool %s", pool.Name())
