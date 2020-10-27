@@ -367,6 +367,7 @@ func (f *flistModule) Umount(path string) error {
 	_, name := filepath.Split(path)
 	pidPath := filepath.Join(f.pid, name) + ".pid"
 
+	// from here on out, skip errors because we want to try to clean up as much as possible
 	opts, err := f.getMountOptions(pidPath)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to read mount options")
@@ -378,7 +379,6 @@ func (f *flistModule) Umount(path string) error {
 
 	if err := syscall.Unmount(path, syscall.MNT_DETACH); err != nil {
 		log.Error().Err(err).Str("path", path).Msg("fail to umount flist")
-
 	}
 
 	if err := waitPidFile(time.Second*2, pidPath, false); err != nil {
@@ -386,22 +386,19 @@ func (f *flistModule) Umount(path string) error {
 
 		pid, err := f.getPid(pidPath)
 		if err != nil {
-			return err
+			log.Error().Int64("pid", pid).Err(err).Msg("failed to get pid")
 		}
 
 		if err := forceStop(int(pid)); err != nil {
 			log.Error().Int64("pid", pid).Err(err).Msg("failed to kill 0-fs process")
 		}
-
-		return err
 	}
 
 	// clean up working dirs
 	logPath := filepath.Join(f.log, name) + ".log"
 	for _, path := range []string{logPath, path} {
 		if err := os.RemoveAll(path); err != nil {
-			log.Error().Err(err).Msg("fail to remove %s")
-			return err
+			log.Error().Err(err).Msgf("fail to remove %s", logPath)
 		}
 	}
 
@@ -411,7 +408,7 @@ func (f *flistModule) Umount(path string) error {
 	}
 
 	if err := f.storage.ReleaseFilesystem(name); err != nil {
-		return errors.Wrap(err, "fail to clean up subvolume")
+		log.Error().Err(err).Msg("fail to clean up subvolume")
 	}
 
 	return nil

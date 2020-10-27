@@ -135,6 +135,8 @@ func (c *Module) upgrade() error {
 
 // Run creates and starts a container
 func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err error) {
+	log.Info().Str("ns", ns).Msg("starting container")
+
 	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -326,6 +328,8 @@ func (c *Module) start(ns, id string) error {
 
 // Inspect returns the detail about a running container
 func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, err error) {
+	log.Info().Str("id", string(id)).Str("ns", ns).Msg("inspect container")
+
 	client, err := containerd.New(c.containerd)
 	if err != nil {
 		return result, err
@@ -379,6 +383,8 @@ func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, e
 
 // ListNS list the name of all the container namespaces
 func (c *Module) ListNS() ([]string, error) {
+	log.Info().Msg("list namespaces")
+
 	client, err := containerd.New(c.containerd)
 	if err != nil {
 		return nil, err
@@ -390,6 +396,8 @@ func (c *Module) ListNS() ([]string, error) {
 
 // List all the existing container IDs from a certain namespace ns
 func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
+	log.Info().Str("ns", ns).Msg("list containers")
+
 	client, err := containerd.New(c.containerd)
 	if err != nil {
 		return nil, err
@@ -413,13 +421,18 @@ func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
 
 // Delete stops and remove a container
 func (c *Module) Delete(ns string, id pkg.ContainerID) error {
+	log.Info().Str("id", string(id)).Str("ns", ns).Msg("delete container")
+
 	client, err := containerd.New(c.containerd)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
+
+	// log.Debug().Msg("fetching namespace")
 	ctx := namespaces.WithNamespace(context.Background(), ns)
 
+	// log.Debug().Str("id", string(id)).Msg("fetching container")
 	container, err := client.LoadContainer(ctx, string(id))
 	if err != nil {
 		return err
@@ -443,12 +456,21 @@ func (c *Module) Delete(ns string, id pkg.ContainerID) error {
 			if trials <= 0 {
 				signal = syscall.SIGKILL
 			}
+
+			log.Debug().Str("id", string(id)).Int("signal", int(signal)).Msg("sending signal")
 			_ = task.Kill(ctx, signal)
 			trials--
+
 			select {
 			case <-exitC:
 				break loop
 			case <-time.After(1 * time.Second):
+			}
+
+			if trials < -5 {
+				msg := fmt.Errorf("cannot stop container, SIGTERM and SIGKILL ignored")
+				log.Error().Err(msg).Msg("stopping container failed")
+				break loop
 			}
 		}
 

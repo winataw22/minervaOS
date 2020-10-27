@@ -177,17 +177,17 @@ func (nr *NetResource) Leave(containerID string) error {
 		Str("container", containerID).
 		Msg("delete container network namespace")
 
-	ns, err := namespace.GetByName(containerID)
-	if err != nil && !os.IsNotExist(err) {
+	namespc, err := namespace.GetByName(containerID)
+	if _, ok := err.(ns.NSPathNotExistErr); ok {
+		return nil
+	} else if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
-	if os.IsNotExist(err) {
-		// nothing to do, early return
-		return nil
-	}
-	defer ns.Close()
+	defer namespc.Close()
 
-	err = namespace.Delete(ns)
+	err = namespace.Delete(namespc)
 	if err != nil {
 		return err
 	}

@@ -217,6 +217,10 @@ func (p *btrfsPool) Mount() (string, error) {
 
 	fs := list[0]
 
+	if len(fs.Devices) == 0 {
+		return "", nil
+	}
+
 	if mnt, mounted := p.mounted(&fs); mounted {
 		return mnt, nil
 	}

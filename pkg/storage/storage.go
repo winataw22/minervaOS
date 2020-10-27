@@ -97,7 +97,8 @@ func (s *storageModule) Total(kind pkg.DeviceType) (uint64, error) {
 			_, err := pool.MountWithoutScan()
 			if err != nil {
 				log.Error().Err(err).Msgf("Failed to mount pool %s", pool.Name())
-				return 0, err
+				// If we fail to mount the pool, don't exit.
+				continue
 			}
 			unmountAfter = true
 		}
@@ -505,6 +506,9 @@ func (s *storageModule) ensureCache() error {
 
 	// check if cache volume available
 	for _, pool := range s.pools {
+		if _, mounted := pool.Mounted(); !mounted {
+			continue
+		}
 		filesystems, err := pool.Volumes()
 		if err != nil {
 			return err
@@ -722,6 +726,9 @@ func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 			}
 
 			for _, pool := range s.pools {
+				if _, mounted := pool.Mounted(); !mounted {
+					continue
+				}
 				devices, err := s.devices.ByLabel(ctx, pool.Name())
 				if err != nil {
 					log.Error().Err(err).Str("pool", pool.Name()).Msg("failed to get devices for pool")
