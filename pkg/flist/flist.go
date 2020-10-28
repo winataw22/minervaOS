@@ -385,13 +385,14 @@ func (f *flistModule) Umount(path string) error {
 		log.Error().Err(err).Str("path", path).Msg("0-fs daemon did not stop properly")
 
 		pid, err := f.getPid(pidPath)
-		if err != nil {
+		if err == nil {
+			if err := forceStop(int(pid)); err != nil {
+				log.Error().Int64("pid", pid).Err(err).Msg("failed to kill 0-fs process")
+			}
+		} else {
 			log.Error().Int64("pid", pid).Err(err).Msg("failed to get pid")
 		}
 
-		if err := forceStop(int(pid)); err != nil {
-			log.Error().Int64("pid", pid).Err(err).Msg("failed to kill 0-fs process")
-		}
 	}
 
 	// clean up working dirs

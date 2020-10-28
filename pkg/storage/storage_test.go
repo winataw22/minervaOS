@@ -180,7 +180,7 @@ func TestCreateSubvol(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvol(500, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(500, "sub", pkg.SSDDevice)
 
 	require.NoError(err)
 }
@@ -235,7 +235,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvol(0, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(0, "sub", pkg.SSDDevice)
 
 	require.NoError(err)
 }
@@ -282,7 +282,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	// from the data above the create subvol will prefer pool 2 because it
 	// after adding the subvol, it will still has more space.
 
-	_, err := mod.createSubvol(20000, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(20000, "sub", pkg.SSDDevice)
 
 	require.EqualError(err, "Not enough space left in pools of this type ssd")
 }

@@ -344,7 +344,7 @@ func (s *storageModule) CreateFilesystem(name string, size uint64, poolType pkg.
 		return pkg.Filesystem{}, fmt.Errorf("invalid volume name. zdb prefix is reserved")
 	}
 
-	fs, err := s.createSubvol(size, name, poolType)
+	fs, err := s.createSubvolWithQuota(size, name, poolType)
 	if err != nil {
 		return pkg.Filesystem{}, err
 	}
@@ -457,6 +457,9 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 // if no volume with name exists, an empty path and an error is returned
 func (s *storageModule) Path(name string) (pkg.Filesystem, error) {
 	for _, pool := range s.pools {
+		if _, mounted := pool.Mounted(); !mounted {
+			continue
+		}
 		filesystems, err := pool.Volumes()
 		if err != nil {
 			return pkg.Filesystem{}, err
@@ -529,7 +532,7 @@ func (s *storageModule) ensureCache() error {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
 		log.Debug().Msgf("Trying to create new cache on SSD")
-		fs, err := s.createSubvol(cacheSize, cacheLabel, pkg.SSDDevice)
+		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, pkg.SSDDevice)
 
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create new cache on SSD")
@@ -540,7 +543,7 @@ func (s *storageModule) ensureCache() error {
 
 	if cacheFs == nil {
 		log.Debug().Msgf("Trying to create new cache on HDD")
-		fs, err := s.createSubvol(cacheSize, cacheLabel, pkg.HDDDevice)
+		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, pkg.HDDDevice)
 
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create new cache on HDD")
@@ -575,9 +578,26 @@ func (s *storageModule) ensureCache() error {
 	return nil
 }
 
-// createSubvol creates a subvolume with the given name and limits it to the given size
-// if the requested disk type does not have a storage pool available, an error is
-// returned
+// createSubvolWithQuota creates a subvolume with the given name and limits it to the given size
+// if the requested disk type does not have a storage pool with enough free size available, an error is returned
+// this methods does set a quota limit equal to size on the created volume
+func (s *storageModule) createSubvolWithQuota(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
+	volume, err := s.createSubvol(size, name, poolType)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = volume.Limit(size); err != nil {
+		log.Error().Err(err).Str("volume", volume.Path()).Msg("failed to set volume size limit")
+		return nil, err
+	}
+
+	return volume, nil
+}
+
+// createSubvol creates a subvolume with the given name
+// if the requested disk type does not have a storage pool with enough free size available, an error is returned
+// this method does not set any quota on the subvolume, for this uses createSubvolWithQuota
 func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	var err error
 
@@ -619,11 +639,6 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.Devi
 		volume, err = candidate.Pool.AddVolume(name)
 		if err != nil {
 			log.Error().Err(err).Str("pool", candidate.Pool.Name()).Msg("failed to create new filesystem")
-			continue
-		}
-		if err = volume.Limit(size); err != nil {
-			candidate.Pool.RemoveVolume(volume.Name()) // try to recover
-			log.Error().Err(err).Str("volume", volume.Path()).Msg("failed to set volume size limit")
 			continue
 		}
 
