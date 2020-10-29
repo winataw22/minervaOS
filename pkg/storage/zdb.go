@@ -137,9 +137,9 @@ func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint
 			return allocation, errors.Wrap(err, "failed to generate new sub-volume name")
 		}
 
-		// we create the zdb instance with 0 (unlimited) because this subvolume is gonna
-		// be used for a new instance of ZDB.
-		volume, err = s.createSubvol(0, name, diskType)
+		// we create the zdb volume without configuring a quota
+		// the used size will the computed from the 0-db namespaces themselves
+		volume, err = s.createSubvol(size, name, diskType)
 		if err != nil {
 			return allocation, errors.Wrap(err, "failed to create sub-volume")
 		}

@@ -378,6 +378,7 @@ func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, e
 		}
 	}
 
+	log.Debug().Str("id", string(id)).Str("ns", ns).Msg("container inspected")
 	return
 }
 
@@ -416,6 +417,7 @@ func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
 		ids = append(ids, pkg.ContainerID(c.ID()))
 	}
 
+	log.Debug().Str("ns", ns).Msg("containers list generated")
 	return ids, nil
 }
 

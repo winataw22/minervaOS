@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -275,8 +276,9 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 		return errors.Wrap(err, "could not remove vDisk")
 	}
 
+	// Unmount flist, skip error if any.
 	if err := flist.NamedUmount(reservation.ID); err != nil {
-		return errors.Wrap(err, "could not unmount flist")
+		log.Err(err).Msg("could not unmount flist")
 	}
 
 	return nil

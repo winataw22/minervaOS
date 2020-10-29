@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/threefoldtech/zbus"
@@ -27,6 +28,7 @@ func main() {
 		msgBrokerCon  string
 		containerdCon string
 		workerNr      uint
+		debug         bool
 		ver           bool
 	)
 
@@ -34,11 +36,18 @@ func main() {
 	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 	flag.StringVar(&containerdCon, "containerd", "/run/containerd/containerd.sock", "connection string to containerd")
 	flag.UintVar(&workerNr, "workers", 1, "number of workers")
+	flag.BoolVar(&debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 
 	flag.Parse()
 	if ver {
 		version.ShowAndExit(false)
+	}
+
+	// Default level is info, unless debug flag is present
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
 	// wait for shim-logs to be available before starting

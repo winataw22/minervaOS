@@ -133,7 +133,7 @@ func Delete(ns ns.NetNS) error {
 	nsPath := ns.Path()
 	// Only unmount if it's been bind-mounted (don't touch namespaces in /proc...)
 	if strings.HasPrefix(nsPath, netNSPath) {
-		if err := unix.Unmount(nsPath, 0); err != nil {
+		if err := unix.Unmount(nsPath, unix.MNT_DETACH|unix.MNT_FORCE); err != nil {
 			return fmt.Errorf("failed to unmount NS: at %s: %v", nsPath, err)
 		}
 

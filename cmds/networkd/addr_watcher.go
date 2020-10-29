@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/rs/zerolog/log"
@@ -165,6 +166,10 @@ func getLocalInterfaces() ([]types.IfaceInfo, error) {
 	}
 
 	for _, link := range ifaceutil.LinkFilter(links, []string{"device", "bridge"}) {
+		// skip the network resource bridge. They have a name that follows the pattern b-*
+		if strings.HasPrefix(link.Attrs().Name, "b-") {
+			continue
+		}
 		// a NIC of which the MII has no handshake detected, doesn't matter if it's up or down, so we bring them up,
 		// in case there is some IPv6 RA on that link.
 
