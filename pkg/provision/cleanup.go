@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
-	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
@@ -95,15 +94,8 @@ func CleanupResources(ctx context.Context, zbus zbus.Client) error {
 }
 
 func checkReservationToDelete(fs pkg.Filesystem, cl *client.Client) bool {
-
-	wid, err := WorkloadIDFromFilesystem(fs)
-	if err != nil {
-		log.Err(err).Msgf("failed to convert workload id %d", wid)
-		return false
-	}
-
-	log.Info().Msgf("checking explorer for reservation: %d", wid)
-	reservation, err := cl.Workloads.Get(schema.ID(wid))
+	log.Info().Msgf("checking explorer for reservation: %s", fs.Name)
+	reservation, err := cl.Workloads.NodeWorkloadGet(fs.Name)
 	if err != nil {
 		var hErr client.HTTPError
 		if ok := errors.As(err, &hErr); ok {
@@ -116,8 +108,9 @@ func checkReservationToDelete(fs pkg.Filesystem, cl *client.Client) bool {
 		return false
 	}
 
-	if reservation.GetNextAction() == workloads.NextActionDelete {
-		log.Info().Msgf("workload %d has next action to delete", wid)
+	nextAction := reservation.GetNextAction()
+	if nextAction == workloads.NextActionDelete || nextAction == workloads.NextActionDeleted || nextAction == workloads.NextActionInvalid {
+		log.Info().Msgf("workload %s has next action to delete / deleted or invalid", fs.Name)
 		return true
 	}
 
