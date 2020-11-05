@@ -187,14 +187,17 @@ func waitYggdrasilBin() {
 }
 
 func fetchPeerList() yggdrasil.PeerList {
-	// Try to fetch public peer for 1 minute, if we failed to do so, use the fallback hardcoded peer list
-
+	// Try to fetch public peer
+	// If we failed to do so, use the fallback hardcoded peer list
 	var pl yggdrasil.PeerList
-	bo := backoff.NewConstantBackOff(time.Minute)
-	bo.Interval = 10 * time.Second
+
+	// Do not retry more than 4 times
+	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 4)
+
 	fetchPeerList := func() error {
 		p, err := yggdrasil.FetchPeerList()
 		if err != nil {
+			log.Debug().Err(err).Msg("failed to fetch yggdrasil peers")
 			return err
 		}
 		pl = p
