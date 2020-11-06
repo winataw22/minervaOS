@@ -24,6 +24,7 @@ var (
 // ReservationPoller define the interface to implement
 // to poll the Explorer for new reservation
 type ReservationPoller interface {
+	ReservationGetter
 	// Poll ask the store to send us reservation for a specific node ID
 	// from is the used as a filter to which reservation to use as
 	// reservation.ID >= from. So a client to the Poll method should make

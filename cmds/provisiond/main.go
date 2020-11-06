@@ -124,11 +124,12 @@ func main() {
 
 	provisioner := primitives.NewProvisioner(localStore, zbusCl)
 
+	puller := explorer.NewPoller(e, primitives.WorkloadToProvisionType, primitives.ProvisionOrder)
 	engine := provision.New(provision.EngineOps{
 		NodeID: nodeID.Identity(),
 		Cache:  localStore,
 		Source: provision.CombinedSource(
-			provision.PollSource(explorer.NewPoller(e, primitives.WorkloadToProvisionType, primitives.ProvisionOrder), nodeID),
+			provision.PollSource(puller, nodeID),
 			provision.NewDecommissionSource(localStore),
 		),
 		Provisioners:   provisioner.Provisioners,
@@ -137,6 +138,7 @@ func main() {
 		Signer:         identity,
 		Statser:        statser,
 		ZbusCl:         zbusCl,
+		Janitor:        provision.NewJanitor(zbusCl, puller),
 	})
 
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.Provision(engine))

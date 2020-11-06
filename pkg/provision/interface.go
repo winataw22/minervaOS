@@ -15,6 +15,12 @@ type ReservationSource interface {
 	Reservations(ctx context.Context) <-chan *ReservationJob
 }
 
+// ReservationGetter interface. Some reservation sources
+// can implement the getter interface
+type ReservationGetter interface {
+	Get(gwid string) (*Reservation, error)
+}
+
 // ProvisionerFunc is the function called by the Engine to provision a workload
 type ProvisionerFunc func(ctx context.Context, reservation *Reservation) (interface{}, error)
 

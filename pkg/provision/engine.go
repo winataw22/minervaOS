@@ -35,6 +35,7 @@ type Engine struct {
 	signer         Signer
 	statser        Statser
 	zbusCl         zbus.Client
+	janitor        *Janitor
 }
 
 // EngineOps are the configuration of the engine
@@ -63,6 +64,10 @@ type EngineOps struct {
 	Statser Statser
 	// ZbusCl is a client to Zbus
 	ZbusCl zbus.Client
+
+	// Janitor is used to clean up some of the resources that might be lingering on the node
+	// if not set, no cleaning up will be done
+	Janitor *Janitor
 }
 
 // New creates a new engine. Once started, the engine
@@ -82,6 +87,7 @@ func New(opts EngineOps) *Engine {
 		signer:         opts.Signer,
 		statser:        opts.Statser,
 		zbusCl:         opts.ZbusCl,
+		janitor:        opts.Janitor,
 	}
 }
 
@@ -96,10 +102,11 @@ func (e *Engine) Run(ctx context.Context) error {
 	_, err := c.AddFunc("@midnight", func() {
 		cleanUp <- struct{}{}
 	})
-	c.Start()
 	if err != nil {
 		return fmt.Errorf("failed to setup cron task: %w", err)
 	}
+
+	c.Start()
 	defer c.Stop()
 
 	for {
@@ -157,7 +164,12 @@ func (e *Engine) Run(ctx context.Context) error {
 				continue
 			}
 			log.Info().Msg("start cleaning up resources")
-			if err := CleanupResources(ctx, e.zbusCl); err != nil {
+			if e.janitor == nil {
+				log.Info().Msg("janitor is not configured, skipping clean up")
+				continue
+			}
+
+			if err := e.janitor.CleanupResources(ctx); err != nil {
 				log.Error().Err(err).Msg("failed to cleanup resources")
 				continue
 			}

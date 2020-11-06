@@ -20,6 +20,10 @@ func (s *TestPollSource) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservatio
 	return returns.Get(0).([]*Reservation), uint64(returns.Get(1).(int)), returns.Error(2)
 }
 
+func (s *TestPollSource) Get(gwid string) (*Reservation, error) {
+	return nil, fmt.Errorf("unimplemented")
+}
+
 func TestHTTPReservationSource(t *testing.T) {
 	require := require.New(t)
 	var store TestPollSource
@@ -84,6 +88,10 @@ type TestTrackSource struct {
 	Max   uint64
 	ID    uint64
 	Calls []int64
+}
+
+func (s *TestTrackSource) Get(gwid string) (*Reservation, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func (s *TestTrackSource) Poll(nodeID pkg.Identifier, from uint64) ([]*Reservation, uint64, error) {

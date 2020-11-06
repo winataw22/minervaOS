@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 )
 
 //go:generate mkdir -p stubs
@@ -177,6 +178,11 @@ type VDisk struct {
 	Size int64
 }
 
+// Name returns the Name part of the disk path
+func (d *VDisk) Name() string {
+	return filepath.Base(d.Path)
+}
+
 // VDiskModule interface
 type VDiskModule interface {
 	// AllocateDisk with given id and size, return path to virtual disk
@@ -187,6 +193,8 @@ type VDiskModule interface {
 	Exists(id string) bool
 	// Inspect return info about the disk
 	Inspect(id string) (VDisk, error)
+	// List lists all the available vdisks
+	List() ([]VDisk, error)
 }
 
 // StorageModule defines the api for storage

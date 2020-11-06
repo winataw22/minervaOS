@@ -33,6 +33,16 @@ func NewPoller(cl *client.Client, inputConv provision.ReservationConverterFunc, 
 	}
 }
 
+// Get gets a reservation by the global workload id
+func (r *Poller) Get(gwid string) (*provision.Reservation, error) {
+	workload, err := r.wl.NodeWorkloadGet(gwid)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.inputConv(workload)
+}
+
 // Poll implements provision.ReservationPoller
 func (r *Poller) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservation, uint64, error) {
 
