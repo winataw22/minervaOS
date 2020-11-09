@@ -58,6 +58,11 @@ func (s *StorageMock) Path(name string) (pkg.Filesystem, error) {
 	}, args.Error(1)
 }
 
+func (s *StorageMock) CanAllocate(name string, size uint64) (bool, error) {
+	args := s.Called(name, size)
+	return args.Bool(0), args.Error(1)
+}
+
 // GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
 func (s *StorageMock) GetCacheFS() (pkg.Filesystem, error) {
 	return pkg.Filesystem{}, nil

@@ -320,7 +320,8 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface
 
 // returns the vCpu's, memory, disksize for a vm size
 // memory and disk size is expressed in MiB
-func vmSize(size uint8) (uint8, uint64, uint64, error) {
+func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
+
 	switch size {
 	case 1:
 		// 1 vCpu, 2 GiB RAM, 50 GB disk
@@ -328,6 +329,42 @@ func vmSize(size uint8) (uint8, uint64, uint64, error) {
 	case 2:
 		// 2 vCpu, 4 GiB RAM, 100 GB disk
 		return 2, 4 * 1024, 100 * 1024, nil
+	case 3:
+		// 2 vCpu, 8 GiB RAM, 25 GB disk
+		return 2, 8 * 1024, 25 * 1024, nil
+	case 4:
+		// 2 vCpu, 8 GiB RAM, 50 GB disk
+		return 2, 8 * 1024, 50 * 1024, nil
+	case 5:
+		// 2 vCpu, 8 GiB RAM, 200 GB disk
+		return 2, 8 * 1024, 200 * 1024, nil
+	case 6:
+		// 4 vCpu, 16 GiB RAM, 50 GB disk
+		return 4, 16 * 1024, 50 * 1024, nil
+	case 7:
+		// 4 vCpu, 16 GiB RAM, 100 GB disk
+		return 4, 16 * 1024, 100 * 1024, nil
+	case 8:
+		// 4 vCpu, 16 GiB RAM, 400 GB disk
+		return 4, 16 * 1024, 400 * 1024, nil
+	case 9:
+		// 8 vCpu, 32 GiB RAM, 100 GB disk
+		return 8, 32 * 1024, 100 * 1024, nil
+	case 10:
+		// 8 vCpu, 32 GiB RAM, 200 GB disk
+		return 8, 32 * 1024, 200 * 1024, nil
+	case 11:
+		// 8 vCpu, 32 GiB RAM, 800 GB disk
+		return 8, 32 * 1024, 800 * 1024, nil
+	case 12:
+		// 1 vCpu, 64 GiB RAM, 200 GB disk
+		return 1, 64 * 1024, 200 * 1024, nil
+	case 13:
+		// 1 mvCpu, 64 GiB RAM, 400 GB disk
+		return 1, 64 * 1024, 400 * 1024, nil
+	case 14:
+		//1 vCpu, 64 GiB RAM, 800 GB disk
+		return 1, 64 * 1024, 800 * 1024, nil
 	}
 
 	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 and 2 are supported", size)
