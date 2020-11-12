@@ -19,6 +19,7 @@ const (
 )
 
 type vdiskModule struct {
+	v    pkg.VolumeAllocater
 	path string
 }
 
@@ -33,7 +34,7 @@ func NewVDiskModule(v pkg.VolumeAllocater) (pkg.VDiskModule, error) {
 		return nil, err
 	}
 
-	return &vdiskModule{path: filepath.Clean(fs.Path)}, nil
+	return &vdiskModule{v: v, path: filepath.Clean(fs.Path)}, nil
 }
 
 // AllocateDisk with given size, return path to virtual disk (size in MB)
@@ -46,6 +47,16 @@ func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
 	if _, err := os.Stat(path); err == nil {
 		// file exists
 		return path, errors.Wrapf(os.ErrExist, "disk with id '%s' already exists", id)
+	}
+
+	supported, err := d.v.CanAllocate(vdiskVolumeName, uint64(size))
+	if err != nil {
+		return path, errors.Wrap(err, "failed to check capacity for this disk allocation")
+	}
+
+	if !supported {
+		// TODO: we need to find another disk on this node if possible
+		return path, fmt.Errorf("not enough space available for this disk size")
 	}
 
 	file, err := os.Create(path)

@@ -13,7 +13,8 @@ import (
 
 type testVolume struct {
 	mock.Mock
-	name string
+	name  string
+	usage filesystem.Usage
 }
 
 func (p *testVolume) ID() int {
@@ -25,7 +26,7 @@ func (p *testVolume) Path() string {
 }
 
 func (p *testVolume) Usage() (filesystem.Usage, error) {
-	return filesystem.Usage{}, fmt.Errorf("not implemented")
+	return p.usage, nil
 }
 
 func (p *testVolume) Limit(size uint64) error {
@@ -80,23 +81,23 @@ func (p *testPool) Mounted() (string, bool) {
 }
 
 func (p *testPool) Mount() (string, error) {
-	return "", fmt.Errorf("not implemented")
+	return "", fmt.Errorf("Mount not implemented")
 }
 
 func (p *testPool) MountWithoutScan() (string, error) {
-	return "", fmt.Errorf("not implemented")
+	return "", fmt.Errorf("MountWithoutScan not implemented")
 }
 
 func (p *testPool) UnMount() error {
-	return fmt.Errorf("not implemented")
+	return fmt.Errorf("UnMount not implemented")
 }
 
 func (p *testPool) AddDevice(_ *filesystem.Device) error {
-	return fmt.Errorf("not implemented")
+	return fmt.Errorf("AddDevice not implemented")
 }
 
 func (p *testPool) RemoveDevice(_ *filesystem.Device) error {
-	return fmt.Errorf("not implemented")
+	return fmt.Errorf("RemoveDevice not implemented")
 }
 
 func (p *testPool) Type() pkg.DeviceType {
@@ -285,4 +286,121 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	_, err := mod.createSubvolWithQuota(20000, "sub", pkg.SSDDevice)
 
 	require.EqualError(err, "Not enough space left in pools of this type ssd")
+}
+
+func TestCanAllocateUsageNoReservation(t *testing.T) {
+	require := require.New(t)
+
+	pool1 := &testPool{
+		name:     "pool-1",
+		reserved: 0,
+		usage: filesystem.Usage{
+			Size: 10000,
+			Used: 100,
+		},
+		ptype: pkg.SSDDevice,
+	}
+
+	mod := &storageModule{
+		pools: []filesystem.Pool{
+			pool1,
+		},
+	}
+
+	pool1.On("Volumes").Return([]filesystem.Volume{
+		&testVolume{
+			name: "vdisk",
+		},
+	}, nil)
+
+	can, err := mod.CanAllocate("vdisk", 100)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 1900)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 10000)
+	require.NoError(err)
+	require.False(can)
+}
+
+func TestCanAllocateReservationNoUsage(t *testing.T) {
+	require := require.New(t)
+
+	pool1 := &testPool{
+		name:     "pool-1",
+		reserved: 5000,
+		usage: filesystem.Usage{
+			Size: 10000,
+			Used: 0,
+		},
+		ptype: pkg.SSDDevice,
+	}
+
+	mod := &storageModule{
+		pools: []filesystem.Pool{
+			pool1,
+		},
+	}
+
+	pool1.On("Volumes").Return([]filesystem.Volume{
+		&testVolume{
+			name: "vdisk",
+		},
+	}, nil)
+
+	can, err := mod.CanAllocate("vdisk", 100)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 5000)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 6000)
+	require.NoError(err)
+	require.False(can)
+}
+
+func TestCanAllocateLimit(t *testing.T) {
+	require := require.New(t)
+
+	pool1 := &testPool{
+		name:     "pool-1",
+		reserved: 5000,
+		usage: filesystem.Usage{
+			Size: 10000,
+			Used: 0,
+		},
+		ptype: pkg.SSDDevice,
+	}
+
+	mod := &storageModule{
+		pools: []filesystem.Pool{
+			pool1,
+		},
+	}
+
+	pool1.On("Volumes").Return([]filesystem.Volume{
+		&testVolume{
+			name: "vdisk",
+			usage: filesystem.Usage{
+				Size: 2000,
+			},
+		},
+	}, nil)
+
+	can, err := mod.CanAllocate("vdisk", 100)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 1500)
+	require.NoError(err)
+	require.True(can)
+
+	can, err = mod.CanAllocate("vdisk", 2100)
+	require.NoError(err)
+	require.False(can)
 }

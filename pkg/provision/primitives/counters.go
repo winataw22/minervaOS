@@ -81,11 +81,12 @@ func (c *Counters) CurrentWorkloads() directory.WorkloadAmount {
 
 // CurrentUnits return the number of each resource units reserved on the system
 func (c *Counters) CurrentUnits() directory.ResourceAmount {
+	gib := float64(gib)
 	return directory.ResourceAmount{
 		Cru: c.CRU.Current(),
-		Mru: float64(c.MRU.Current() / gib),
-		Hru: float64(c.HRU.Current() / gib),
-		Sru: float64(c.SRU.Current() / gib),
+		Mru: float64(c.MRU.Current()) / gib,
+		Hru: float64(c.HRU.Current()) / gib,
+		Sru: float64(c.SRU.Current()) / gib,
 	}
 }
 

@@ -465,22 +465,29 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *storageModule) Path(name string) (pkg.Filesystem, error) {
+	_, fs, err := s.path(name)
+	return fs, err
+}
+
+// Path return the path of the mountpoint of the named filesystem
+// if no volume with name exists, an empty path and an error is returned
+func (s *storageModule) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
 	for _, pool := range s.pools {
 		if _, mounted := pool.Mounted(); !mounted {
 			continue
 		}
 		filesystems, err := pool.Volumes()
 		if err != nil {
-			return pkg.Filesystem{}, err
+			return nil, pkg.Filesystem{}, err
 		}
 		for _, fs := range filesystems {
 			if fs.Name() == name {
 				usage, err := fs.Usage()
 				if err != nil {
-					return pkg.Filesystem{}, err
+					return nil, pkg.Filesystem{}, err
 				}
 
-				return pkg.Filesystem{
+				return pool, pkg.Filesystem{
 					ID:     fs.ID(),
 					FsType: fs.FsType(),
 					Name:   fs.Name(),
@@ -495,7 +502,47 @@ func (s *storageModule) Path(name string) (pkg.Filesystem, error) {
 		}
 	}
 
-	return pkg.Filesystem{}, errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
+	return nil, pkg.Filesystem{}, errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
+}
+
+func (s *storageModule) CanAllocate(name string, size uint64) (bool, error) {
+	pool, fs, err := s.path(name)
+	if err != nil {
+		return false, err
+	}
+
+	usage, err := pool.Usage()
+	if err != nil {
+		return false, err
+	}
+
+	reserved, err := pool.Reserved()
+	if err != nil {
+		return false, err
+	}
+
+	if usage.Used+size > usage.Size {
+		// disk does not have enough space for this size
+		return false, nil
+	}
+
+	if reserved+size > usage.Size {
+		// check that we won't go over reserved capacity as well
+		return false, nil
+	}
+
+	// so disk have enough capacity, now we need to check if the
+	// subvolume limit actually supports this
+	if fs.Usage.Size > 0 {
+		// we only validate the quota limit if and only if
+		// quota is set
+		if fs.Usage.Used+size > fs.Usage.Size {
+			return false, nil
+		}
+	}
+
+	// otherwise it's okay
+	return true, nil
 }
 
 // GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
