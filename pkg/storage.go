@@ -165,14 +165,6 @@ type VolumeAllocater interface {
 
 	// GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
 	GetCacheFS() (Filesystem, error)
-
-	// GetVdiskFS return the filesystem used to store the vdisk file for the VM module
-	GetVdiskFS() (Filesystem, error)
-
-	// CanAllocate checks if the given subvolume name can use this given size
-	// it checks against physical disk space first if there is enough capacity
-	// to support this, and if okay, it checks against the subvolume quota limit if set
-	CanAllocate(name string, size uint64) (bool, error)
 }
 
 // VDisk info returned by a call to inspect

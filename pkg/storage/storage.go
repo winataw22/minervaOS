@@ -39,7 +39,8 @@ var (
 	}
 )
 
-type storageModule struct {
+// Module implements functionality for pkg.StorageModule
+type Module struct {
 	pools         []filesystem.Pool
 	brokenPools   []pkg.BrokenPool
 	devices       filesystem.DeviceManager
@@ -49,7 +50,7 @@ type storageModule struct {
 }
 
 // New create a new storage module service
-func New() (pkg.StorageModule, error) {
+func New() (*Module, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -60,7 +61,7 @@ func New() (pkg.StorageModule, error) {
 		return nil, err
 	}
 
-	s := &storageModule{
+	s := &Module{
 		pools:         []filesystem.Pool{},
 		brokenPools:   []pkg.BrokenPool{},
 		devices:       m,
@@ -82,7 +83,7 @@ func New() (pkg.StorageModule, error) {
 }
 
 // Total gives the total amount of storage available for a device type
-func (s *storageModule) Total(kind pkg.DeviceType) (uint64, error) {
+func (s *Module) Total(kind pkg.DeviceType) (uint64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var total uint64
@@ -124,20 +125,20 @@ func (s *storageModule) Total(kind pkg.DeviceType) (uint64, error) {
 }
 
 // BrokenPools lists the broken storage pools that have been detected
-func (s *storageModule) BrokenPools() []pkg.BrokenPool {
+func (s *Module) BrokenPools() []pkg.BrokenPool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.brokenPools
 }
 
 // BrokenDevices lists the broken devices that have been detected
-func (s *storageModule) BrokenDevices() []pkg.BrokenDevice {
+func (s *Module) BrokenDevices() []pkg.BrokenDevice {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.brokenDevices
 }
 
-func (s *storageModule) Dump() {
+func (s *Module) dump() {
 	log.Debug().Int("volumes", len(s.pools)).Msg("dumping volumes")
 
 	for _, pool := range s.pools {
@@ -160,7 +161,7 @@ What Initialize will do is the following:
  - Scan free devices, apply the policy.
  - If new pools were created, the pool is going to be mounted automatically
 **/
-func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
+func (s *Module) initialize(policy pkg.StoragePolicy) error {
 	// lock for the entire initialization method, so other code which relies
 	// on this observes this as an atomic operation
 	s.mu.Lock()
@@ -211,7 +212,7 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 	sort.Sort(filesystem.ByReadTime(freeDisks))
 
 	// dumping current s.volumes list
-	s.Dump()
+	s.dump()
 
 	log.Info().Msgf("Creating new volumes using policy: %s", policy.Raid)
 
@@ -320,7 +321,7 @@ func (s *storageModule) initialize(policy pkg.StoragePolicy) error {
 	return nil
 }
 
-func (s *storageModule) shutdownUnusedPools() error {
+func (s *Module) shutdownUnusedPools() error {
 	for _, pool := range s.pools {
 		if _, mounted := pool.Mounted(); mounted {
 			volumes, err := pool.Volumes()
@@ -347,7 +348,7 @@ func (s *storageModule) shutdownUnusedPools() error {
 }
 
 // CreateFilesystem with the given size in a storage pool.
-func (s *storageModule) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
+func (s *Module) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
 	if strings.HasPrefix(name, "zdb") {
 		return pkg.Filesystem{}, fmt.Errorf("invalid volume name. zdb prefix is reserved")
@@ -372,13 +373,14 @@ func (s *storageModule) CreateFilesystem(name string, size uint64, poolType pkg.
 			Size: usage.Size,
 			Used: usage.Used,
 		},
+		DiskType: poolType,
 	}, nil
 }
 
 // ReleaseFilesystem with the given name, this will unmount and then delete
 // the filesystem. After this call, the caller must not perform any more actions
 // on this filesystem
-func (s *storageModule) ReleaseFilesystem(name string) error {
+func (s *Module) ReleaseFilesystem(name string) error {
 	log.Info().Msgf("Deleting volume %v", name)
 
 	for _, pool := range s.pools {
@@ -420,7 +422,7 @@ func (s *storageModule) ReleaseFilesystem(name string) error {
 }
 
 // ListFilesystems return all the filesystem managed by storeaged present on the nodes
-func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
+func (s *Module) ListFilesystems() ([]pkg.Filesystem, error) {
 	fss := make([]pkg.Filesystem, 0, 10)
 
 	for _, pool := range s.pools {
@@ -464,14 +466,14 @@ func (s *storageModule) ListFilesystems() ([]pkg.Filesystem, error) {
 
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
-func (s *storageModule) Path(name string) (pkg.Filesystem, error) {
+func (s *Module) Path(name string) (pkg.Filesystem, error) {
 	_, fs, err := s.path(name)
 	return fs, err
 }
 
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
-func (s *storageModule) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
+func (s *Module) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
 	for _, pool := range s.pools {
 		if _, mounted := pool.Mounted(); !mounted {
 			continue
@@ -505,58 +507,72 @@ func (s *storageModule) path(name string) (filesystem.Pool, pkg.Filesystem, erro
 	return nil, pkg.Filesystem{}, errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
 }
 
-func (s *storageModule) CanAllocate(name string, size uint64) (bool, error) {
-	pool, fs, err := s.path(name)
+// VDiskFindCandidate find a suitbale location for creating a vdisk of the given size
+func (s *Module) VDiskFindCandidate(size uint64) (path string, err error) {
+	candidates, err := s.findCandidates(size, pkg.SSDDevice)
 	if err != nil {
-		return false, err
+		return path, err
 	}
+	// does anyone have a vdisk subvol
+	for _, candidate := range candidates {
+		volumes, err := candidate.Pool.Volumes()
+		if err != nil {
+			log.Error().Str("pool", candidate.Pool.Path()).Err(err).Msg("failed to list pool volumes")
+			continue
+		}
+		for _, volume := range volumes {
+			if volume.Name() != vdiskVolumeName {
+				continue
+			}
 
-	usage, err := pool.Usage()
+			return volume.Path(), nil
+		}
+	}
+	// none has a vdiks subvolume, we need to
+	// create one.
+	candidate := candidates[0]
+	volume, err := candidate.Pool.AddVolume(vdiskVolumeName)
 	if err != nil {
-		return false, err
+		return path, errors.Wrap(err, "failed to create vdisk pool")
 	}
 
-	reserved, err := pool.Reserved()
-	if err != nil {
-		return false, err
-	}
+	return volume.Path(), nil
+}
 
-	if usage.Used+size > usage.Size {
-		// disk does not have enough space for this size
-		return false, nil
-	}
+// VDiskPools return a list of all vdisk pools
+func (s *Module) VDiskPools() ([]string, error) {
+	var paths []string
+	for _, pool := range s.pools {
+		if pool.Type() != pkg.SSDDevice {
+			continue
+		}
 
-	if reserved+size > usage.Size {
-		// check that we won't go over reserved capacity as well
-		return false, nil
-	}
+		if _, mounted := pool.Mounted(); !mounted {
+			continue
+		}
 
-	// so disk have enough capacity, now we need to check if the
-	// subvolume limit actually supports this
-	if fs.Usage.Size > 0 {
-		// we only validate the quota limit if and only if
-		// quota is set
-		if fs.Usage.Used+size > fs.Usage.Size {
-			return false, nil
+		volumes, err := pool.Volumes()
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to list pool '%s' volumes", pool.Path())
+		}
+
+		for _, volume := range volumes {
+			if volume.Name() == vdiskVolumeName {
+				paths = append(paths, volume.Path())
+			}
 		}
 	}
 
-	// otherwise it's okay
-	return true, nil
+	return paths, nil
 }
 
 // GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
-func (s *storageModule) GetCacheFS() (pkg.Filesystem, error) {
+func (s *Module) GetCacheFS() (pkg.Filesystem, error) {
 	return s.Path(cacheLabel)
 }
 
-// GetVdiskFS return the filesystem used to store the vdisk file for the VM module
-func (s *storageModule) GetVdiskFS() (pkg.Filesystem, error) {
-	return s.Path(vdiskVolumeName)
-}
-
 // ensureCache creates a "cache" subvolume and mounts it in /var
-func (s *storageModule) ensureCache() error {
+func (s *Module) ensureCache() error {
 	log.Info().Msgf("Setting up cache")
 
 	log.Debug().Msgf("Checking pools for existing cache")
@@ -637,7 +653,7 @@ func (s *storageModule) ensureCache() error {
 // createSubvolWithQuota creates a subvolume with the given name and limits it to the given size
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this methods does set a quota limit equal to size on the created volume
-func (s *storageModule) createSubvolWithQuota(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
+func (s *Module) createSubvolWithQuota(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	volume, err := s.createSubvol(size, name, poolType)
 	if err != nil {
 		return nil, err
@@ -654,7 +670,7 @@ func (s *storageModule) createSubvolWithQuota(size uint64, name string, poolType
 // createSubvol creates a subvolume with the given name
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this method does not set any quota on the subvolume, for this uses createSubvolWithQuota
-func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
+func (s *Module) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	var err error
 
 	if poolType != pkg.HDDDevice && poolType != pkg.SSDDevice {
@@ -662,33 +678,11 @@ func (s *storageModule) createSubvol(size uint64, name string, poolType pkg.Devi
 	}
 
 	// Look for candidates in mounted pools first
-	candidates, err := s.checkForCandidates(size, poolType, true)
+	candidates, err := s.findCandidates(size, poolType)
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to search candidates on mounted pools")
 		return nil, err
 	}
-
-	log.Debug().Msgf("Found %d candidates in mounted pools", len(candidates))
-
-	// If no candidates or found in mounted pools, we check the unmounted pools and get the first one that fits
-	if len(candidates) == 0 {
-		log.Debug().Msg("Checking unmounted pools")
-		candidates, err = s.checkForCandidates(size, poolType, false)
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to search candidates on mounted pools")
-			return nil, err
-		}
-		log.Debug().Msgf("Found %d candidates in unmounted pools", len(candidates))
-	}
-
-	if len(candidates) == 0 {
-		return nil, pkg.ErrNotEnoughSpace{DeviceType: poolType}
-	}
-
-	sort.Slice(candidates, func(i, j int) bool {
-		// reverse sorting so most available is at beginning
-		return candidates[i].Available > candidates[j].Available
-	})
 
 	var volume filesystem.Volume
 	for _, candidate := range candidates {
@@ -709,7 +703,35 @@ type candidate struct {
 	Available uint64
 }
 
-func (s *storageModule) checkForCandidates(size uint64, poolType pkg.DeviceType, mounted bool) ([]candidate, error) {
+func (s *Module) findCandidates(size uint64, poolType pkg.DeviceType) ([]candidate, error) {
+
+	// Look for candidates in mounted pools first
+	candidates, err := s.checkForCandidates(size, poolType, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to search candidate on mounted pools")
+	}
+
+	log.Debug().Msgf("found %d candidates in mounted pools", len(candidates))
+
+	// If no candidates or found in mounted pools, we check the unmounted pools and get the first one that fits
+	if len(candidates) == 0 {
+		log.Debug().Msg("Checking unmounted pools")
+		candidates, err = s.checkForCandidates(size, poolType, false)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to search candidates on unmounted pools")
+		}
+
+		log.Debug().Msgf("found %d candidates in unmounted pools", len(candidates))
+	}
+
+	if len(candidates) == 0 {
+		return nil, pkg.ErrNotEnoughSpace{DeviceType: poolType}
+	}
+
+	return candidates, nil
+}
+
+func (s *Module) checkForCandidates(size uint64, poolType pkg.DeviceType, mounted bool) ([]candidate, error) {
 	var candidates []candidate
 	for _, pool := range s.pools {
 		_, poolIsMounted := pool.Mounted()
@@ -780,10 +802,17 @@ func (s *storageModule) checkForCandidates(size uint64, poolType pkg.DeviceType,
 			return candidates, nil
 		}
 	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		// reverse sorting so most available is at beginning
+		return candidates[i].Available > candidates[j].Available
+	})
+
 	return candidates, nil
 }
 
-func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
+// Monitor implements monitor method
+func (s *Module) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 	ch := make(chan pkg.PoolsStats)
 	values := make(pkg.PoolsStats)
 	go func() {
@@ -842,7 +871,7 @@ func (s *storageModule) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 	return ch
 }
 
-func (s *storageModule) periodicallyCheckDiskShutdown() {
+func (s *Module) periodicallyCheckDiskShutdown() {
 	ticker := time.NewTicker(5 * time.Minute)
 
 	go func() {
@@ -856,7 +885,7 @@ func (s *storageModule) periodicallyCheckDiskShutdown() {
 
 // shutdownDisks will check the disks power status.
 // If a disk is on and it is not mounted then it is not supposed to be on, turn it off
-func (s *storageModule) shutdownDisks() {
+func (s *Module) shutdownDisks() {
 	for _, pool := range s.pools {
 		for _, device := range pool.Devices() {
 			log.Debug().Msgf("checking device: %s", device.Path)

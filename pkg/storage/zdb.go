@@ -15,7 +15,8 @@ import (
 	"github.com/threefoldtech/zos/pkg/storage/zdbpool"
 )
 
-func (s *storageModule) Find(nsID string) (allocation pkg.Allocation, err error) {
+// Find finds a zdb namespace allocation
+func (s *Module) Find(nsID string) (allocation pkg.Allocation, err error) {
 	for _, pool := range s.pools {
 		if _, mounted := pool.Mounted(); !mounted {
 			continue
@@ -54,7 +55,7 @@ func (s *storageModule) Find(nsID string) (allocation pkg.Allocation, err error)
 // Allocate is responsible to make sure the subvolume used by a 0-db as enough storage capacity
 // of specified size, type and mode
 // it returns the volume ID and its path or an error if it couldn't allocate enough storage
-func (s *storageModule) Allocate(nsID string, diskType pkg.DeviceType, size uint64, mode pkg.ZDBMode) (allocation pkg.Allocation, err error) {
+func (s *Module) Allocate(nsID string, diskType pkg.DeviceType, size uint64, mode pkg.ZDBMode) (allocation pkg.Allocation, err error) {
 	log := log.With().
 		Str("type", string(diskType)).
 		Uint64("size", size).
@@ -163,7 +164,7 @@ type zdbcandidate struct {
 	Free uint64
 }
 
-func (s *storageModule) checkForZDBCandidateVolumes(size uint64, poolType pkg.DeviceType, targetMode zdbpool.IndexMode) ([]zdbcandidate, error) {
+func (s *Module) checkForZDBCandidateVolumes(size uint64, poolType pkg.DeviceType, targetMode zdbpool.IndexMode) ([]zdbcandidate, error) {
 	var candidates []zdbcandidate
 	for _, pool := range s.pools {
 		// ignore pools that are not mounted for now

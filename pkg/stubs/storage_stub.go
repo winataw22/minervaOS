@@ -2,6 +2,7 @@ package stubs
 
 import (
 	"context"
+
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -63,22 +64,6 @@ func (s *StorageModuleStub) BrokenPools() (ret0 []pkg.BrokenPool) {
 	return
 }
 
-func (s *StorageModuleStub) CanAllocate(arg0 string, arg1 uint64) (ret0 bool, ret1 error) {
-	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "CanAllocate", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
 func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 pkg.DeviceType) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "CreateFilesystem", args...)
@@ -114,22 +99,6 @@ func (s *StorageModuleStub) Find(arg0 string) (ret0 pkg.Allocation, ret1 error) 
 func (s *StorageModuleStub) GetCacheFS() (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.Request(s.module, s.object, "GetCacheFS", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *StorageModuleStub) GetVdiskFS() (ret0 pkg.Filesystem, ret1 error) {
-	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "GetVdiskFS", args...)
 	if err != nil {
 		panic(err)
 	}

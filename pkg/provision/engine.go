@@ -235,23 +235,29 @@ func (e *Engine) provision(ctx context.Context, r *Reservation) error {
 		return errors.Wrapf(err, "failed to build result object for reservation: %s", result.ID)
 	}
 
-	// we make sure we store the reservation in cache first before
-	// returning the reply back to the grid, this is to make sure
-	// if the reply failed for any reason, the node still doesn't
-	// try to redeploy that reservation.
-	r.ID = realID
-	r.Result = *result
-	if err := e.cache.Add(r); err != nil {
-		return errors.Wrapf(err, "failed to cache reservation %s locally", r.ID)
-	}
-
+	// send response to explorer
 	if err := e.reply(ctx, result); err != nil {
 		log.Error().Err(err).Msg("failed to send result to BCDB")
 	}
 
-	// we skip the counting.
+	// if we fail to decomission the reservation then must be marked
+	// as deleted so it's never tried again. we also skip caching
+	// the reservation object. this is similar to what decomission does
+	// since on a decomission we also clear up the cache.
 	if provisionError != nil {
+		// we need to mark the reservation as deleted as well
+		if err := e.feedback.Deleted(e.nodeID, realID); err != nil {
+			log.Error().Err(err).Msg("failed to mark failed reservation as deleted")
+		}
+
 		return provisionError
+	}
+
+	// we only cache successful reservations
+	r.ID = realID
+	r.Result = *result
+	if err := e.cache.Add(r); err != nil {
+		return errors.Wrapf(err, "failed to cache reservation %s locally", r.ID)
 	}
 
 	// If an update occurs on the network we don't increment the counter
@@ -302,6 +308,18 @@ func (e *Engine) decommission(ctx context.Context, r *Reservation) error {
 	realID := r.ID
 	if r.Reference != "" {
 		r.ID = r.Reference
+	}
+
+	if r.Result.State == StateError {
+		// this reservation already failed to deploy
+		// this code here shouldn't be executing because if
+		// the reservation has error-ed, it means is should
+		// not be in cache.
+		// BUT
+		// that was not always the case, so instead we
+		// will just return. here
+		log.Warn().Str("id", realID).Msg("skipping reservation because it is not provisioned")
+		return nil
 	}
 
 	err = fn(ctx, r)

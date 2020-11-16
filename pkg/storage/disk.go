@@ -19,44 +19,50 @@ const (
 )
 
 type vdiskModule struct {
-	v    pkg.VolumeAllocater
-	path string
+	module *Module
 }
 
 // NewVDiskModule creates a new disk allocator
-func NewVDiskModule(v pkg.VolumeAllocater) (pkg.VDiskModule, error) {
-	fs, err := v.Path(vdiskVolumeName)
-	if errors.Is(err, os.ErrNotExist) {
-		fs, err = v.CreateFilesystem(vdiskVolumeName, 0, pkg.SSDDevice)
-	}
+func NewVDiskModule(module *Module) (pkg.VDiskModule, error) {
+	return &vdiskModule{module: module}, nil
+}
 
+func (d *vdiskModule) findDisk(id string) (string, error) {
+	pools, err := d.module.VDiskPools()
 	if err != nil {
-		return nil, err
+		return "", errors.Wrapf(err, "failed to find disk with id '%s'", id)
 	}
 
-	return &vdiskModule{v: v, path: filepath.Clean(fs.Path)}, nil
+	for _, pool := range pools {
+		path, err := d.safePath(pool, id)
+		if err != nil {
+			return "", err
+		}
+
+		if _, err := os.Stat(path); err == nil {
+			// file exists
+			return path, nil
+		}
+	}
+
+	return "", os.ErrNotExist
 }
 
 // AllocateDisk with given size, return path to virtual disk (size in MB)
 func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
-	path, err := d.safePath(id)
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := os.Stat(path); err == nil {
-		// file exists
+	path, err := d.findDisk(id)
+	if err == nil {
 		return path, errors.Wrapf(os.ErrExist, "disk with id '%s' already exists", id)
 	}
 
-	supported, err := d.v.CanAllocate(vdiskVolumeName, uint64(size))
+	base, err := d.module.VDiskFindCandidate(uint64(size))
 	if err != nil {
-		return path, errors.Wrap(err, "failed to check capacity for this disk allocation")
+		return "", errors.Wrapf(err, "failed to find a candidate to host vdisk of size '%d'", size)
 	}
 
-	if !supported {
-		// TODO: we need to find another disk on this node if possible
-		return path, fmt.Errorf("not enough space available for this disk size")
+	path, err = d.safePath(base, id)
+	if err != nil {
+		return "", err
 	}
 
 	file, err := os.Create(path)
@@ -69,13 +75,13 @@ func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
 	return path, syscall.Fallocate(int(file.Fd()), 0, 0, size*mib)
 }
 
-func (d *vdiskModule) safePath(id string) (string, error) {
-	path := filepath.Join(d.path, id)
+func (d *vdiskModule) safePath(base, id string) (string, error) {
+	path := filepath.Join(base, id)
 	// this to avoid passing an `injection` id like '../name'
 	// and end up deleting a file on the system. so only delete
 	// allocated disks
 	location := filepath.Dir(path)
-	if filepath.Clean(location) != d.path {
+	if filepath.Clean(location) != base {
 		return "", fmt.Errorf("invalid disk id: '%s'", id)
 	}
 
@@ -84,8 +90,10 @@ func (d *vdiskModule) safePath(id string) (string, error) {
 
 // DeallocateVDisk removes a virtual disk
 func (d *vdiskModule) Deallocate(id string) error {
-	path, err := d.safePath(id)
-	if err != nil {
+	path, err := d.findDisk(id)
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
@@ -98,24 +106,16 @@ func (d *vdiskModule) Deallocate(id string) error {
 
 // DeallocateVDisk removes a virtual disk
 func (d *vdiskModule) Exists(id string) bool {
-	path, err := d.safePath(id)
-
-	if err != nil {
-		// invalid ID
-		return false
-	}
-
-	_, err = os.Stat(path)
+	_, err := d.findDisk(id)
 
 	return err == nil
 }
 
 // Inspect return info about the disk
 func (d *vdiskModule) Inspect(id string) (disk pkg.VDisk, err error) {
-	path, err := d.safePath(id)
+	path, err := d.findDisk(id)
 
 	if err != nil {
-		// invalid ID
 		return disk, err
 	}
 
@@ -130,21 +130,30 @@ func (d *vdiskModule) Inspect(id string) (disk pkg.VDisk, err error) {
 }
 
 func (d *vdiskModule) List() ([]pkg.VDisk, error) {
-	items, err := ioutil.ReadDir(d.path)
+	pools, err := d.module.VDiskPools()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list virtual disks")
+		return nil, err
 	}
+	var disks []pkg.VDisk
+	for _, pool := range pools {
 
-	disks := make([]pkg.VDisk, 0, len(items))
-	for _, item := range items {
-		if item.IsDir() {
-			continue
+		items, err := ioutil.ReadDir(pool)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list virtual disks")
 		}
 
-		disks = append(disks, pkg.VDisk{
-			Path: filepath.Join(d.path, item.Name()),
-			Size: item.Size(),
-		})
+		for _, item := range items {
+			if item.IsDir() {
+				continue
+			}
+
+			disks = append(disks, pkg.VDisk{
+				Path: filepath.Join(pool, item.Name()),
+				Size: item.Size(),
+			})
+		}
+
+		return disks, nil
 	}
 
 	return disks, nil
