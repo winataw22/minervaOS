@@ -432,7 +432,8 @@ func (n *networker) RemoveTap(networkID pkg.NetID) error {
 	return ifaceutil.Delete(tapIface, nil)
 }
 
-// GetSubnet of a local network resource identified by the network ID
+// GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6
+// subnet respectively
 func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
@@ -442,25 +443,44 @@ func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	return localNR.Subnet.IPNet, nil
 }
 
-// GetDefaultGwIP returns the IP(v4) of the default gateway inside the network
-// resource identified by the network ID on the local node
-func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, error) {
+// GetNet of a network identified by the network ID
+func (n networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	return localNR.NetworkIPRange.IPNet, nil
+}
+
+// GetDefaultGwIP returns the IPs of the default gateways inside the network
+// resource identified by the network ID on the local node, for IPv4 and IPv6
+// respectively
+func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
+	localNR, err := n.networkOf(string(networkID))
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
 
 	// only IP4 atm
 	ip := localNR.Subnet.IP.To4()
 	if ip == nil {
-		return nil, errors.New("nr subnet is not valid IPv4")
+		return nil, nil, errors.New("nr subnet is not valid IPv4")
 	}
 
 	// defaut gw is currently implied to be at `x.x.x.1`
 	// also a subnet in a NR is assumed to be a /24
 	ip[len(ip)-1] = 1
 
-	return ip, nil
+	return ip, net.ParseIP("fe80::1"), nil
+}
+
+// GetIPv6From4 generates an IPv6 address from a given IPv4 address in a NR
+func (n networker) GetIPv6From4(networkID pkg.NetID, ip net.IP) (net.IPNet, error) {
+	if ip.To4() == nil {
+		return net.IPNet{}, errors.New("invalid IPv4 address")
+	}
+	return net.IPNet{IP: nr.Convert4to6(string(networkID), ip), Mask: net.CIDRMask(64, 128)}, nil
 }
 
 // Addrs return the IP addresses of interface

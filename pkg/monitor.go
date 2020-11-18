@@ -47,9 +47,6 @@ func (s *TimesStat) String() string {
 		s.CPU, s.Percent, s.User, s.System, s.Idle)
 }
 
-// CPUTimesStat alias for []TimesStat required by zbus
-type CPUTimesStat []TimesStat
-
 // DisksIOCountersStat alias for map[string]IOCountersStat required by zbus
 type DisksIOCountersStat map[string]DiskIOCountersStat
 
@@ -82,7 +79,7 @@ type PoolsStats map[string]PoolStats
 //SystemMonitor interface (provided by monitord)
 type SystemMonitor interface {
 	Memory(ctx context.Context) <-chan VirtualMemoryStat
-	CPU(ctx context.Context) <-chan CPUTimesStat
+	CPU(ctx context.Context) <-chan TimesStat
 	Disks(ctx context.Context) <-chan DisksIOCountersStat
 	Nics(ctx context.Context) <-chan NicsIOCounterStat
 }

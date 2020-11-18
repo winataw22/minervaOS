@@ -65,20 +65,20 @@ func (b *Boot) Name() string {
 }
 
 //CurrentBins returns a list of current binaries installed
-func (b *Boot) CurrentBins() (map[string]RepoFList, error) {
+func (b *Boot) CurrentBins() (map[string]FListInfo, error) {
 	f, err := os.Open(BinariesFile)
 	if err != nil {
 		return nil, err
 	}
 	dec := json.NewDecoder(f)
 
-	var result map[string]RepoFList
+	var result map[string]FListInfo
 	err = dec.Decode(&result)
 	return result, err
 }
 
 //SetBins sets the current list of binaries in boot files
-func (b *Boot) SetBins(current map[string]RepoFList) error {
+func (b *Boot) SetBins(current map[string]FListInfo) error {
 	f, err := os.Create(BinariesFile)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func (b *Boot) MustVersion() semver.Version {
 }
 
 // loadInfo get boot info set by bootstrap process
-func loadInfo(fqn string, path string) (info flistInfo, err error) {
+func loadInfo(fqn string, path string) (info FullFListInfo, err error) {
 	info.Repository = filepath.Dir(fqn)
 	f, err := os.Open(path)
 	if err != nil {

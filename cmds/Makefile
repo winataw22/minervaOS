@@ -8,10 +8,17 @@ ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revisio
 all: $(shell ls -d */)
 	strip $(OUT)/*
 
-.PHONY: output clean
+.PHONY: output clean identityd identityd/
 
 output:
 	mkdir -p $(OUT)
+
+identityd:
+	cd identityd && GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
+
+# this one is expanded by the `all` rule.
+identityd/:
+	cd identityd && GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
 
 %:	%/*.go output
 	cd $(shell dirname $<) && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/$(shell basename `dirname $<`)

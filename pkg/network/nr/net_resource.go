@@ -353,7 +353,7 @@ func (nr *NetResource) attachToNRBridge() error {
 			return err
 		}
 
-		ipv6 := convert4to6(nr.ID(), ipnet.IP)
+		ipv6 := Convert4to6(nr.ID(), ipnet.IP)
 		addr = &netlink.Addr{IPNet: &net.IPNet{
 			IP:   ipv6,
 			Mask: net.CIDRMask(64, 128),
@@ -489,7 +489,7 @@ func (nr *NetResource) applyFirewall() error {
 	return nil
 }
 
-func convert4to6(netID string, ip net.IP) net.IP {
+func Convert4to6(netID string, ip net.IP) net.IP {
 	h := md5.New()
 	md5NetID := h.Sum([]byte(netID))
 

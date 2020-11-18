@@ -9,7 +9,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
+	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -43,6 +46,8 @@ type Kubernetes struct {
 	// the later, the VM will retrieve the github keys for this username
 	// when it boots.
 	SSHKeys []string `json:"ssh_keys"`
+	// PublicIP points to a reservation for a public ip
+	PublicIP schema.ID `json:"public_ip"`
 
 	PlainClusterSecret string `json:"-"`
 }
@@ -201,6 +206,7 @@ func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu ui
 		InitrdImage: imagePath + "/k3os-initrd-amd64",
 		KernelArgs:  cmdline,
 		Disks:       disks,
+		NoKeepAlive: true, //machine will not restarted automatically when it exists
 	}
 
 	if err := vm.Run(installVM); err != nil {
@@ -297,22 +303,71 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface
 		return pkg.VMNetworkInfo{}, fmt.Errorf("IP %s is not part of local nr subnet %s", cfg.IP.String(), subnet.String())
 	}
 
+	privNet, err := network.GetNet(netID)
+	if err != nil {
+		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network range")
+	}
+
 	addrCIDR := net.IPNet{
 		IP:   cfg.IP,
 		Mask: subnet.Mask,
 	}
 
-	gw, err := network.GetDefaultGwIP(netID)
+	gw4, gw6, err := network.GetDefaultGwIP(netID)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource default gateway")
+		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get network resource default gateway")
+	}
+
+	privIP6, err := network.GetIPv6From4(netID, cfg.IP)
+	if err != nil {
+		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
 	}
 
 	networkInfo := pkg.VMNetworkInfo{
-		Tap:         iface,
-		MAC:         "", // rely on static IP configuration so we don't care here
-		AddressCIDR: addrCIDR,
-		GatewayIP:   net.IP(gw),
+		Ifaces: []pkg.VMIface{{
+			Tap:            iface,
+			MAC:            "", // rely on static IP configuration so we don't care here
+			IP4AddressCIDR: addrCIDR,
+			IP4GatewayIP:   net.IP(gw4),
+			IP4Net:         privNet,
+			IP6AddressCIDR: privIP6,
+			IP6GatewayIP:   gw6,
+			Public:         false,
+		}},
 		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("8.8.4.4")},
+	}
+
+	if cfg.PublicIP != 0 {
+		// A public ip is set, load the reservation, extract the ip and make a config
+		// for it
+		// TODO: proper firewalling on the host
+
+		explorerClient, err := app.ExplorerClient()
+		if err != nil {
+			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not create explorer client")
+		}
+
+		workloadDefinition, err := explorerClient.Workloads.Get(cfg.PublicIP)
+		if err != nil {
+			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not load public ip reservation")
+		}
+		// load IP
+		ip, ok := workloadDefinition.(*workloads.PublicIP)
+		if !ok {
+			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not decode ip reservation")
+		}
+
+		iface := pkg.VMIface{
+			// Tap: ,// TODO,
+			MAC:            "",                                                                      // super static stuff
+			IP4AddressCIDR: net.IPNet{IP: ip.IPaddress, Mask: net.IPv4Mask(0xff, 0xff, 0xff, 0xff)}, // TODO: get from networkd
+			IP4GatewayIP:   ip.IPaddress,                                                            // TODO: get from  reservation
+			// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
+			//
+			Public: true,
+		}
+
+		networkInfo.Ifaces = append(networkInfo.Ifaces, iface)
 	}
 
 	return networkInfo, nil
@@ -365,6 +420,15 @@ func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
 	case 14:
 		//1 vCpu, 64 GiB RAM, 800 GB disk
 		return 1, 64 * 1024, 800 * 1024, nil
+	case 15:
+		//1 vCpu, 2 GiB RAM, 25 GB disk
+		return 1, 2 * 1024, 25 * 1024, nil
+	case 16:
+		//2 vCpu, 4 GiB RAM, 50 GB disk
+		return 2, 4 * 1024, 50 * 1024, nil
+	case 17:
+		//4 vCpu, 8 GiB RAM, 50 GB disk
+		return 4, 8 * 1024, 50 * 1024, nil
 	}
 
 	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 and 2 are supported", size)

@@ -23,6 +23,10 @@ func Decrypt(msg []byte, sk ed25519.PrivateKey) ([]byte, error) {
 	curvePriv := PrivateKeyToCurve25519(sk)
 	curvePub := PublicKeyToCurve25519(sk.Public().(ed25519.PublicKey))
 
+	if len(msg) < 48 {
+		return nil, fmt.Errorf("invalid cipher text too short")
+	}
+
 	return box.Open(msg, &curvePub, &curvePriv)
 }
 

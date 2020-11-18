@@ -1,23 +1,24 @@
 package vm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
 	firecracker "github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
+	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 )
 
@@ -28,29 +29,33 @@ const (
 	defaultKernelArgs = "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules"
 )
 
-// vmModuleImpl implements the VMModule interface
-type vmModuleImpl struct {
-	root string
+// Module implements the VMModule interface
+type Module struct {
+	root     string
+	client   zbus.Client
+	lock     sync.Mutex
+	failures *cache.Cache
 }
 
 var (
-	_ pkg.VMModule = (*vmModuleImpl)(nil)
-
-	errScanFound = fmt.Errorf("found")
+	_ pkg.VMModule = (*Module)(nil)
 )
 
 // NewVMModule creates a new instance of vm manager
-func NewVMModule(root string) (pkg.VMModule, error) {
+func NewVMModule(cl zbus.Client, root string) (*Module, error) {
 	if err := os.MkdirAll(FCSockDir, 0755); err != nil {
 		return nil, err
 	}
 
-	return &vmModuleImpl{
-		root: root,
+	return &Module{
+		root:   root,
+		client: cl,
+		// values are cached only for 1 minute. purge cache every 20 second
+		failures: cache.New(2*time.Minute, 20*time.Second),
 	}, nil
 }
 
-func (m *vmModuleImpl) makeDevices(vm *pkg.VM) ([]Drive, error) {
+func (m *Module) makeDevices(vm *pkg.VM) ([]Drive, error) {
 	var drives []Drive
 	for i, disk := range vm.Disks {
 		id := fmt.Sprintf("%d", i+2)
@@ -66,20 +71,21 @@ func (m *vmModuleImpl) makeDevices(vm *pkg.VM) ([]Drive, error) {
 	return drives, nil
 }
 
-func (m *vmModuleImpl) machineRoot(id string) string {
+func (m *Module) machineRoot(id string) string {
 	return filepath.Join(m.root, "firecracker", id)
 }
 
-func (m *vmModuleImpl) socket(id string) string {
+func (m *Module) socket(id string) string {
 	return filepath.Join(m.machineRoot(id), "root", "api.socket")
 }
 
-func (m *vmModuleImpl) Exists(id string) bool {
-	_, err := m.find(id)
+// Exists checks if firecracker process running for this machine
+func (m *Module) Exists(id string) bool {
+	_, err := find(id)
 	return err == nil
 }
 
-func (m *vmModuleImpl) cleanFs(id string) error {
+func (m *Module) cleanFs(id string) error {
 	root := filepath.Join(m.machineRoot(id), "root")
 
 	files, err := ioutil.ReadDir(root)
@@ -111,13 +117,30 @@ func (m *vmModuleImpl) cleanFs(id string) error {
 	return os.RemoveAll(m.machineRoot(id))
 }
 
-func (m *vmModuleImpl) makeNetwork(vm *pkg.VM) (iface Interface, cmdline string, err error) {
-	netIP := vm.Network.AddressCIDR
+func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
+	// assume there is always at least 1 iface present
 
-	nic := Interface{
-		ID:  "eth0",
-		Tap: vm.Network.Tap,
-		Mac: vm.Network.MAC,
+	// we do 2 things here:
+	// - create the correct fc structure
+	// - create the cmd line params
+	//
+	// for FC vms there are 2 different methods. The original one used a built-in
+	// NFS module to allow setting a static ipv4 from the command line. The newer
+	// method uses a custom script inside the image to set proper IP. The config
+	// is also passed through the command line. To have easy backward compatibility,
+	// we just set the args for both here, as unused params don't crash the guest.
+
+	// netIP is only used for the old style network, which only had 1 iface, so we
+	// just take it from the first iface config (which should be the only one)
+	netIP := vm.Network.Ifaces[0].IP4AddressCIDR
+
+	nics := make([]Interface, 0, len(vm.Network.Ifaces))
+	for i, ifcfg := range vm.Network.Ifaces {
+		nics = append(nics, Interface{
+			ID:  fmt.Sprintf("eth%d", i),
+			Tap: ifcfg.Tap,
+			Mac: ifcfg.MAC,
+		})
 	}
 
 	dns0 := ""
@@ -128,19 +151,59 @@ func (m *vmModuleImpl) makeNetwork(vm *pkg.VM) (iface Interface, cmdline string,
 	if len(vm.Network.Nameservers) > 1 {
 		dns1 = vm.Network.Nameservers[1].String()
 	}
+	if len(vm.Network.Nameservers) > 2 {
+		dns1 = vm.Network.Nameservers[2].String()
+	}
 
-	cmdline = fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
+	oldCmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
 		netIP.IP.String(),
-		vm.Network.GatewayIP.String(),
+		vm.Network.Ifaces[0].IP4GatewayIP.String(), // again the old style network has a single iface so use the gw directly
 		net.IP(netIP.Mask).String(),
 		dns0,
 		dns1,
 	)
 
-	return nic, cmdline, nil
+	newCmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
+	for i, ifcfg := range vm.Network.Ifaces {
+		newCmdLineSections = append(newCmdLineSections, m.makeNetCmdLine(i, ifcfg))
+	}
+	dnsSection := make([]string, 0, len(vm.Network.Nameservers))
+	for _, ns := range vm.Network.Nameservers {
+		dnsSection = append(dnsSection, ns.String())
+	}
+	newCmdLineSections = append(newCmdLineSections, fmt.Sprintf("net_dns=%s", strings.Join(dnsSection, ",")))
+
+	cmdline := strings.Join(append([]string{oldCmdline}, newCmdLineSections...), " ")
+
+	return nics, cmdline, nil
 }
 
-func (m *vmModuleImpl) tail(path string) (string, error) {
+func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
+	// net_%ifacename=%ip4_cidr,$ip4_gw[,$ip4_route],$ipv6_cidr,$ipv6_gw,public|priv
+	ip4Elems := make([]string, 0, 3)
+	ip4Elems = append(ip4Elems, ifcfg.IP4AddressCIDR.String())
+	ip4Elems = append(ip4Elems, ifcfg.IP4GatewayIP.String())
+	if len(ifcfg.IP4Net.IP) > 0 {
+		ip4Elems = append(ip4Elems, ifcfg.IP4Net.String())
+	}
+
+	ip6Elems := make([]string, 0, 3)
+	if ifcfg.IP6AddressCIDR.IP.To16() != nil {
+		ip6Elems = append(ip6Elems, ifcfg.IP6AddressCIDR.String())
+		ip6Elems = append(ip6Elems, ifcfg.IP6GatewayIP.String())
+	} else {
+		ip6Elems = append(ip6Elems, "slaac")
+	}
+
+	privPub := "private"
+	if ifcfg.Public {
+		privPub = "public"
+	}
+
+	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)
+}
+
+func (m *Module) tail(path string) (string, error) {
 	// fetch 2k of bytes from the path ?
 	// TODO: implement a better tail algo.
 
@@ -178,7 +241,7 @@ func (m *vmModuleImpl) tail(path string) (string, error) {
 	return string(logs), nil
 }
 
-func (m *vmModuleImpl) withLogs(path string, err error) error {
+func (m *Module) withLogs(path string, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -192,7 +255,10 @@ func (m *vmModuleImpl) withLogs(path string, err error) error {
 }
 
 // Run vm
-func (m *vmModuleImpl) Run(vm pkg.VM) error {
+func (m *Module) Run(vm pkg.VM) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if err := vm.Validate(); err != nil {
 		return errors.Wrap(err, "machine configuration validation failed")
 	}
@@ -219,7 +285,7 @@ func (m *vmModuleImpl) Run(vm pkg.VM) error {
 		kargs.WriteString(defaultKernelArgs)
 	}
 
-	nic, args, err := m.makeNetwork(&vm)
+	nics, args, err := m.makeNetwork(&vm)
 	if err != nil {
 		return err
 	}
@@ -242,10 +308,8 @@ func (m *vmModuleImpl) Run(vm pkg.VM) error {
 			Mem:       vm.Memory,
 			HTEnabled: false,
 		},
-		Interfaces: []Interface{
-			nic,
-		},
-		Drives: devices,
+		Interfaces: nics,
+		Drives:     devices,
 	}
 
 	defer func() {
@@ -254,18 +318,39 @@ func (m *vmModuleImpl) Run(vm pkg.VM) error {
 		}
 	}()
 
-	logFile := machine.Log(m.root)
+	jailed, err := machine.Jail(m.root)
+	if err != nil {
+		return err
+	}
 
-	if err = machine.Start(ctx, m.root); err != nil {
+	if err = jailed.Save(); err != nil {
+		return err
+	}
+
+	logFile := jailed.Log(m.root)
+
+	if vm.NoKeepAlive {
+		m.failures.Set(jailed.ID, permanent, cache.NoExpiration)
+	}
+
+	if err = jailed.Start(ctx); err != nil {
 		return m.withLogs(logFile, err)
 	}
 
+	if err := m.waitAndAdjOom(ctx, jailed.ID); err != nil {
+		return m.withLogs(logFile, err)
+	}
+
+	return nil
+}
+
+func (m *Module) waitAndAdjOom(ctx context.Context, id string) error {
 	check := func() error {
-		if !m.Exists(machine.ID) {
-			return fmt.Errorf("failed to spawn vm machine process '%s'", machine.ID)
+		if !m.Exists(id) {
+			return fmt.Errorf("failed to spawn vm machine process '%s'", id)
 		}
 		//TODO: check unix connection
-		socket := m.socket(machine.ID)
+		socket := m.socket(id)
 		con, err := net.Dial("unix", socket)
 		if err != nil {
 			return err
@@ -278,15 +363,24 @@ func (m *vmModuleImpl) Run(vm pkg.VM) error {
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
 
-	// wait for the machine to answer
-	if err = backoff.Retry(check, backoff.WithContext(backoff.NewConstantBackOff(2*time.Second), ctx)); err != nil {
-		return m.withLogs(logFile, err)
+	if err := backoff.Retry(check, backoff.WithContext(backoff.NewConstantBackOff(2*time.Second), ctx)); err != nil {
+		return err
+	}
+
+	pid, err := find(id)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find vm with id '%s'", id)
+	}
+
+	if err := ioutil.WriteFile(filepath.Join("/proc/", fmt.Sprint(pid), "oom_adj"), []byte("-17"), 0644); err != nil {
+		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", id, pid)
 	}
 
 	return nil
 }
 
-func (m *vmModuleImpl) Inspect(name string) (pkg.VMInfo, error) {
+// Inspect a machine by name
+func (m *Module) Inspect(name string) (pkg.VMInfo, error) {
 	if !m.Exists(name) {
 		return pkg.VMInfo{}, fmt.Errorf("machine '%s' does not exist", name)
 	}
@@ -304,69 +398,16 @@ func (m *vmModuleImpl) Inspect(name string) (pkg.VMInfo, error) {
 	}, nil
 }
 
-func (m *vmModuleImpl) find(name string) (int, error) {
-	const (
-		proc   = "/proc"
-		search = "/firecracker"
-	)
-	idArg := name
-	result := 0
-	err := filepath.Walk(proc, func(path string, info os.FileInfo, _ error) error {
-		if path == proc {
-			// assend into /proc
-			return nil
-		}
-
-		dir, name := filepath.Split(path)
-
-		if filepath.Clean(dir) != proc {
-			// this to make sure we only scan first level
-			return filepath.SkipDir
-		}
-
-		pid, err := strconv.Atoi(name)
-		if err != nil {
-			//not a number
-			return nil //continue scan
-		}
-		cmd, err := ioutil.ReadFile(filepath.Join(path, "cmdline"))
-		if os.IsNotExist(err) {
-			return nil
-		} else if err != nil {
-			return err
-		}
-
-		parts := bytes.Split(cmd, []byte{0})
-		if string(parts[0]) != search {
-			return nil
-		}
-
-		// a firecracker instance, now find id
-		for _, part := range parts {
-			if string(part) == idArg {
-				// a hit
-				result = pid
-				// this is to stop the scan.
-				return errScanFound
-			}
-		}
-
-		return nil
-	})
-
-	if err == errScanFound {
-		return result, nil
-	} else if err != nil {
-		return 0, err
-	}
-
-	return 0, fmt.Errorf("vm '%s' not found", name)
-}
-
-func (m *vmModuleImpl) Delete(name string) error {
+// Delete deletes a machine by name (id)
+func (m *Module) Delete(name string) error {
 	defer m.cleanFs(name)
+	defer m.failures.Delete(name)
 
-	pid, err := m.find(name)
+	// before we do anything we set failures to permanent to prevent monitoring from trying
+	// to revive this machine
+	m.failures.Set(name, permanent, cache.NoExpiration)
+
+	pid, err := find(name)
 	if err != nil {
 		// machine already gone
 		return nil

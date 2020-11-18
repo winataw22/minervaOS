@@ -94,7 +94,7 @@ func (nr *NetResource) Join(cfg ContainerConfig) (join pkg.Member, err error) {
 		// then we create derive one to allow IPv6 traffic to go out
 		// if the user ask for a public IPv6, then the all config comes from SLAAC so we don't have to do anything ourself
 		if !cfg.IPv4Only && !cfg.PublicIP6 {
-			ipv6 := convert4to6(nr.ID(), cfg.IPs[0])
+			ipv6 := Convert4to6(nr.ID(), cfg.IPs[0])
 			slog.Info().
 				Str("ip", ipv6.String()).
 				Msgf("set ip to container")

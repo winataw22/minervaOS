@@ -430,18 +430,24 @@ func (e *Engine) updateStats() error {
 	wl := e.statser.CurrentWorkloads()
 	r := e.statser.CurrentUnits()
 
-	storaged := stubs.NewStorageModuleStub(e.zbusCl)
+	if e.zbusCl != nil {
+		// TODO: this is a very specific zos code that should not be
+		// here. this is a quick fix for the tfgateways
+		// but should be implemented cleanely after
+		storaged := stubs.NewStorageModuleStub(e.zbusCl)
 
-	cache, err := storaged.GetCacheFS()
-	if err != nil {
-		return err
-	}
+		cache, err := storaged.GetCacheFS()
+		if err != nil {
+			return err
+		}
 
-	switch cache.DiskType {
-	case pkg.SSDDevice:
-		r.Sru += float64(cache.Usage.Size / gib)
-	case pkg.HDDDevice:
-		r.Hru += float64(cache.Usage.Size / gib)
+		switch cache.DiskType {
+		case pkg.SSDDevice:
+			r.Sru += float64(cache.Usage.Size / gib)
+		case pkg.HDDDevice:
+			r.Hru += float64(cache.Usage.Size / gib)
+		}
+
 	}
 
 	log.Info().

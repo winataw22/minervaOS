@@ -39,7 +39,7 @@ type Watcher interface {
 
 //FListEvent struct
 type FListEvent struct {
-	flistInfo
+	FullFListInfo
 }
 
 //EventType of the event
@@ -62,7 +62,7 @@ type FListSemverWatcher struct {
 	Duration time.Duration
 	Current  semver.Version
 
-	client hubClient
+	client HubClient
 }
 
 var _ Watcher = &FListSemverWatcher{}
@@ -89,7 +89,7 @@ func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 
 	if version.GT(w.Current) {
 		ch <- &FListEvent{
-			flistInfo: info,
+			FullFListInfo: info,
 		}
 		w.Current = version
 	}
@@ -124,7 +124,7 @@ func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 			if version.GT(w.Current) {
 				select {
 				case ch <- &FListEvent{
-					flistInfo: info,
+					FullFListInfo: info,
 				}:
 				case <-ctx.Done():
 					return
@@ -138,16 +138,11 @@ func (w *FListSemverWatcher) Watch(ctx context.Context) (<-chan Event, error) {
 	return ch, nil
 }
 
-//RepoFList holds information of flist from a repo list operation
-type RepoFList struct {
-	listFListInfo
-}
-
 //RepoEvent is returned by the repo watcher
 type RepoEvent struct {
 	Repo  string
-	ToAdd []RepoFList
-	ToDel []RepoFList
+	ToAdd []FListInfo
+	ToDel []FListInfo
 }
 
 //EventType returns event type
@@ -158,28 +153,28 @@ func (e *RepoEvent) EventType() EventType {
 //FListRepoWatcher type
 type FListRepoWatcher struct {
 	Repo     string
-	Current  map[string]RepoFList
+	Current  map[string]FListInfo
 	Duration time.Duration
 
-	client hubClient
+	client HubClient
 }
 
-func (w *FListRepoWatcher) list() (map[string]RepoFList, error) {
+func (w *FListRepoWatcher) list() (map[string]FListInfo, error) {
 	packages, err := w.client.List(w.Repo)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]RepoFList)
+	result := make(map[string]FListInfo)
 	for _, pkg := range packages {
-		flist := RepoFList{pkg}
-		result[flist.Fqdn()] = flist
+		//flist := FListInfo{pkg}
+		result[pkg.Fqdn()] = pkg
 	}
 
 	return result, nil
 }
 
-func (w *FListRepoWatcher) diff(packages map[string]RepoFList) (toAdd, toDel []RepoFList) {
+func (w *FListRepoWatcher) diff(packages map[string]FListInfo) (toAdd, toDel []FListInfo) {
 	for name, pkg := range packages {
 		current, ok := w.Current[name]
 		if !ok || pkg.Updated != current.Updated {
@@ -198,7 +193,7 @@ func (w *FListRepoWatcher) diff(packages map[string]RepoFList) (toAdd, toDel []R
 }
 
 // Diff return the remote changes related to current list of packages
-func (w *FListRepoWatcher) Diff() (all map[string]RepoFList, toAdd, toDell []RepoFList, err error) {
+func (w *FListRepoWatcher) Diff() (all map[string]FListInfo, toAdd, toDell []FListInfo, err error) {
 	all, err = w.list()
 	if err != nil {
 		return all, nil, nil, errors.Wrap(err, "failed to get available packages")

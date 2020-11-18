@@ -41,27 +41,30 @@ func main() {
 		log.Fatal().Err(err).Str("root", moduleRoot).Msg("Failed to create module root")
 	}
 
+	client, err := zbus.NewRedisClient(msgBrokerCon)
 	server, err := zbus.NewRedisServer(module, msgBrokerCon, workerNr)
 	if err != nil {
 		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)
 	}
 
-	mod, err := vm.NewVMModule(moduleRoot)
+	mod, err := vm.NewVMModule(client, moduleRoot)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create a new instance of manager")
 	}
 
 	server.Register(zbus.ObjectID{Name: "manager", Version: "0.0.1"}, mod)
 
-	log.Info().
-		Str("broker", msgBrokerCon).
-		Uint("worker nr", workerNr).
-		Msg("starting vmd module")
-
 	ctx, _ := utils.WithSignal(context.Background())
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
+
+	mod.Monitor(ctx)
+
+	log.Info().
+		Str("broker", msgBrokerCon).
+		Uint("worker nr", workerNr).
+		Msg("starting vmd module")
 
 	if err := server.Run(ctx); err != nil && err != context.Canceled {
 		log.Fatal().Err(err).Msg("unexpected error")

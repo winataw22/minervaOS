@@ -88,9 +88,44 @@ func (s *NetworkerStub) DeleteNR(arg0 pkg.NetResource) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 error) {
+func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetDefaultGwIP", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) GetIPv6From4(arg0 pkg.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "GetIPv6From4", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) GetNet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "GetNet", args...)
 	if err != nil {
 		panic(err)
 	}
