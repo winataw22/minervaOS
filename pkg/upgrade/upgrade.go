@@ -287,7 +287,6 @@ func (u Upgrader) stopMultiple(timeout time.Duration, service ...string) error {
 // next time this method is called, it will match the flist
 // revision, and hence will continue updating all the other daemons
 func (u *Upgrader) upgradeSelf(store meta.Walker) error {
-	log.Debug().Msg("starting self upgrade")
 	if u.noSelfUpdate {
 		log.Debug().Msg("skipping self upgrade")
 		return nil
@@ -305,17 +304,12 @@ func (u *Upgrader) upgradeSelf(store meta.Walker) error {
 		return nil
 	}
 
-	newBin := fmt.Sprintf("%s.new", bin)
-	if err := u.copyFile(newBin, info); err != nil {
-		return err
-	}
-
 	// the timeout here is set to 1 min because
 	// this most probably will trigger a download
 	// of the binary over 0-fs, hence we need to
 	// give it enough time to download the file
 	// on slow network (i am looking at u Egypt)
-	new, err := revisionOf(newBin, 2*time.Minute)
+	new, err := revisionOf(bin, 2*time.Minute)
 	if err != nil {
 		return errors.Wrap(err, "failed to check new update daemon revision number")
 	}
@@ -324,12 +318,11 @@ func (u *Upgrader) upgradeSelf(store meta.Walker) error {
 
 	// nothing to be done here.
 	if current == new {
-		log.Debug().Msg("skipping self upgrade because same revision")
 		return nil
 	}
 
-	if err := os.Rename(newBin, bin); err != nil {
-		return errors.Wrap(err, "failed to update self binary")
+	if err := u.copyFile(bin, info); err != nil {
+		return err
 	}
 
 	log.Debug().Msg("revisions are differnet, self upgrade is needed")

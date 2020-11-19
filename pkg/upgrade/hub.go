@@ -133,9 +133,7 @@ func (h *HubClient) Download(cache, flist string) (string, error) {
 	)
 
 	// check if already downloaded
-	downloaded := filepath.Join(cache, info.Hash)
-	extracted := fmt.Sprintf("%s.d", downloaded)
-
+	extracted := filepath.Join(cache, info.Hash)
 	if _, err := os.Stat(filepath.Join(extracted, dbFileName)); err == nil {
 		// already exists.
 		return extracted, nil
@@ -150,12 +148,12 @@ func (h *HubClient) Download(cache, flist string) (string, error) {
 	log.Debug().Str("url", u.String()).Msg("downloading flist")
 	response, err := http.Get(u.String())
 	if err != nil {
-		return "", errors.Wrap(err, "failed to download flist")
+		return extracted, errors.Wrap(err, "failed to download flist")
 	}
 
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download flist: %s", response.Status)
+		return extracted, fmt.Errorf("failed to download flist: %s", response.Status)
 	}
 
 	return extracted, meta.Unpack(response.Body, extracted)

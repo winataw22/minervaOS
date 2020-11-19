@@ -49,7 +49,3 @@ require (
 )
 
 replace github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
-
-replace github.com/threefoldtech/tfexplorer v0.4.1-0.20201014110255-653c7314b944 => ../tfexplorer
-
-replace github.com/threefoldtech/zbus => ../zbus
