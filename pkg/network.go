@@ -69,12 +69,33 @@ type Networker interface {
 	// of the networkID
 	RemoveTap(networkID NetID) error
 
+	// PublicIPv4Support enabled on this node for reservations
+	PublicIPv4Support() bool
+
+	// SetupPubTap sets up a tap device in the host namespace for the networkID. It is hooked
+	// to the public bridge. The name of the tap interface is returned
+	SetupPubTap(networkID NetID) (string, error)
+
+	// PubTapExists checks if the tap device for the public network exists already
+	PubTapExists(networkID NetID) (bool, error)
+
+	// RemovePubTap removes the public tap device from the host namespace
+	// of the networkID
+	RemovePubTap(networkID NetID) error
+
 	// GetSubnet of the network with the given ID on the local node
 	GetSubnet(networkID NetID) (net.IPNet, error)
 
-	// GetDefaultGwIP returns the IP(v4) of the default gateway inside the network
-	// resource identified by the network ID on the local node
-	GetDefaultGwIP(networkID NetID) (net.IP, error)
+	// GetNet returns the full network range of the network
+	GetNet(networkID NetID) (net.IPNet, error)
+
+	// GetDefaultGwIP returns the IPs of the default gateways inside the network
+	// resource identified by the network ID on the local node, for IPv4 and IPv6
+	// respectively
+	GetDefaultGwIP(networkID NetID) (net.IP, net.IP, error)
+
+	// GetIPv6From4 generates an IPv6 address from a given IPv4 address in a NR
+	GetIPv6From4(networkID NetID, ip net.IP) (net.IPNet, error)
 
 	// Addrs return the IP addresses of interface
 	// if the interface is in a network namespace netns needs to be not empty

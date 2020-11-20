@@ -259,7 +259,7 @@ func processKubernetes(r *provision.Reservation) (u resourceUnits, err error) {
 		u.SRU = 25 * gib
 	case 4:
 		u.CRU = 2
-		u.MRU = 5 * gib
+		u.MRU = 8 * gib
 		u.SRU = 50 * gib
 	case 5:
 		u.CRU = 2
@@ -301,6 +301,18 @@ func processKubernetes(r *provision.Reservation) (u resourceUnits, err error) {
 		u.CRU = 1
 		u.MRU = 64 * gib
 		u.SRU = 800 * gib
+	case 15:
+		u.CRU = 1
+		u.MRU = 2 * gib
+		u.SRU = 25 * gib
+	case 16:
+		u.CRU = 2
+		u.MRU = 4 * gib
+		u.SRU = 50 * gib
+	case 17:
+		u.CRU = 4
+		u.MRU = 8 * gib
+		u.SRU = 50 * gib
 	}
 
 	return u, nil

@@ -88,9 +88,44 @@ func (s *NetworkerStub) DeleteNR(arg0 pkg.NetResource) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 error) {
+func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetDefaultGwIP", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) GetIPv6From4(arg0 pkg.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "GetIPv6From4", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) GetNet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "GetNet", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -149,6 +184,22 @@ func (s *NetworkerStub) Leave(arg0 pkg.NetID, arg1 string) (ret0 error) {
 	return
 }
 
+func (s *NetworkerStub) PubTapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "PubTapExists", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
 	ch := make(chan pkg.NetlinkAddresses)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "PublicAddresses")
@@ -168,9 +219,34 @@ func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.Netlink
 	return ch, nil
 }
 
+func (s *NetworkerStub) PublicIPv4Support() (ret0 bool) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "PublicIPv4Support", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) Ready() (ret0 error) {
 	args := []interface{}{}
 	result, err := s.client.Request(s.module, s.object, "Ready", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) RemovePubTap(arg0 pkg.NetID) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "RemovePubTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -189,6 +265,22 @@ func (s *NetworkerStub) RemoveTap(arg0 pkg.NetID) (ret0 error) {
 	}
 	ret0 = new(zbus.RemoteError)
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) SetupPubTap(arg0 pkg.NetID) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "SetupPubTap", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return

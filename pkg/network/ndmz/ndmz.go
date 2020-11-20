@@ -55,6 +55,9 @@ type DMZ interface {
 	IP6PublicIface() string
 	//configure an address on the public IPv6 interface
 	SetIP6PublicIface(net.IPNet) error
+	// SupportsPubIPv4 indicates if the node supports public ipv4 addresses for
+	// workloads
+	SupportsPubIPv4() bool
 }
 
 // FindIPv6Master finds which interface to use as master for NDMZ npub6 interface

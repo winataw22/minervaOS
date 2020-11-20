@@ -13,6 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	configFileName = "config.json"
+)
+
 // Boot config struct
 type Boot struct {
 	Kernel string `json:"kernel_image_path"`
@@ -51,6 +55,12 @@ type Machine struct {
 	Config     Config      `json:"machine-config"`
 }
 
+// Jailed represents a jailed machine.
+type Jailed struct {
+	Machine
+	Root string `json:"-"`
+}
+
 func (m *Machine) root(base string) string {
 	return filepath.Join(base, "firecracker", m.ID, "root")
 }
@@ -75,13 +85,14 @@ func mount(src, dest string) error {
 	return nil
 }
 
-// Jail will move files to machine root and update a "jailed"
-// copy of the config to reference correct files.
-func (m *Machine) jail(root string) (Machine, error) {
-	cfg := *m
+// Jail will move files to module base and returned a jailed machine.
+func (m *Machine) Jail(base string) (*Jailed, error) {
+	root := m.root(base)
 	if err := os.MkdirAll(root, 0755); err != nil {
-		return cfg, err
+		return nil, errors.Wrapf(err, "failed to create machine root '%s'", m.ID)
 	}
+
+	cfg := *m
 
 	rooted := func(f string) string {
 		return filepath.Join(root, filepath.Base(f))
@@ -95,7 +106,7 @@ func (m *Machine) jail(root string) (Machine, error) {
 
 		// mount kernel
 		if err := mount(file, rooted(file)); err != nil {
-			return cfg, err
+			return nil, errors.Wrapf(err, "failed to bind mount '%s' to machine root", file)
 		}
 
 		*str = filepath.Base(file)
@@ -103,51 +114,75 @@ func (m *Machine) jail(root string) (Machine, error) {
 
 	// mount drives
 	for i, drive := range cfg.Drives {
+		if len(drive.Path) == 0 {
+			return nil, fmt.Errorf("invalid configured disk empty path '%s'", m.ID)
+		}
+
 		name := filepath.Base(drive.Path)
 		if err := mount(drive.Path, rooted(drive.Path)); err != nil {
-			return cfg, err
+			return nil, errors.Wrapf(err, "failed to bind mount '%s' to machine root", drive.Path)
 		}
 
 		m.Drives[i].Path = name
 	}
 
-	return cfg, nil
+	return &Jailed{Machine: cfg, Root: root}, nil
 }
 
-// Start starts the machine.
-func (m *Machine) Start(ctx context.Context, base string) error {
-	root := m.root(base)
-	if err := os.MkdirAll(root, 0755); err != nil {
-		return errors.Wrap(err, "failed to create machine root")
-	}
-
-	jailed, err := m.jail(root)
+// JailedFromPath loads a jailed machine from given path.
+// the root points to directory which has `config.json` from
+// a previous Save() call
+func JailedFromPath(root string) (*Jailed, error) {
+	cfg, err := os.Open(filepath.Join(root, configFileName))
 	if err != nil {
-		return errors.Wrap(err, "failed to jail files")
+		return nil, err
 	}
+	defer cfg.Close()
+	var j Jailed
+	dec := json.NewDecoder(cfg)
+	if err := dec.Decode(&j); err != nil {
+		return nil, err
+	}
+	// extract ID from root
+	// root is always in format <base>/firecracker/<id>/root
+	j.ID = filepath.Base(filepath.Dir(root))
+	j.Root = root
+	return &j, nil
+}
 
-	cfg, err := os.Create(filepath.Join(root, "config.json"))
+func (j *Jailed) base() string {
+	t := filepath.Join("/firecracker", j.ID, "root")
+	return filepath.Clean(strings.TrimSuffix(j.Root, t))
+}
+
+// Save configuration
+func (j *Jailed) Save() error {
+	cfg, err := os.Create(filepath.Join(j.Root, "config.json"))
 	if err != nil {
 		return errors.Wrap(err, "failed to write config file")
 	}
 
 	defer cfg.Close()
 	enc := json.NewEncoder(cfg)
-	if err := enc.Encode(jailed); err != nil {
+	if err := enc.Encode(j); err != nil {
 		return err
 	}
 
-	cfg.Close()
+	return cfg.Close()
 
-	return jailed.exec(ctx, base)
+}
+
+// Start starts the machine.
+func (j *Jailed) Start(ctx context.Context) error {
+	return j.exec(ctx)
 }
 
 // Log returns machine log file path
-func (m *Machine) Log(base string) string {
-	return filepath.Join(m.root(base), "machine.log")
+func (j *Jailed) Log(base string) string {
+	return filepath.Join(j.Root, "machine.log")
 }
 
-func (m *Machine) exec(ctx context.Context, base string) error {
+func (j *Jailed) exec(ctx context.Context) error {
 	// prepare command
 	// because the --daemonize flag does not work as expected
 	// we are daemonizing with `ash and &` so we can use cmd.Run().
@@ -156,6 +191,17 @@ func (m *Machine) exec(ctx context.Context, base string) error {
 	// we will endup with 'zombi' process because vmd did not 'wait' for the
 	// process exit. hence daemonizing is required.
 	// due to issues with jailer --daemonize flag, we use the ash trick below
+
+	for _, d := range []string{"dev", "run", "api.socket"} {
+		err := os.RemoveAll(filepath.Join(j.Root, d))
+		if err == nil || os.IsNotExist(err) {
+			continue
+		} else {
+			return errors.Wrap(err, "failed to cleanup machine root")
+		}
+	}
+
+	base := j.base() // that is module root
 
 	jailerBin, err := exec.LookPath("jailer")
 	if err != nil {
@@ -169,7 +215,7 @@ func (m *Machine) exec(ctx context.Context, base string) error {
 
 	args := []string{
 		jailerBin,
-		"--id", m.ID,
+		"--id", j.ID,
 		"--uid", "0", "--gid", "0",
 		"--chroot-base-dir", base, // this stupid flag creates so many layers but is needed
 		"--exec-file", fcBin,
@@ -188,9 +234,15 @@ func (m *Machine) exec(ctx context.Context, base string) error {
 		testing = false
 	)
 
-	logFile := m.Log(base)
+	logFile := j.Log(base)
 
 	var cmd *exec.Cmd
+	// okay we use ash as a way to daemonize the firecracker process
+	// for somereason doing a cmd.Start() only will make the process
+	// killed if the vmd exits! which is a weird behavior not like
+	// what is expected (we also tried process.Release()) and also
+	// tried to use syscall.SysProcAttr with no luck.
+	// TODO:clean up hack use go-daemon
 	if !testing {
 		cmd = exec.CommandContext(ctx,
 			"ash", "-c",

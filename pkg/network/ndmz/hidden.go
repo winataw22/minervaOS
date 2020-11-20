@@ -178,3 +178,8 @@ func (d *Hidden) SetIP6PublicIface(subnet net.IPNet) error {
 func (d *Hidden) IP6PublicIface() string {
 	return types.DefaultBridge
 }
+
+// SupportsPubIPv4 implements DMZ interface
+func (d *Hidden) SupportsPubIPv4() bool {
+	return false
+}
