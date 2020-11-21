@@ -127,7 +127,12 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 	// for FC vms there are 2 different methods. The original one used a built-in
 	// NFS module to allow setting a static ipv4 from the command line. The newer
 	// method uses a custom script inside the image to set proper IP. The config
-	// is also passed through the command line.
+	// is also passed through the command line. To have easy backward compatibility,
+	// we just set the args for both here, as unused params don't crash the guest.
+
+	// netIP is only used for the old style network, which only had 1 iface, so we
+	// just take it from the first iface config (which should be the only one)
+	netIP := vm.Network.Ifaces[0].IP4AddressCIDR
 
 	nics := make([]Interface, 0, len(vm.Network.Ifaces))
 	for i, ifcfg := range vm.Network.Ifaces {
@@ -138,43 +143,34 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 		})
 	}
 
-	if !vm.Network.NewStyle {
-		// netIP is only used for the old style network, which only had 1 iface, so we
-		// just take it from the first iface config (which should be the only one)
-		netIP := vm.Network.Ifaces[0].IP4AddressCIDR
-
-		dns0 := ""
-		dns1 := ""
-		if len(vm.Network.Nameservers) > 0 {
-			dns0 = vm.Network.Nameservers[0].String()
-		}
-		if len(vm.Network.Nameservers) > 1 {
-			dns1 = vm.Network.Nameservers[1].String()
-		}
-
-		cmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
-			netIP.IP.String(),
-			vm.Network.Ifaces[0].IP4GatewayIP.String(), // again the old style network has a single iface so use the gw directly
-			net.IP(netIP.Mask).String(),
-			dns0,
-			dns1,
-		)
-
-		// only return the first nic should multiple be present (shouldnt be possible)
-		return nics[:1], cmdline, nil
+	dns0 := ""
+	dns1 := ""
+	if len(vm.Network.Nameservers) > 0 {
+		dns0 = vm.Network.Nameservers[0].String()
+	}
+	if len(vm.Network.Nameservers) > 1 {
+		dns1 = vm.Network.Nameservers[1].String()
 	}
 
-	cmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
+	oldCmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
+		netIP.IP.String(),
+		vm.Network.Ifaces[0].IP4GatewayIP.String(), // again the old style network has a single iface so use the gw directly
+		net.IP(netIP.Mask).String(),
+		dns0,
+		dns1,
+	)
+
+	newCmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
 	for i, ifcfg := range vm.Network.Ifaces {
-		cmdLineSections = append(cmdLineSections, m.makeNetCmdLine(i, ifcfg))
+		newCmdLineSections = append(newCmdLineSections, m.makeNetCmdLine(i, ifcfg))
 	}
 	dnsSection := make([]string, 0, len(vm.Network.Nameservers))
 	for _, ns := range vm.Network.Nameservers {
 		dnsSection = append(dnsSection, ns.String())
 	}
-	cmdLineSections = append(cmdLineSections, fmt.Sprintf("net_dns=%s", strings.Join(dnsSection, ",")))
+	newCmdLineSections = append(newCmdLineSections, fmt.Sprintf("net_dns=%s", strings.Join(dnsSection, ",")))
 
-	cmdline := strings.Join(cmdLineSections, " ")
+	cmdline := strings.Join(append([]string{oldCmdline}, newCmdLineSections...), " ")
 
 	return nics, cmdline, nil
 }
@@ -198,7 +194,7 @@ func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
 
 	privPub := "priv"
 	if ifcfg.Public {
-		privPub = "public"
+		privPub = "pub"
 	}
 
 	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)

@@ -522,8 +522,7 @@ func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
 	// also a subnet in a NR is assumed to be a /24
 	ip[len(ip)-1] = 1
 
-	// ipv6 is derived from the ipv4
-	return ip, nr.Convert4to6(string(networkID), ip), nil
+	return ip, net.ParseIP("fe80::1"), nil
 }
 
 // GetIPv6From4 generates an IPv6 address from a given IPv4 address in a NR

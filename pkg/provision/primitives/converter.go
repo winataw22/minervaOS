@@ -200,20 +200,6 @@ func K8SToProvisionType(w workloads.Workloader) (Kubernetes, string, error) {
 	return k8s, k.NodeId, nil
 }
 
-// PublicIPToProvisionType converts type to internal provision type
-func PublicIPToProvisionType(w workloads.Workloader) (PublicIP, string, error) {
-	p, ok := w.(*workloads.PublicIP)
-	if !ok {
-		return PublicIP{}, "", fmt.Errorf("failed to convert kubernetes workload, wrong format")
-	}
-
-	publicIP := PublicIP{
-		IP: p.IPaddress.IPNet,
-	}
-
-	return publicIP, p.NodeId, nil
-}
-
 // NetworkResourceToProvisionType converts type to internal provision type
 func NetworkResourceToProvisionType(w workloads.Workloader) (pkg.NetResource, error) {
 	n, ok := w.(*workloads.NetworkResource)
@@ -308,11 +294,6 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 		if err != nil {
 			return nil, err
 		}
-	case workloads.WorkloadTypePublicIP:
-		data, reservation.NodeID, err = PublicIPToProvisionType(w)
-		if err != nil {
-			return nil, err
-		}
 	default:
 		return nil, fmt.Errorf("%w (%s) (%T)", ErrUnsupportedWorkload, w.GetWorkloadType().String(), w)
 	}
@@ -340,8 +321,6 @@ func ResultToSchemaType(r provision.Result) (*workloads.Result, error) {
 		rType = workloads.WorkloadTypeNetwork
 	case KubernetesReservation:
 		rType = workloads.WorkloadTypeKubernetes
-	case PublicIPReservation:
-		rType = workloads.WorkloadTypePublicIP
 	default:
 		return nil, fmt.Errorf("unknown reservation type: %s", r.Type)
 	}

@@ -17,8 +17,6 @@ const (
 	DebugReservation provision.ReservationType = "debug"
 	// KubernetesReservation type
 	KubernetesReservation provision.ReservationType = "kubernetes"
-	// PublicIPReservation type
-	PublicIPReservation provision.ReservationType = "public_ip"
 )
 
 // ProvisionOrder is used to sort the workload type
@@ -31,5 +29,4 @@ var ProvisionOrder = map[provision.ReservationType]int{
 	VolumeReservation:          4,
 	ContainerReservation:       5,
 	KubernetesReservation:      6,
-	PublicIPReservation:        7,
 }
