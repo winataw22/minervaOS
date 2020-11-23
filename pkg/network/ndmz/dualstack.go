@@ -94,6 +94,8 @@ func (d *DualStack) Create(ctx context.Context) error {
 		d.hasPubBridge = true
 	}
 
+	log.Info().Bool("public bridge", d.hasPubBridge).Msg("set up public bridge")
+
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {
 		// since we create the NDMZ here this should be a freshly booted node,
@@ -110,6 +112,7 @@ func (d *DualStack) Create(ctx context.Context) error {
 		return errors.Wrapf(err, "ndmz: createRoutingBride error")
 	}
 
+	log.Info().Msgf("set ndmz ipv6 master to %s", master)
 	d.ipv6Master = master
 
 	if err := createPubIface6(DMZPub6, master, d.nodeID, netNS); err != nil {

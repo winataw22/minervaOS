@@ -151,9 +151,6 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 	if len(vm.Network.Nameservers) > 1 {
 		dns1 = vm.Network.Nameservers[1].String()
 	}
-	if len(vm.Network.Nameservers) > 2 {
-		dns1 = vm.Network.Nameservers[2].String()
-	}
 
 	oldCmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
 		netIP.IP.String(),
@@ -195,9 +192,9 @@ func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
 		ip6Elems = append(ip6Elems, "slaac")
 	}
 
-	privPub := "private"
+	privPub := "priv"
 	if ifcfg.Public {
-		privPub = "public"
+		privPub = "pub"
 	}
 
 	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)

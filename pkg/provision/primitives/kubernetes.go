@@ -154,7 +154,6 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 
 	defer func() {
 		if err != nil {
-			_ = vm.Delete(reservation.ID)
 			_ = network.RemoveTap(netID)
 		}
 	}()
@@ -165,6 +164,12 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 		if err != nil {
 			return result, errors.Wrap(err, "could not set up tap device for public network")
 		}
+
+		defer func() {
+			if err != nil {
+				_ = network.RemovePubTap(netID)
+			}
+		}()
 	}
 
 	var netInfo pkg.VMNetworkInfo
@@ -180,6 +185,11 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}
 
 	err = p.kubernetesRun(ctx, reservation.ID, cpu, memory, diskPath, imagePath, netInfo, config)
+	if err != nil {
+		// attempt to delete the vm, should the process still be lingering
+		vm.Delete(reservation.ID)
+	}
+
 	return result, err
 }
 
@@ -238,6 +248,13 @@ func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu ui
 		case <-time.After(time.Second * 3):
 			// retry after 3 secs
 		case <-deadline.Done():
+			// If install takes longer than 5 minutes, we consider it a failure.
+			// In that case, we attempt a delete first. This will kill the vm process
+			// if it is still going. The actual resources (disk, taps, ...) should
+			// be handled by the caller.
+			if err := vm.Delete(name); err != nil {
+				log.Warn().Err(err).Msg("could not delete vm who's install deadline expired")
+			}
 			return errors.New("failed to install vm in 5 minutes")
 		}
 	}
@@ -354,7 +371,7 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface
 			IP6GatewayIP:   gw6,
 			Public:         false,
 		}},
-		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("8.8.4.4")},
+		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
 	}
 
 	if cfg.PublicIP != 0 {
@@ -391,7 +408,8 @@ func (p *Provisioner) getPubIPConfig(rid schema.ID) (net.IPNet, net.IP, error) {
 		return net.IPNet{}, nil, errors.Wrap(err, "could not create explorer client")
 	}
 
-	workloadDefinition, err := explorerClient.Workloads.Get(rid)
+	// explorerClient.Workloads.Get(...) is currently broken
+	workloadDefinition, err := explorerClient.Workloads.NodeWorkloadGet(fmt.Sprintf("%d-1", rid))
 	if err != nil {
 		return net.IPNet{}, nil, errors.Wrap(err, "could not load public ip reservation")
 	}
