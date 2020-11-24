@@ -11,7 +11,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-// func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 	env, err := environment.Get()
 	if err != nil {
@@ -23,18 +22,14 @@ func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 	var farm string
 	farmID, err := identity.FarmID()
 	if err != nil {
-		farm = "not set"
+		farm = "not attached to a farm"
 	} else {
 		farm = fmt.Sprintf("%d", farmID)
 	}
 
-	h.Text = "\n    Fetching realtime node information... please wait."
+	format := fmt.Sprintf("Zero OS [%s] Version: %%s NodeID: %s FarmID: %s", env.RunningMode.String(), nodeID.Identity(), farm)
 
-	var s string
-	s = "          Welcome to [Zero-OS](fg:yellow), [ThreeFold](fg:blue) Autonomous Operating System\n" +
-		"\n" +
-		" This is node [%s](fg:green) (farmer [%s](fg:green))\n" +
-		" running Zero-OS version [%s](fg:blue) (mode [%s](fg:cyan))"
+	h.Text = "Zero OS"
 
 	host := stubs.NewVersionMonitorStub(c)
 	ctx := context.Background()
@@ -45,8 +40,11 @@ func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 
 	go func() {
 		for version := range ch {
-			h.Text = fmt.Sprintf(s, nodeID, farm, version.String(), env.RunningMode.String())
-			r.Signal()
+			v := fmt.Sprintf(format, version.String())
+			if h.Text != v {
+				h.Text = v
+				r.Signal()
+			}
 		}
 	}()
 

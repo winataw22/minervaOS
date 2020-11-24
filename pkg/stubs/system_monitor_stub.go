@@ -2,7 +2,6 @@ package stubs
 
 import (
 	"context"
-
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -24,8 +23,8 @@ func NewSystemMonitorStub(client zbus.Client) *SystemMonitorStub {
 	}
 }
 
-func (s *SystemMonitorStub) CPU(ctx context.Context) (<-chan pkg.TimesStat, error) {
-	ch := make(chan pkg.TimesStat)
+func (s *SystemMonitorStub) CPU(ctx context.Context) (<-chan pkg.CPUTimesStat, error) {
+	ch := make(chan pkg.CPUTimesStat)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "CPU")
 	if err != nil {
 		return nil, err
@@ -33,7 +32,7 @@ func (s *SystemMonitorStub) CPU(ctx context.Context) (<-chan pkg.TimesStat, erro
 	go func() {
 		defer close(ch)
 		for event := range recv {
-			var obj pkg.TimesStat
+			var obj pkg.CPUTimesStat
 			if err := event.Unmarshal(&obj); err != nil {
 				panic(err)
 			}

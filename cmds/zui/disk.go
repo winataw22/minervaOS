@@ -20,7 +20,6 @@ func diskRender(client zbus.Client, grid *ui.Grid, render *Flag) error {
 	pools := widgets.NewTable()
 	pools.Title = "Storage Pools"
 	pools.RowSeparator = false
-	pools.TextAlignment = ui.AlignCenter
 	pools.Rows = [][]string{
 		{"POOL", "TOTAL", "USED"},
 	}

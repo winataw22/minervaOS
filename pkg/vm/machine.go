@@ -89,7 +89,7 @@ func mount(src, dest string) error {
 func (m *Machine) Jail(base string) (*Jailed, error) {
 	root := m.root(base)
 	if err := os.MkdirAll(root, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to create machine root '%s'", m.ID)
+		return nil, errors.Wrap(err, "failed to create machine root")
 	}
 
 	cfg := *m
@@ -106,7 +106,7 @@ func (m *Machine) Jail(base string) (*Jailed, error) {
 
 		// mount kernel
 		if err := mount(file, rooted(file)); err != nil {
-			return nil, errors.Wrapf(err, "failed to bind mount '%s' to machine root", file)
+			return nil, err
 		}
 
 		*str = filepath.Base(file)
@@ -114,13 +114,9 @@ func (m *Machine) Jail(base string) (*Jailed, error) {
 
 	// mount drives
 	for i, drive := range cfg.Drives {
-		if len(drive.Path) == 0 {
-			return nil, fmt.Errorf("invalid configured disk empty path '%s'", m.ID)
-		}
-
 		name := filepath.Base(drive.Path)
 		if err := mount(drive.Path, rooted(drive.Path)); err != nil {
-			return nil, errors.Wrapf(err, "failed to bind mount '%s' to machine root", drive.Path)
+			return nil, err
 		}
 
 		m.Drives[i].Path = name

@@ -117,30 +117,13 @@ func (m *Module) cleanFs(id string) error {
 	return os.RemoveAll(m.machineRoot(id))
 }
 
-func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
-	// assume there is always at least 1 iface present
+func (m *Module) makeNetwork(vm *pkg.VM) (iface Interface, cmdline string, err error) {
+	netIP := vm.Network.AddressCIDR
 
-	// we do 2 things here:
-	// - create the correct fc structure
-	// - create the cmd line params
-	//
-	// for FC vms there are 2 different methods. The original one used a built-in
-	// NFS module to allow setting a static ipv4 from the command line. The newer
-	// method uses a custom script inside the image to set proper IP. The config
-	// is also passed through the command line. To have easy backward compatibility,
-	// we just set the args for both here, as unused params don't crash the guest.
-
-	// netIP is only used for the old style network, which only had 1 iface, so we
-	// just take it from the first iface config (which should be the only one)
-	netIP := vm.Network.Ifaces[0].IP4AddressCIDR
-
-	nics := make([]Interface, 0, len(vm.Network.Ifaces))
-	for i, ifcfg := range vm.Network.Ifaces {
-		nics = append(nics, Interface{
-			ID:  fmt.Sprintf("eth%d", i),
-			Tap: ifcfg.Tap,
-			Mac: ifcfg.MAC,
-		})
+	nic := Interface{
+		ID:  "eth0",
+		Tap: vm.Network.Tap,
+		Mac: vm.Network.MAC,
 	}
 
 	dns0 := ""
@@ -152,52 +135,15 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 		dns1 = vm.Network.Nameservers[1].String()
 	}
 
-	oldCmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
+	cmdline = fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
 		netIP.IP.String(),
-		vm.Network.Ifaces[0].IP4GatewayIP.String(), // again the old style network has a single iface so use the gw directly
+		vm.Network.GatewayIP.String(),
 		net.IP(netIP.Mask).String(),
 		dns0,
 		dns1,
 	)
 
-	newCmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
-	for i, ifcfg := range vm.Network.Ifaces {
-		newCmdLineSections = append(newCmdLineSections, m.makeNetCmdLine(i, ifcfg))
-	}
-	dnsSection := make([]string, 0, len(vm.Network.Nameservers))
-	for _, ns := range vm.Network.Nameservers {
-		dnsSection = append(dnsSection, ns.String())
-	}
-	newCmdLineSections = append(newCmdLineSections, fmt.Sprintf("net_dns=%s", strings.Join(dnsSection, ",")))
-
-	cmdline := strings.Join(append([]string{oldCmdline}, newCmdLineSections...), " ")
-
-	return nics, cmdline, nil
-}
-
-func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
-	// net_%ifacename=%ip4_cidr,$ip4_gw[,$ip4_route],$ipv6_cidr,$ipv6_gw,public|priv
-	ip4Elems := make([]string, 0, 3)
-	ip4Elems = append(ip4Elems, ifcfg.IP4AddressCIDR.String())
-	ip4Elems = append(ip4Elems, ifcfg.IP4GatewayIP.String())
-	if len(ifcfg.IP4Net.IP) > 0 {
-		ip4Elems = append(ip4Elems, ifcfg.IP4Net.String())
-	}
-
-	ip6Elems := make([]string, 0, 3)
-	if ifcfg.IP6AddressCIDR.IP.To16() != nil {
-		ip6Elems = append(ip6Elems, ifcfg.IP6AddressCIDR.String())
-		ip6Elems = append(ip6Elems, ifcfg.IP6GatewayIP.String())
-	} else {
-		ip6Elems = append(ip6Elems, "slaac")
-	}
-
-	privPub := "priv"
-	if ifcfg.Public {
-		privPub = "pub"
-	}
-
-	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)
+	return nic, cmdline, nil
 }
 
 func (m *Module) tail(path string) (string, error) {
@@ -282,7 +228,7 @@ func (m *Module) Run(vm pkg.VM) error {
 		kargs.WriteString(defaultKernelArgs)
 	}
 
-	nics, args, err := m.makeNetwork(&vm)
+	nic, args, err := m.makeNetwork(&vm)
 	if err != nil {
 		return err
 	}
@@ -305,8 +251,10 @@ func (m *Module) Run(vm pkg.VM) error {
 			Mem:       vm.Memory,
 			HTEnabled: false,
 		},
-		Interfaces: nics,
-		Drives:     devices,
+		Interfaces: []Interface{
+			nic,
+		},
+		Drives: devices,
 	}
 
 	defer func() {
@@ -325,10 +273,6 @@ func (m *Module) Run(vm pkg.VM) error {
 	}
 
 	logFile := jailed.Log(m.root)
-
-	if vm.NoKeepAlive {
-		m.failures.Set(jailed.ID, permanent, cache.NoExpiration)
-	}
 
 	if err = jailed.Start(ctx); err != nil {
 		return m.withLogs(logFile, err)
@@ -398,11 +342,10 @@ func (m *Module) Inspect(name string) (pkg.VMInfo, error) {
 // Delete deletes a machine by name (id)
 func (m *Module) Delete(name string) error {
 	defer m.cleanFs(name)
-	defer m.failures.Delete(name)
 
 	// before we do anything we set failures to permanent to prevent monitoring from trying
 	// to revive this machine
-	m.failures.Set(name, permanent, cache.NoExpiration)
+	m.failures.Set(name, permanent, cache.DefaultExpiration)
 
 	pid, err := find(name)
 	if err != nil {

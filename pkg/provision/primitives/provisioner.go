@@ -31,7 +31,6 @@ func NewProvisioner(cache provision.ReservationCache, zbus zbus.Client) *Provisi
 		ZDBReservation:             p.zdbProvision,
 		DebugReservation:           p.debugProvision,
 		KubernetesReservation:      p.kubernetesProvision,
-		PublicIPReservation:        p.publicIPProvision,
 	}
 	p.Decommissioners = map[provision.ReservationType]provision.DecomissionerFunc{
 		ContainerReservation:       p.containerDecommission,
@@ -41,7 +40,6 @@ func NewProvisioner(cache provision.ReservationCache, zbus zbus.Client) *Provisi
 		ZDBReservation:             p.zdbDecommission,
 		DebugReservation:           p.debugDecommission,
 		KubernetesReservation:      p.kubernetesDecomission,
-		PublicIPReservation:        p.publicIPDecomission,
 	}
 
 	return p
