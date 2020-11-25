@@ -353,7 +353,7 @@ func (nr *NetResource) attachToNRBridge() error {
 			return err
 		}
 
-		ipv6 := convert4to6(nr.ID(), ipnet.IP)
+		ipv6 := Convert4to6(nr.ID(), ipnet.IP)
 		addr = &netlink.Addr{IPNet: &net.IPNet{
 			IP:   ipv6,
 			Mask: net.CIDRMask(64, 128),
@@ -489,12 +489,24 @@ func (nr *NetResource) applyFirewall() error {
 	return nil
 }
 
-func convert4to6(netID string, ip net.IP) net.IP {
+// Convert4to6 converts a (private) ipv4 to the corresponding ipv6
+func Convert4to6(netID string, ip net.IP) net.IP {
 	h := md5.New()
 	md5NetID := h.Sum([]byte(netID))
 
+	// pick the last 2 bytes, handle ipv4 in both ipv6 form (leading 0 bytes)
+	// and ipv4 form
+	var lastbyte, secondtolastbyte byte
+	if len(ip) == net.IPv6len {
+		lastbyte = ip[15]
+		secondtolastbyte = ip[14]
+	} else if len(ip) == net.IPv4len {
+		lastbyte = ip[3]
+		secondtolastbyte = ip[2]
+	}
+
 	ipv6 := fmt.Sprintf("fd%x:%x%x:%x%x", md5NetID[0], md5NetID[1], md5NetID[2], md5NetID[3], md5NetID[4])
-	ipv6 = fmt.Sprintf("%s:%x::%x", ipv6, ip[14], ip[15])
+	ipv6 = fmt.Sprintf("%s:%x::%x", ipv6, secondtolastbyte, lastbyte)
 
 	return net.ParseIP(ipv6)
 }

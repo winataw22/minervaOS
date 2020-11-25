@@ -1,0 +1,33 @@
+name: Chatflows Tests
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Gathering deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git python3-pip python3-venv python3-setuptools tmux redis restic nginx cron wireguard
+          sudo service redis stop
+          sudo service nginx stop
+          git clone https://github.com/threefoldtech/js-sdk.git
+          cd js-sdk
+          sudo pip3 install poetry
+          sudo poetry run pip3 install pytest 
+      - name: Install
+        run: |
+          cd js-sdk
+          sudo poetry install
+      - name: Run tests
+        env:
+          TNAME: ${{ secrets.TNAME }}
+          EMAIL: ${{ secrets.EMAIL }}
+          WORDS: ${{ secrets.WORDS }}
+          WALLET_SECRET: ${{ secrets.WALLET_SECRET }}
+        run: |
+          cd js-sdk
+          sudo --preserve-env=TNAME --preserve-env=EMAIL --preserve-env=WORDS --preserve-env=WALLET_SECRET \
+          poetry run pytest -sv tests/sals/automated_chatflows

@@ -7,18 +7,39 @@ import (
 
 //go:generate zbusc -module vmd -version 0.0.1 -name manager -package stubs github.com/threefoldtech/zos/pkg+VMModule stubs/vmd_stub.go
 
-// VMNetworkInfo structure
-type VMNetworkInfo struct {
+// VMIface structure
+type VMIface struct {
 	// Tap device name
 	Tap string
 	// Mac address of the device
 	MAC string
-	// Address of the device in the form of cidr
-	AddressCIDR net.IPNet
-	// Gateway gateway address
-	GatewayIP net.IP
+	// Address of the device in the form of cidr for ipv4
+	IP4AddressCIDR net.IPNet
+	// Gateway address for ipv4
+	IP4GatewayIP net.IP
+	// Full subnet for the IP4 resource. This allows configuration of networking for
+	// non local subnets (i.e. NR on other nodes).
+	// Does not need to be set for public ifaces
+	IP4Net net.IPNet
+	// Address of the device in the form of cidr for ipv6
+	IP6AddressCIDR net.IPNet
+	// Gateway address for ipv6
+	IP6GatewayIP net.IP
+	// Private or public network
+	Public bool
+}
+
+// VMNetworkInfo structure
+type VMNetworkInfo struct {
+	// Interfaces for the vm network
+	Ifaces []VMIface
 	// Nameservers dns servers
 	Nameservers []net.IP
+	// NewStyle version of the network. This specifically differentiates between
+	// the old way of statically setting the IP via the `IP` kernel parameter,
+	// or using a boot script. The new way allows multiple interfaces and more
+	// configuration
+	NewStyle bool
 }
 
 // VMDisk specifies vm disk params
@@ -48,6 +69,11 @@ type VM struct {
 	// Disks are a list of disks that are going to
 	// be auto allocated on the provided storage path
 	Disks []VMDisk
+	// If this flag is set, the VM module will not auto start
+	// this machine hence, also no auto clean up when it exits
+	// it's up to the caller to check for the machine status
+	// and do clean up (module.Delete(vm)) when needed
+	NoKeepAlive bool
 }
 
 // Validate vm data

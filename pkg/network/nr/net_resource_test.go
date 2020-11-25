@@ -183,7 +183,7 @@ func Test_convert4to6(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NotNil(t, tt.want)
-			got := convert4to6(tt.args.netID, tt.args.ip)
+			got := Convert4to6(tt.args.netID, tt.args.ip)
 			require.NotNil(t, got)
 			assert.EqualValues(t, tt.want, got)
 		})

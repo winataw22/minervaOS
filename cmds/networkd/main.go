@@ -99,16 +99,16 @@ func main() {
 		}
 	}
 
-	ndmz, err := buildNDMZ(nodeID.Identity())
+	ndmzNs, err := buildNDMZ(nodeID.Identity())
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
-	if err := ndmz.Create(ctx); err != nil {
+	if err := ndmzNs.Create(ctx); err != nil {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmz)
+	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmzNs)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("fail to start yggdrasil")
 	}
@@ -118,9 +118,13 @@ func main() {
 		log.Fatal().Err(err).Msgf("fail read yggdrasil subnet")
 	}
 
-	if err := ndmz.SetIP6PublicIface(gw); err != nil {
+	if err := ndmzNs.SetIP6PublicIface(gw); err != nil {
 		log.Fatal().Err(err).Msgf("fail to configure yggdrasil subnet gateway IP")
+	}
 
+	// make sure ndmz has a way out
+	if err := ndmzNs.EnsureRoutable(); err != nil {
+		log.Fatal().Err(err).Msg("failed to ensure ndmz routability")
 	}
 
 	// send another detail of network interfaces now that ndmz is created
@@ -143,7 +147,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, directory, root, ndmz, ygg)
+	networker, err := network.NewNetworker(identity, directory, root, ndmzNs, ygg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating network manager")
 	}

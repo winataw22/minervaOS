@@ -9,7 +9,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
+	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -43,11 +46,14 @@ type Kubernetes struct {
 	// the later, the VM will retrieve the github keys for this username
 	// when it boots.
 	SSHKeys []string `json:"ssh_keys"`
+	// PublicIP points to a reservation for a public ip
+	PublicIP schema.ID `json:"public_ip"`
 
 	PlainClusterSecret string `json:"-"`
 }
 
-const k3osFlistURL = "https://hub.grid.tf/tf-official-apps/k3os.flist"
+// const k3osFlistURL = "https://hub.grid.tf/tf-official-apps/k3os.flist"
+const k3osFlistURL = "https://hub.grid.tf/lee/k3os.flist"
 
 func (p *Provisioner) kubernetesProvision(ctx context.Context, reservation *provision.Reservation) (interface{}, error) {
 	return p.kubernetesProvisionImpl(ctx, reservation)
@@ -81,6 +87,11 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 
 	if exists {
 		return result, errors.New("kubernetes vm with same network already exists")
+	}
+
+	// check if public ipv4 is supported, should this be requested
+	if config.PublicIP != 0 && !network.PublicIPv4Support() {
+		return result, errors.New("public ipv4 is requested, but not supported on this node")
 	}
 
 	result.ID = reservation.ID
@@ -143,13 +154,26 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 
 	defer func() {
 		if err != nil {
-			_ = vm.Delete(reservation.ID)
 			_ = network.RemoveTap(netID)
 		}
 	}()
 
+	var pubIface string
+	if config.PublicIP != 0 {
+		pubIface, err = network.SetupPubTap(netID)
+		if err != nil {
+			return result, errors.Wrap(err, "could not set up tap device for public network")
+		}
+
+		defer func() {
+			if err != nil {
+				_ = network.RemovePubTap(netID)
+			}
+		}()
+	}
+
 	var netInfo pkg.VMNetworkInfo
-	netInfo, err = p.buildNetworkInfo(ctx, reservation.User, iface, config)
+	netInfo, err = p.buildNetworkInfo(ctx, reservation.Version, reservation.User, iface, pubIface, config)
 	if err != nil {
 		return result, errors.Wrap(err, "could not generate network info")
 	}
@@ -161,6 +185,11 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}
 
 	err = p.kubernetesRun(ctx, reservation.ID, cpu, memory, diskPath, imagePath, netInfo, config)
+	if err != nil {
+		// attempt to delete the vm, should the process still be lingering
+		vm.Delete(reservation.ID)
+	}
+
 	return result, err
 }
 
@@ -201,6 +230,7 @@ func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu ui
 		InitrdImage: imagePath + "/k3os-initrd-amd64",
 		KernelArgs:  cmdline,
 		Disks:       disks,
+		NoKeepAlive: true, //machine will not restarted automatically when it exists
 	}
 
 	if err := vm.Run(installVM); err != nil {
@@ -218,6 +248,13 @@ func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu ui
 		case <-time.After(time.Second * 3):
 			// retry after 3 secs
 		case <-deadline.Done():
+			// If install takes longer than 5 minutes, we consider it a failure.
+			// In that case, we attempt a delete first. This will kill the vm process
+			// if it is still going. The actual resources (disk, taps, ...) should
+			// be handled by the caller.
+			if err := vm.Delete(name); err != nil {
+				log.Warn().Err(err).Msg("could not delete vm who's install deadline expired")
+			}
 			return errors.New("failed to install vm in 5 minutes")
 		}
 	}
@@ -272,6 +309,12 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 		return errors.Wrap(err, "could not clean up tap device")
 	}
 
+	if cfg.PublicIP != 0 {
+		if err := network.RemovePubTap(netID); err != nil {
+			return errors.Wrap(err, "could not clean up public tap device")
+		}
+	}
+
 	if err := storage.Deallocate(fmt.Sprintf("%s-%s", reservation.ID, "vda")); err != nil {
 		return errors.Wrap(err, "could not remove vDisk")
 	}
@@ -284,7 +327,7 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 	return nil
 }
 
-func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
+func (p *Provisioner) buildNetworkInfo(ctx context.Context, rversion int, userID string, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
 	netID := provision.NetworkID(userID, string(cfg.NetworkID))
@@ -297,25 +340,112 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface
 		return pkg.VMNetworkInfo{}, fmt.Errorf("IP %s is not part of local nr subnet %s", cfg.IP.String(), subnet.String())
 	}
 
+	privNet, err := network.GetNet(netID)
+	if err != nil {
+		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network range")
+	}
+
 	addrCIDR := net.IPNet{
 		IP:   cfg.IP,
 		Mask: subnet.Mask,
 	}
 
-	gw, err := network.GetDefaultGwIP(netID)
+	gw4, gw6, err := network.GetDefaultGwIP(netID)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource default gateway")
+		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get network resource default gateway")
+	}
+
+	privIP6, err := network.GetIPv6From4(netID, cfg.IP)
+	if err != nil {
+		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
 	}
 
 	networkInfo := pkg.VMNetworkInfo{
-		Tap:         iface,
-		MAC:         "", // rely on static IP configuration so we don't care here
-		AddressCIDR: addrCIDR,
-		GatewayIP:   net.IP(gw),
-		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("8.8.4.4")},
+		Ifaces: []pkg.VMIface{{
+			Tap:            iface,
+			MAC:            "", // rely on static IP configuration so we don't care here
+			IP4AddressCIDR: addrCIDR,
+			IP4GatewayIP:   net.IP(gw4),
+			IP4Net:         privNet,
+			IP6AddressCIDR: privIP6,
+			IP6GatewayIP:   gw6,
+			Public:         false,
+		}},
+		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
+	}
+
+	// from this reservation version on we deploy new VM's with the custom boot script for IP
+	if rversion >= 2 {
+		networkInfo.NewStyle = true
+	}
+
+	if cfg.PublicIP != 0 {
+		// A public ip is set, load the reservation, extract the ip and make a config
+		// for it
+		// TODO: proper firewalling on the host
+
+		pubIP, pubGw, err := p.getPubIPConfig(cfg.PublicIP)
+		if err != nil {
+			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get public ip config")
+		}
+
+		iface := pkg.VMIface{
+			Tap:            pubIface,
+			MAC:            "", // static ip is set so not important
+			IP4AddressCIDR: pubIP,
+			IP4GatewayIP:   pubGw,
+			// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
+			//
+			Public: true,
+		}
+
+		networkInfo.Ifaces = append(networkInfo.Ifaces, iface)
 	}
 
 	return networkInfo, nil
+}
+
+// Get the public ip, and the gateway from the reservation ID
+func (p *Provisioner) getPubIPConfig(rid schema.ID) (net.IPNet, net.IP, error) {
+	// TODO: check if there is a better way to do this
+	explorerClient, err := app.ExplorerClient()
+	if err != nil {
+		return net.IPNet{}, nil, errors.Wrap(err, "could not create explorer client")
+	}
+
+	// explorerClient.Workloads.Get(...) is currently broken
+	workloadDefinition, err := explorerClient.Workloads.NodeWorkloadGet(fmt.Sprintf("%d-1", rid))
+	if err != nil {
+		return net.IPNet{}, nil, errors.Wrap(err, "could not load public ip reservation")
+	}
+	// load IP
+	ip, ok := workloadDefinition.(*workloads.PublicIP)
+	if !ok {
+		return net.IPNet{}, nil, errors.Wrap(err, "could not decode ip reservation")
+	}
+	identity := stubs.NewIdentityManagerStub(p.zbus)
+	self := identity.NodeID().Identity()
+	selfDescription, err := explorerClient.Directory.NodeGet(self, false)
+	if err != nil {
+		return net.IPNet{}, nil, errors.Wrap(err, "could not get our own node description")
+	}
+	farm, err := explorerClient.Directory.FarmGet(schema.ID(selfDescription.FarmId))
+	if err != nil {
+		return net.IPNet{}, nil, errors.Wrap(err, "could not get our own farm")
+	}
+
+	var pubGw schema.IP
+	for _, ips := range farm.IPAddresses {
+		if ips.ReservationID == rid {
+			pubGw = ips.Gateway
+			break
+		}
+	}
+	if pubGw.IP == nil {
+		return net.IPNet{}, nil, errors.New("unable to identify public ip gateway")
+	}
+
+	return ip.IPaddress.IPNet, pubGw.IP, nil
 }
 
 // returns the vCpu's, memory, disksize for a vm size

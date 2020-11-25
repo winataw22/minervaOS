@@ -399,7 +399,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 		return "", errors.Wrap(err, "could not get network namespace bridge")
 	}
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(networkID, false)
 	if err != nil {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -412,7 +412,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 func (n *networker) TapExists(networkID pkg.NetID) (bool, error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Checking if tap interface exists")
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(networkID, false)
 	if err != nil {
 		return false, errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -424,7 +424,7 @@ func (n *networker) TapExists(networkID pkg.NetID) (bool, error) {
 func (n *networker) RemoveTap(networkID pkg.NetID) error {
 	log.Info().Str("network-id", string(networkID)).Msg("Removing tap interface")
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(networkID, false)
 	if err != nil {
 		return errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -432,7 +432,58 @@ func (n *networker) RemoveTap(networkID pkg.NetID) error {
 	return ifaceutil.Delete(tapIface, nil)
 }
 
-// GetSubnet of a local network resource identified by the network ID
+func (n *networker) PublicIPv4Support() bool {
+	return n.ndmz.SupportsPubIPv4()
+}
+
+// SetupPubTap sets up a tap device in the host namespace for the networkID. It is hooked
+// to the public bridge. The name of the tap interface is returned
+func (n *networker) SetupPubTap(networkID pkg.NetID) (string, error) {
+	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
+
+	if !n.ndmz.SupportsPubIPv4() {
+		return "", errors.New("can't create public tap on this node")
+	}
+
+	bridgeName := n.ndmz.IP6PublicIface()
+
+	tapIface, err := tapName(networkID, true)
+	if err != nil {
+		return "", errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	_, err = tuntap.CreateTap(tapIface, bridgeName)
+
+	return tapIface, err
+}
+
+// PubTapExists checks if the tap device for the public network exists already
+func (n *networker) PubTapExists(networkID pkg.NetID) (bool, error) {
+	log.Info().Str("network-id", string(networkID)).Msg("Checking if public tap interface exists")
+
+	tapIface, err := tapName(networkID, true)
+	if err != nil {
+		return false, errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	return ifaceutil.Exists(tapIface, nil), nil
+}
+
+// RemovePubTap removes the public tap device from the host namespace
+// of the networkID
+func (n *networker) RemovePubTap(networkID pkg.NetID) error {
+	log.Info().Str("network-id", string(networkID)).Msg("Removing public tap interface")
+
+	tapIface, err := tapName(networkID, true)
+	if err != nil {
+		return errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	return ifaceutil.Delete(tapIface, nil)
+}
+
+// GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6
+// subnet respectively
 func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
@@ -442,25 +493,45 @@ func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	return localNR.Subnet.IPNet, nil
 }
 
-// GetDefaultGwIP returns the IP(v4) of the default gateway inside the network
-// resource identified by the network ID on the local node
-func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, error) {
+// GetNet of a network identified by the network ID
+func (n networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+	}
+
+	return localNR.NetworkIPRange.IPNet, nil
+}
+
+// GetDefaultGwIP returns the IPs of the default gateways inside the network
+// resource identified by the network ID on the local node, for IPv4 and IPv6
+// respectively
+func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
+	localNR, err := n.networkOf(string(networkID))
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
 
 	// only IP4 atm
 	ip := localNR.Subnet.IP.To4()
 	if ip == nil {
-		return nil, errors.New("nr subnet is not valid IPv4")
+		return nil, nil, errors.New("nr subnet is not valid IPv4")
 	}
 
 	// defaut gw is currently implied to be at `x.x.x.1`
 	// also a subnet in a NR is assumed to be a /24
 	ip[len(ip)-1] = 1
 
-	return ip, nil
+	// ipv6 is derived from the ipv4
+	return ip, nr.Convert4to6(string(networkID), ip), nil
+}
+
+// GetIPv6From4 generates an IPv6 address from a given IPv4 address in a NR
+func (n networker) GetIPv6From4(networkID pkg.NetID, ip net.IP) (net.IPNet, error) {
+	if ip.To4() == nil {
+		return net.IPNet{}, errors.New("invalid IPv4 address")
+	}
+	return net.IPNet{IP: nr.Convert4to6(string(networkID), ip), Mask: net.CIDRMask(64, 128)}, nil
 }
 
 // Addrs return the IP addresses of interface
@@ -969,8 +1040,12 @@ func createNetNS(name string) (ns.NetNS, error) {
 }
 
 // tapName returns the name of the tap device for a network namespace
-func tapName(netID pkg.NetID) (string, error) {
-	name := fmt.Sprintf("t-%s", netID)
+func tapName(netID pkg.NetID, public bool) (string, error) {
+	ident := "t"
+	if public {
+		ident = "p"
+	}
+	name := fmt.Sprintf("%s-%s", ident, netID)
 	if len(name) > 15 {
 		return "", errors.Errorf("tap name too long %s", name)
 	}
