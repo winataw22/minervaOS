@@ -58,8 +58,6 @@ type DMZ interface {
 	// SupportsPubIPv4 indicates if the node supports public ipv4 addresses for
 	// workloads
 	SupportsPubIPv4() bool
-	// EnsureRoutable makes sure the DMZ has a way to reach the public internet
-	EnsureRoutable() error
 }
 
 // FindIPv6Master finds which interface to use as master for NDMZ npub6 interface

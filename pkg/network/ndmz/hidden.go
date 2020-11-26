@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -22,8 +21,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 )
-
-const yggVeth = "ndmztozos"
 
 // Hidden implement DMZ interface using ipv4 only
 type Hidden struct {
@@ -185,35 +182,4 @@ func (d *Hidden) IP6PublicIface() string {
 // SupportsPubIPv4 implements DMZ interface
 func (d *Hidden) SupportsPubIPv4() bool {
 	return false
-}
-
-// EnsureRoutable implements DMZ interface
-func (d *Hidden) EnsureRoutable() error {
-	// since we are a hidden node, we need to plug the ndmz bridge into the zos
-	// bridge, as the zos bridge has the (only) physical interface
-	var veth netlink.Link
-	var err error
-	if !ifaceutil.Exists(yggVeth, nil) {
-		veth, err = ifaceutil.MakeVethPair(yggVeth, types.DefaultBridge, 1500)
-		if err != nil {
-			return errors.Wrap(err, "failed to create veth pair")
-		}
-	} else {
-		veth, err = ifaceutil.VethByName(yggVeth)
-		if err != nil {
-			return errors.Wrap(err, "failed to load existing yggdrasil veth link")
-		}
-	}
-
-	// now plug the other end of the veth pair in the ndmz master bridge
-	ndmzBr, err := bridge.Get(BridgeNDMZ)
-	if err != nil {
-		return errors.Wrap(err, "failed to load ndmz bridge")
-	}
-
-	if err := bridge.AttachNic(veth, ndmzBr); err != nil {
-		return errors.Wrap(err, "failed to add veth to ndmz master bridge")
-	}
-
-	return nil
 }

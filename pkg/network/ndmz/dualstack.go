@@ -28,6 +28,7 @@ import (
 
 const (
 	publicBridge = "br-pub"
+	toZosVeth    = "tozos"
 )
 
 // DualStack implement DMZ interface using dual stack ipv4/ipv6
@@ -55,11 +56,15 @@ func (d *DualStack) Create(ctx context.Context) error {
 	}
 
 	// There are 2 options for the master:
-	// - use the physical interface directly
-	// - create a bridge and plug the physical interface into that one
+	// - use the interface directly
+	// - create a bridge and plug the interface into that one
 	// The second option is used by default, and the first one is now legacy.
 	// However to not break existing containers, we keep the old one if networkd
 	// is restarted but the node is not. In this case, ndmz will already be present.
+	//
+	// Now, it is possible that we are a 1 nic dualstack node, in which case
+	// master will actually be `zos`. In that case, we can't plug the physical
+	// iface, but need to create a veth pair between br-pub and zos.
 	if !namespace.Exists(NetNSNDMZ) {
 		var masterBr *netlink.Bridge
 		if !ifaceutil.Exists(publicBridge, nil) {
@@ -75,6 +80,26 @@ func (d *DualStack) Create(ctx context.Context) error {
 			}
 		}
 		physLink, err := netlink.LinkByName(master)
+		// if the physLink is a bridge (zos), create a veth pair. else plug
+		// the iface directly into br-pub.
+		if physLink.Type() == "bridge" {
+			bridgeLink := physLink.(*netlink.Bridge)
+			var veth netlink.Link
+			if !ifaceutil.Exists(toZosVeth, nil) {
+				veth, err = ifaceutil.MakeVethPair(toZosVeth, publicBridge, 1500)
+				if err != nil {
+					return errors.Wrap(err, "failed to create veth pair")
+				}
+			} else {
+				veth, err = ifaceutil.VethByName(toZosVeth)
+				if err != nil {
+					return errors.Wrap(err, "failed to load existing veth link to master bridge")
+				}
+			}
+			if err = bridge.AttachNic(veth, bridgeLink); err != nil {
+				return errors.Wrap(err, "failed to add veth to ndmz master bridge")
+			}
+		}
 		if err != nil {
 			return errors.Wrap(err, "could not load public physical iface")
 		}
@@ -262,12 +287,6 @@ func (d *DualStack) IP6PublicIface() string {
 // SupportsPubIPv4 implements DMZ interface
 func (d *DualStack) SupportsPubIPv4() bool {
 	return d.hasPubBridge
-}
-
-// EnsureRoutable implements DMZ interface
-func (d *DualStack) EnsureRoutable() error {
-	// dualstack nodes have a dedicated physical interface so this is a no op
-	return nil
 }
 
 // waitIP4 waits to receives some IPv4 from DHCP

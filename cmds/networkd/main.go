@@ -122,11 +122,6 @@ func main() {
 		log.Fatal().Err(err).Msgf("fail to configure yggdrasil subnet gateway IP")
 	}
 
-	// make sure ndmz has a way out
-	if err := ndmzNs.EnsureRoutable(); err != nil {
-		log.Fatal().Err(err).Msg("failed to ensure ndmz routability")
-	}
-
 	// send another detail of network interfaces now that ndmz is created
 	ndmzIfaces, err := getNdmzInterfaces()
 	if err != nil {
