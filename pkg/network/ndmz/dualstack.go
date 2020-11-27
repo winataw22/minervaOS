@@ -28,7 +28,7 @@ import (
 
 const (
 	publicBridge = "br-pub"
-	toZosVeth    = "tozos"
+	toZosVeth    = "tozos" // veth pair from br-pub to zos
 )
 
 // DualStack implement DMZ interface using dual stack ipv4/ipv6
@@ -39,20 +39,25 @@ type DualStack struct {
 }
 
 // NewDualStack creates a new DMZ DualStack
-func NewDualStack(nodeID string) *DualStack {
+func NewDualStack(nodeID string, master string) *DualStack {
 	return &DualStack{
-		nodeID: nodeID,
+		nodeID:     nodeID,
+		ipv6Master: master,
 	}
 }
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
 func (d *DualStack) Create(ctx context.Context) error {
-	master, err := FindIPv6Master()
-	if err != nil {
-		return errors.Wrap(err, "could not find public master iface for ndmz")
-	}
+	master := d.ipv6Master
+	var err error
 	if master == "" {
-		return errors.New("invalid physical interface to use as master for ndmz npub6")
+		master, err = FindIPv6Master()
+		if err != nil {
+			return errors.Wrap(err, "could not find public master iface for ndmz")
+		}
+		if master == "" {
+			return errors.New("invalid physical interface to use as master for ndmz npub6")
+		}
 	}
 
 	// There are 2 options for the master:
@@ -80,6 +85,9 @@ func (d *DualStack) Create(ctx context.Context) error {
 			}
 		}
 		physLink, err := netlink.LinkByName(master)
+		if err != nil {
+			return errors.Wrap(err, "failed to get master link")
+		}
 		// if the physLink is a bridge (zos), create a veth pair. else plug
 		// the iface directly into br-pub.
 		if physLink.Type() == "bridge" {
@@ -99,11 +107,7 @@ func (d *DualStack) Create(ctx context.Context) error {
 			if err = bridge.AttachNic(veth, bridgeLink); err != nil {
 				return errors.Wrap(err, "failed to add veth to ndmz master bridge")
 			}
-		}
-		if err != nil {
-			return errors.Wrap(err, "could not load public physical iface")
-		}
-		if err = bridge.AttachNic(physLink, masterBr); err != nil {
+		} else if err = bridge.AttachNic(physLink, masterBr); err != nil {
 			return errors.Wrap(err, "could not attach public physical iface to bridge")
 		}
 
@@ -130,12 +134,8 @@ func (d *DualStack) Create(ctx context.Context) error {
 
 	defer netNS.Close()
 
-	// br-ndmz is legacy in dual stack mode - only run this function if we don't
-	// have a br-pub
-	if !d.hasPubBridge {
-		if err := createRoutingBridge(BridgeNDMZ, netNS); err != nil {
-			return errors.Wrapf(err, "ndmz: createRoutingBride error")
-		}
+	if err := createRoutingBridge(BridgeNDMZ, netNS); err != nil {
+		return errors.Wrapf(err, "ndmz: createRoutingBride error")
 	}
 
 	log.Info().Msgf("set ndmz ipv6 master to %s", master)
@@ -206,13 +206,7 @@ func (d *DualStack) AttachNR(networkID string, nr *nr.NetResource, ipamLeaseDir 
 	}
 
 	if !ifaceutil.Exists(nrPubIface, nrNS) {
-		// br-pub replaced ndmz bridge, but we need to keep the old flow
-		// for nodes which did not get rebooted (and thus did not migrate) yet
-		ndmzBr := BridgeNDMZ
-		if d.hasPubBridge {
-			ndmzBr = publicBridge
-		}
-		if _, err = macvlan.Create(nrPubIface, ndmzBr, nrNS); err != nil {
+		if _, err = macvlan.Create(nrPubIface, BridgeNDMZ, nrNS); err != nil {
 			return err
 		}
 	}

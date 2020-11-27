@@ -198,7 +198,7 @@ func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
 
 	privPub := "priv"
 	if ifcfg.Public {
-		privPub = "pub"
+		privPub = "public"
 	}
 
 	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)

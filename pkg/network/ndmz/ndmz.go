@@ -53,7 +53,7 @@ type DMZ interface {
 	AttachNR(networkID string, nr *nr.NetResource, ipamLeaseDir string) error
 	// Return the interface used by ndmz to router public ipv6 traffic
 	IP6PublicIface() string
-	//configure an address on the public IPv6 interface
+	// configure an address on the public IPv6 interface
 	SetIP6PublicIface(net.IPNet) error
 	// SupportsPubIPv4 indicates if the node supports public ipv4 addresses for
 	// workloads
@@ -62,7 +62,6 @@ type DMZ interface {
 
 // FindIPv6Master finds which interface to use as master for NDMZ npub6 interface
 func FindIPv6Master() (master string, err error) {
-
 	if namespace.Exists(types.PublicNamespace) {
 		pubNS, err := namespace.GetByName(types.PublicNamespace)
 		if err != nil {

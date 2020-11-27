@@ -92,20 +92,26 @@ func main() {
 	}
 
 	exitIface, err := getPubIface(directory, nodeID.Identity())
+	pubConfMaster := ""
 	if err == nil {
-		if err := configurePubIface(exitIface, nodeID); err != nil {
-			log.Error().Err(err).Msg("failed to configure public interface")
-			os.Exit(1)
-		}
+		pubConfMaster = exitIface.Master
 	}
+	hasPubConf := err == nil
 
-	ndmzNs, err := buildNDMZ(nodeID.Identity())
+	ndmzNs, err := buildNDMZ(nodeID.Identity(), pubConfMaster)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
 	if err := ndmzNs.Create(ctx); err != nil {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
+	}
+
+	if hasPubConf {
+		if err := configurePubIface(ndmzNs, exitIface, nodeID); err != nil {
+			log.Error().Err(err).Msg("failed to configure public interface")
+			os.Exit(1)
+		}
 	}
 
 	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmzNs)
@@ -314,31 +320,32 @@ func explorerClient() (client.Directory, error) {
 	return client.Directory, nil
 }
 
-func buildNDMZ(nodeID string) (ndmz.DMZ, error) {
-	var (
-		master string
-	)
+func buildNDMZ(nodeID string, pubMaster string) (ndmz.DMZ, error) {
+	master := pubMaster
 
-	notify := func(err error, d time.Duration) {
-		log.Warn().Err(err).Msgf("did not find a valid IPV6 master address for ndmz, retry in %s", d.String())
+	var err error
+	if master == "" {
+		notify := func(err error, d time.Duration) {
+			log.Warn().Err(err).Msgf("did not find a valid IPV6 master address for ndmz, retry in %s", d.String())
+		}
+
+		findMaster := func() error {
+			var err error
+			master, err = ndmz.FindIPv6Master()
+			return err
+		}
+
+		bo := backoff.NewExponentialBackOff()
+		// wait for 2 minute for public ipv6
+		bo.MaxElapsedTime = time.Minute * 2
+		bo.MaxInterval = time.Second * 10
+		err = backoff.RetryNotify(findMaster, bo, notify)
 	}
-
-	findMaster := func() error {
-		var err error
-		master, err = ndmz.FindIPv6Master()
-		return err
-	}
-
-	bo := backoff.NewExponentialBackOff()
-	// wait for 2 minute for public ipv6
-	bo.MaxElapsedTime = time.Minute * 2
-	bo.MaxInterval = time.Second * 10
-	err := backoff.RetryNotify(findMaster, bo, notify)
 
 	// if ipv6 found, use dual stack ndmz
 	if err == nil && master != "" {
 		log.Info().Str("ndmz_npub6_master", master).Msg("network mode dualstack")
-		return ndmz.NewDualStack(nodeID), nil
+		return ndmz.NewDualStack(nodeID, master), nil
 	}
 
 	// else use ipv4 only mode
