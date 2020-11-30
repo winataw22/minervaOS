@@ -12,6 +12,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
+	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/vishvananda/netlink"
 )
@@ -94,13 +95,18 @@ func publicConfig(iface *types.PubIface, nodeID pkg.Identifier) (ips []*net.IPNe
 }
 
 // CreatePublicNS creates a public namespace in a node
-func CreatePublicNS(iface *types.PubIface, nodeID pkg.Identifier) error {
+func CreatePublicNS(dmz ndmz.DMZ, iface *types.PubIface, nodeID pkg.Identifier) error {
 
 	pubNS, err := ensureNamespace()
 	if err != nil {
 		return err
 	}
 	defer pubNS.Close()
+
+	// Override master from config to ndmz master.
+	// This is fine anyhow since in old nodes the master will be the physical iface
+	// and this will be a no-op
+	iface.Master = dmz.IP6PublicIface()
 
 	pubIface, err := ensurePublicMacvlan(iface, pubNS)
 	if err != nil {

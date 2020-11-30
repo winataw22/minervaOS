@@ -92,23 +92,29 @@ func main() {
 	}
 
 	exitIface, err := getPubIface(directory, nodeID.Identity())
+	pubConfMaster := ""
 	if err == nil {
-		if err := configurePubIface(exitIface, nodeID); err != nil {
+		pubConfMaster = exitIface.Master
+	}
+	hasPubConf := err == nil
+
+	ndmzNs, err := buildNDMZ(nodeID.Identity(), pubConfMaster)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create ndmz")
+	}
+
+	if err := ndmzNs.Create(ctx); err != nil {
+		log.Fatal().Err(err).Msg("failed to create ndmz")
+	}
+
+	if hasPubConf {
+		if err := configurePubIface(ndmzNs, exitIface, nodeID); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
 			os.Exit(1)
 		}
 	}
 
-	ndmz, err := buildNDMZ(nodeID.Identity())
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create ndmz")
-	}
-
-	if err := ndmz.Create(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to create ndmz")
-	}
-
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmz)
+	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmzNs)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("fail to start yggdrasil")
 	}
@@ -118,9 +124,8 @@ func main() {
 		log.Fatal().Err(err).Msgf("fail read yggdrasil subnet")
 	}
 
-	if err := ndmz.SetIP6PublicIface(gw); err != nil {
+	if err := ndmzNs.SetIP6PublicIface(gw); err != nil {
 		log.Fatal().Err(err).Msgf("fail to configure yggdrasil subnet gateway IP")
-
 	}
 
 	// send another detail of network interfaces now that ndmz is created
@@ -143,7 +148,7 @@ func main() {
 		log.Fatal().Err(err).Msgf("fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, directory, root, ndmz, ygg)
+	networker, err := network.NewNetworker(identity, directory, root, ndmzNs, ygg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error creating network manager")
 	}
@@ -315,31 +320,32 @@ func explorerClient() (client.Directory, error) {
 	return client.Directory, nil
 }
 
-func buildNDMZ(nodeID string) (ndmz.DMZ, error) {
-	var (
-		master string
-	)
+func buildNDMZ(nodeID string, pubMaster string) (ndmz.DMZ, error) {
+	master := pubMaster
 
-	notify := func(err error, d time.Duration) {
-		log.Warn().Err(err).Msgf("did not find a valid IPV6 master address for ndmz, retry in %s", d.String())
+	var err error
+	if master == "" {
+		notify := func(err error, d time.Duration) {
+			log.Warn().Err(err).Msgf("did not find a valid IPV6 master address for ndmz, retry in %s", d.String())
+		}
+
+		findMaster := func() error {
+			var err error
+			master, err = ndmz.FindIPv6Master()
+			return err
+		}
+
+		bo := backoff.NewExponentialBackOff()
+		// wait for 2 minute for public ipv6
+		bo.MaxElapsedTime = time.Minute * 2
+		bo.MaxInterval = time.Second * 10
+		err = backoff.RetryNotify(findMaster, bo, notify)
 	}
-
-	findMaster := func() error {
-		var err error
-		master, err = ndmz.FindIPv6Master()
-		return err
-	}
-
-	bo := backoff.NewExponentialBackOff()
-	// wait for 2 minute for public ipv6
-	bo.MaxElapsedTime = time.Minute * 2
-	bo.MaxInterval = time.Second * 10
-	err := backoff.RetryNotify(findMaster, bo, notify)
 
 	// if ipv6 found, use dual stack ndmz
 	if err == nil && master != "" {
 		log.Info().Str("ndmz_npub6_master", master).Msg("network mode dualstack")
-		return ndmz.NewDualStack(nodeID), nil
+		return ndmz.NewDualStack(nodeID, master), nil
 	}
 
 	// else use ipv4 only mode

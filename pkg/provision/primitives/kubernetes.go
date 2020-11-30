@@ -154,7 +154,6 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 
 	defer func() {
 		if err != nil {
-			_ = vm.Delete(reservation.ID)
 			_ = network.RemoveTap(netID)
 		}
 	}()
@@ -174,7 +173,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}
 
 	var netInfo pkg.VMNetworkInfo
-	netInfo, err = p.buildNetworkInfo(ctx, reservation.User, iface, pubIface, config)
+	netInfo, err = p.buildNetworkInfo(ctx, reservation.Version, reservation.User, iface, pubIface, config)
 	if err != nil {
 		return result, errors.Wrap(err, "could not generate network info")
 	}
@@ -186,6 +185,11 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 	}
 
 	err = p.kubernetesRun(ctx, reservation.ID, cpu, memory, diskPath, imagePath, netInfo, config)
+	if err != nil {
+		// attempt to delete the vm, should the process still be lingering
+		vm.Delete(reservation.ID)
+	}
+
 	return result, err
 }
 
@@ -244,6 +248,20 @@ func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu ui
 		case <-time.After(time.Second * 3):
 			// retry after 3 secs
 		case <-deadline.Done():
+			// If install takes longer than 5 minutes, we consider it a failure.
+			// In that case, we attempt a delete first. This will kill the vm process
+			// if it is still going. The actual resources (disk, taps, ...) should
+			// be handled by the caller.
+			logs, err := vm.Logs(name)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to get machine logs")
+			} else {
+				log.Warn().Str("vm", name).Str("type", "machine-logs").Msg(logs)
+			}
+
+			if err := vm.Delete(name); err != nil {
+				log.Warn().Err(err).Msg("could not delete vm who's install deadline expired")
+			}
 			return errors.New("failed to install vm in 5 minutes")
 		}
 	}
@@ -258,6 +276,7 @@ func (p *Provisioner) kubernetesRun(ctx context.Context, name string, cpu uint8,
 	disks := make([]pkg.VMDisk, 1)
 	// installed disk
 	disks[0] = pkg.VMDisk{Path: diskPath, ReadOnly: false, Root: false}
+	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.token=%s", cfg.PlainClusterSecret)
 
 	kubevm := pkg.VM{
 		Name:        name,
@@ -266,7 +285,7 @@ func (p *Provisioner) kubernetesRun(ctx context.Context, name string, cpu uint8,
 		Network:     networkInfo,
 		KernelImage: imagePath + "/k3os-vmlinux",
 		InitrdImage: imagePath + "/k3os-initrd-amd64",
-		KernelArgs:  "console=ttyS0 reboot=k panic=1",
+		KernelArgs:  cmdline,
 		Disks:       disks,
 	}
 
@@ -316,7 +335,7 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 	return nil
 }
 
-func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
+func (p *Provisioner) buildNetworkInfo(ctx context.Context, rversion int, userID string, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
 	netID := provision.NetworkID(userID, string(cfg.NetworkID))
@@ -361,6 +380,11 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, userID string, iface
 			Public:         false,
 		}},
 		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
+	}
+
+	// from this reservation version on we deploy new VM's with the custom boot script for IP
+	if rversion >= 2 {
+		networkInfo.NewStyle = true
 	}
 
 	if cfg.PublicIP != 0 {

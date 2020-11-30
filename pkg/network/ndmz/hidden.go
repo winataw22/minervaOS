@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -24,7 +25,9 @@ import (
 
 // Hidden implement DMZ interface using ipv4 only
 type Hidden struct {
-	nodeID string
+	nodeID       string
+	hasPubBridge bool
+	master       string
 }
 
 // NewHidden creates a new DMZ Hidden
@@ -36,6 +39,49 @@ func NewHidden(nodeID string) *Hidden {
 
 //Create create the NDMZ network namespace and configure its default routes and addresses
 func (d *Hidden) Create(ctx context.Context) error {
+	// shameless code duplication from `dualstack.go`. Since we want to streamline
+	// operation of the different modes, we might be able to unify both ndmz
+	// imlementations in the cleanup
+	d.master = types.DefaultBridge
+	if !namespace.Exists(NetNSNDMZ) {
+		var masterBr *netlink.Bridge
+		var err error
+		if !ifaceutil.Exists(publicBridge, nil) {
+			// create bridge, this needs to happen on the host ns
+			masterBr, err = bridge.New(publicBridge)
+			if err != nil {
+				return errors.Wrap(err, "could not create public bridge")
+			}
+		} else {
+			masterBr, err = bridge.Get(publicBridge)
+			if err != nil {
+				return errors.Wrap(err, "could not load public bridge")
+			}
+		}
+		var veth netlink.Link
+		if !ifaceutil.Exists(toZosVeth, nil) {
+			veth, err = ifaceutil.MakeVethPair(toZosVeth, publicBridge, 1500)
+			if err != nil {
+				return errors.Wrap(err, "failed to create veth pair")
+			}
+		} else {
+			veth, err = ifaceutil.VethByName(toZosVeth)
+			if err != nil {
+				return errors.Wrap(err, "failed to load existing veth link to master bridge")
+			}
+		}
+		if err = bridge.AttachNic(veth, masterBr); err != nil {
+			return errors.Wrap(err, "failed to add veth to ndmz master bridge")
+		}
+
+		// this is the master now
+		d.master = publicBridge
+		d.hasPubBridge = true
+	} else if ifaceutil.Exists(publicBridge, nil) {
+		// existing bridge is the master
+		d.master = publicBridge
+		d.hasPubBridge = true
+	}
 	netNS, err := namespace.GetByName(NetNSNDMZ)
 	if err != nil {
 		netNS, err = namespace.Create(NetNSNDMZ)
@@ -49,7 +95,7 @@ func (d *Hidden) Create(ctx context.Context) error {
 		return errors.Wrapf(err, "ndmz: createRoutingBride error")
 	}
 
-	if err := createPubIface6(DMZPub6, types.DefaultBridge, d.nodeID, netNS); err != nil {
+	if err := createPubIface6(DMZPub6, d.master, d.nodeID, netNS); err != nil {
 		return errors.Wrapf(err, "ndmz: could not node create pub iface 6")
 	}
 
@@ -176,7 +222,7 @@ func (d *Hidden) SetIP6PublicIface(subnet net.IPNet) error {
 
 // IP6PublicIface implements DMZ interface
 func (d *Hidden) IP6PublicIface() string {
-	return types.DefaultBridge
+	return d.master
 }
 
 // SupportsPubIPv4 implements DMZ interface

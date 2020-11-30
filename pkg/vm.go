@@ -35,6 +35,11 @@ type VMNetworkInfo struct {
 	Ifaces []VMIface
 	// Nameservers dns servers
 	Nameservers []net.IP
+	// NewStyle version of the network. This specifically differentiates between
+	// the old way of statically setting the IP via the `IP` kernel parameter,
+	// or using a boot script. The new way allows multiple interfaces and more
+	// configuration
+	NewStyle bool
 }
 
 // VMDisk specifies vm disk params
@@ -115,5 +120,6 @@ type VMModule interface {
 	Run(vm VM) error
 	Inspect(name string) (VMInfo, error)
 	Delete(name string) error
-	Exists(id string) bool
+	Exists(name string) bool
+	Logs(name string) (string, error)
 }

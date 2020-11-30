@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/pkg/errors"
 
 	"github.com/rs/zerolog/log"
 
@@ -154,6 +155,21 @@ func MakeVethPair(name, peer string, mtu int) (netlink.Link, error) {
 	}
 
 	return veth2, nil
+}
+
+// VethByName loads one end of a veth pair given its name
+func VethByName(name string) (netlink.Link, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "veth %s not found", name)
+	}
+
+	if link.Type() != "veth" {
+		return nil, fmt.Errorf("device '%s' is not a veth pair", name)
+	}
+
+	return link.(*netlink.Veth), nil
+
 }
 
 // Exists test check if the named interface exists
