@@ -11,11 +11,11 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/jbenet/go-base58"
+	"github.com/patrickmn/go-cache"
+	"github.com/robfig/cron/v3"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/stubs"
-
-	"github.com/robfig/cron/v3"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -36,6 +36,8 @@ type Engine struct {
 	statser        Statser
 	zbusCl         zbus.Client
 	janitor        *Janitor
+
+	memCache *cache.Cache
 }
 
 // EngineOps are the configuration of the engine
@@ -88,6 +90,7 @@ func New(opts EngineOps) *Engine {
 		statser:        opts.Statser,
 		zbusCl:         opts.ZbusCl,
 		janitor:        opts.Janitor,
+		memCache:       cache.New(30*time.Second, 10*time.Second),
 	}
 }
 
@@ -124,9 +127,21 @@ func (e *Engine) Run(ctx context.Context) error {
 			if reservation.last {
 				isAllWorkloadsProcessed = true
 				// Trigger cleanup by sending a struct onto the channel
+				log.Debug().Msg("kicking clean up after redeploying history")
 				cleanUp <- struct{}{}
 				continue
 			}
+
+			//TODO:
+			// this is just a hack now to avoid having double provisioning
+			// other logs has been added in other places so we can find why
+			// the node keep receiving the same reservation twice
+			if _, ok := e.memCache.Get(reservation.ID); ok {
+				log.Debug().Str("id", reservation.ID).Msg("skipping reservation since it has just been processes!")
+				continue
+			}
+
+			e.memCache.Set(reservation.ID, struct{}{}, cache.DefaultExpiration)
 
 			expired := reservation.Expired()
 			slog := log.With().

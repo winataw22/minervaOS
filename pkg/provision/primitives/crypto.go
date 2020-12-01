@@ -31,7 +31,7 @@ func decryptSecret(secret, userID string, reservationVersion int, client zbus.Cl
 	switch reservationVersion {
 	case 0:
 		out, err = identity.Decrypt(bytes)
-	case 1:
+	default:
 		userPubKey, err = fetchUserPublicKey(userID)
 		if err != nil {
 			return "", fmt.Errorf("failed to retrieve user %s public key: %w", userID, err)
