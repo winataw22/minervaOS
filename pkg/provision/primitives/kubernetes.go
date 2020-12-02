@@ -164,14 +164,14 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 
 	var pubIface string
 	if config.PublicIP != 0 {
-		pubIface, err = network.SetupPubTap(netID)
+		pubIface, err = network.SetupPubTap(pubIPResID(config.PublicIP))
 		if err != nil {
 			return result, errors.Wrap(err, "could not set up tap device for public network")
 		}
 
 		defer func() {
 			if err != nil {
-				_ = network.RemovePubTap(netID)
+				_ = network.RemovePubTap(pubIPResID(config.PublicIP))
 			}
 		}()
 	}
@@ -320,7 +320,7 @@ func (p *Provisioner) kubernetesDecomission(ctx context.Context, reservation *pr
 	}
 
 	if cfg.PublicIP != 0 {
-		if err := network.RemovePubTap(netID); err != nil {
+		if err := network.RemovePubTap(pubIPResID(cfg.PublicIP)); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}
 	}
@@ -512,4 +512,9 @@ func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
 	}
 
 	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 and 2 are supported", size)
+}
+
+func pubIPResID(reservationID schema.ID) string {
+	// TODO: should this change in the actual reservation?
+	return fmt.Sprintf("%d-1", reservationID)
 }

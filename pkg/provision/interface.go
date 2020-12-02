@@ -67,4 +67,5 @@ type Statser interface {
 	Decrement(r *Reservation) error
 	CurrentUnits() directory.ResourceAmount
 	CurrentWorkloads() directory.WorkloadAmount
+	CheckMemoryRequirements(r *Reservation, totalMemAvailable uint64) error
 }

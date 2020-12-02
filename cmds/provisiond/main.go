@@ -125,7 +125,7 @@ func main() {
 	provisioner := primitives.NewProvisioner(localStore, zbusCl)
 
 	puller := explorer.NewPoller(e, primitives.WorkloadToProvisionType, primitives.ProvisionOrder)
-	engine := provision.New(provision.EngineOps{
+	engine, err := provision.New(provision.EngineOps{
 		NodeID: nodeID.Identity(),
 		Cache:  localStore,
 		Source: provision.CombinedSource(
@@ -140,6 +140,10 @@ func main() {
 		ZbusCl:         zbusCl,
 		Janitor:        provision.NewJanitor(zbusCl, puller),
 	})
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to instantiate provision engine")
+	}
 
 	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.Provision(engine))
 
