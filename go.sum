@@ -602,6 +602,14 @@ github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae h1:vgGSvdW5Lqg+I1
 github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae/go.mod h1:quDq6Se6jlGwiIKia/itDZxqC5rj6/8OdFyMMAwTxCs=
 github.com/threefoldtech/0-fs v1.3.1-0.20201111155454-6f328c14703a h1:Lf8jNyiWM3eNECGMOQSZvkDWWMR2AaO9LfUFV+ddp5c=
 github.com/threefoldtech/0-fs v1.3.1-0.20201111155454-6f328c14703a/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203152200-ddd253b478c9 h1:uVbpt003AMxP9WfJEB6eXl0S6F16q3ERp+d/tGyBZYU=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203152200-ddd253b478c9/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203161332-960be87c0412 h1:oKy7Qc9n0uY/vVlisYjdExdTjdsKAVeJfokRjFv3+ZA=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203161332-960be87c0412/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203161446-e6bb71e35cbc h1:JQg96ARkuOeoYJIzqEJm5UDHBNkIViCOoCW10WFrHWk=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203161446-e6bb71e35cbc/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7 h1:64QIPSO1Acx7ENdMwQ0Q4tnE94By1BljA/2R2NbY51Y=
+github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
 github.com/threefoldtech/tfexplorer v0.3.2-0.20200918135528-58e333897454 h1:MUtGnBw3P5Zp6CS26dOw6/WksisommGCd4hqP4G4D3w=
 github.com/threefoldtech/tfexplorer v0.3.2-0.20200918135528-58e333897454/go.mod h1:fA2oR3D6Wre9tXSiWFiapeuUI5UA9aXP9fejr6hDEYM=
 github.com/threefoldtech/tfexplorer v0.4.1-0.20201014110255-653c7314b944 h1:jJG/lUhZVn70RWzi79nxrTQHWpd6Thb4lB+klQfVCiU=

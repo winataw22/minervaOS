@@ -99,7 +99,7 @@ func New(opts EngineOps) (*Engine, error) {
 		statser:           opts.Statser,
 		zbusCl:            opts.ZbusCl,
 		janitor:           opts.Janitor,
-		memCache:          cache.New(30*time.Second, 10*time.Second),
+		memCache:          cache.New(30*time.Minute, 30*time.Second),
 		totalMemAvailable: memStats.Total - minimunZosMemory,
 	}, nil
 }
@@ -142,17 +142,6 @@ func (e *Engine) Run(ctx context.Context) error {
 				continue
 			}
 
-			//TODO:
-			// this is just a hack now to avoid having double provisioning
-			// other logs has been added in other places so we can find why
-			// the node keep receiving the same reservation twice
-			if _, ok := e.memCache.Get(reservation.ID); ok {
-				log.Debug().Str("id", reservation.ID).Msg("skipping reservation since it has just been processes!")
-				continue
-			}
-
-			e.memCache.Set(reservation.ID, struct{}{}, cache.DefaultExpiration)
-
 			expired := reservation.Expired()
 			slog := log.With().
 				Str("id", string(reservation.ID)).
@@ -171,6 +160,18 @@ func (e *Engine) Run(ctx context.Context) error {
 				}
 			} else {
 				slog.Info().Msg("start provisioning reservation")
+
+				//TODO:
+				// this is just a hack now to avoid having double provisioning
+				// other logs has been added in other places so we can find why
+				// the node keep receiving the same reservation twice
+				if _, ok := e.memCache.Get(reservation.ID); ok {
+					log.Debug().Str("id", reservation.ID).Msg("skipping reservation since it has just been processes!")
+					continue
+				}
+
+				e.memCache.Set(reservation.ID, struct{}{}, cache.DefaultExpiration)
+
 				if err := e.provision(ctx, &reservation.Reservation); err != nil {
 					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
 					continue
@@ -317,7 +318,7 @@ func (e *Engine) provisionForward(ctx context.Context, fn ProvisionerFunc, r *Re
 		Str("result", fmt.Sprintf("%v", returned)).
 		Msgf("workload deployed")
 
-	return nil, nil
+	return returned, nil
 }
 
 func (e *Engine) decommission(ctx context.Context, r *Reservation) error {

@@ -135,7 +135,13 @@ func RandomName(prefix string) (string, error) {
 }
 
 // MakeVethPair creates a veth pair
-func MakeVethPair(name, peer string, mtu int) (netlink.Link, error) {
+func MakeVethPair(name, master string, mtu int) (netlink.Link, error) {
+	masterLink, err := netlink.LinkByName(master)
+	if err != nil {
+		return nil, err
+	}
+
+	peer := fmt.Sprintf("%s-p", name)
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
 			Name:  name,
@@ -144,13 +150,25 @@ func MakeVethPair(name, peer string, mtu int) (netlink.Link, error) {
 		},
 		PeerName: peer,
 	}
-	if err := netlink.LinkAdd(veth); err != nil {
+
+	if err = netlink.LinkAdd(veth); err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if err != nil {
+			netlink.LinkDel(veth)
+		}
+	}()
+
+	peerLink, err := netlink.LinkByName(peer)
+	if err = netlink.LinkSetMaster(peerLink, masterLink); err != nil {
+		return nil, err
+	}
+
 	// Re-fetch the link to get its creation-time parameters, e.g. index and mac
 	veth2, err := netlink.LinkByName(name)
 	if err != nil {
-		netlink.LinkDel(veth) // try and clean up the link if possible.
 		return nil, err
 	}
 

@@ -15,6 +15,7 @@ import (
 
 const (
 	configFileName = "config.json"
+	logFileName    = "machine.log"
 )
 
 // Boot config struct
@@ -179,7 +180,7 @@ func (j *Jailed) Start(ctx context.Context) error {
 
 // Log returns machine log file path
 func (j *Jailed) Log(base string) string {
-	return filepath.Join(j.Root, "machine.log")
+	return filepath.Join(j.Root, logFileName)
 }
 
 func (j *Jailed) exec(ctx context.Context) error {

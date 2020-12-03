@@ -382,7 +382,7 @@ func (m *Module) waitAndAdjOom(ctx context.Context, id string) error {
 
 // Logs returns machine logs for give machine name
 func (m *Module) Logs(name string) (string, error) {
-	path := filepath.Join(m.machineRoot(name), "root", "machine.log")
+	path := filepath.Join(m.machineRoot(name), "root", logFileName)
 	return m.tail(path)
 }
 
@@ -405,11 +405,30 @@ func (m *Module) Inspect(name string) (pkg.VMInfo, error) {
 	}, nil
 }
 
+func (m *Module) backupLogs(name string) error {
+	root := filepath.Join(m.machineRoot(name), "root")
+	logsDir := filepath.Join(m.root, "logs")
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return err
+	}
+
+	return os.Rename(
+		filepath.Join(root, logFileName),
+		filepath.Join(logsDir, fmt.Sprintf("%s.log", name)),
+	)
+}
+
 // Delete deletes a machine by name (id)
 func (m *Module) Delete(name string) error {
 	defer m.cleanFs(name)
 	defer m.failures.Delete(name)
 
+	// try to backup machine logs
+	if err := m.backupLogs(name); err != nil {
+		if !os.IsNotExist(err) {
+			log.Error().Err(err).Str("id", name).Msg("failed to back up machine log file")
+		}
+	}
 	// before we do anything we set failures to permanent to prevent monitoring from trying
 	// to revive this machine
 	m.failures.Set(name, permanent, cache.NoExpiration)
