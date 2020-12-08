@@ -200,7 +200,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 func (p *Provisioner) kubernetesInstall(ctx context.Context, name string, cpu uint8, memory uint64, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
 	vm := stubs.NewVMModuleStub(p.zbus)
 
-	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.mode=install k3os.install.silent k3os.debug k3os.install.device=/dev/vda k3os.token=%s", cfg.PlainClusterSecret)
+	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.mode=install k3os.install.silent k3os.debug k3os.install.device=/dev/vda k3os.token=%s k3os.k3s_args=\"--flannel-iface=eth0\"", cfg.PlainClusterSecret)
 	// if there is no server url configured, the node is set up as a master, therefore
 	// this will cause nodes with an empty master list to be implicitly treated as
 	// a master node
