@@ -485,6 +485,7 @@ func (e *Engine) updateStats() error {
 			r.Hru += float64(cache.Usage.Size / gib)
 		}
 
+		r.Mru += float64(minimunZosMemory / gib)
 	}
 
 	log.Info().
