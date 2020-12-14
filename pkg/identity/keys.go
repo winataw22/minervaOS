@@ -1,10 +1,12 @@
 package identity
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/jbenet/go-base58"
 	"github.com/threefoldtech/zos/pkg/versioned"
+	"github.com/tyler-smith/go-bip39"
 
 	"golang.org/x/crypto/ed25519"
 )
@@ -60,16 +62,27 @@ func LoadSeed(path string) ([]byte, error) {
 		// this is a compatibility code for seed files
 		// in case it does not have any version information
 		versioned.WriteFile(path, SeedVersionLatest, seed, 0400)
-		version = SeedVersionLatest
+		version = SeedVersion1
 	} else if err != nil {
 		return nil, err
 	}
 
-	if version.NE(SeedVersion1) {
+	if version.NE(SeedVersion1) && version.NE(SeedVersion11) {
 		return nil, fmt.Errorf("unknown seed version")
 	}
 
-	return seed, nil
+	if version.EQ(SeedVersion1) {
+		return seed, nil
+	}
+	// it means we read json data instead of the secret
+	type Seed110Struct struct {
+		Mnemonics string `json:"mnemonic"`
+	}
+	var seed110 Seed110Struct
+	if err = json.Unmarshal(seed, &seed110); err != nil {
+		return nil, err
+	}
+	return bip39.EntropyFromMnemonic(seed110.Mnemonics)
 }
 
 // LoadKeyPair reads a seed from a file located at path and re-create a
@@ -95,7 +108,7 @@ func loadKeyPair(path string) (k KeyPair, err error) {
 // FromSeed creates a new key pair from seed
 func FromSeed(seed []byte) (pair KeyPair, err error) {
 	if len(seed) != ed25519.SeedSize {
-		return pair, fmt.Errorf("seed has the wrong size %d", len(seed))
+		return pair, fmt.Errorf("seed has the wrong size %d and should be %d", len(seed), ed25519.SeedSize)
 	}
 
 	privateKey := ed25519.NewKeyFromSeed(seed)

@@ -35,6 +35,7 @@ require (
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
 	github.com/threefoldtech/tfexplorer v0.4.1-0.20201120111415-6fefe983b035
 	github.com/threefoldtech/zbus v0.1.4
+	github.com/tyler-smith/go-bip39 v1.0.2
 	github.com/urfave/cli v1.22.4
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
