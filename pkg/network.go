@@ -93,6 +93,9 @@ type Networker interface {
 	// GetNet returns the full network range of the network
 	GetNet(networkID NetID) (net.IPNet, error)
 
+	// GetPublicIPv6Subnet returns the IPv6 prefix op the public subnet of the host
+	GetPublicIPv6Subnet() (net.IPNet, error)
+
 	// GetDefaultGwIP returns the IPs of the default gateways inside the network
 	// resource identified by the network ID on the local node, for IPv4 and IPv6
 	// respectively

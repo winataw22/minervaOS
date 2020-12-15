@@ -152,6 +152,22 @@ func (s *NetworkerStub) GetNet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
+func (s *NetworkerStub) GetPublicIPv6Subnet() (ret0 net.IPNet, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "GetPublicIPv6Subnet", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) GetSubnet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetSubnet", args...)

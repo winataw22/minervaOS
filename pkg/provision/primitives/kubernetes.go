@@ -13,6 +13,7 @@ import (
 	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
+	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -387,16 +388,18 @@ func (p *Provisioner) buildNetworkInfo(ctx context.Context, rversion int, userID
 	if cfg.PublicIP != 0 {
 		// A public ip is set, load the reservation, extract the ip and make a config
 		// for it
-		// TODO: proper firewalling on the host
 
 		pubIP, pubGw, err := p.getPubIPConfig(cfg.PublicIP)
 		if err != nil {
 			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get public ip config")
 		}
 
+		// this needs to be the same as how we get it in the actual IP reservation
+		mac := ifaceutil.HardwareAddrFromInputBytes(pubIP.IP.To4())
+
 		iface := pkg.VMIface{
 			Tap:            pubIface,
-			MAC:            "", // static ip is set so not important
+			MAC:            mac.String(), // mac so we always get the same IPv6 from slaac
 			IP4AddressCIDR: pubIP,
 			IP4GatewayIP:   pubGw,
 			// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty

@@ -107,6 +107,10 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create ndmz")
 	}
 
+	if err := ensureHostFw(ctx); err != nil {
+		log.Fatal().Err(err).Msg("failed to host firewall rules")
+	}
+
 	if hasPubConf {
 		if err := configurePubIface(ndmzNs, exitIface, nodeID); err != nil {
 			log.Error().Err(err).Msg("failed to configure public interface")
