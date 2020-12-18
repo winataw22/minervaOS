@@ -426,7 +426,7 @@ func validateContainerConfig(config Container) error {
 	}
 
 	if config.Capacity.Memory < 1024 {
-		return fmt.Errorf("amount of memory allocated for the container cannot be lower then 1024 bytes")
+		return fmt.Errorf("amount of memory allocated for the container cannot be lower then 1024 megabytes")
 	}
 
 	if config.Capacity.CPU == 0 {

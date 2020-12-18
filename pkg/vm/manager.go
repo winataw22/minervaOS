@@ -309,8 +309,9 @@ func (m *Module) Run(vm pkg.VM) error {
 			Mem:       vm.Memory,
 			HTEnabled: false,
 		},
-		Interfaces: nics,
-		Drives:     devices,
+		Interfaces:  nics,
+		Drives:      devices,
+		NoKeepAlive: vm.NoKeepAlive,
 	}
 
 	defer func() {

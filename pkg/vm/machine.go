@@ -54,6 +54,9 @@ type Machine struct {
 	Drives     []Drive     `json:"drives"`
 	Interfaces []Interface `json:"network-interfaces"`
 	Config     Config      `json:"machine-config"`
+	// NoKeepAlive is not used by firecracker, but instead a marker
+	// for the vm  mananger to not restart the machine when it stops
+	NoKeepAlive bool `json:"no-keep-alive"`
 }
 
 // Jailed represents a jailed machine.
