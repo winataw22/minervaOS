@@ -344,6 +344,10 @@ func processKubernetes(r *provision.Reservation) (u resourceUnits, err error) {
 		u.CRU = 4
 		u.MRU = 8 * gib
 		u.SRU = 50 * gib
+	case 18:
+		u.CRU = 1
+		u.MRU = 1 * gib
+		u.SRU = 25 * gib
 	}
 
 	return u, nil

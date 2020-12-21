@@ -512,9 +512,12 @@ func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
 	case 17:
 		//4 vCpu, 8 GiB RAM, 50 GB disk
 		return 4, 8 * 1024, 50 * 1024, nil
+	case 18:
+		//1 vCpu, 1 GiB RAM, 25 GB disk
+		return 1, 1 * 1024, 25 * 1024, nil
 	}
 
-	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 and 2 are supported", size)
+	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 to 18 are supported", size)
 }
 
 func pubIPResID(reservationID schema.ID) string {

@@ -33,7 +33,7 @@ require (
 	github.com/stretchr/testify v1.6.1
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/tfexplorer v0.4.1-0.20201120111415-6fefe983b035
+	github.com/threefoldtech/tfexplorer v0.4.8-0.20201218110633-b1b2cd7b4975
 	github.com/threefoldtech/zbus v0.1.4
 	github.com/tyler-smith/go-bip39 v1.0.2
 	github.com/urfave/cli v1.22.4
