@@ -94,7 +94,8 @@ func (r *ResourceOracle) Disks() (d Disks, err error) {
 	for i, device := range devices {
 		info, err = smartctl.DeviceInfo(device)
 		if err != nil {
-			return
+			log.Error().Err(err).Msgf("failed to get device info for: %s", device.Path)
+			continue
 		}
 		d.Devices[i] = info
 		if d.Environment == "" {

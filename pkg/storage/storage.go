@@ -45,6 +45,8 @@ type Module struct {
 	brokenPools   []pkg.BrokenPool
 	devices       filesystem.DeviceManager
 	brokenDevices []pkg.BrokenDevice
+	totalSSD      uint64
+	totalHDD      uint64
 
 	mu sync.RWMutex
 }
@@ -86,42 +88,15 @@ func New() (*Module, error) {
 func (s *Module) Total(kind pkg.DeviceType) (uint64, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var total uint64
 
-	for _, pool := range s.pools {
-		// ignore pools which don't have the right device type
-		if pool.Type() != kind {
-			continue
-		}
-
-		unmountAfter := false
-		if _, mounted := pool.Mounted(); !mounted {
-			_, err := pool.MountWithoutScan()
-			if err != nil {
-				log.Error().Err(err).Msgf("Failed to mount pool %s", pool.Name())
-				// If we fail to mount the pool, don't exit.
-				continue
-			}
-			unmountAfter = true
-		}
-
-		usage, err := pool.Usage()
-		if err != nil {
-			log.Error().Msgf("Failed to get current volume usage: %v", err)
-			return 0, err
-		}
-
-		total += usage.Size
-
-		if unmountAfter {
-			err := pool.UnMount()
-			if err != nil {
-				log.Error().Err(err).Msgf("Failed to unmount pool %s", pool.Name())
-				return 0, err
-			}
-		}
+	switch kind {
+	case pkg.SSDDevice:
+		return s.totalSSD, nil
+	case pkg.HDDDevice:
+		return s.totalHDD, nil
+	default:
+		return 0, fmt.Errorf("kind %+v unknown", kind)
 	}
-	return total, nil
 }
 
 // BrokenPools lists the broken storage pools that have been detected
@@ -289,9 +264,25 @@ func (s *Module) initialize(policy pkg.StoragePolicy) error {
 	}
 
 	// add expvar variables
+	s.totalSSD = 0
+	s.totalHDD = 0
 	for _, pool := range s.pools {
 		for _, device := range pool.Devices() {
 			device.ShutdownCount = expvar.NewInt(device.Path)
+		}
+
+		// calculate size for pool
+		usage, err := pool.Usage()
+		if err != nil {
+			log.Error().Msgf("Failed to get current volume usage: %v", err)
+			continue
+		}
+
+		switch pool.Type() {
+		case pkg.HDDDevice:
+			s.totalHDD += usage.Size
+		case pkg.SSDDevice:
+			s.totalSSD += usage.Size
 		}
 	}
 
