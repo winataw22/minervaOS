@@ -27,6 +27,10 @@ In order to use the full power of theses scripts, you'll need in addition:
 Then you can use the full power of the overlay. Everything is already setup using symlinks
 to use your local binaries inside the image.
 
+### Build the Binaries
+
+To build the binaries do `cd cmds && make`
+
 ### Use the Makefile
 
 To prepare your environment call `make prepare`. This will:
@@ -141,8 +145,24 @@ sudo ip link set forzos up
 1. Now run your vm
 
 ```bash
-./vm.sh -n myzos-01 -c farmer_id=2 printk.devmsg=on runmode=dev
+./vm.sh -n myzos-01 -c "farmer_id=2 printk.devmsg=on runmode=dev"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 
 and `farmer_id` is the id of the farm you registered with `tffarmer`
+
+Note: `double quotes around the flags after -c are very important` 
+
+
+## To ssh into the machine
+
+### Authorizing yourself
+- `cp ~/.ssh/authorized_keys qemu/overlay/root/.ssh/`
+
+
+### SSH to the node
+- use `ssh root@{NODE_IP}`
+
+## inspecting the cmdline Arguments
+
+can be done using `cat /proc/cmdline`
