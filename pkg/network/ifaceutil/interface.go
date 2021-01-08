@@ -166,6 +166,11 @@ func MakeVethPair(name, master string, mtu int) (netlink.Link, error) {
 		return nil, err
 	}
 
+	// make sure the lowerhalf is up, this automatically sets the upperhalf UP
+	if err = netlink.LinkSetUp(peerLink); err != nil {
+		return nil, errors.Wrap(err, "could not set veth peer up")
+	}
+
 	// Re-fetch the link to get its creation-time parameters, e.g. index and mac
 	veth2, err := netlink.LinkByName(name)
 	if err != nil {
