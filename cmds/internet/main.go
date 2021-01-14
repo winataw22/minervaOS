@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
@@ -25,9 +26,7 @@ import (
 func main() {
 	app.Initialize()
 
-	var (
-		ver bool
-	)
+	var ver bool
 
 	flag.BoolVar(&ver, "v", false, "show version and exit")
 	flag.Parse()
@@ -55,7 +54,6 @@ func main() {
 
 func check() error {
 	f := func() error {
-
 		cmd := exec.Command("ping", "-c", "1", "google.com")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -74,7 +72,6 @@ func check() error {
 
 func configureZOS() error {
 	f := func() error {
-
 		z, err := zinit.New("")
 		if err != nil {
 			log.Error().Err(err).Msg("failed to connect to zinit")
@@ -118,6 +115,11 @@ func configureZOS() error {
 				Str("bridge", br.Name).
 				Msg("fail to attach device to bridge")
 			return err
+		}
+
+		// disable ipv6 on slave of zos
+		if _, err = sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", zosChild), "1"); err != nil {
+			return errors.Wrapf(err, "failed to disable ip6 on zos slave %s", zosChild)
 		}
 
 		if err := netlink.LinkSetUp(link); err != nil {
