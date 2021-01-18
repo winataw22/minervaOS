@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/tfexplorer/models/generated/workloads"
 	"github.com/threefoldtech/tfexplorer/schema"
 	"github.com/threefoldtech/zos/pkg"
@@ -314,7 +315,8 @@ func WorkloadToProvisionType(w workloads.Workloader) (*provision.Reservation, er
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("%w (%s) (%T)", ErrUnsupportedWorkload, w.GetWorkloadType().String(), w)
+		log.Error().Str("type", w.GetWorkloadType().String()).Msg("unsupported reservation type")
+		return reservation, nil
 	}
 
 	reservation.Data, err = json.Marshal(data)

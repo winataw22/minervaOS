@@ -53,7 +53,7 @@ func (r *Poller) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservat
 
 	result := make([]*provision.Reservation, 0, len(list))
 	for _, wl := range list {
-		r, err := r.inputConv(wl)
+		converted, err := r.inputConv(wl)
 		if err != nil {
 			if errors.Is(err, primitives.ErrUnsupportedWorkload) {
 				log.Warn().Err(err).Msgf("received unsupported workload, skipping")
@@ -62,7 +62,7 @@ func (r *Poller) Poll(nodeID pkg.Identifier, from uint64) ([]*provision.Reservat
 			return nil, 0, err
 		}
 
-		result = append(result, r)
+		result = append(result, converted)
 	}
 
 	if r.provisionOrder != nil {

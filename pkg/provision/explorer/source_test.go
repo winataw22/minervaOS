@@ -84,5 +84,6 @@ func TestSkipUnsupportedType(t *testing.T) {
 
 	result, _, err := p.Poll(pkg.StrIdentifier(""), 0)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, 2, len(result))
+	assert.Len(t, result[1].Data, 0)
 }
