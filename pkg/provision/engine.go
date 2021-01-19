@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
@@ -88,6 +89,9 @@ func New(opts EngineOps) (*Engine, error) {
 		return nil, errors.Wrap(err, "failed retrieve memory stats")
 	}
 
+	// we round the total memory size to the nearest 1G
+	totalMemory := math.Ceil(float64(memStats.Total)/gib) * gib
+
 	return &Engine{
 		nodeID:            opts.NodeID,
 		source:            opts.Source,
@@ -100,7 +104,7 @@ func New(opts EngineOps) (*Engine, error) {
 		zbusCl:            opts.ZbusCl,
 		janitor:           opts.Janitor,
 		memCache:          cache.New(30*time.Minute, 30*time.Second),
-		totalMemAvailable: memStats.Total - minimunZosMemory,
+		totalMemAvailable: uint64(totalMemory) - minimunZosMemory,
 	}, nil
 }
 

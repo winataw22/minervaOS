@@ -137,7 +137,7 @@ func (p *Provisioner) kubernetesProvisionImpl(ctx context.Context, reservation *
 		if err != nil {
 			return result, errors.Wrap(err, "could not get path to existing disk")
 		}
-		diskName = info.Path
+		diskPath = info.Path
 	} else {
 		diskPath, err = storage.Allocate(diskName, int64(disk))
 		if err != nil {
