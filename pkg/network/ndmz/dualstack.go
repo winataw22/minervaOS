@@ -51,6 +51,19 @@ func (d *DualStack) Create(ctx context.Context) error {
 	master := d.ipv6Master
 	var err error
 	if master == "" {
+		// Look for an ipv6 master iface on the host. This eventually tries to find
+		// an interface with a SLAAC address. The physical iface attached to the
+		// zos bridge will not be selected as it should have ipv6 disabled already
+		// (or its SLAAC address will be moved to zos). It might be that this happens
+		// too soon though for all ifaces to properly have configured their SLAAC
+		// address.
+		// TODO: fix this properly: https://github.com/threefoldtech/zos/issues/1159
+		// As a temporary workaround / hack, wait for a while before continuing
+		// 3 Minutes should be sufficient for now
+		log.Info().Msg("goin to sleep for a while so all ifaces have time to do SLAAC")
+		time.Sleep(3 * time.Minute)
+		log.Info().Msg("woke up from SLAAC sleep")
+
 		master, err = FindIPv6Master()
 		if err != nil {
 			return errors.Wrap(err, "could not find public master iface for ndmz")
