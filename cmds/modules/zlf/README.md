@@ -1,3 +1,5 @@
+# DEPRECATED
+
 # zlf
 Zero-OS Logs Forwarder reads logs from local unix socket and forward them to a remote redis server
 
@@ -11,4 +13,3 @@ Usage of ./zlf:
     	zinit unix socket (default "/var/run/log.sock")
   -port int
     	redis port (default 6379)
-

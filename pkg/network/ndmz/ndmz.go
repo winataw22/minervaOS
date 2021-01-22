@@ -61,7 +61,7 @@ type DMZ interface {
 }
 
 // FindIPv6Master finds which interface to use as master for NDMZ npub6 interface
-func FindIPv6Master() (master string, err error) {
+func FindIPv6Master(useZos bool) (master string, err error) {
 	if namespace.Exists(types.PublicNamespace) {
 		pubNS, err := namespace.GetByName(types.PublicNamespace)
 		if err != nil {
@@ -76,7 +76,7 @@ func FindIPv6Master() (master string, err error) {
 		return parent.Attrs().Name, nil
 	}
 
-	master, err = ifaceutil.HostIPV6Iface()
+	master, err = ifaceutil.HostIPV6Iface(useZos)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to find a valid network interface to use as parent for ndmz public interface")
 	}

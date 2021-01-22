@@ -64,7 +64,7 @@ func (d *DualStack) Create(ctx context.Context) error {
 		time.Sleep(3 * time.Minute)
 		log.Info().Msg("woke up from SLAAC sleep")
 
-		master, err = FindIPv6Master()
+		master, err = FindIPv6Master(true)
 		if err != nil {
 			return errors.Wrap(err, "could not find public master iface for ndmz")
 		}

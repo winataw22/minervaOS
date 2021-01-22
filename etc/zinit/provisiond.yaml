@@ -1,4 +1,4 @@
-exec: provisiond -broker unix:///var/run/redis.sock -root /var/cache/modules/provisiond
+exec: provisiond --broker unix:///var/run/redis.sock --root /var/cache/modules/provisiond
 after:
   - boot
   - flistd

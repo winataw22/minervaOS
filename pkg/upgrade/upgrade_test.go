@@ -20,7 +20,7 @@ func TestUpgraderDownload(t *testing.T) {
 	err := Storage(defaultHubStorage)(up)
 	require.NoError(err)
 
-	const flist = "thabet/redis.flist"
+	const flist = "azmy.3bot/test-flist.flist"
 
 	store, err := up.getFlist(flist)
 	require.NoError(err)
@@ -35,14 +35,20 @@ func TestUpgraderDownload(t *testing.T) {
 	// validation of download
 	err = store.Walk("", func(path string, info meta.Meta) error {
 		downloaded := filepath.Join(tmp, path)
-		stat, err := os.Stat(downloaded)
+		stat, err := os.Lstat(downloaded)
 		require.NoError(err)
 		require.Equal(info.IsDir(), stat.IsDir())
 		if info.IsDir() {
 			return nil
 		}
 
-		require.Equal(info.Info().Size, uint64(stat.Size()))
+		switch info.Info().Type {
+		case meta.RegularType:
+			require.Equal(info.Info().Size, uint64(stat.Size()))
+		case meta.LinkType:
+			require.Equal(os.ModeSymlink, stat.Mode()&os.ModeType)
+		}
+
 		return nil
 	})
 

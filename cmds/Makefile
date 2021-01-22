@@ -5,10 +5,10 @@ dirty = $(shell test -n "`git diff --shortstat 2> /dev/null | tail -n1`" && echo
 version = github.com/threefoldtech/zos/pkg/version
 ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revision) -X $(version).Dirty=$(dirty) -extldflags "-static"'
 
-all: $(shell ls -d */)
+all: identityd internet zos
 	strip $(OUT)/*
 
-.PHONY: output clean identityd identityd/
+.PHONY: output clean identityd internet zos
 
 output:
 	mkdir -p $(OUT)
@@ -16,9 +16,8 @@ output:
 identityd:
 	cd identityd && GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
 
-# this one is expanded by the `all` rule.
-identityd/:
-	cd identityd && GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
+internet: output
+	cd internet && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/internet
 
-%:	%/*.go output
-	cd $(shell dirname $<) && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/$(shell basename `dirname $<`)
+zos: output
+	cd zos && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/zos

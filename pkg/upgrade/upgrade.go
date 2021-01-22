@@ -462,16 +462,33 @@ func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...
 		}
 
 		if info.IsDir() {
-
 			if err := os.MkdirAll(dest, os.FileMode(info.Info().Access.Mode)); err != nil {
 				return err
 			}
-		} else if info.Info().Type == meta.RegularType {
+			return nil
+		}
+
+		stat := info.Info()
+
+		switch stat.Type {
+		case meta.RegularType:
 			// regular file (or other types that we don't handle)
-			if err := u.copyFile(dest, info); err != nil {
+			return u.copyFile(dest, info)
+		case meta.LinkType:
+			//fmt.Println("link target", stat.LinkTarget)
+			target := stat.LinkTarget
+			if filepath.IsAbs(target) {
+				// if target is absolute, we make sure it's under destination
+				// other wise use relative path
+				target = filepath.Join(destination, stat.LinkTarget)
+			}
+
+			if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
 				return err
 			}
-		} else {
+
+			return os.Symlink(target, dest)
+		default:
 			log.Debug().Str("type", info.Info().Type.String()).Msg("ignoring not suppored file type")
 		}
 

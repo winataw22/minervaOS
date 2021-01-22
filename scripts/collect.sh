@@ -1,16 +1,1 @@
-#!/bin/sh
-set -e
-
-# This file is used by CI to build an archive with
-# all the binaries, and config files for flist building
-
-archive=$1
-
-if [ -z "${archive}" ]; then
-    echo "missing argument" >&2
-    exit 1
-fi
-
-mkdir -p ${archive}/bin ${archive}/etc
-cp bin/* ${archive}/bin/
-cp -r etc/* ${archive}/etc/
+/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/7a5b0d882966d0b7536179a79b9e5859

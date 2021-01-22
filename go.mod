@@ -36,7 +36,8 @@ require (
 	github.com/threefoldtech/tfexplorer v0.4.8-0.20201218110633-b1b2cd7b4975
 	github.com/threefoldtech/zbus v0.1.4
 	github.com/tyler-smith/go-bip39 v1.0.2
-	github.com/urfave/cli v1.22.4
+	github.com/urfave/cli v1.22.5
+	github.com/urfave/cli/v2 v2.3.0
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d

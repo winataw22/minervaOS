@@ -293,7 +293,7 @@ func Delete(name string, netNS ns.NetNS) error {
 
 // HostIPV6Iface return the first physical interface to have an
 // ipv6 public address
-func HostIPV6Iface() (string, error) {
+func HostIPV6Iface(useZos bool) (string, error) {
 
 	links, err := netlink.LinkList()
 	if err != nil {
@@ -307,7 +307,9 @@ func HostIPV6Iface() (string, error) {
 	// first check all physical interface
 	links = LinkFilter(links, []string{"device"})
 	// then check zos bridge
-	links = append(links, zos)
+	if useZos {
+		links = append(links, zos)
+	}
 
 	for _, link := range links {
 
