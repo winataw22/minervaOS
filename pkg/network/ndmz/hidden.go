@@ -44,20 +44,15 @@ func (d *Hidden) Create(ctx context.Context) error {
 	// imlementations in the cleanup
 	d.master = types.DefaultBridge
 	if !namespace.Exists(NetNSNDMZ) {
-		var masterBr *netlink.Bridge
 		var err error
 		if !ifaceutil.Exists(publicBridge, nil) {
 			// create bridge, this needs to happen on the host ns
-			masterBr, err = bridge.New(publicBridge)
+			_, err = bridge.New(publicBridge)
 			if err != nil {
 				return errors.Wrap(err, "could not create public bridge")
 			}
-		} else {
-			masterBr, err = bridge.Get(publicBridge)
-			if err != nil {
-				return errors.Wrap(err, "could not load public bridge")
-			}
 		}
+
 		var veth netlink.Link
 		if !ifaceutil.Exists(toZosVeth, nil) {
 			veth, err = ifaceutil.MakeVethPair(toZosVeth, publicBridge, 1500)
@@ -70,7 +65,13 @@ func (d *Hidden) Create(ctx context.Context) error {
 				return errors.Wrap(err, "failed to load existing veth link to master bridge")
 			}
 		}
-		if err = bridge.AttachNic(veth, masterBr); err != nil {
+
+		zos, err := bridge.Get(types.DefaultBridge)
+		if err != nil {
+			return errors.Wrap(err, "could not load public bridge")
+		}
+
+		if err = bridge.AttachNic(veth, zos); err != nil {
 			return errors.Wrap(err, "failed to add veth to ndmz master bridge")
 		}
 
