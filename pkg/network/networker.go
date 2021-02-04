@@ -17,6 +17,7 @@ import (
 	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
+	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
@@ -164,11 +165,6 @@ func (n *networker) Ready() error {
 	return nil
 }
 
-func (n *networker) ipv4Only() bool {
-	_, ipv4Only := n.ndmz.(*ndmz.Hidden)
-	return ipv4Only
-}
-
 func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.ContainerNetworkConfig) (join pkg.Member, err error) {
 	// TODO:
 	// 1- Make sure this network id is actually deployed
@@ -185,7 +181,11 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 		return join, errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
 	}
 
-	if cfg.PublicIP6 && n.ipv4Only() {
+	ipv4Only, err := n.ndmz.IsIPv4Only()
+	if err != nil {
+		return join, errors.Wrap(err, "failed to check ipv6 support")
+	}
+	if cfg.PublicIP6 && ipv4Only {
 		return join, errors.Errorf("this node runs in IPv4 only mode and you asked for a public IPv6. Impossible to fulfill the request")
 	}
 
@@ -203,7 +203,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 		ContainerID: containerID,
 		IPs:         ips,
 		PublicIP6:   cfg.PublicIP6,
-		IPv4Only:    n.ipv4Only(),
+		IPv4Only:    ipv4Only,
 	})
 	if err != nil {
 		return join, errors.Wrap(err, "failed to load network resource")
@@ -361,7 +361,7 @@ func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.I
 	})
 
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
-		macVlan, err = macvlan.Create(iface, n.ndmz.IP6PublicIface(), netNs)
+		macVlan, err = macvlan.Create(iface, public.PublicBridge, netNs)
 
 		if err != nil {
 			return err
@@ -446,14 +446,12 @@ func (n *networker) SetupPubTap(pubIPReservationID string) (string, error) {
 		return "", errors.New("can't create public tap on this node")
 	}
 
-	bridgeName := n.ndmz.IP6PublicIface()
-
 	tapIface, err := pubTapName(pubIPReservationID)
 	if err != nil {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
 
-	_, err = tuntap.CreateTap(tapIface, bridgeName)
+	_, err = tuntap.CreateTap(tapIface, public.PublicBridge)
 
 	return tapIface, err
 }
@@ -509,7 +507,7 @@ func (n *networker) DisconnectPubTap(pubIPReservationID string) error {
 // GetPublicIPv6Subnet returns the IPv6 prefix op the public subnet of the host
 func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
 	// TODO
-	pubIface, err := netlink.LinkByName(n.ndmz.IP6PublicIface())
+	pubIface, err := netlink.LinkByName(public.PublicBridge)
 	if err != nil {
 		return net.IPNet{}, errors.Wrap(err, "could not load public interface")
 	}
@@ -665,26 +663,47 @@ func (n *networker) CreateNR(netNR pkg.NetResource) (string, error) {
 		}
 	}
 
-	// this is ok if pubNS is nil, nr.Create handles it
-	pubNS, _ := namespace.GetByName(types.PublicNamespace)
+	defer func() {
+		if err != nil {
+			cleanup()
+		}
+	}()
+
+	wgName, err := netr.WGName()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get wg interface name for network resource")
+	}
 
 	log.Info().Msg("create network resource namespace")
-	if err := netr.Create(pubNS); err != nil {
-		cleanup()
+	if err = netr.Create(); err != nil {
 		return "", errors.Wrap(err, "failed to create network resource")
 	}
 
-	if err := n.ndmz.AttachNR(string(netNR.NetID), netr, n.ipamLeaseDir); err != nil {
+	exists, err := netr.HasWireguard()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to check if network resource has wireguard setup")
+	}
+
+	if !exists {
+		var wg *wireguard.Wireguard
+		wg, err = public.NewWireguard(wgName)
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to create wg interface for network resource '%s'", netNR.Name)
+		}
+		if err = netr.SetWireguard(wg); err != nil {
+			return "", errors.Wrap(err, "failed to setup wireguard interface for network resource")
+		}
+	}
+
+	if err = n.ndmz.AttachNR(string(netNR.NetID), netr, n.ipamLeaseDir); err != nil {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
-	if err := netr.ConfigureWG(privateKey); err != nil {
-		cleanup()
+	if err = netr.ConfigureWG(privateKey); err != nil {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
-	if err := n.storeNetwork(netNR); err != nil {
-		cleanup()
+	if err = n.storeNetwork(netNR); err != nil {
 		return "", errors.Wrap(err, "failed to store network object")
 	}
 
@@ -864,99 +883,64 @@ func (n *networker) publishWGPorts() error {
 	return nil
 }
 
-func (n *networker) getAddresses(nsName, link string) ([]netlink.Addr, error) {
-	netns, err := namespace.GetByName(nsName)
-	if err != nil {
-		return nil, err
-	}
-
-	defer netns.Close()
-	var addr []netlink.Addr
-	err = netns.Do(func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(link)
-		if err != nil {
-			return err
-		}
-		addr, err = netlink.AddrList(link, netlink.FAMILY_ALL)
-		return err
-	})
-
-	return addr, err
-}
-
-func (n *networker) monitorNS(ctx context.Context, name string, links ...string) <-chan pkg.NetlinkAddresses {
-	get := func() (pkg.NetlinkAddresses, error) {
-		var result pkg.NetlinkAddresses
-		for _, link := range links {
-			values, err := n.getAddresses(name, link)
-			if err != nil {
-				return nil, err
-			}
-
-			for _, value := range values {
-				result = append(result, pkg.NetlinkAddress(value))
-			}
-		}
-
-		return result, nil
-	}
-
-	addresses, _ := get()
+func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
 	ch := make(chan pkg.NetlinkAddresses)
 	go func() {
-		monitorCtx, cancel := context.WithCancel(context.Background())
-
-		defer func() {
-			close(ch)
-			cancel()
-		}()
-
-	main:
 		for {
-			updates, err := namespace.Monitor(monitorCtx, name)
-			if err != nil {
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(30 * time.Second):
-					continue
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(30 * time.Second):
+				ips, err := n.ndmz.GetIP(ndmz.FamilyAll)
+				if err != nil {
+					log.Error().Err(err).Msg("failed to get dmz IPs")
 				}
+				ch <- ips
 			}
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-updates:
-					addresses, err = get()
-					if err != nil {
-						// this might be duo too namespace was deleted, hence
-						// we need to try find the namespace object again
-						cancel()
-						monitorCtx, cancel = context.WithCancel(context.Background())
-						continue main
-					}
-				case <-time.After(2 * time.Second):
-					ch <- addresses
-				}
-			}
-
 		}
 	}()
 
 	return ch
 }
 
-func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	return n.monitorNS(ctx, ndmz.NetNSNDMZ, ndmz.DMZPub4, ndmz.DMZPub6)
-}
-
 func (n *networker) YggAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	return n.monitorNS(ctx, ndmz.NetNSNDMZ, yggdrasil.YggIface)
+	ch := make(chan pkg.NetlinkAddresses)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(30 * time.Second):
+				ips, err := n.ndmz.GetIPFor(yggdrasil.YggIface)
+				if err != nil {
+					log.Error().Err(err).Str("inf", yggdrasil.YggIface).Msg("failed to get public IPs")
+				}
+				ch <- ips
+			}
+		}
+	}()
+
+	return ch
 }
 
 func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	return n.monitorNS(ctx, types.PublicNamespace, types.PublicIface)
+	ch := make(chan pkg.NetlinkAddresses)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(30 * time.Second):
+				ips, err := public.IPs()
+				if err != nil {
+					log.Error().Err(err).Msg("failed to get public IPs")
+				}
+				ch <- ips
+			}
+		}
+	}()
+
+	return ch
 }
 
 func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
@@ -977,7 +961,7 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 		var result pkg.NetlinkAddresses
 		values, _ := netlink.AddrList(link, netlink.FAMILY_ALL)
 		for _, value := range values {
-			result = append(result, pkg.NetlinkAddress(value))
+			result = append(result, *value.IPNet)
 		}
 
 		return result

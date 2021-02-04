@@ -10,7 +10,7 @@ build = false
 [dependencies]
 retry = "0.5.1"
 shlex = "0.1.1"
-failure = "0.1.6"
+anyhow = "1.0.38"
 reqwest = "0.9.22"
 serde = "1.0.102"
 serde_json = "1.0.41"

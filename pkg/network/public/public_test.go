@@ -1,4 +1,4 @@
-package network
+package public
 
 import (
 	"net"
@@ -27,6 +27,6 @@ func TestCreatePublicNS(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	err := CreatePublicNS(nil, iface, pkg.StrIdentifier(""))
+	err := createPublicNS(pkg.StrIdentifier(""), iface)
 	require.NoError(t, err)
 }

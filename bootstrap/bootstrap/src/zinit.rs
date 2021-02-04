@@ -1,7 +1,5 @@
-use failure::Error;
+use anyhow::Result;
 use std::process::Command;
-
-type Result<T> = std::result::Result<T, Error>;
 
 /// monitor service via name
 pub fn monitor<T>(name: T) -> Result<()>

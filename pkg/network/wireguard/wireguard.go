@@ -32,7 +32,9 @@ func New(name string) (*Wireguard, error) {
 	if err := netlink.LinkAdd(wg); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
-	return wg, nil
+
+	// always make sure we load the full attributes
+	return GetByName(name)
 }
 
 // GetByName return a wireguard object by its name

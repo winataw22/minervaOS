@@ -4,18 +4,15 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"time"
 
-	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/network/namespace"
-	"github.com/urfave/cli/v2"
-	"github.com/vishvananda/netlink"
-
 	"github.com/threefoldtech/zos/pkg/network/latency"
+	"github.com/threefoldtech/zos/pkg/network/public"
+	"github.com/threefoldtech/zos/pkg/zinit"
+	"github.com/urfave/cli/v2"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog/log"
@@ -30,7 +27,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
-	"github.com/threefoldtech/zos/pkg/zinit"
 )
 
 const redisSocket = "unix:///var/run/redis.sock"
@@ -98,19 +94,24 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to publish network interfaces to BCDB")
 	}
 
-	exitIface, err := getPubIface(directory, nodeID.Identity())
-	pubConfMaster := ""
-	if err == nil {
-		pubConfMaster = exitIface.Master
+	// choose exit interface for (br-pub)
+	// - this is public_config.master if set
+	// - otherwise we find the first nic with public ipv6 (that is not zos)
+	// - finally we use zos if that is the last option.
+	pub, err := getExitInterface(directory, nodeID.Identity())
+	log.Debug().Err(err).Msgf("public interface configred: %+v", pub)
+	if err != nil && err != ErrNoPubInterface {
+		return errors.Wrap(err, "failed to get node public_config")
 	}
-	hasPubConf := err == nil
 
-	ndmzNs, err := buildNDMZ(nodeID.Identity(), pubConfMaster)
+	master, err := public.EnsurePublicSetup(nodeID, pub)
 	if err != nil {
-		return errors.Wrap(err, "failed to create ndmz")
+		return errors.Wrap(err, "failed to setup public bridge")
 	}
 
-	if err := ndmzNs.Create(ctx); err != nil {
+	dmz := ndmz.New(nodeID.Identity(), master)
+
+	if err := dmz.Create(ctx); err != nil {
 		return errors.Wrap(err, "failed to create ndmz")
 	}
 
@@ -118,13 +119,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to host firewall rules")
 	}
 
-	if hasPubConf {
-		if err := configurePubIface(ndmzNs, exitIface, nodeID); err != nil {
-			return errors.Wrap(err, "failed to configure public interface")
-		}
-	}
-
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), ndmzNs)
+	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), dmz)
 	if err != nil {
 		return errors.Wrap(err, "fail to start yggdrasil")
 	}
@@ -134,12 +129,12 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "fail read yggdrasil subnet")
 	}
 
-	if err := ndmzNs.SetIP6PublicIface(gw); err != nil {
+	if err := dmz.SetIP(gw); err != nil {
 		return errors.Wrap(err, "fail to configure yggdrasil subnet gateway IP")
 	}
 
 	// send another detail of network interfaces now that ndmz is created
-	ndmzIfaces, err := getNdmzInterfaces()
+	ndmzIfaces, err := dmz.Interfaces()
 	if err != nil {
 		return errors.Wrap(err, "failed to read ndmz network interfaces")
 	}
@@ -151,14 +146,14 @@ func action(cli *cli.Context) error {
 
 	// watch modification of the address on the nic so we can update the explorer
 	// with eventual new values
-	go startAddrWatch(ctx, nodeID, directory, ifaces)
+	go startAddrWatch(ctx, dmz, nodeID, directory, ifaces)
 
 	log.Info().Msg("start zbus server")
 	if err := os.MkdirAll(root, 0750); err != nil {
 		return errors.Wrap(err, "fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, directory, root, ndmzNs, ygg)
+	networker, err := network.NewNetworker(identity, directory, root, dmz, ygg)
 	if err != nil {
 		return errors.Wrap(err, "error creating network manager")
 	}
@@ -240,18 +235,28 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz
 
 	// filter out the possible yggdrasil public node
 	var filter latency.IPFilter
-	_, ipv4Only := dmz.(*ndmz.Hidden)
+	ipv4Only, err := dmz.IsIPv4Only()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to check ipv6 support for dmz")
+	}
+
 	if ipv4Only {
 		// if we are a hidden node,only keep ipv4 public nodes
 		filter = latency.IPV4Only
 	} else {
 		// if we are a dual stack node, filter out all the nodes from the same
 		// segment so we do not just connect locally
-		npub6IP, err := getDMZNPub6Addr()
+		ips, err := dmz.GetIP(ndmz.FamilyV6)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to get ndmz public ipv6")
 		}
-		filter = latency.ExcludePrefix(npub6IP[:8])
+
+		for _, ip := range ips {
+			if ip.IP.IsGlobalUnicast() {
+				filter = latency.ExcludePrefix(ip.IP[:8])
+				break
+			}
+		}
 	}
 
 	ls := latency.NewSorter(endpoints, 5, filter)
@@ -299,7 +304,7 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz
 	return server, nil
 }
 
-func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, cl client.Directory, ifaces []types.IfaceInfo) {
+func startAddrWatch(ctx context.Context, dmz ndmz.DMZ, nodeID pkg.Identifier, cl client.Directory, ifaces []types.IfaceInfo) {
 
 	ifaceNames := make([]string, len(ifaces))
 	for i, iface := range ifaces {
@@ -308,7 +313,7 @@ func startAddrWatch(ctx context.Context, nodeID pkg.Identifier, cl client.Direct
 	log.Info().Msgf("watched interfaces %v", ifaceNames)
 
 	f := func() error {
-		wl := NewWatchedLinks(ifaceNames, nodeID, cl)
+		wl := NewWatchedLinks(dmz, ifaceNames, nodeID, cl)
 		if err := wl.Forever(ctx); err != nil {
 			log.Error().Err(err).Msg("error in address watcher")
 			return err
@@ -330,82 +335,4 @@ func explorerClient() (client.Directory, error) {
 	}
 
 	return client.Directory, nil
-}
-
-func buildNDMZ(nodeID string, pubMaster string) (ndmz.DMZ, error) {
-	master := pubMaster
-
-	var err error
-	if master == "" {
-		notify := func(err error, d time.Duration) {
-			log.Warn().Err(err).Msgf("did not find a valid IPV6 master address for ndmz, retry in %s", d.String())
-		}
-
-		findMaster := func() error {
-			var err error
-			master, err = ndmz.FindIPv6Master(false)
-			return err
-		}
-
-		bo := backoff.NewExponentialBackOff()
-		// wait for 2 minute for public ipv6
-		bo.MaxElapsedTime = time.Minute * 2
-		bo.MaxInterval = time.Second * 10
-		err = backoff.RetryNotify(findMaster, bo, notify)
-	}
-
-	// if we haven't found a master after 2 minutes, include zos bridge in the
-	// search, and search 1 more time
-	if master == "" {
-		master, err = ndmz.FindIPv6Master(true)
-	}
-
-	// if ipv6 found, use dual stack ndmz
-	if err == nil && master != "" {
-		log.Info().Str("ndmz_npub6_master", master).Msg("network mode dualstack")
-		return ndmz.NewDualStack(nodeID, master), nil
-	}
-
-	// else use ipv4 only mode
-	log.Info().Msg("network mode hidden ipv4 only")
-	return ndmz.NewHidden(nodeID), nil
-}
-
-func getDMZNPub6Addr() (net.IP, error) {
-	netns, err := namespace.GetByName(ndmz.NetNSNDMZ)
-	if err != nil {
-		return nil, err
-	}
-	defer netns.Close()
-
-	var ip net.IP
-	getIP := func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(ndmz.DMZPub6)
-		if err != nil {
-			return err
-		}
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
-		if err != nil {
-			return err
-		}
-
-		for _, addr := range addrs {
-			if addr.IP.IsGlobalUnicast() {
-				ip = addr.IP
-				return nil
-			}
-		}
-
-		return nil
-	}
-
-	if err = netns.Do(getIP); err != nil {
-		return nil, err
-	}
-
-	if ip == nil {
-		return nil, fmt.Errorf("didn't not find the IP of npub6 interface")
-	}
-
-	return ip, nil
 }

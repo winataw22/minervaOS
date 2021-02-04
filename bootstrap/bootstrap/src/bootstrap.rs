@@ -4,7 +4,7 @@ use super::workdir::WorkDir;
 use super::zfs::Zfs;
 use super::zinit;
 
-use failure::Error;
+use anyhow::{Context, Result};
 use retry;
 
 const FLIST_REPO: &str = "tf-zos";
@@ -12,8 +12,6 @@ const BIN_REPO: &str = "tf-zos-bins";
 const FLIST_INFO_FILE: &str = "/tmp/flist.info";
 const FLIST_NAME_FILE: &str = "/tmp/flist.name";
 const WORKDIR: &str = "/tmp/bootstrap";
-
-type Result<T> = std::result::Result<T, Error>;
 
 fn boostrap_zos(cfg: &config::Config) -> Result<()> {
     let flist = match cfg.runmode {
@@ -192,8 +190,9 @@ fn install_package(flist: &hub::Flist) -> Result<()> {
     let fs = Zfs::mount("backend", &flist.name, "root")?;
     debug!("zfs started, now copying all files");
 
-    fs.copy("/")?;
+    fs.copy("/").context("failed to copy files")?;
 
+    debug!("starting services");
     run_all(&fs)
 }
 

@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use shlex::split;
 use std::collections::HashMap;
 use std::fs;

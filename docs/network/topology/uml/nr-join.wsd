@@ -1,0 +1,23 @@
+@startuml
+
+component "br-pub" as public
+component "b-<netid>\nbridge" as bridge
+package "<reservation-id> namespace" {
+    component eth0 as eth
+    note right of eth
+        set ip as configured in the reservation
+        it must be in the subnet assinged to n-<netid>
+        in the user resource above.
+        - set default route through n-<netid>
+    end note
+    eth .. bridge: veth
+
+    component [pub\nmacvlan] as pub
+    pub .. public
+
+    note right of pub
+    only if public ipv6 is requests
+    also gets a consistent MAC address
+    end note
+}
+@enduml

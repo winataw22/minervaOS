@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate failure;
+extern crate anyhow;
 #[macro_use]
 extern crate log;
 
@@ -11,10 +11,8 @@ mod workdir;
 mod zfs;
 mod zinit;
 
+use anyhow::Result;
 use config::Config;
-use failure::Error;
-
-type Result<T> = std::result::Result<T, Error>;
 
 fn app() -> Result<()> {
     let config = Config::current()?;

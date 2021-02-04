@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/vishvananda/netlink"
 )
 
@@ -83,6 +84,40 @@ func Exists(name string) bool {
 	return ok
 }
 
+func vethName(from, to string) string {
+	name := fmt.Sprintf("%sto%s", from, to)
+	if len(name) > 13 {
+		return name[:13]
+	}
+
+	return name
+}
+
+// Attach attaches any link to a bridge, based on the link type
+// can be directly plugged or crossed over with a veth pair
+// if name is provided, the name will be used in case of veth pair instead of
+// a generated name
+func Attach(link netlink.Link, bridge *netlink.Bridge, name ...string) error {
+	if link.Type() == "device" {
+		return AttachNic(link, bridge)
+	} else if link.Type() == "bridge" {
+		linkBr := link.(*netlink.Bridge)
+		n := vethName(link.Attrs().Name, bridge.Name)
+		if len(name) > 0 {
+			n = name[0]
+		}
+		//we need to create an veth pair to wire 2 bridges.
+		veth, err := ifaceutil.MakeVethPair(n, bridge.Name, 1500)
+		if err != nil {
+			return err
+		}
+
+		return AttachNic(veth, linkBr)
+	}
+
+	return fmt.Errorf("unsupported link type '%s'", link.Type())
+}
+
 // AttachNic attaches an interface to a bridge
 func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
 	// Jan said this was fine
@@ -90,7 +125,8 @@ func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
 		return errors.Wrap(err, "could not set veth peer up")
 	}
 	// disable ipv6 on slave
-	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", link.Attrs().Name), "1"); err != nil {
+
+	if err := options.Set(link.Attrs().Name, options.IPv6Disable(true)); err != nil {
 		return errors.Wrap(err, "failed to disable ipv6 on link interface")
 	}
 	return netlink.LinkSetMaster(link, bridge)

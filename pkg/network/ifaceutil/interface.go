@@ -213,6 +213,21 @@ func Exists(name string, netNS ns.NetNS) bool {
 	return exist
 }
 
+// Get link by name from optional namespace
+func Get(name string, netNS ns.NetNS) (link netlink.Link, err error) {
+	if netNS != nil {
+		netNS.Do(func(_ ns.NetNS) error {
+			link, err = netlink.LinkByName(name)
+			return nil
+		})
+
+		return
+	}
+
+	link, err = netlink.LinkByName(name)
+	return
+}
+
 // GetMAC gets the mac address from the Interface
 func GetMAC(name string, netNS ns.NetNS) (net.HardwareAddr, error) {
 	if netNS != nil {
@@ -324,7 +339,7 @@ func HostIPV6Iface(useZos bool) (string, error) {
 				Str("addr", addr.String()).
 				Msg("search public ipv6 address")
 
-			if addr.IP.IsGlobalUnicast() && !isULA(addr.IP) {
+			if addr.IP.IsGlobalUnicast() && !IsULA(addr.IP) {
 				return link.Attrs().Name, nil
 			}
 		}
@@ -368,6 +383,7 @@ var ulaPrefix = net.IPNet{
 	Mask: net.CIDRMask(7, 128),
 }
 
-func isULA(ip net.IP) bool {
+// IsULA checks if IPv6 is a ULA ip
+func IsULA(ip net.IP) bool {
 	return ulaPrefix.Contains(ip)
 }

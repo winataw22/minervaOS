@@ -1,0 +1,31 @@
+@startuml
+component [b-<netid>] as bridge
+note left of bridge
+- net.ipv6.conf.b-<netid>.disable_ipv6 = 1
+end note
+
+package "n-<netid> namespace" {
+    component [n-<netid>\nmacvlan] as nic
+    bridge .. nic: macvlan
+
+    note bottom of nic
+    - nic gets the first ip ".1" in the assigned
+    user subnet.
+    - an ipv6 driven from ipv4 that is driven from the assigned ipv4
+    - fe80::1/64
+    end note
+    component [public\nmacvlan] as public
+    note bottom of public
+    - gets an ipv4 in 100.127.0.9/16 range
+    - get an ipv6 in the fd00::/64 prefix
+    - route over 100.127.0.1
+    - route over fe80::1/64
+    end note
+    note as G
+     - net.ipv6.conf.all.forwarding = 1
+    end note
+}
+
+component [br-ndmz] as brndmz
+brndmz .. public: macvlan
+@enduml

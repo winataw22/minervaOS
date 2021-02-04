@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/vishvananda/netlink"
@@ -17,6 +16,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/zinit"
 
@@ -80,7 +80,7 @@ func configureZOS() error {
 
 		log.Info().Msg("Start network bootstrap")
 
-		ifaceConfigs, err := bootstrap.InspectIfaces()
+		ifaceConfigs, err := bootstrap.AnalyseLinks(bootstrap.PhysicalFilter, bootstrap.PluggedFilter)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to gather network interfaces configuration")
 			return err
@@ -117,8 +117,7 @@ func configureZOS() error {
 			return err
 		}
 
-		// disable ipv6 on slave of zos
-		if _, err = sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", zosChild), "1"); err != nil {
+		if err := options.Set(zosChild, options.IPv6Disable(true)); err != nil {
 			return errors.Wrapf(err, "failed to disable ip6 on zos slave %s", zosChild)
 		}
 

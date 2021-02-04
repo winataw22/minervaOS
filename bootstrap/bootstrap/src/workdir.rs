@@ -1,8 +1,6 @@
-use failure::Error;
+use anyhow::Result;
 use std::env;
 use std::path::PathBuf;
-
-type Result<T> = std::result::Result<T, Error>;
 
 pub struct WorkDir {
     path: PathBuf,

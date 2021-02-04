@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Result;
 use reqwest::{get, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -7,8 +7,6 @@ use std::io::copy;
 use std::path::Path;
 
 const HUB: &str = "https://hub.grid.tf";
-
-type Result<T> = std::result::Result<T, Error>;
 
 pub struct Repo {
     base: String,

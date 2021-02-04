@@ -1,8 +1,6 @@
 use super::kparams;
+use anyhow::Result;
 use clap::{App, Arg};
-use failure::Error;
-
-type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum RunMode {

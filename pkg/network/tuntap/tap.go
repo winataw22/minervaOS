@@ -3,12 +3,10 @@ package tuntap
 import (
 	"fmt"
 
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/vishvananda/netlink"
 )
-
-const disableIPv6Template = "net.ipv6.conf.%s.disable_ipv6"
 
 // CreateTap creates a new tap device with the given name, and sets the master interface
 func CreateTap(name string, master string) (*netlink.Tuntap, error) {
@@ -41,8 +39,7 @@ func CreateTap(name string, master string) (*netlink.Tuntap, error) {
 		return nil, errors.Wrap(err, "could not set tap master")
 	}
 
-	disableIPv6Cmd := fmt.Sprintf(disableIPv6Template, name)
-	if _, err := sysctl.Sysctl(disableIPv6Cmd, "1"); err != nil {
+	if err := options.Set(name, options.IPv6Disable(true)); err != nil {
 		return nil, errors.Wrap(err, "failed to disable ipv6 on interface host side")
 	}
 

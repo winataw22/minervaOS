@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	stdnet "net"
+
 	"github.com/blang/semver"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -64,7 +66,7 @@ type NicsIOCounterStat []NicIOCounterStat
 type NetlinkAddress netlink.Addr
 
 // NetlinkAddresses alias for [][]NetlinkAddress
-type NetlinkAddresses []NetlinkAddress
+type NetlinkAddresses []stdnet.IPNet
 
 // PoolStats is pool statistics reported by storaged
 type PoolStats struct {

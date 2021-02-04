@@ -7,14 +7,12 @@ import (
 	"os"
 
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/network/options"
 
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/vishvananda/netlink"
 )
-
-const ipv4InterfaceArpProxySysctlTemplate = "net.ipv4.conf.%s.proxy_arp"
 
 // Create creates a new macvlan interface in the network namespace
 // name is the name of the macvlan interface
@@ -57,8 +55,7 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 		// containernetworking sets it up in some ref code somewhere, we copied it. we were stoopit
 		// disable proxy_arp, as it is ony useful in some very distinct cases, and otherwise can wreak
 		// havoc in networks -> 0!
-		ipv4SysctlValueName := fmt.Sprintf(ipv4InterfaceArpProxySysctlTemplate, tmpName)
-		if _, err := sysctl.Sysctl(ipv4SysctlValueName, "0"); err != nil {
+		if err := options.Set(tmpName, options.ProxyArp(false)); err != nil {
 			// remove the newly added link and ignore errors, because we already are in a failed state
 			_ = netlink.LinkDel(mv)
 			return fmt.Errorf("failed to set proxy_arp on newly added interface %q: %v", tmpName, err)

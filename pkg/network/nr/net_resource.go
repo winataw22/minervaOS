@@ -10,10 +10,10 @@ import (
 
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
+	"github.com/threefoldtech/zos/pkg/network/options"
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/pkg/errors"
 
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -97,7 +97,7 @@ func (nr *NetResource) WGName() (string, error) {
 
 // Create setup the basic components of the network resource
 // network namespace, bridge, wireguard interface and veth pair
-func (nr *NetResource) Create(pubNS ns.NetNS) error {
+func (nr *NetResource) Create() error {
 	log.Debug().Str("nr", nr.String()).Msg("create network resource")
 
 	if err := nr.createBridge(); err != nil {
@@ -109,9 +109,7 @@ func (nr *NetResource) Create(pubNS ns.NetNS) error {
 	if err := nr.attachToNRBridge(); err != nil {
 		return err
 	}
-	if err := nr.createWireguard(pubNS); err != nil {
-		return err
-	}
+
 	if err := nr.applyFirewall(); err != nil {
 		return err
 	}
@@ -296,7 +294,7 @@ func (nr *NetResource) createNetNS() error {
 	}
 	defer netNS.Close()
 	err = netNS.Do(func(_ ns.NetNS) error {
-		if _, err := sysctl.Sysctl("net.ipv6.conf.all.forwarding", "1"); err != nil {
+		if err := options.SetIPv6Forwarding(true); err != nil {
 			return err
 		}
 		if err := ifaceutil.SetLoUp(); err != nil {
@@ -394,21 +392,49 @@ func (nr *NetResource) createBridge() error {
 		return err
 	}
 
-	if _, err := sysctl.Sysctl(fmt.Sprintf("net.ipv6.conf.%s.disable_ipv6", name), "1"); err != nil {
+	if err := options.Set(name, options.IPv6Disable(true)); err != nil {
 		return errors.Wrapf(err, "failed to disable ip6 on bridge %s", name)
 	}
 	return nil
 }
 
-// createWireguard the wireguard interface of the network resource
-// if a public namespace handle (pubNetNS) is not nil, the interface is created
-// inside the public namespace and then moved inside the network resource namespace
-func (nr *NetResource) createWireguard(pubNetNS ns.NetNS) error {
-	wgName, err := nr.WGName()
+// HasWireguard checks if network resource has wireguard setup up
+func (nr *NetResource) HasWireguard() (bool, error) {
+	nsName, err := nr.Namespace()
 	if err != nil {
-		return err
+		return false, err
 	}
 
+	nrNetNS, err := namespace.GetByName(nsName)
+	if err != nil {
+		return false, err
+	}
+
+	defer nrNetNS.Close()
+
+	wgName, err := nr.WGName()
+	if err != nil {
+		return false, err
+	}
+	exist := false
+	err = nrNetNS.Do(func(_ ns.NetNS) error {
+		_, err = wireguard.GetByName(wgName)
+
+		if errors.As(err, &netlink.LinkNotFoundError{}) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+
+		exist = true
+		return nil
+	})
+
+	return exist, err
+}
+
+//SetWireguard sets wireguard of this network resource
+func (nr *NetResource) SetWireguard(wg *wireguard.Wireguard) error {
 	nsName, err := nr.Namespace()
 	if err != nil {
 		return err
@@ -419,54 +445,6 @@ func (nr *NetResource) createWireguard(pubNetNS ns.NetNS) error {
 		return err
 	}
 	defer nrNetNS.Close()
-
-	exists := false
-	nrNetNS.Do(func(hostNS ns.NetNS) error {
-		_, err := netlink.LinkByName(wgName)
-		if err == nil {
-			exists = true
-		}
-		return nil
-	})
-
-	// wireguard already exist, early exit
-	if exists {
-		return nil
-	}
-
-	slog := log.With().
-		Str("wg", wgName).
-		Str("namespace", nsName).
-		Logger()
-
-	if pubNetNS == nil {
-		// create the wg interface in the host network namespace
-		log.Info().Str("wg", wgName).Msg("create wireguard interface in host namespace")
-		_, err := wireguard.New(wgName)
-		if err != nil {
-			return err
-		}
-	} else {
-		if err := pubNetNS.Do(func(hostNS ns.NetNS) error {
-
-			log.Info().Str("wg", wgName).Msg("create wireguard interface in public namespace")
-			wg, err := wireguard.New(wgName)
-			if err != nil {
-				return err
-			}
-
-			slog.Info().Msg("move wireguard into host namespace")
-			return netlink.LinkSetNsFd(wg, int(hostNS.Fd()))
-		}); err != nil {
-			return err
-		}
-	}
-
-	slog.Info().Msg("move wireguard into net resource namespace")
-	wg, err := netlink.LinkByName(wgName)
-	if err != nil {
-		return err
-	}
 
 	return netlink.LinkSetNsFd(wg, int(nrNetNS.Fd()))
 }
