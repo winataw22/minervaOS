@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/containernetworking/plugins/pkg/utils/sysctl"
+	"github.com/rs/zerolog/log"
 )
 
 type sysOption struct {
@@ -12,7 +13,9 @@ type sysOption struct {
 }
 
 func (s *sysOption) apply(inf string) error {
-	_, err := sysctl.Sysctl(fmt.Sprintf(s.key, inf), s.val)
+	key := fmt.Sprintf(s.key, inf)
+	log.Debug().Str("key", key).Str("value", s.val).Msg("sysctl")
+	_, err := sysctl.Sysctl(key, s.val)
 	return err
 }
 

@@ -84,16 +84,6 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("shutting down")
 	})
 
-	// already sends all the interfaces detail we find
-	// this won't contains the ndmz IP yet, but this is OK.
-	ifaces, err := getLocalInterfaces()
-	if err != nil {
-		return errors.Wrap(err, "failed to read local network interfaces")
-	}
-	if err := publishIfaces(ifaces, nodeID, directory); err != nil {
-		return errors.Wrap(err, "failed to publish network interfaces to BCDB")
-	}
-
 	// choose exit interface for (br-pub)
 	// - this is public_config.master if set
 	// - otherwise we find the first nic with public ipv6 (that is not zos)
@@ -138,6 +128,13 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to read ndmz network interfaces")
 	}
+	// already sends all the interfaces detail we find
+	// this won't contains the ndmz IP yet, but this is OK.
+	ifaces, err := getLocalInterfaces()
+	if err != nil {
+		return errors.Wrap(err, "failed to read local network interfaces")
+	}
+
 	ifaces = append(ifaces, ndmzIfaces...)
 
 	if err := publishIfaces(ifaces, nodeID, directory); err != nil {

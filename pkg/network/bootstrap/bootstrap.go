@@ -20,11 +20,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-var (
-	cached     = map[int]IfaceConfig{}
-	cachedLock sync.RWMutex
-)
-
 // IfaceConfig contains all the IP address and routes of an interface
 type IfaceConfig struct {
 	Name    string
@@ -33,6 +28,16 @@ type IfaceConfig struct {
 	Routes4 []netlink.Route
 	Routes6 []netlink.Route
 }
+
+// Requires tesll the analyser to wait for ip type
+type Requires int
+
+const (
+	// RequiresIPv4 requires ipv4
+	RequiresIPv4 Requires = 1 << iota
+	// RequiresIPv6 requires ipv6
+	RequiresIPv6
+)
 
 type byIP4 []IfaceConfig
 
@@ -56,7 +61,7 @@ func (a byAddr) Less(i, j int) bool { return bytes.Compare(a[i].IP, a[j].IP) < 0
 // It will list all the physical interfaces that have a cable plugged in it
 // create a network namespace per interfaces
 // start a DHCP probe on each interfaces and gather the IPs and routes received
-func AnalyseLinks(filters ...Filter) ([]IfaceConfig, error) {
+func AnalyseLinks(requires Requires, filters ...Filter) ([]IfaceConfig, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to list interfaces")
@@ -80,22 +85,23 @@ filter:
 			}
 
 			if !ok {
+				log.Info().Msg("link didn't match filter crateria, skip testing")
 				continue filter
 			}
 		}
-		log.Info().Msg("testing link for connectivity")
+		log.Info().Msg("link valid. testing link for connectivity")
 		filterred = append(filterred, link)
 	}
 
 	wg := sync.WaitGroup{}
 
 	ch := make(chan IfaceConfig)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	for _, link := range filterred {
 		wg.Add(1)
-		analyseLink(ctx, &wg, ch, link)
+		analyseLink(ctx, &wg, ch, requires, link)
 	}
 
 	go func() {
@@ -105,6 +111,7 @@ filter:
 
 	configs := make([]IfaceConfig, 0, len(links))
 	for cfg := range ch {
+		log.Info().Str("link", cfg.Name).Str("info", fmt.Sprintf("%+v", cfg)).Msg("info")
 		configs = append(configs, cfg)
 	}
 
@@ -112,14 +119,8 @@ filter:
 }
 
 // AnalyseLink gets information about link
-func AnalyseLink(ctx context.Context, link netlink.Link) (cfg IfaceConfig, err error) {
-	cachedLock.RLock()
-	if cfg, ok := cached[link.Attrs().Index]; ok {
-		cachedLock.RUnlock()
-		return cfg, nil
-	}
-	cachedLock.RUnlock()
-
+func AnalyseLink(ctx context.Context, requires Requires, link netlink.Link) (cfg IfaceConfig, err error) {
+	cfg.Name = link.Attrs().Name
 	if link.Attrs().MasterIndex != 0 {
 		// this is to avoid breaking setups if a link is
 		// already used
@@ -190,7 +191,8 @@ func AnalyseLink(ctx context.Context, link netlink.Link) (cfg IfaceConfig, err e
 					}
 				}
 
-				if addrs6.Len() > 0 && addrs4.Len() > 0 {
+				if ((requires&RequiresIPv6 == 0) || addrs6.Len() != 0) &&
+					((requires&RequiresIPv4 == 0) || addrs4.Len() != 0) {
 					break loop
 				}
 
@@ -217,20 +219,16 @@ func AnalyseLink(ctx context.Context, link netlink.Link) (cfg IfaceConfig, err e
 
 		return nil
 	})
-	cachedLock.Lock()
-	defer cachedLock.Unlock()
-	cached[link.Attrs().Index] = cfg
 
 	return
 }
 
-func analyseLink(ctx context.Context, wg *sync.WaitGroup, out chan<- IfaceConfig, link netlink.Link) {
+func analyseLink(ctx context.Context, wg *sync.WaitGroup, out chan<- IfaceConfig, requires Requires, link netlink.Link) {
 	go func() {
 		defer wg.Done()
-		cfg, err := AnalyseLink(ctx, link)
+		cfg, err := AnalyseLink(ctx, requires, link)
 		if err != nil {
 			log.Error().Err(err).Str("interface", link.Attrs().Name).Msg("error analysing interface")
-			return
 		}
 		out <- cfg
 	}()
@@ -297,7 +295,7 @@ func PluggedFilter(link netlink.Link) (bool, error) {
 		return false, errors.Wrapf(err, "failed to bring interface '%s' up", link.Attrs().Name)
 	}
 
-	return ifaceutil.IsVirtEth(link.Attrs().Name) || ifaceutil.IsPluggedTimeout(link.Attrs().Name, time.Second*5), nil
+	return ifaceutil.IsVirtEth(link.Attrs().Name) || ifaceutil.IsPluggedTimeout(link.Attrs().Name, time.Second*10), nil
 }
 
 // NotAttachedFilter filters out network cards that

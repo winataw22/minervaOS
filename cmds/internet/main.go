@@ -80,7 +80,10 @@ func configureZOS() error {
 
 		log.Info().Msg("Start network bootstrap")
 
-		ifaceConfigs, err := bootstrap.AnalyseLinks(bootstrap.PhysicalFilter, bootstrap.PluggedFilter)
+		ifaceConfigs, err := bootstrap.AnalyseLinks(
+			bootstrap.RequiresIPv4,
+			bootstrap.PhysicalFilter,
+			bootstrap.PluggedFilter)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to gather network interfaces configuration")
 			return err
