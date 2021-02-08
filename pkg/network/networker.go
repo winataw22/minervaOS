@@ -506,22 +506,18 @@ func (n *networker) DisconnectPubTap(pubIPReservationID string) error {
 
 // GetPublicIPv6Subnet returns the IPv6 prefix op the public subnet of the host
 func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
-	// TODO
-	pubIface, err := netlink.LinkByName(public.PublicBridge)
+	addrs, err := n.ndmz.GetIP(ndmz.FamilyV6)
 	if err != nil {
-		return net.IPNet{}, errors.Wrap(err, "could not load public interface")
+		return net.IPNet{}, errors.Wrap(err, "could not get ips from ndmz")
 	}
-	// get the ipv6 address
-	addrs, err := netlink.AddrList(pubIface, netlink.FAMILY_V6)
-	if err != nil {
-		return net.IPNet{}, errors.Wrap(err, "could not load public interface ipv6 addresses")
-	}
+
 	for _, addr := range addrs {
 		if addr.IP.IsGlobalUnicast() && !isULA(addr.IP) {
-			return *addr.IPNet, nil
+			return addr, nil
 		}
 	}
-	return net.IPNet{}, nil
+
+	return net.IPNet{}, fmt.Errorf("no public ipv6 found")
 }
 
 // GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6

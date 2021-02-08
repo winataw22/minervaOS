@@ -23,6 +23,19 @@ type PublicIP struct {
 	IP net.IPNet `json:"ip"`
 }
 
+// Valid validate public ip input
+func (p *PublicIP) Valid() error {
+	if len(p.IP.IP) == 0 {
+		return fmt.Errorf("empty ip value")
+	}
+
+	if p.IP.IP.To4() == nil {
+		return fmt.Errorf("invalid ip format")
+	}
+
+	return nil
+}
+
 // PublicIPResult result returned by publicIP reservation
 type PublicIPResult struct {
 	ID string `json:"id"`
@@ -40,6 +53,10 @@ func (p *Provisioner) publicIPProvisionImpl(ctx context.Context, reservation *pr
 
 	if err := json.Unmarshal(reservation.Data, &config); err != nil {
 		return PublicIPResult{}, errors.Wrap(err, "failed to decode reservation schema")
+	}
+
+	if err := config.Valid(); err != nil {
+		return PublicIPResult{}, errors.Wrap(err, "failed to validate ip reservation")
 	}
 
 	pubIP6Base, err := network.GetPublicIPv6Subnet()
@@ -88,7 +105,7 @@ nft 'add chain bridge filter %[1]s'
 nft 'add rule arp filter input iifname "%[2]s" jump %[1]s'
 nft 'add rule bridge filter forward iifname "%[2]s" jump %[1]s'
 
-# arp rule for vm 
+# arp rule for vm
 nft 'add rule arp filter %[1]s arp operation reply arp saddr ip . arp saddr ether != { %[3]s . %[4]s } drop'
 
 # filter on L2 fowarding of non-matching ip/mac, drop RA,dhcpv6,dhcp
@@ -117,7 +134,7 @@ nft 'delete chain bridge filter handle '${a}
 
 # in arp table
 nft 'flush chain arp filter %[1]s'
-# jump to chain rule 
+# jump to chain rule
 a=$( nft -a list table arp filter | awk '/jump %[1]s/{ print $NF}' )
 nft 'delete rule arp filter input handle '${a}
 # chain itself
