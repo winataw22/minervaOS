@@ -117,7 +117,7 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 		}
 
 		if err := waitIP6(); err != nil {
-			return err
+			log.Error().Err(err).Msg("ndmz: no ipv6 found")
 		}
 		return nil
 	})
