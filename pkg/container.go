@@ -5,7 +5,7 @@ package pkg
 
 import (
 	"github.com/threefoldtech/zos/pkg/container/logger"
-	"github.com/threefoldtech/zos/pkg/container/stats"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 // ContainerID type
@@ -54,7 +54,7 @@ type Container struct {
 	// Logs backends
 	Logs []logger.Logs
 	// Stats container metrics backend
-	Stats []stats.Stats
+	Stats []zos.Stats
 }
 
 // ContainerModule defines rpc interface to containerd

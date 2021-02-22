@@ -1,5 +1,5 @@
 name: Release (development)
-on: 
+on:
   push:
     branches:
       - '*'
@@ -36,7 +36,7 @@ jobs:
       id: setname
       run: |
         echo "::set-output name=build::zos:v$(date +%y%m%d.%-H%M%S.0)-dev.flist"
-        
+
     - name: Publish flist (${{ github.sha }})
       if: success()
       uses: threefoldtech/publish-flist@master
@@ -46,7 +46,7 @@ jobs:
         user: tf-autobuilder
         root: archive
         name: zos-${{ github.sha }}.flist
-    
+
     - name: Symlink flist (development)
       uses: threefoldtech/publish-flist@master
       with:
@@ -57,12 +57,11 @@ jobs:
         target: ${{ steps.setname.outputs.build }}
 
     - name: Crosslink flist (development)
-      if: success() && github.ref == 'refs/heads/master'
+      if: success() && github.ref == 'refs/heads/master-3'
       uses: threefoldtech/publish-flist@master
       with:
         token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos
-        name: zos:development:latest.flist
+        name: zos:development-3:latest.flist
         target: tf-autobuilder/${{ steps.setname.outputs.build }}
-

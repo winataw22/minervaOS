@@ -260,7 +260,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 	for _, l := range data.Stats {
 		switch l.Type {
 		case stats.RedisType:
-			s, err := stats.NewRedis(l.Data.Endpoint)
+			s, err := stats.NewRedis(l.Endpoint)
 
 			if err != nil {
 				log.Error().Err(err).Msg("redis stats")

@@ -2,19 +2,16 @@ package network
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/termie/go-shutil"
+	"github.com/blang/semver"
 
-	"github.com/threefoldtech/tfexplorer/client"
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
@@ -48,7 +45,6 @@ const (
 	wgPortDir          = "wireguard_ports"
 	networkDir         = "networks"
 	ipamLeaseDir       = "ndmz-lease"
-	ipamPath           = "/var/cache/modules/networkd/lease"
 	zdbNamespacePrefix = "zdb-ns-"
 )
 
@@ -56,52 +52,49 @@ const (
 	mib = 1024 * 1024
 )
 
+var (
+	//NetworkSchemaLatestVersion last version
+	NetworkSchemaLatestVersion = semver.MustParse("0.1.0")
+)
+
 type networker struct {
 	identity     pkg.IdentityManager
 	networkDir   string
 	ipamLeaseDir string
-	tnodb        client.Directory
 	portSet      *set.UIntSet
 
-	ndmz ndmz.DMZ
-	ygg  *yggdrasil.Server
+	publicConfig string
+	ndmz         ndmz.DMZ
+	ygg          *yggdrasil.Server
 }
 
+var _ pkg.Networker = (*networker)(nil)
+
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageDir string, ndmz ndmz.DMZ, ygg *yggdrasil.Server) (pkg.Networker, error) {
+func NewNetworker(identity pkg.IdentityManager, publicCfgPath string, ndmz ndmz.DMZ, ygg *yggdrasil.Server) (pkg.Networker, error) {
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
 	}
 
-	nwDir := filepath.Join(vd, networkDir)
+	runtimeDir := filepath.Join(vd, networkDir)
 	ipamLease := filepath.Join(vd, ipamLeaseDir)
 
-	oldPath := filepath.Join(ipamPath, "ndmz")
-	newPath := filepath.Join(ipamLease, "ndmz")
-	if _, err := os.Stat(oldPath); err == nil {
-		if err := shutil.CopyTree(oldPath, newPath, nil); err != nil {
-			return nil, err
-		}
-		_ = os.RemoveAll(ipamPath)
-	}
-
-	//TODO: remove once all the node have move the network into the volatile directory
-	if _, err = os.Stat(storageDir); err == nil {
-		if err := copyNetworksToVolatile(storageDir, nwDir); err != nil {
-			return nil, fmt.Errorf("failed to copy old networks directory: %w", err)
+	for _, dir := range []string{runtimeDir, ipamLease} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, errors.Wrapf(err, "failed to create directory: '%s'", dir)
 		}
 	}
 
 	nw := &networker{
 		identity:     identity,
-		tnodb:        tnodb,
-		networkDir:   nwDir,
+		networkDir:   runtimeDir,
 		ipamLeaseDir: ipamLease,
 		portSet:      set.NewInt(),
 
-		ygg:  ygg,
-		ndmz: ndmz,
+		publicConfig: publicCfgPath,
+		ygg:          ygg,
+		ndmz:         ndmz,
 	}
 
 	// always add the reserved yggdrasil port to the port set so we make sure they are never
@@ -116,53 +109,17 @@ func NewNetworker(identity pkg.IdentityManager, tnodb client.Directory, storageD
 		return nil, err
 	}
 
-	if err := nw.publishWGPorts(); err != nil {
-		return nil, err
-	}
-
 	return nw, nil
-}
-
-func copyNetworksToVolatile(src, dst string) error {
-	log.Info().Msg("move network cached file to volatile directory")
-	if err := os.MkdirAll(dst, 0700); err != nil {
-		return err
-	}
-
-	infos, err := ioutil.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	copy := func(src string, dst string) error {
-		log.Info().Str("source", src).Str("dst", dst).Msg("copy file")
-		// Read all content of src to data
-		data, err := ioutil.ReadFile(src)
-		if err != nil {
-			return err
-		}
-		// Write data to dst
-		return ioutil.WriteFile(dst, data, 0644)
-	}
-
-	for _, info := range infos {
-		if info.IsDir() {
-			continue
-		}
-
-		s := filepath.Join(src, info.Name())
-		d := filepath.Join(dst, info.Name())
-		if err := copy(s, d); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 var _ pkg.Networker = (*networker)(nil)
 
 func (n *networker) Ready() error {
 	return nil
+}
+
+func (n *networker) WireguardPorts() ([]uint, error) {
+	return n.portSet.List()
 }
 
 func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.ContainerNetworkConfig) (join pkg.Member, err error) {
@@ -613,25 +570,14 @@ func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
 }
 
 // CreateNR implements pkg.Networker interface
-func (n *networker) CreateNR(netNR pkg.NetResource) (string, error) {
-	defer func() {
-		if err := n.publishWGPorts(); err != nil {
-			log.Warn().Err(err).Msg("failed to publish wireguard port to BCDB")
-		}
-	}()
-
+func (n *networker) CreateNR(netNR pkg.Network) (string, error) {
 	log.Info().Str("network", string(netNR.NetID)).Msg("create network resource")
-
-	privateKey, err := n.extractPrivateKey(netNR.WGPrivateKey)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to extract private key from network object")
-	}
 
 	// check if there is a reserved wireguard port for this NR already
 	// or if we need to update it
 	storedNR, err := n.networkOf(string(netNR.NetID))
 	if err != nil && !os.IsNotExist(err) {
-		return "", err
+		return "", errors.Wrap(err, "failed to load previous network setup")
 	}
 
 	if err == nil {
@@ -695,7 +641,7 @@ func (n *networker) CreateNR(netNR pkg.NetResource) (string, error) {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
-	if err = netr.ConfigureWG(privateKey); err != nil {
+	if err = netr.ConfigureWG(netNR.WGPrivateKeyPlain); err != nil {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
@@ -706,7 +652,7 @@ func (n *networker) CreateNR(netNR pkg.NetResource) (string, error) {
 	return netr.Namespace()
 }
 
-func (n *networker) storeNetwork(network pkg.NetResource) error {
+func (n *networker) storeNetwork(network pkg.Network) error {
 	// map the network ID to the network namespace
 	path := filepath.Join(n.networkDir, string(network.NetID))
 	file, err := os.Create(path)
@@ -715,7 +661,7 @@ func (n *networker) storeNetwork(network pkg.NetResource) error {
 	}
 	defer file.Close()
 
-	writer, err := versioned.NewWriter(file, pkg.NetworkSchemaLatestVersion)
+	writer, err := versioned.NewWriter(file, NetworkSchemaLatestVersion)
 	if err != nil {
 		return err
 	}
@@ -729,13 +675,7 @@ func (n *networker) storeNetwork(network pkg.NetResource) error {
 }
 
 // DeleteNR implements pkg.Networker interface
-func (n *networker) DeleteNR(netNR pkg.NetResource) error {
-	defer func() {
-		if err := n.publishWGPorts(); err != nil {
-			log.Warn().Msg("failed to publish wireguard port to BCDB")
-		}
-	}()
-
+func (n *networker) DeleteNR(netNR pkg.Network) error {
 	nr, err := nr.New(netNR)
 	if err != nil {
 		return errors.Wrap(err, "failed to load network resource")
@@ -759,7 +699,27 @@ func (n *networker) DeleteNR(netNR pkg.NetResource) error {
 	return nil
 }
 
-func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
+// Set node public namespace config
+func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
+	id := n.identity.NodeID()
+	_, err := public.EnsurePublicSetup(id, &cfg)
+	if err != nil {
+		return err
+	}
+
+	return public.SavePublicConfig(n.publicConfig, &cfg)
+}
+
+// Get node public namespace config
+func (n *networker) GetPublicConfig() (pkg.PublicConfig, error) {
+	cfg, err := public.LoadPublicConfig(n.publicConfig)
+	if err != nil {
+		return pkg.PublicConfig{}, err
+	}
+	return *cfg, nil
+}
+
+func (n *networker) networkOf(id string) (nr pkg.Network, err error) {
 	path := filepath.Join(n.networkDir, string(id))
 	file, err := os.OpenFile(path, os.O_RDWR, 0660)
 	if err != nil {
@@ -774,51 +734,19 @@ func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 			return nr, err
 		}
 
-		reader = versioned.NewVersionedReader(versioned.MustParse("0.0.0"), file)
+		reader = versioned.NewVersionedReader(NetworkSchemaLatestVersion, file)
 	} else if err != nil {
 		return nr, err
 	}
 
-	var net pkg.NetResource
+	var net pkg.Network
 	dec := json.NewDecoder(reader)
 
 	version := reader.Version()
-	validV1 := versioned.MustParseRange(fmt.Sprintf("=%s", pkg.NetworkSchemaV1))
-	validLatest := versioned.MustParseRange(fmt.Sprintf("<=%s", pkg.NetworkSchemaLatestVersion))
+	//validV1 := versioned.MustParseRange(fmt.Sprintf("=%s", pkg.NetworkSchemaV1))
+	validLatest := versioned.MustParseRange(fmt.Sprintf("<=%s", NetworkSchemaLatestVersion.String()))
 
-	if validV1(version) {
-		// we found a v1 full network definition, let migrate it to v2 network resource
-		var network pkg.Network
-		if err := dec.Decode(&network); err != nil {
-			return nr, err
-		}
-
-		for _, nr := range network.NetResources {
-			if nr.NodeID == n.identity.NodeID().Identity() {
-				net = nr
-				break
-			}
-		}
-		net.Name = network.Name
-		net.NetworkIPRange = network.IPRange
-		net.NetID = network.NetID
-
-		// overwrite the old version network with latest version
-		// old data that doesn't have any version information
-		if _, err := file.Seek(0, 0); err != nil {
-			return nr, err
-		}
-
-		writer, err := versioned.NewWriter(file, pkg.NetworkSchemaLatestVersion)
-		if err != nil {
-			return nr, err
-		}
-
-		if err := json.NewEncoder(writer).Encode(&net); err != nil {
-			return nr, err
-		}
-
-	} else if validLatest(version) {
+	if validLatest(version) {
 		if err := dec.Decode(&net); err != nil {
 			return nr, err
 		}
@@ -831,22 +759,6 @@ func (n *networker) networkOf(id string) (nr pkg.NetResource, err error) {
 	}
 
 	return net, nil
-}
-
-func (n *networker) extractPrivateKey(hexKey string) (string, error) {
-	//FIXME zaibon: I would like to move this into the nr package,
-	// but this method requires the identity module which is only available
-	// on the networker object
-	sk, err := hex.DecodeString(hexKey)
-	if err != nil {
-		return "", err
-	}
-	decoded, err := n.identity.Decrypt(sk)
-	if err != nil {
-		return "", err
-	}
-
-	return string(decoded), nil
 }
 
 func (n *networker) reservePort(port uint16) error {
@@ -862,20 +774,6 @@ func (n *networker) reservePort(port uint16) error {
 func (n *networker) releasePort(port uint16) error {
 	log.Debug().Uint16("port", port).Msg("release wireguard port")
 	n.portSet.Remove(uint(port))
-	return nil
-}
-
-func (n *networker) publishWGPorts() error {
-	ports, err := n.portSet.List()
-	if err != nil {
-		return err
-	}
-
-	if err := n.tnodb.NodeSetPorts(n.identity.NodeID().Identity(), ports); err != nil {
-		// maybe retry a couple of times ?
-		// having bdb and the node out of sync is pretty bad
-		return errors.Wrap(err, "fail to publish wireguard port to bcdb")
-	}
 	return nil
 }
 

@@ -3,6 +3,7 @@ package stubs
 import (
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 type ZDBAllocaterStub struct {
@@ -22,7 +23,7 @@ func NewZDBAllocaterStub(client zbus.Client) *ZDBAllocaterStub {
 	}
 }
 
-func (s *ZDBAllocaterStub) Allocate(arg0 string, arg1 pkg.DeviceType, arg2 uint64, arg3 pkg.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
+func (s *ZDBAllocaterStub) Allocate(arg0 string, arg1 zos.DeviceType, arg2 uint64, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3}
 	result, err := s.client.Request(s.module, s.object, "Allocate", args...)
 	if err != nil {

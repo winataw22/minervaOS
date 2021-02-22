@@ -19,6 +19,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
 
@@ -90,9 +91,9 @@ func (s *Module) Total(kind pkg.DeviceType) (uint64, error) {
 	defer s.mu.RUnlock()
 
 	switch kind {
-	case pkg.SSDDevice:
+	case zos.SSDDevice:
 		return s.totalSSD, nil
-	case pkg.HDDDevice:
+	case zos.HDDDevice:
 		return s.totalHDD, nil
 	default:
 		return 0, fmt.Errorf("kind %+v unknown", kind)
@@ -209,7 +210,7 @@ func (s *Module) initialize(policy pkg.StoragePolicy) error {
 	hdds := filesystem.DeviceCache{}
 
 	for idx := range freeDisks {
-		if freeDisks[idx].DiskType == pkg.SSDDevice {
+		if freeDisks[idx].DiskType == zos.SSDDevice {
 			ssds = append(ssds, freeDisks[idx])
 		} else {
 			hdds = append(hdds, freeDisks[idx])
@@ -279,9 +280,9 @@ func (s *Module) initialize(policy pkg.StoragePolicy) error {
 		}
 
 		switch pool.Type() {
-		case pkg.HDDDevice:
+		case zos.HDDDevice:
 			s.totalHDD += usage.Size
-		case pkg.SSDDevice:
+		case zos.SSDDevice:
 			s.totalSSD += usage.Size
 		}
 	}
@@ -500,7 +501,7 @@ func (s *Module) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
 
 // VDiskFindCandidate find a suitbale location for creating a vdisk of the given size
 func (s *Module) VDiskFindCandidate(size uint64) (path string, err error) {
-	candidates, err := s.findCandidates(size, pkg.SSDDevice)
+	candidates, err := s.findCandidates(size, zos.SSDDevice)
 	if err != nil {
 		return path, err
 	}
@@ -534,7 +535,7 @@ func (s *Module) VDiskFindCandidate(size uint64) (path string, err error) {
 func (s *Module) VDiskPools() ([]string, error) {
 	var paths []string
 	for _, pool := range s.pools {
-		if pool.Type() != pkg.SSDDevice {
+		if pool.Type() != zos.SSDDevice {
 			continue
 		}
 
@@ -595,7 +596,7 @@ func (s *Module) ensureCache() error {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
 		log.Debug().Msgf("Trying to create new cache on SSD")
-		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, pkg.SSDDevice)
+		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, zos.SSDDevice)
 
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create new cache on SSD")
@@ -606,7 +607,7 @@ func (s *Module) ensureCache() error {
 
 	if cacheFs == nil {
 		log.Debug().Msgf("Trying to create new cache on HDD")
-		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, pkg.HDDDevice)
+		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, zos.HDDDevice)
 
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create new cache on HDD")
@@ -664,7 +665,7 @@ func (s *Module) createSubvolWithQuota(size uint64, name string, poolType pkg.De
 func (s *Module) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	var err error
 
-	if poolType != pkg.HDDDevice && poolType != pkg.SSDDevice {
+	if poolType != zos.HDDDevice && poolType != zos.SSDDevice {
 		return nil, pkg.ErrInvalidDeviceType{DeviceType: poolType}
 	}
 

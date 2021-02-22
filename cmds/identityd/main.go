@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,15 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jbenet/go-base58"
 	"github.com/shirou/gopsutil/host"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/tfexplorer/client"
-	"github.com/threefoldtech/tfexplorer/models/generated/directory"
 	"github.com/threefoldtech/zos/pkg/app"
-	"github.com/threefoldtech/zos/pkg/geoip"
-	"github.com/threefoldtech/zos/pkg/network"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
 
@@ -126,51 +120,9 @@ func main() {
 
 	// 2. Register the node to BCDB
 	// at this point we are running latest version
-	idMgr, err := identityMgr(root)
+	idMgr, err := getIdentityMgr(root)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create identity manager")
-	}
-
-	idStore, err := bcdbClient()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create identity client")
-	}
-
-	var current string
-	if bootMethod == upgrade.BootMethodFList {
-		v, err := boot.Version()
-		if err != nil {
-			//NOTE: this is set to error intentionally (not fatal)
-			//this will cause version to be 0.0.0 and will force an
-			//immediate update of the flist to latest
-			log.Error().Err(err).Msg("failed to read current version")
-		}
-		current = v.String()
-	} else {
-		current = "not booted from flist"
-	}
-
-	nodeID := idMgr.NodeID()
-	farmID, err := idMgr.FarmID()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read farm ID")
-	}
-
-	loc, err := geoip.Fetch()
-	if err != nil {
-		log.Fatal().Err(err).Msg("fetch location")
-	}
-
-	register := func(v string) error {
-		return registerNode(nodeID, farmID, v, idStore, loc)
-	}
-
-	if err := backoff.RetryNotify(func() error {
-		return register(current)
-	}, backoff.NewExponentialBackOff(), retryNotify); err != nil {
-		log.Error().Err(err).Msg("failed to register node")
-	} else {
-		log.Info().Str("version", current).Msg("node registered successfully")
 	}
 
 	monitor := newVersionMonitor(2 * time.Second)
@@ -216,7 +168,8 @@ func main() {
 	// 4. Start watcher for new version
 	log.Info().Msg("start upgrade daemon")
 
-	upgradeLoop(ctx, &boot, upgrader, debug, monitor, register)
+	// TODO: do we need to update farmer on node upgrade?
+	upgradeLoop(ctx, &boot, upgrader, debug, monitor, func(string) error { return nil })
 }
 
 // allow reinstall if receive signal USR1
@@ -374,13 +327,6 @@ func upgradeLoop(
 			}
 
 			monitor.C <- version
-			if err := backoff.RetryNotify(func() error {
-				return register(version.String())
-			}, backoff.NewExponentialBackOff(), retryNotify); err != nil {
-				log.Error().Err(err).Msg("failed to register node")
-			} else {
-				log.Info().Str("version", version.String()).Msg("node registered successfully")
-			}
 		case e := <-repoEvents:
 			if e == nil {
 				continue
@@ -407,11 +353,7 @@ func upgradeLoop(
 	}
 }
 
-func retryNotify(err error, d time.Duration) {
-	log.Warn().Err(err).Str("sleep", d.String()).Msg("registration failed")
-}
-
-func identityMgr(root string) (pkg.IdentityManager, error) {
+func getIdentityMgr(root string) (pkg.IdentityManager, error) {
 	seedPath := filepath.Join(root, seedName)
 
 	manager, err := identity.NewManager(seedPath)
@@ -435,58 +377,6 @@ func identityMgr(root string) (pkg.IdentityManager, error) {
 		Msg("farmer identified")
 
 	return manager, nil
-}
-
-// instantiate the proper client based on the running mode
-func bcdbClient() (client.Directory, error) {
-	client, err := app.ExplorerClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return client.Directory, nil
-}
-
-func registerNode(nodeID pkg.Identifier, farmID pkg.FarmID, version string, store client.Directory, loc geoip.Location) error {
-	log.Info().Str("version", version).Msg("start registration of the node")
-
-	v1ID, _ := network.NodeIDv1()
-
-	publicKeyHex := hex.EncodeToString(base58.Decode(nodeID.Identity()))
-
-	hostName, err := os.Hostname()
-	if err != nil {
-		hostName = "unknown"
-	}
-
-	uptime, err := hostUptime()
-	if err != nil {
-		return errors.Wrap(err, "could not get node uptime")
-	}
-
-	err = store.NodeRegister(directory.Node{
-		NodeId:    nodeID.Identity(),
-		HostName:  hostName,
-		NodeIdV1:  v1ID,
-		FarmId:    int64(farmID),
-		OsVersion: version,
-		Location: directory.Location{
-			Continent: loc.Continent,
-			Country:   loc.Country,
-			City:      loc.City,
-			Longitude: loc.Longitute,
-			Latitude:  loc.Latitude,
-		},
-		PublicKeyHex: publicKeyHex,
-		Uptime:       int64(uptime),
-	})
-
-	if err != nil {
-		log.Error().Err(err).Send()
-		return err
-	}
-
-	return nil
 }
 
 // hostUptime returns the uptime of the node

@@ -2,19 +2,24 @@ package provisiond
 
 import (
 	"context"
-	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/rusart/muxprom"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
-	"github.com/threefoldtech/zos/pkg/provision/explorer"
-	"github.com/threefoldtech/zos/pkg/provision/primitives"
-	"github.com/threefoldtech/zos/pkg/provision/primitives/cache"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/primitives"
+	"github.com/threefoldtech/zos/pkg/provision/api"
+	"github.com/threefoldtech/zos/pkg/provision/storage"
+	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -28,6 +33,7 @@ import (
 
 const (
 	module = "provision"
+	gib    = 1024 * 1024 * 1024
 )
 
 // Module entry point
@@ -45,6 +51,11 @@ var Module cli.Command = cli.Command{
 			Usage: "connection string to the message `BROKER`",
 			Value: "unix:///var/run/redis.sock",
 		},
+		&cli.StringFlag{
+			Name:  "http",
+			Usage: "http listen address",
+			Value: ":2021",
+		},
 	},
 	Action: action,
 }
@@ -53,10 +64,8 @@ func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 		storageDir   string = cli.String("root")
+		httpAddr     string = cli.String("http")
 	)
-
-	flag.StringVar(&storageDir, "root", "/var/cache/modules/provisiond", "root path of the module")
-	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
 
 	// keep checking if limited-cache flag is set
 	if app.CheckFlag(app.LimitedCache) {
@@ -86,18 +95,22 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to message broker")
 	}
-	zbusCl, err := zbus.NewRedisClient(msgBrokerCon)
+	cl, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		return errors.Wrap(err, "fail to connect to message broker server")
 	}
 
-	identity := stubs.NewIdentityManagerStub(zbusCl)
+	identity := stubs.NewIdentityManagerStub(cl)
 	nodeID := identity.NodeID()
 
 	// block until networkd is ready to serve request from zbus
 	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
 	// https://github.com/threefoldtech/zos/issues/632
-	network := stubs.NewNetworkerStub(zbusCl)
+	// NOTE - UPDATE: this block of code should be deprecated
+	// since we do the waiting in zinit now since provisiond waits for networkd
+	// which has a 'test' condition in the zinit yaml file for networkd to wait
+	// for zbus
+	network := stubs.NewNetworkerStub(cl)
 	bo := backoff.NewExponentialBackOff()
 	bo.MaxElapsedTime = 0
 	backoff.RetryNotify(func() error {
@@ -106,42 +119,61 @@ func action(cli *cli.Context) error {
 		log.Error().Err(err).Msg("networkd is not ready yet")
 	})
 
-	// to get reservation from tnodb
-	e, err := app.ExplorerClient()
-	if err != nil {
-		return errors.Wrap(err, "failed to instantiate BCDB client")
-	}
-
 	// keep track of resource units reserved and amount of workloads provisionned
-	statser := &primitives.Counters{}
 
 	// to store reservation locally on the node
-	localStore, err := cache.NewFSStore(filepath.Join(storageDir, "reservations"))
+	store, err := storage.NewFSStore(filepath.Join(storageDir, "workloads"))
 	if err != nil {
 		return errors.Wrap(err, "failed to create local reservation store")
 	}
 
-	// update stats from the local reservation cache
-	localStore.Sync(statser)
+	const daemonBootFlag = "provisiond"
+	// update initial capacity with
+	reserved, err := getNodeReserved(cl)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node reserved capacity")
+	}
 
-	provisioner := primitives.NewProvisioner(localStore, zbusCl)
+	handlers := primitives.NewPrimitivesProvisioner(cl)
+	/* --- committer
+	 *   --- cache
+	 *	   --- statistics
+	 *	     --- handlers
+	 */
+	provisioner := primitives.NewStatisticsProvisioner(
+		primitives.Counters{},
+		reserved,
+		nodeID.Identity(),
+		handlers,
+	)
 
-	puller := explorer.NewPoller(e, primitives.WorkloadToProvisionType, primitives.ProvisionOrder)
-	engine, err := provision.New(provision.EngineOps{
-		NodeID: nodeID.Identity(),
-		Cache:  localStore,
-		Source: provision.CombinedSource(
-			provision.PollSource(puller, nodeID),
-			provision.NewDecommissionSource(localStore),
+	// TODO: that is a test user map for development, do not commit
+	// users := mw.NewUserMap()
+	// users.AddKeyFromHex(gridtypes.ID("1"), "95d1ba20e9f5cb6cfc6182fecfa904664fb1953eba520db454d5d5afaa82d791")
+
+	users, err := substrate.NewSubstrateUsers(env.SubstrateURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to create substrate users database")
+	}
+
+	admins, err := substrate.NewSubstrateAdmins(env.SubstrateURL, uint32(env.FarmerID))
+	if err != nil {
+		return errors.Wrap(err, "failed to create substrate admins database")
+	}
+
+	engine := provision.New(
+		store,
+		provisioner,
+		provision.WithUsers(users),
+		provision.WithAdmins(admins),
+		// set priority to some reservation types on boot
+		// so we always need to make sure all volumes and networks
+		// comes first.
+		provision.WithStartupOrder(
+			zos.VolumeType,
+			zos.NetworkType,
 		),
-		Provisioners:   provisioner.Provisioners,
-		Decomissioners: provisioner.Decommissioners,
-		Feedback:       explorer.NewFeedback(e, primitives.ResultToSchemaType),
-		Signer:         identity,
-		Statser:        statser,
-		ZbusCl:         zbusCl,
-		Janitor:        provision.NewJanitor(zbusCl, puller),
-	})
+	)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to instantiate provision engine")
@@ -155,29 +187,86 @@ func action(cli *cli.Context) error {
 
 	ctx := context.Background()
 	ctx, _ = utils.WithSignal(ctx)
-	utils.OnDone(ctx, func(_ error) {
-		log.Info().Msg("shutting down")
-	})
 
 	// call the runtime upgrade before running engine
-	provisioner.RuntimeUpgrade(ctx)
+	handlers.RuntimeUpgrade(ctx)
 
 	go func() {
+		if err := engine.Run(ctx); err != nil && err != context.Canceled {
+			log.Fatal().Err(err).Msg("provision engine exited unexpectedely")
+		}
+	}()
+
+	// starts zbus server in the back ground
+	go func() {
 		if err := server.Run(ctx); err != nil && err != context.Canceled {
-			log.Fatal().Err(err).Msg("unexpected error")
+			log.Fatal().Err(err).Msg("zbus provision engine api exited unexpectedely")
 		}
 		log.Info().Msg("zbus server stopped")
 	}()
 
-	if err := engine.Run(ctx); err != nil {
-		return errors.Wrap(err, "unexpected error")
+	httpServer, err := getHTTPServer(cl, engine)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize API")
+	}
+	httpServer.Addr = httpAddr
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+		httpServer.Close()
+	})
+
+	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return errors.Wrap(err, "http api exited unexpectedely")
 	}
 
 	log.Info().Msg("provision engine stopped")
 	return nil
 }
 
-type store interface {
-	provision.ReservationPoller
-	provision.Feedbacker
+func getNodeReserved(cl zbus.Client) (counter primitives.Counters, err error) {
+	storage := stubs.NewStorageModuleStub(cl)
+	fs, err := storage.GetCacheFS()
+	if err != nil {
+		return counter, err
+	}
+
+	var v *primitives.AtomicValue
+	switch fs.DiskType {
+	case zos.HDDDevice:
+		v = &counter.HRU
+	case zos.SSDDevice:
+		v = &counter.SRU
+	default:
+		return counter, fmt.Errorf("unknown cache disk type '%s'", fs.DiskType)
+	}
+
+	v.Increment(fs.Usage.Size)
+	counter.MRU.Increment(2 * gib)
+	return
+}
+
+func getHTTPServer(cl zbus.Client, engine provision.Engine) (*http.Server, error) {
+	router := mux.NewRouter().StrictSlash(true)
+
+	prom := muxprom.New(
+		muxprom.Router(router),
+		muxprom.Namespace("provision"),
+	)
+	prom.Instrument()
+
+	v1 := router.PathPrefix("/api/v1").Subrouter()
+
+	_, err := api.NewWorkloadsAPI(v1, engine)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to setup workload api")
+	}
+
+	_, err = api.NewNetworkAPI(v1, engine, cl)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to setup network api")
+	}
+
+	return &http.Server{
+		Handler: router,
+	}, nil
 }

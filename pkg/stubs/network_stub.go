@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"net"
 )
 
@@ -40,7 +41,7 @@ func (s *NetworkerStub) Addrs(arg0 string, arg1 string) (ret0 [][]uint8, ret1 er
 	return
 }
 
-func (s *NetworkerStub) CreateNR(arg0 pkg.NetResource) (ret0 string, ret1 error) {
+func (s *NetworkerStub) CreateNR(arg0 pkg.Network) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "CreateNR", args...)
 	if err != nil {
@@ -75,7 +76,7 @@ func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 	return ch, nil
 }
 
-func (s *NetworkerStub) DeleteNR(arg0 pkg.NetResource) (ret0 error) {
+func (s *NetworkerStub) DeleteNR(arg0 pkg.Network) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "DeleteNR", args...)
 	if err != nil {
@@ -101,7 +102,7 @@ func (s *NetworkerStub) DisconnectPubTap(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
+func (s *NetworkerStub) GetDefaultGwIP(arg0 zos.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetDefaultGwIP", args...)
 	if err != nil {
@@ -120,7 +121,7 @@ func (s *NetworkerStub) GetDefaultGwIP(arg0 pkg.NetID) (ret0 []uint8, ret1 []uin
 	return
 }
 
-func (s *NetworkerStub) GetIPv6From4(arg0 pkg.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetIPv6From4(arg0 zos.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.Request(s.module, s.object, "GetIPv6From4", args...)
 	if err != nil {
@@ -136,9 +137,25 @@ func (s *NetworkerStub) GetIPv6From4(arg0 pkg.NetID, arg1 []uint8) (ret0 net.IPN
 	return
 }
 
-func (s *NetworkerStub) GetNet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetNet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetNet", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) GetPublicConfig() (ret0 pkg.PublicConfig, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "GetPublicConfig", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +185,7 @@ func (s *NetworkerStub) GetPublicIPv6Subnet() (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) GetSubnet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetSubnet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "GetSubnet", args...)
 	if err != nil {
@@ -184,7 +201,7 @@ func (s *NetworkerStub) GetSubnet(arg0 pkg.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
+func (s *NetworkerStub) Join(arg0 zos.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.Request(s.module, s.object, "Join", args...)
 	if err != nil {
@@ -200,7 +217,7 @@ func (s *NetworkerStub) Join(arg0 pkg.NetID, arg1 string, arg2 pkg.ContainerNetw
 	return
 }
 
-func (s *NetworkerStub) Leave(arg0 pkg.NetID, arg1 string) (ret0 error) {
+func (s *NetworkerStub) Leave(arg0 zos.NetID, arg1 string) (ret0 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.Request(s.module, s.object, "Leave", args...)
 	if err != nil {
@@ -286,9 +303,22 @@ func (s *NetworkerStub) RemovePubTap(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) RemoveTap(arg0 pkg.NetID) (ret0 error) {
+func (s *NetworkerStub) RemoveTap(arg0 zos.NetID) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "RemoveTap", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) SetPublicConfig(arg0 pkg.PublicConfig) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "SetPublicConfig", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -315,7 +345,7 @@ func (s *NetworkerStub) SetupPubTap(arg0 string) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) SetupTap(arg0 pkg.NetID) (ret0 string, ret1 error) {
+func (s *NetworkerStub) SetupTap(arg0 zos.NetID) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "SetupTap", args...)
 	if err != nil {
@@ -331,9 +361,25 @@ func (s *NetworkerStub) SetupTap(arg0 pkg.NetID) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) TapExists(arg0 pkg.NetID) (ret0 bool, ret1 error) {
+func (s *NetworkerStub) TapExists(arg0 zos.NetID) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "TapExists", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) WireguardPorts() (ret0 []uint, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "WireguardPorts", args...)
 	if err != nil {
 		panic(err)
 	}

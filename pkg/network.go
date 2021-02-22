@@ -2,11 +2,10 @@ package pkg
 
 import (
 	"context"
-	"fmt"
 	"net"
 
-	"github.com/threefoldtech/zos/pkg/network/types"
-	"github.com/threefoldtech/zos/pkg/versioned"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 //go:generate mkdir -p stubs
@@ -34,9 +33,9 @@ type Networker interface {
 	Ready() error
 
 	// Create a new network resource
-	CreateNR(NetResource) (string, error)
+	CreateNR(Network) (string, error)
 	// Delete a network resource
-	DeleteNR(NetResource) error
+	DeleteNR(Network) error
 
 	// Join a network (with network id) will create a new isolated namespace
 	// that is hooked to the network bridge with a veth pair, and assign it a
@@ -108,6 +107,14 @@ type Networker interface {
 	// if the interface is in a network namespace netns needs to be not empty
 	Addrs(iface string, netns string) ([]net.IP, error)
 
+	WireguardPorts() ([]uint, error)
+
+	// Set node public namespace config
+	SetPublicConfig(cfg PublicConfig) error
+
+	// Get node public namespace config
+	GetPublicConfig() (PublicConfig, error)
+
 	// ZOSAddresses monitoring streams for ZOS bridge IPs
 	ZOSAddresses(ctx context.Context) <-chan NetlinkAddresses
 
@@ -120,111 +127,40 @@ type Networker interface {
 	PublicAddresses(ctx context.Context) <-chan NetlinkAddresses
 }
 
-// Network represent the description if a user private network
+// Network type
 type Network struct {
-	Name string `json:"name"`
-	//unique id inside the reservation is an autoincrement (USE AS NET_ID)
-	NetID NetID `json:"net_id"`
-	// IP range of the network, must be an IPv4 /16
-	IPRange types.IPNet `json:"ip_range"`
-
-	NetResources []NetResource `json:"net_resources"`
+	zos.Network
+	NetID             NetID  `json:"net_id"`
+	WGPrivateKeyPlain string `json:"wireguard_private_key"`
 }
 
-// NetResource is the description of a part of a network local to a specific node
-type NetResource struct {
-	Name string
-	//unique id inside the reservation is an autoincrement (USE AS NET_ID)
-	NetID NetID `json:"net_id"`
-	// IP range of the network, must be an IPv4 /16
-	NetworkIPRange types.IPNet `json:"ip_range"`
+// NetID type
+type NetID = zos.NetID
 
-	NodeID string `json:"node_id"`
-	// IPV4 subnet for this network resource
-	Subnet types.IPNet `json:"subnet"`
+// IfaceType define the different public interface supported
+type IfaceType string
 
-	WGPrivateKey string `json:"wg_private_key"`
-	WGPublicKey  string `json:"wg_public_key"`
-	WGListenPort uint16 `json:"wg_listen_port"`
-
-	Peers []Peer `json:"peers"`
-}
-
-// Valid checks if the network resource is valid.
-func (nr *NetResource) Valid() error {
-	if nr.NetID == "" {
-		return fmt.Errorf("network ID cannot be empty")
-	}
-
-	if nr.Name == "" {
-		return fmt.Errorf("network name cannot be empty")
-	}
-
-	if nr.NetworkIPRange.Nil() {
-		return fmt.Errorf("network IP range cannot be empty")
-	}
-
-	if nr.NodeID == "" {
-		return fmt.Errorf("network resource node ID cannot empty")
-	}
-	if len(nr.Subnet.IP) == 0 {
-		return fmt.Errorf("network resource subnet cannot empty")
-	}
-
-	if nr.WGPrivateKey == "" {
-		return fmt.Errorf("network resource wireguard private key cannot empty")
-	}
-
-	if nr.WGPublicKey == "" {
-		return fmt.Errorf("network resource wireguard public key cannot empty")
-	}
-
-	if nr.WGListenPort == 0 {
-		return fmt.Errorf("network resource wireguard listen port cannot empty")
-	}
-
-	for _, peer := range nr.Peers {
-		if err := peer.Valid(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Peer is the description of a peer of a NetResource
-type Peer struct {
-	// IPV4 subnet of the network resource of the peer
-	Subnet types.IPNet `json:"subnet"`
-
-	WGPublicKey string        `json:"wg_public_key"`
-	AllowedIPs  []types.IPNet `json:"allowed_ips"`
-	Endpoint    string        `json:"endpoint"`
-}
-
-// NetID is a type defining the ID of a network
-type NetID string
-
-// Version of the network workloads keep in cache by networkd
-var (
-	NetworkSchemaV1 = versioned.MustParse("1.0.0")
-	NetworkSchemaV2 = versioned.MustParse("2.0.0")
-	// NetworkSchemaLatestVersion network object latest version
-	NetworkSchemaLatestVersion = NetworkSchemaV2
+const (
+	//VlanIface means we use vlan for the public interface
+	VlanIface IfaceType = "vlan"
+	//MacVlanIface means we use macvlan for the public interface
+	MacVlanIface IfaceType = "macvlan"
 )
 
-// Valid checks if peer is valid
-func (p *Peer) Valid() error {
-	if p.WGPublicKey == "" {
-		return fmt.Errorf("peer wireguard public key cannot empty")
-	}
+// PublicConfig is the configuration of the interface
+// that is connected to the public internet
+type PublicConfig struct {
+	// Type define if we need to use
+	// the Vlan field or the MacVlan
+	Type IfaceType `json:"type"`
+	// Vlan int16     `json:"vlan"`
+	// Macvlan net.HardwareAddr
 
-	if p.Subnet.Nil() {
-		return fmt.Errorf("peer wireguard subnet cannot empty")
-	}
+	IPv4 gridtypes.IPNet `json:"ipv4"`
+	IPv6 gridtypes.IPNet `json:"ipv6"`
 
-	if len(p.AllowedIPs) <= 0 {
-		return fmt.Errorf("peer wireguard allowedIPs cannot empty")
-	}
-	return nil
+	GW4 net.IP `json:"gw4"`
+	GW6 net.IP `json:"gw6"`
+
+	// Version int `json:"version"`
 }

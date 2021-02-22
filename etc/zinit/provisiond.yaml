@@ -1,5 +1,8 @@
-exec: provisiond --broker unix:///var/run/redis.sock --root /var/cache/modules/provisiond
+# provisind runs inside ndmz. the ndmz has rules to accept connection to
+# provisiond address :2021
+exec: ip netns exec ndmz provisiond --broker unix:///var/run/redis.sock --root /var/cache/modules/provisiond
 after:
   - boot
   - flistd
   - contd
+  - networkd

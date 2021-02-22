@@ -15,14 +15,14 @@ import (
 type Environment struct {
 	RunningMode RunningMode
 
-	BcdbURL      string
-	BcdbPassword string
-
 	FlistURL string
 	BinRepo  string
 
 	FarmerID pkg.FarmID
 	Orphan   bool
+
+	FarmSecret   string
+	SubstrateURL string
 }
 
 // RunningMode type
@@ -30,11 +30,11 @@ type RunningMode string
 
 func (r RunningMode) String() string {
 	switch r {
-	case RunningDev:
+	case RunningDev3:
 		return "development"
 	case RunningMain:
 		return "production"
-	case RunningTest:
+	case RunningTest3:
 		return "testing"
 	}
 
@@ -43,9 +43,11 @@ func (r RunningMode) String() string {
 
 // Possible running mode of a node
 const (
-	RunningDev  RunningMode = "dev"
-	RunningTest RunningMode = "test"
-	RunningMain RunningMode = "prod"
+	//RunningDev   RunningMode = "dev"
+	RunningDev3 RunningMode = "dev3"
+	//RunningTest  RunningMode = "test"
+	RunningTest3 RunningMode = "test3"
+	RunningMain  RunningMode = "prod"
 
 	// Orphanage is the default farmid where nodes are registered
 	// if no farmid were specified on the kernel command line
@@ -56,25 +58,26 @@ const (
 
 var (
 	envDev = Environment{
-		RunningMode: RunningDev,
-		BcdbURL:     "https://explorer.devnet.grid.tf/explorer",
-		FlistURL:    "zdb://hub.grid.tf:9900",
-		BinRepo:     "tf-zos-bins.dev",
+		RunningMode:  RunningDev3,
+		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		FlistURL:     "zdb://hub.grid.tf:9900",
+		BinRepo:      "tf-zos-bins.dev",
 	}
 
 	envTest = Environment{
-		RunningMode: RunningTest,
-		BcdbURL:     "https://explorer.testnet.grid.tf/explorer",
-		FlistURL:    "zdb://hub.grid.tf:9900",
-		BinRepo:     "tf-zos-bins.test",
+		RunningMode: RunningTest3,
+		// TODO: this should become a different substrate ?
+		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		FlistURL:     "zdb://hub.grid.tf:9900",
+		BinRepo:      "tf-zos-bins.test",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
-		RunningMode: RunningMain,
-		BcdbURL:     "https://explorer.grid.tf/explorer",
-		FlistURL:    "zdb://hub.grid.tf:9900",
-		BinRepo:     "tf-zos-bins",
+		RunningMode:  RunningMain,
+		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		FlistURL:     "zdb://hub.grid.tf:9900",
+		BinRepo:      "tf-zos-bins",
 	}
 )
 
@@ -95,9 +98,9 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	}
 
 	switch RunningMode(runmode[0]) {
-	case RunningDev:
+	case RunningDev3:
 		env = envDev
-	case RunningTest:
+	case RunningTest3:
 		env = envTest
 	case RunningMain:
 		env = envProd
@@ -105,11 +108,15 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		env = envProd
 	}
 
-	if RunningMode(runmode[0]) == RunningDev {
-		//allow override of the bcdb url in dev mode
-		bcdb, found := params.Get("bcdb")
-		if found && len(bcdb) >= 1 {
-			env.BcdbURL = bcdb[0]
+	if substrate, ok := params.Get("substrate"); ok {
+		if len(substrate) > 0 {
+			env.SubstrateURL = substrate[len(substrate)-1]
+		}
+	}
+
+	if farmSecret, ok := params.Get("secret"); ok {
+		if len(farmSecret) > 0 {
+			env.FarmSecret = farmSecret[len(farmSecret)-1]
 		}
 	}
 
@@ -119,9 +126,9 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		env.Orphan = true
 
 		switch env.RunningMode {
-		case RunningDev:
+		case RunningDev3:
 			env.FarmerID = OrphanageDev
-		case RunningTest:
+		case RunningTest3:
 			env.FarmerID = OrphanageTest
 		case RunningMain:
 			env.FarmerID = OrphanageMain
@@ -129,7 +136,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 
 	} else {
 		env.Orphan = false
-		id, err := strconv.ParseUint(farmerID[0], 10, 64)
+		id, err := strconv.ParseUint(farmerID[0], 10, 32)
 		if err != nil {
 			return env, errors.Wrap(err, "wrong format for farm ID")
 		}
@@ -139,12 +146,8 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	// Checking if there environment variable
 	// override default settings
 
-	if e := os.Getenv("ZOS_BCDB_URL"); e != "" {
-		env.BcdbURL = e
-	}
-
-	if e := os.Getenv("ZOS_BCDB_PASSWORD"); e != "" {
-		env.BcdbPassword = e
+	if e := os.Getenv("ZOS_SUBSTRATE_URL"); e != "" {
+		env.SubstrateURL = e
 	}
 
 	if e := os.Getenv("ZOS_FLIST_URL"); e != "" {

@@ -24,6 +24,10 @@ func (t *testIdentityManager) NodeID() pkg.StrIdentifier {
 	return pkg.StrIdentifier(t.id)
 }
 
+func (t *testIdentityManager) FarmSecret() (string, error) {
+	return "", nil
+}
+
 // FarmID return the farm id this node is part of. this is usually a configuration
 // that the node is booted with. An error is returned if the farmer id is not configured
 func (t *testIdentityManager) FarmID() (pkg.FarmID, error) {
@@ -67,7 +71,7 @@ func (t *testIdentityManager) PrivateKey() []byte {
 }
 
 func TestNamespace(t *testing.T) {
-	nr, err := New(pkg.NetResource{NodeID: "node1"})
+	nr, err := New(pkg.Network{})
 	require.NoError(t, err)
 
 	nsName, err := nr.Namespace()
@@ -85,7 +89,7 @@ func TestNamespace(t *testing.T) {
 }
 
 func TestNaming(t *testing.T) {
-	nr, err := New(pkg.NetResource{NodeID: "node1"})
+	nr, err := New(pkg.Network{})
 	require.NoError(t, err)
 
 	nsName, err := nr.Namespace()
@@ -103,7 +107,7 @@ func TestNaming(t *testing.T) {
 }
 
 func TestCreateBridge(t *testing.T) {
-	nr, err := New(pkg.NetResource{NodeID: "node1"})
+	nr, err := New(pkg.Network{})
 	require.NoError(t, err)
 
 	brName, err := nr.BridgeName()

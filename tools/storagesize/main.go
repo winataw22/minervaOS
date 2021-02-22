@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/threefoldtech/zos/pkg"
+
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/storage"
 )
 
@@ -12,7 +13,7 @@ func main() {
 		panic(fmt.Sprintf("%v", err))
 	}
 
-	kind := pkg.SSDDevice
+	kind := zos.SSDDevice
 	total, err := s.Total(kind)
 	if err != nil {
 		panic(fmt.Sprintf("%v", err))
@@ -20,7 +21,7 @@ func main() {
 
 	fmt.Printf("SSD: %v\n", total)
 
-	kind = pkg.HDDDevice
+	kind = zos.HDDDevice
 	total, err = s.Total(kind)
 	if err != nil {
 		panic(fmt.Sprintf("%v", err))

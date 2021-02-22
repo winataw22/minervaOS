@@ -30,15 +30,16 @@ import (
 type NetResource struct {
 	id pkg.NetID
 	// local network resources
-	resource pkg.NetResource
+	resource pkg.Network
 	// network IP range, usually a /16
 	networkIPRange net.IPNet
 }
 
 // New creates a new NetResource object
 // iprange is the full network subnet
-func New(nr pkg.NetResource) (*NetResource, error) {
+func New(nr pkg.Network) (*NetResource, error) {
 	return &NetResource{
+		//fix here
 		id:             nr.NetID,
 		resource:       nr,
 		networkIPRange: nr.NetworkIPRange.IPNet,
@@ -118,7 +119,7 @@ func (nr *NetResource) Create() error {
 }
 
 func wgIP(subnet *net.IPNet) *net.IPNet {
-	// example: 10.3.1.0 -> 10.255.3.1
+	// example: 10.3.1.0 -> 100.64.3.1
 	a := subnet.IP[len(subnet.IP)-3]
 	b := subnet.IP[len(subnet.IP)-2]
 

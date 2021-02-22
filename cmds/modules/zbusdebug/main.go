@@ -2,7 +2,6 @@ package zbusdebug
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -55,9 +54,6 @@ func action(cli *cli.Context) error {
 		module       string = cli.String("module")
 	)
 
-	flag.StringVar(&msgBrokerCon, "broker", "unix:///var/run/redis.sock", "connection string to the message broker")
-	flag.StringVar(&module, "module", "", "debug specific module")
-
 	cl, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize zbus client")
@@ -80,6 +76,9 @@ func action(cli *cli.Context) error {
 	for _, module := range debug {
 		if err := printModuleStatus(parent, cl, module); err != nil {
 			log.Error().Str("module", module).Err(err).Msg("failed to get status for module")
+			if len(debug) == 1 {
+				return err
+			}
 		}
 	}
 

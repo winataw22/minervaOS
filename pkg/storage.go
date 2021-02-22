@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 //go:generate mkdir -p stubs
@@ -45,7 +47,7 @@ func (e ErrInvalidDeviceType) Error() string {
 
 // DeviceType is the actual type of hardware that the storage device runs on,
 // i.e. SSD or HDD
-type DeviceType string
+type DeviceType = zos.DeviceType
 
 type (
 	// BrokenDevice is a disk which is somehow not fully functional. Storage keeps
@@ -65,12 +67,6 @@ type (
 		// Err returned by the action which let to the pool being marked as broken
 		Err error
 	}
-)
-
-// Known device types
-const (
-	SSDDevice DeviceType = "ssd"
-	HDDDevice DeviceType = "hdd"
 )
 
 // Validate make sure profile is correct

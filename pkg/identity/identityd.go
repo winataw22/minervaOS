@@ -54,6 +54,15 @@ func (d *identityManager) FarmID() (pkg.FarmID, error) {
 	return env.FarmerID, nil
 }
 
+// FarmSecret returns farm secret from kernel params
+func (d *identityManager) FarmSecret() (string, error) {
+	env, err := environment.Get()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse node environment")
+	}
+	return env.FarmSecret, nil
+}
+
 // Sign signs the message with privateKey and returns a signature.
 func (d *identityManager) Sign(message []byte) ([]byte, error) {
 	return crypto.Sign(d.key.PrivateKey, message)

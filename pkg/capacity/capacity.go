@@ -31,24 +31,23 @@ func NewResourceOracle(s *stubs.StorageModuleStub) *ResourceOracle {
 }
 
 // Total returns the total amount of resource units of the node
-func (r *ResourceOracle) Total() (c *Capacity, err error) {
-	c = &Capacity{}
+func (r *ResourceOracle) Total() (c Capacity, err error) {
 
 	c.CRU, err = r.cru()
 	if err != nil {
-		return nil, err
+		return c, err
 	}
 	c.MRU, err = r.mru()
 	if err != nil {
-		return nil, err
+		return c, err
 	}
 	c.SRU, err = r.sru()
 	if err != nil {
-		return nil, err
+		return c, err
 	}
 	c.HRU, err = r.hru()
 	if err != nil {
-		return nil, err
+		return c, err
 	}
 
 	return c, nil

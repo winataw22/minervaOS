@@ -102,6 +102,22 @@ func (s *IdentityManagerStub) FarmID() (ret0 pkg.FarmID, ret1 error) {
 	return
 }
 
+func (s *IdentityManagerStub) FarmSecret() (ret0 string, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.Request(s.module, s.object, "FarmSecret", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *IdentityManagerStub) NodeID() (ret0 pkg.StrIdentifier) {
 	args := []interface{}{}
 	result, err := s.client.Request(s.module, s.object, "NodeID", args...)

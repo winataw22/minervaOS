@@ -1,4 +1,4 @@
-exec: capacityd --broker unix://var/run/redis.sock
+exec: ip netns exec ndmz capacityd --broker unix://var/run/redis.sock
 after:
   - boot
   - networkd

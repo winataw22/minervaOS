@@ -84,8 +84,33 @@ func IPs() ([]net.IPNet, error) {
 	return ips, err
 }
 
+func setupPublicBridge(br *netlink.Bridge) error {
+	// find possible exit interface.
+	// or fall back to zos.
+	exit, err := findPossibleExit()
+	if err != nil {
+		return errors.Wrap(err, "failed to find possible exit")
+	}
+
+	log.Debug().Str("master", exit).Msg("public master (exit)")
+	exitLink, err := netlink.LinkByName(exit)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get link '%s' by name", exit)
+	}
+
+	if err := netlink.LinkSetUp(exitLink); err != nil {
+		return errors.Wrapf(err, "failed to set link '%s' up", exitLink.Attrs().Name)
+	}
+
+	if err := bridge.Attach(exitLink, br, toZosVeth); err != nil {
+		return errors.Wrap(err, "failed to attach exit nic to public bridge 'br-pub'")
+	}
+
+	return nil
+}
+
 // EnsurePublicSetup create the public setup, it's okay to have inf == nil
-func EnsurePublicSetup(nodeID pkg.Identifier, inf *types.PubIface) (*netlink.Bridge, error) {
+func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.Bridge, error) {
 	log.Debug().Msg("ensure public setup")
 	br, err := ensurePublicBridge()
 	if err != nil {
@@ -106,49 +131,19 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *types.PubIface) (*netlink.Bri
 		}
 	}
 
-	if len(filtered) > 0 {
-		// the bridge already has connected devices, hence we are
-		// sure to a great extend that things has been done before.
-		// but to be sure, we can take one extra verification step
-		// by checking if one of the links is actually inf.master
-		// in case inf is set.
-
-		return br, nil
-	}
-	var exit string
-	if inf == nil {
-		// find possible exit interface.
-		// or fall back to zos.
-		exit, err = findPossibleExit()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to find possible exit")
+	if len(filtered) == 0 {
+		if err := setupPublicBridge(br); err != nil {
+			return nil, err
 		}
-	} else {
-		exit = inf.Master
-	}
-
-	log.Debug().Str("master", exit).Msg("public master (exit)")
-	exitLink, err := netlink.LinkByName(exit)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get link '%s' by name", exit)
-	}
-
-	if err := netlink.LinkSetUp(exitLink); err != nil {
-		return nil, errors.Wrapf(err, "failed to set link '%s' up", exitLink.Attrs().Name)
-	}
-
-	if err := bridge.Attach(exitLink, br, toZosVeth); err != nil {
-		return nil, errors.Wrap(err, "failed to attach exit nic to public bridge 'br-pub'")
 	}
 
 	if inf != nil {
-		if err := createPublicNS(nodeID, inf); err != nil {
+		if err := setupPublicNS(nodeID, inf); err != nil {
 			return nil, errors.Wrap(err, "failed to ensure public namespace setup")
 		}
 	}
 
 	return br, netlink.LinkSetUp(br)
-
 }
 
 func findPossibleExit() (string, error) {
@@ -187,7 +182,7 @@ func ensureNamespace() (ns.NetNS, error) {
 	return namespace.GetByName(types.PublicNamespace)
 }
 
-func ensurePublicMacvlan(iface *types.PubIface, pubNS ns.NetNS) (*netlink.Macvlan, error) {
+func ensurePublicMacvlan(iface *pkg.PublicConfig, pubNS ns.NetNS) (*netlink.Macvlan, error) {
 	var (
 		pubIface *netlink.Macvlan
 		err      error
@@ -196,7 +191,7 @@ func ensurePublicMacvlan(iface *types.PubIface, pubNS ns.NetNS) (*netlink.Macvla
 	if !ifaceutil.Exists(types.PublicIface, pubNS) {
 
 		switch iface.Type {
-		case types.MacVlanIface:
+		case pkg.MacVlanIface:
 			pubIface, err = macvlan.Create(types.PublicIface, types.PublicBridge, pubNS)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to create public mac vlan interface")
@@ -219,7 +214,7 @@ func ensurePublicMacvlan(iface *types.PubIface, pubNS ns.NetNS) (*netlink.Macvla
 	return pubIface, nil
 }
 
-func publicConfig(iface *types.PubIface) (ips []*net.IPNet, routes []*netlink.Route, err error) {
+func publicConfig(iface *pkg.PublicConfig) (ips []*net.IPNet, routes []*netlink.Route, err error) {
 	if !iface.IPv6.Nil() && iface.GW6 != nil {
 		routes = append(routes, &netlink.Route{
 			Dst: &net.IPNet{
@@ -251,9 +246,8 @@ func publicConfig(iface *types.PubIface) (ips []*net.IPNet, routes []*netlink.Ro
 	return ips, routes, nil
 }
 
-// createPublicNS creates a public namespace in a node
-func createPublicNS(nodeID pkg.Identifier, iface *types.PubIface) error {
-
+// setupPublicNS creates a public namespace in a node
+func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	pubNS, err := ensureNamespace()
 	if err != nil {
 		return err

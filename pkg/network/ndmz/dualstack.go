@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/threefoldtech/tfexplorer/schema"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
@@ -387,11 +387,11 @@ func (d *dmzImpl) Interfaces() ([]types.IfaceInfo, error) {
 
 			info := types.IfaceInfo{
 				Name:       name,
-				Addrs:      make([]types.IPNet, len(addrs)),
-				MacAddress: schema.MacAddress{link.Attrs().HardwareAddr},
+				Addrs:      make([]gridtypes.IPNet, len(addrs)),
+				MacAddress: types.MacAddress{HardwareAddr: link.Attrs().HardwareAddr},
 			}
 			for i, addr := range addrs {
-				info.Addrs[i] = types.NewIPNet(addr.IPNet)
+				info.Addrs[i] = gridtypes.NewIPNet(*addr.IPNet)
 			}
 
 			output = append(output, info)

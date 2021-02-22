@@ -4,16 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 
-	"github.com/threefoldtech/tfexplorer/client"
-	"github.com/threefoldtech/tfexplorer/models/generated/directory"
-	"github.com/threefoldtech/zos/pkg/app"
-	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/monitord"
-	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 
 	"github.com/rs/zerolog/log"
@@ -35,113 +29,6 @@ var Module cli.Command = cli.Command{
 		},
 	},
 	Action: action,
-}
-
-func cap(ctx context.Context, client zbus.Client) {
-	storage := stubs.NewStorageModuleStub(client)
-	identity := stubs.NewIdentityManagerStub(client)
-	network := stubs.NewNetworkerStub(client)
-	cl, err := bcdbClient()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to connect to bcdb backend")
-	}
-
-	// call this now so we block here until identityd is ready to serve us
-	nodeID := identity.NodeID().Identity()
-
-	// block until networkd is ready to serve request from zbus
-	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
-	// https://github.com/threefoldtech/zos/issues/632
-	bo := backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 0
-	backoff.RetryNotify(func() error {
-		return network.Ready()
-	}, bo, func(err error, d time.Duration) {
-		log.Error().Err(err).Msgf("networkd is not ready yet")
-	})
-
-	r := capacity.NewResourceOracle(storage)
-
-	log.Info().Msg("inspect hardware resources")
-	resources, err := r.Total()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read resources capacity from hardware")
-	}
-	log.Info().
-		Uint64("CRU", resources.CRU).
-		Uint64("MRU", resources.MRU).
-		Uint64("SRU", resources.SRU).
-		Uint64("HRU", resources.HRU).
-		Msg("resource units found")
-
-	log.Info().Msg("read DMI info")
-	dmi, err := r.DMI()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read DMI information from hardware")
-	}
-
-	disks, err := r.Disks()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read smartctl information from disks")
-	}
-
-	hypervisor, err := r.GetHypervisor()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read virtualized state")
-	}
-
-	ru := directory.ResourceAmount{
-		Cru: resources.CRU,
-		Mru: float64(resources.MRU),
-		Hru: float64(resources.HRU),
-		Sru: float64(resources.SRU),
-	}
-
-	setCapacity := func() error {
-		log.Info().Msg("sends capacity detail to BCDB")
-		return cl.NodeSetCapacity(nodeID, ru, *dmi, disks, hypervisor)
-	}
-	bo = backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 0 // retry forever
-	backoff.RetryNotify(setCapacity, bo, func(err error, d time.Duration) {
-		log.Error().
-			Err(err).
-			Str("sleep", d.String()).
-			Msgf("failed to write resources capacity on BCDB")
-	})
-
-	sendUptime := func() error {
-		uptime, err := r.Uptime()
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to read uptime")
-			return err
-		}
-
-		log.Info().Msg("send heart-beat to BCDB")
-		if err := cl.NodeUpdateUptime(identity.NodeID().Identity(), uptime); err != nil {
-			log.Error().Err(err).Msgf("failed to send heart-beat to BCDB")
-			return err
-		}
-		return nil
-	}
-	if err := sendUptime(); err != nil {
-		log.Fatal().Err(err).Send()
-	}
-
-	tick := time.NewTicker(time.Minute * 10)
-
-	go func() {
-		defer tick.Stop()
-
-		for {
-			select {
-			case <-tick.C:
-				backoff.Retry(sendUptime, backoff.NewExponentialBackOff())
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 }
 
 func mon(ctx context.Context, server zbus.Server) {
@@ -178,7 +65,10 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("shutting down")
 	})
 
-	cap(ctx, redis)
+	if err := registration(ctx, redis); err != nil {
+		return errors.Wrap(err, "failed during node registration")
+	}
+
 	mon(ctx, server)
 
 	if err := server.Run(ctx); err != nil && err != context.Canceled {
@@ -186,14 +76,4 @@ func action(cli *cli.Context) error {
 	}
 
 	return nil
-}
-
-// instantiate the proper client based on the running mode
-func bcdbClient() (client.Directory, error) {
-	client, err := app.ExplorerClient()
-	if err != nil {
-		return nil, err
-	}
-
-	return client.Directory, nil
 }

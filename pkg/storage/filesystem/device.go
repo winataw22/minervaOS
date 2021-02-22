@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 // DeviceManager is able to list all/specific devices on a system
@@ -51,7 +51,7 @@ type Device struct {
 	Label      string         `json:"label"`
 	Filesystem FSType         `json:"fstype"`
 	Children   []Device       `json:"children"`
-	DiskType   pkg.DeviceType `json:"-"`
+	DiskType   zos.DeviceType `json:"-"`
 	ReadTime   uint64         `json:"-"`
 	//HasPartions is different from children, because once the
 	//devices are flattend in the device, cache, the children list is
@@ -236,7 +236,7 @@ func (l *lsblkDeviceManager) setDeviceTypes(devices []Device) error {
 
 // setDeviceType recursively sets a device type and read time on a device and
 // all of its children
-func (l *lsblkDeviceManager) setDeviceType(device *Device, typ pkg.DeviceType, readTime uint64) {
+func (l *lsblkDeviceManager) setDeviceType(device *Device, typ zos.DeviceType, readTime uint64) {
 	device.DiskType = typ
 	device.ReadTime = readTime
 
@@ -246,15 +246,15 @@ func (l *lsblkDeviceManager) setDeviceType(device *Device, typ pkg.DeviceType, r
 	}
 }
 
-func (l *lsblkDeviceManager) deviceTypeFromString(typ string) pkg.DeviceType {
+func (l *lsblkDeviceManager) deviceTypeFromString(typ string) zos.DeviceType {
 	switch strings.ToLower(typ) {
-	case string(pkg.SSDDevice):
-		return pkg.SSDDevice
-	case string(pkg.HDDDevice):
-		return pkg.HDDDevice
+	case string(zos.SSDDevice):
+		return zos.SSDDevice
+	case string(zos.HDDDevice):
+		return zos.HDDDevice
 	default:
 		// if we have an error or unrecognized type, set type to HDD
-		return pkg.HDDDevice
+		return zos.HDDDevice
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
 
@@ -47,7 +47,7 @@ type testPool struct {
 	name     string
 	usage    filesystem.Usage
 	reserved uint64
-	ptype    pkg.DeviceType
+	ptype    zos.DeviceType
 }
 
 var _ filesystem.Pool = &testPool{}
@@ -100,7 +100,7 @@ func (p *testPool) RemoveDevice(_ *filesystem.Device) error {
 	return fmt.Errorf("RemoveDevice not implemented")
 }
 
-func (p *testPool) Type() pkg.DeviceType {
+func (p *testPool) Type() zos.DeviceType {
 	return p.ptype
 }
 
@@ -141,7 +141,7 @@ func TestCreateSubvol(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -151,7 +151,7 @@ func TestCreateSubvol(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -161,7 +161,7 @@ func TestCreateSubvol(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.HDDDevice,
+		ptype: zos.HDDDevice,
 	}
 
 	mod := Module{
@@ -181,7 +181,7 @@ func TestCreateSubvol(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvolWithQuota(500, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(500, "sub", zos.SSDDevice)
 
 	require.NoError(err)
 }
@@ -196,7 +196,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -206,7 +206,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -216,7 +216,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.HDDDevice,
+		ptype: zos.HDDDevice,
 	}
 
 	mod := Module{
@@ -236,7 +236,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvolWithQuota(0, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(0, "sub", zos.SSDDevice)
 
 	require.NoError(err)
 }
@@ -251,7 +251,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -261,7 +261,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -271,7 +271,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.HDDDevice,
+		ptype: zos.HDDDevice,
 	}
 
 	mod := Module{
@@ -283,7 +283,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	// from the data above the create subvol will prefer pool 2 because it
 	// after adding the subvol, it will still has more space.
 
-	_, err := mod.createSubvolWithQuota(20000, "sub", pkg.SSDDevice)
+	_, err := mod.createSubvolWithQuota(20000, "sub", zos.SSDDevice)
 
 	require.EqualError(err, "Not enough space left in pools of this type ssd")
 }
@@ -298,7 +298,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -308,7 +308,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -318,7 +318,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.HDDDevice,
+		ptype: zos.HDDDevice,
 	}
 
 	mod := Module{
@@ -353,7 +353,7 @@ func TestVDiskFindCandidatesWrongType(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -363,7 +363,7 @@ func TestVDiskFindCandidatesWrongType(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -373,7 +373,7 @@ func TestVDiskFindCandidatesWrongType(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.HDDDevice,
+		ptype: zos.HDDDevice,
 	}
 
 	mod := Module{
@@ -407,7 +407,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
@@ -417,7 +417,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 			Size: 10000,
 			Used: 100,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	pool3 := &testPool{
@@ -427,7 +427,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 			Size: 100000,
 			Used: 0,
 		},
-		ptype: pkg.SSDDevice,
+		ptype: zos.SSDDevice,
 	}
 
 	mod := Module{

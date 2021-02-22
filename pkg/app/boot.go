@@ -3,6 +3,8 @@ package app
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 // bootedPath is the path where to store the booted flag
@@ -16,13 +18,17 @@ func MarkBooted(name string) error {
 		return err
 	}
 	path := filepath.Join(bootedPath, name)
-	_, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
-	return err
+	marker, err := os.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to mark service as booted: %s", name)
+	}
+
+	return marker.Close()
 }
 
 // IsFirstBoot checks if the a file has been created by MarkBooted function
 func IsFirstBoot(name string) bool {
 	path := filepath.Join(bootedPath, name)
 	_, err := os.Stat(path)
-	return !(err == nil)
+	return err != nil
 }

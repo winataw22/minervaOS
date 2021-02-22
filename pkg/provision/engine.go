@@ -1,80 +1,140 @@
 package provision
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
-	"encoding/json"
+	"crypto/ed25519"
 	"fmt"
-	"math"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
-	"github.com/jbenet/go-base58"
-	"github.com/patrickmn/go-cache"
-	"github.com/robfig/cron/v3"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/stubs"
-
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
+
 	"github.com/rs/zerolog/log"
 )
 
-const gib = 1024 * 1024 * 1024
-
-const minimunZosMemory = 2 * gib
-
-// Engine is the core of this package
-// The engine is responsible to manage provision and decomission of workloads on the system
-type Engine struct {
-	nodeID         string
-	source         ReservationSource
-	cache          ReservationCache
-	feedback       Feedbacker
-	provisioners   map[ReservationType]ProvisionerFunc
-	decomissioners map[ReservationType]DecomissionerFunc
-	signer         Signer
-	statser        Statser
-	zbusCl         zbus.Client
-	janitor        *Janitor
-
-	memCache          *cache.Cache
-	totalMemAvailable uint64
+// EngineOption interface
+type EngineOption interface {
+	apply(e *NativeEngine)
 }
 
-// EngineOps are the configuration of the engine
-type EngineOps struct {
-	// NodeID is the identity of the system running the engine
-	NodeID string
-	// Source is responsible to retrieve reservation for a remote source
-	Source ReservationSource
-	// Feedback is used to send provision result to the source
-	// after the reservation is provisionned
-	Feedback Feedbacker
-	// Cache is a used to keep track of which reservation are provisionned on the system
-	// and know when they expired so they can be decommissioned
-	Cache ReservationCache
-	// Provisioners is a function map so the engine knows how to provision the different
-	// workloads supported by the system running the engine
-	Provisioners map[ReservationType]ProvisionerFunc
-	// Decomissioners contains the opposite function from Provisioners
-	// they are used to decomission workloads from the system
-	Decomissioners map[ReservationType]DecomissionerFunc
-	// Signer is used to authenticate the result send to the source
-	Signer Signer
-	// Statser is responsible to keep track of how much workloads and resource units
-	// are reserved on the system running the engine
-	// After each provision/decomission the engine sends statistics update to the staster
-	Statser Statser
-	// ZbusCl is a client to Zbus
-	ZbusCl zbus.Client
+// WithJanitor sets a janitor for the engine.
+// a janitor is executed periodically to clean up
+// the deployed resources.
+func WithJanitor(j Janitor) EngineOption {
+	return &withJanitorOpt{j}
+}
 
-	// Janitor is used to clean up some of the resources that might be lingering on the node
-	// if not set, no cleaning up will be done
-	Janitor *Janitor
+// WithUsers sets the user key getter on the
+// engine
+func WithUsers(g Users) EngineOption {
+	return &withUserKeyGetter{g}
+}
+
+// WithAdmins sets the admins key getter on the
+// engine
+func WithAdmins(g Users) EngineOption {
+	return &withAdminsKeyGetter{g}
+}
+
+// WithStartupOrder forces a specific startup order of types
+// any type that is not listed in this list, will get started
+// in an nondeterministic order
+func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
+	return &withStartupOrder{t}
+}
+
+type provisionJob struct {
+	wl gridtypes.Workload
+	ch chan error
+}
+
+type deprovisionJob struct {
+	id     gridtypes.ID
+	ch     chan error
+	reason string
+}
+
+// NativeEngine is the core of this package
+// The engine is responsible to manage provision and decomission of workloads on the system
+type NativeEngine struct {
+	storage     Storage
+	provisioner Provisioner
+
+	provision   chan provisionJob
+	deprovision chan deprovisionJob
+
+	//options
+	// janitor Janitor
+	users  Users
+	admins Users
+	order  []gridtypes.WorkloadType
+}
+
+var _ Engine = (*NativeEngine)(nil)
+var _ pkg.Provision = (*NativeEngine)(nil)
+
+type withJanitorOpt struct {
+	j Janitor
+}
+
+func (o *withJanitorOpt) apply(e *NativeEngine) {
+	panic("not imple=nted")
+	// e.janitor = o.j
+}
+
+type withUserKeyGetter struct {
+	g Users
+}
+
+func (o *withUserKeyGetter) apply(e *NativeEngine) {
+	e.users = o.g
+}
+
+type withAdminsKeyGetter struct {
+	g Users
+}
+
+func (o *withAdminsKeyGetter) apply(e *NativeEngine) {
+	e.admins = o.g
+}
+
+type withStartupOrder struct {
+	o []gridtypes.WorkloadType
+}
+
+func (w *withStartupOrder) apply(e *NativeEngine) {
+	all := make(map[gridtypes.WorkloadType]struct{})
+	for _, typ := range e.order {
+		all[typ] = struct{}{}
+	}
+	ordered := make([]gridtypes.WorkloadType, 0, len(all))
+	for _, typ := range w.o {
+		if _, ok := all[typ]; !ok {
+			panic(fmt.Sprintf("type '%s' is not registered", typ))
+		}
+		delete(all, typ)
+		ordered = append(ordered, typ)
+	}
+	// now move everything else
+	for typ := range all {
+		ordered = append(ordered, typ)
+	}
+
+	e.order = ordered
+}
+
+type nullKeyGetter struct{}
+
+func (n *nullKeyGetter) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
+	return nil, fmt.Errorf("null user key getter")
+}
+
+type engineKey struct{}
+
+// GetEngine gets engine from context
+func GetEngine(ctx context.Context) Engine {
+	return ctx.Value(engineKey{}).(Engine)
 }
 
 // New creates a new engine. Once started, the engine
@@ -83,512 +143,228 @@ type EngineOps struct {
 // the default implementation is a single threaded worker. so it process
 // one reservation at a time. On error, the engine will log the error. and
 // continue to next reservation.
-func New(opts EngineOps) (*Engine, error) {
-	memStats, err := mem.VirtualMemory()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed retrieve memory stats")
+func New(storage Storage, provisioner Provisioner, opts ...EngineOption) *NativeEngine {
+
+	e := &NativeEngine{
+		storage:     storage,
+		provisioner: provisioner,
+		provision:   make(chan provisionJob),
+		deprovision: make(chan deprovisionJob),
+		users:       &nullKeyGetter{},
+		admins:      &nullKeyGetter{},
+		order:       gridtypes.Types(),
 	}
 
-	// we round the total memory size to the nearest 1G
-	totalMemory := math.Ceil(float64(memStats.Total)/gib) * gib
+	for _, opt := range opts {
+		opt.apply(e)
+	}
 
-	return &Engine{
-		nodeID:            opts.NodeID,
-		source:            opts.Source,
-		cache:             opts.Cache,
-		feedback:          opts.Feedback,
-		provisioners:      opts.Provisioners,
-		decomissioners:    opts.Decomissioners,
-		signer:            opts.Signer,
-		statser:           opts.Statser,
-		zbusCl:            opts.ZbusCl,
-		janitor:           opts.Janitor,
-		memCache:          cache.New(30*time.Minute, 30*time.Second),
-		totalMemAvailable: uint64(totalMemory) - minimunZosMemory,
-	}, nil
+	return e
+}
+
+// Storage returns
+func (e *NativeEngine) Storage() Storage {
+	return e.storage
+}
+
+// Users returns users db
+func (e *NativeEngine) Users() Users {
+	return e.users
+}
+
+// Admins returns admins db
+func (e *NativeEngine) Admins() Users {
+	return e.admins
+}
+
+// Provision workload
+func (e *NativeEngine) Provision(ctx context.Context, wl gridtypes.Workload) error {
+	j := provisionJob{
+		wl: wl,
+		ch: make(chan error),
+	}
+
+	defer close(j.ch)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case e.provision <- j:
+		return <-j.ch
+	}
+}
+
+// Deprovision workload
+func (e *NativeEngine) Deprovision(ctx context.Context, id gridtypes.ID, reason string) error {
+	j := deprovisionJob{
+		id:     id,
+		ch:     make(chan error),
+		reason: reason,
+	}
+
+	defer close(j.ch)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case e.deprovision <- j:
+		return <-j.ch
+	}
 }
 
 // Run starts reader reservation from the Source and handle them
-func (e *Engine) Run(ctx context.Context) error {
-	cReservation := e.source.Reservations(ctx)
+func (e *NativeEngine) Run(ctx context.Context) error {
+	defer close(e.provision)
+	defer close(e.deprovision)
 
-	isAllWorkloadsProcessed := false
-	// run a cron task that will fire the cleanup at midnight
-	cleanUp := make(chan struct{}, 2)
-	c := cron.New()
-	_, err := c.AddFunc("@midnight", func() {
-		cleanUp <- struct{}{}
-	})
-	if err != nil {
-		return fmt.Errorf("failed to setup cron task: %w", err)
-	}
+	ctx = context.WithValue(ctx, engineKey{}, e)
 
-	c.Start()
-	defer c.Stop()
+	// restart everything first
+	// TODO: potential network disconnections if network already exists.
+	// may be network manager need to do nothing if same exact network config
+	// is applied
+	e.boot(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info().Msg("provision engine context done, exiting")
-			return nil
-
-		case reservation, ok := <-cReservation:
-			if !ok {
-				log.Info().Msg("reservation source is emptied. stopping engine")
-				return nil
+			return ctx.Err()
+		case job := <-e.deprovision:
+			wl, err := e.storage.Get(job.id)
+			if err != nil {
+				job.ch <- err
+				log.Error().Err(err).Stringer("id", job.id).Msg("failed to get workload from storage")
+				continue
 			}
-
-			if reservation.last {
-				isAllWorkloadsProcessed = true
-				// Trigger cleanup by sending a struct onto the channel
-				log.Debug().Msg("kicking clean up after redeploying history")
-				cleanUp <- struct{}{}
+			wl.ToDelete = true
+			err = e.storage.Set(wl)
+			job.ch <- err
+			if err != nil {
+				log.Error().Err(err).Stringer("id", job.id).Msg("failed to mark workload at to be delete")
 				continue
 			}
 
-			expired := reservation.Expired()
-			slog := log.With().
-				Str("id", string(reservation.ID)).
-				Str("type", string(reservation.Type)).
-				Str("duration", fmt.Sprintf("%v", reservation.Duration)).
-				Str("tag", reservation.Tag.String()).
-				Bool("to-delete", reservation.ToDelete).
-				Bool("expired", expired).
-				Logger()
+			e.uninstall(ctx, wl, job.reason)
+		case job := <-e.provision:
+			job.wl.Created = gridtypes.Timestamp(time.Now().Unix())
+			job.wl.ToDelete = false
+			job.wl.Result.State = gridtypes.StateAccepted
+			job.wl.Result.Created = gridtypes.Timestamp(time.Now().Unix())
 
-			if expired || reservation.ToDelete {
-				slog.Info().Msg("start decommissioning reservation")
-				if err := e.decommission(ctx, &reservation.Reservation); err != nil {
-					log.Error().Err(err).Msgf("failed to decommission reservation %s", reservation.ID)
-					continue
-				}
-			} else {
-				slog.Info().Msg("start provisioning reservation")
-
-				//TODO:
-				// this is just a hack now to avoid having double provisioning
-				// other logs has been added in other places so we can find why
-				// the node keep receiving the same reservation twice
-				if _, ok := e.memCache.Get(reservation.ID); ok {
-					log.Debug().Str("id", reservation.ID).Msg("skipping reservation since it has just been processes!")
-					continue
-				}
-
-				e.memCache.Set(reservation.ID, struct{}{}, cache.DefaultExpiration)
-
-				if err := e.provision(ctx, &reservation.Reservation); err != nil {
-					log.Error().Err(err).Msgf("failed to provision reservation %s", reservation.ID)
-					continue
-				}
-			}
-
-			if err := e.updateStats(); err != nil {
-				log.Error().Err(err).Msg("failed to updated the capacity counters")
-			}
-
-		case <-cleanUp:
-			if !isAllWorkloadsProcessed {
-				// only allow cleanup triggered by the cron to run once
-				// we are sure all the workloads from the cache/explorer have been processed
-				log.Info().Msg("all workloads not yet processed, delay cleanup")
-				continue
-			}
-			log.Info().Msg("start cleaning up resources")
-			if e.janitor == nil {
-				log.Info().Msg("janitor is not configured, skipping clean up")
+			err := e.storage.Add(job.wl)
+			// release the job. the caller will now know that the workload
+			// has been committed to storage (or not)
+			job.ch <- err
+			if err != nil {
+				log.Error().Err(err).Stringer("id", job.wl.ID).Msg("failed to commit workload to storage")
 				continue
 			}
 
-			if err := e.janitor.CleanupResources(ctx); err != nil {
-				log.Error().Err(err).Msg("failed to cleanup resources")
-				continue
-			}
+			e.install(ctx, job.wl)
 		}
 	}
 }
 
-func (e *Engine) provision(ctx context.Context, r *Reservation) error {
-	if err := r.validate(); err != nil {
-		return errors.Wrapf(err, "failed validation of reservation")
-	}
-
-	if r.Reference != "" {
-		if err := e.migrateToPool(ctx, r); err != nil {
-			return err
-		}
-	}
-
-	if cached, err := e.cache.Get(r.ID); err == nil {
-		log.Info().Str("id", r.ID).Msg("reservation have already been processed")
-		if cached.Result.IsNil() {
-			// this is probably an older reservation that is cached BEFORE
-			// we start caching the result along with the reservation
-			// then we just need to return here.
-			return nil
-		}
-
-		// otherwise, it's safe to resend the same result
-		// back to the grid.
-		if err := e.reply(ctx, &cached.Result); err != nil {
-			log.Error().Err(err).Msg("failed to send result to BCDB")
-		}
-
-		return nil
-	}
-
-	// to ensure old reservation workload that are already running
-	// keeps running as it is, we use the reference as new workload ID
-	realID := r.ID
-	if r.Reference != "" {
-		r.ID = r.Reference
-	}
-
-	returned, provisionError := e.provisionForward(ctx, r)
-
-	result, err := e.buildResult(realID, r.Type, provisionError, returned)
-	if err != nil {
-		return errors.Wrapf(err, "failed to build result object for reservation: %s", result.ID)
-	}
-
-	// send response to explorer
-	if err := e.reply(ctx, result); err != nil {
-		log.Error().Err(err).Msg("failed to send result to BCDB")
-	}
-
-	// if we fail to decomission the reservation then must be marked
-	// as deleted so it's never tried again. we also skip caching
-	// the reservation object. this is similar to what decomission does
-	// since on a decomission we also clear up the cache.
-	if provisionError != nil {
-		// we need to mark the reservation as deleted as well
-		if err := e.feedback.Deleted(e.nodeID, realID); err != nil {
-			log.Error().Err(err).Msg("failed to mark failed reservation as deleted")
-		}
-
-		return provisionError
-	}
-
-	// we only cache successful reservations
-	r.ID = realID
-	r.Result = *result
-	if err := e.cache.Add(r); err != nil {
-		return errors.Wrapf(err, "failed to cache reservation %s locally", r.ID)
-	}
-
-	// If an update occurs on the network we don't increment the counter
-	if r.Type == "network_resource" {
-		nr := pkg.NetResource{}
-		if err := json.Unmarshal(r.Data, &nr); err != nil {
-			return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
-		}
-
-		uniqueID := NetworkID(r.User, nr.Name)
-		exists, err := e.cache.NetworkExists(string(uniqueID))
+// boot will make sure to re-deploy all stored reservation
+// on boot.
+func (e *NativeEngine) boot(ctx context.Context) {
+	storage := e.Storage()
+	for _, typ := range e.order {
+		ids, err := storage.ByType(typ)
 		if err != nil {
-			return errors.Wrap(err, "failed to check if network exists")
+			log.Error().Err(err).Stringer("type", typ).Msg("failed to get all reservation of type")
+			continue
 		}
-		if exists {
-			return nil
+		for _, id := range ids {
+			wl, err := storage.Get(id)
+			if err != nil {
+				log.Error().Err(err).Stringer("id", id).Msg("failed to load workload")
+				continue
+			}
+
+			if wl.Result.State != gridtypes.StateOk && wl.Result.State != gridtypes.StateAccepted {
+				continue
+			}
+			e.install(ctx, wl)
 		}
 	}
-
-	if err := e.statser.Increment(r); err != nil {
-		log.Err(err).Str("reservation_id", r.ID).Msg("failed to increment workloads statistics")
-	}
-
-	return nil
 }
 
-func (e *Engine) provisionForward(ctx context.Context, r *Reservation) (interface{}, error) {
-	fn, ok := e.provisioners[r.Type]
-	if !ok {
-		return nil, fmt.Errorf("type of reservation not supported: %s", r.Type)
+func (e *NativeEngine) uninstall(ctx context.Context, wl gridtypes.Workload, reason string) {
+	log := log.With().Str("id", string(wl.ID)).Str("type", string(wl.Type)).Logger()
+
+	log.Debug().Msg("de-provisioning")
+	if wl.Result.State == gridtypes.StateDeleted ||
+		wl.Result.State == gridtypes.StateError {
+		//nothing to do!
+		return
 	}
 
-	if err := e.statser.CheckMemoryRequirements(r, e.totalMemAvailable); err != nil {
-		return nil, errors.Wrapf(err, "failed to apply provision")
-	}
-
-	returned, provisionError := fn(ctx, r)
-	if provisionError != nil {
-		log.Error().
-			Err(provisionError).
-			Str("id", r.ID).
-			Msgf("failed to apply provision")
-		return nil, provisionError
-	}
-
-	log.Info().
-		Str("result", fmt.Sprintf("%v", returned)).
-		Msgf("workload deployed")
-
-	return returned, nil
-}
-
-func (e *Engine) decommission(ctx context.Context, r *Reservation) error {
-
-	exists, err := e.cache.Exists(r.ID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to check if reservation %s exists in cache", r.ID)
-	}
-
-	if !exists {
-		log.Info().Str("id", r.ID).Msg("reservation not provisioned, no need to decomission")
-		if err := e.feedback.Deleted(e.nodeID, r.ID); err != nil {
-			log.Error().Err(err).Str("id", r.ID).Msg("failed to mark reservation as deleted")
-		}
-		return nil
-	}
-
-	// to ensure old reservation can be deleted
-	// we use the reference as workload ID
-	realID := r.ID
-	if r.Reference != "" {
-		r.ID = r.Reference
-	}
-
-	if r.Result.State == StateError {
-		// this reservation already failed to deploy
-		// this code here shouldn't be executing because if
-		// the reservation has error-ed, it means is should
-		// not be in cache.
-		// BUT
-		// that was not always the case, so instead we
-		// will just return. here
-		log.Warn().Str("id", realID).Msg("skipping reservation because it is not provisioned")
-		return nil
-	}
-
-	if fn, ok := e.decomissioners[r.Type]; ok {
-		if err := fn(ctx, r); err != nil {
-			return errors.Wrap(err, "decommissioning of reservation failed")
-		}
-	} else {
-		log.Error().Str("type", string(r.Type)).Msg("type of reservation not supported")
-	}
-
-	r.ID = realID
-
-	if err := e.cache.Remove(r.ID); err != nil {
-		return errors.Wrapf(err, "failed to remove reservation %s from cache", r.ID)
-	}
-
-	if err := e.statser.Decrement(r); err != nil {
-		log.Err(err).Str("reservation_id", r.ID).Msg("failed to decrement workloads statistics")
-	}
-
-	if err := e.feedback.Deleted(e.nodeID, r.ID); err != nil {
-		return errors.Wrap(err, "failed to mark reservation as deleted")
-	}
-
-	return nil
-}
-
-func (e *Engine) reply(ctx context.Context, result *Result) error {
-	log.Debug().Str("id", result.ID).Msg("sending reply for reservation")
-
-	if err := e.signResult(result); err != nil {
-		return err
-	}
-
-	return e.feedback.Feedback(e.nodeID, result)
-}
-
-// DecommissionCached is used by other module to ask provisiond that
-// a certain reservation is dead beyond repair and owner must be informed
-// the decommission method will take care to update the reservation instance
-// and also decommission the reservation normally
-func (e *Engine) DecommissionCached(id string, reason string) error {
-	r, err := e.cache.Get(id)
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	result, err := e.buildResult(id, r.Type, fmt.Errorf(reason), nil)
-	if err != nil {
-		return errors.Wrapf(err, "failed to build result object for reservation: %s", id)
-	}
-
-	if err := e.decommission(ctx, r); err != nil {
-		log.Error().Err(err).Msgf("failed to update reservation result with failure: %s", id)
-	}
-
-	bf := backoff.NewExponentialBackOff()
-	bf.MaxInterval = 10 * time.Second
-	bf.MaxElapsedTime = 1 * time.Minute
-
-	return backoff.Retry(func() error {
-		err := e.reply(ctx, result)
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to update reservation result with failure: %s", id)
-		}
-		return err
-	}, bf)
-}
-
-func (e *Engine) buildResult(id string, typ ReservationType, err error, info interface{}) (*Result, error) {
-	result := &Result{
-		Type:    typ,
-		Created: time.Now(),
-		ID:      id,
+	err := e.provisioner.Decommission(ctx, &wl)
+	result := &gridtypes.Result{
+		Error: reason,
+		State: gridtypes.StateDeleted,
 	}
 
 	if err != nil {
-		result.Error = err.Error()
-		result.State = StateError
-	} else {
-		result.State = StateOk
+		log.Error().Err(err).Msg("failed to deploy workload")
+		result.State = gridtypes.StateError
+		result.Error = errors.Wrapf(err, "error while decommission reservation because of: '%s'", result.Error).Error()
 	}
 
-	br, err := json.Marshal(info)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode result")
-	}
-	result.Data = br
+	result.Created = gridtypes.Timestamp(time.Now().Unix())
+	wl.Result = *result
 
-	return result, nil
+	if err := e.storage.Set(wl); err != nil {
+		log.Error().Err(err).Msg("failed to set workload result")
+	}
 }
 
-func (e *Engine) signResult(result *Result) error {
+func (e *NativeEngine) install(ctx context.Context, wl gridtypes.Workload) {
+	log := log.With().Str("id", string(wl.ID)).Str("type", string(wl.Type)).Logger()
 
-	b, err := result.Bytes()
+	log.Debug().Msg("provisioning")
+	result, err := e.provisioner.Provision(ctx, &wl)
 	if err != nil {
-		return errors.Wrap(err, "failed to convert the result to byte for signature")
-	}
-
-	sig, err := e.signer.Sign(b)
-	if err != nil {
-		return errors.Wrap(err, "failed to signed the result")
-	}
-	result.Signature = hex.EncodeToString(sig)
-
-	return nil
-}
-
-func (e *Engine) updateStats() error {
-	wl := e.statser.CurrentWorkloads()
-	r := e.statser.CurrentUnits()
-
-	if e.zbusCl != nil {
-		// TODO: this is a very specific zos code that should not be
-		// here. this is a quick fix for the tfgateways
-		// but should be implemented cleanely after
-		storaged := stubs.NewStorageModuleStub(e.zbusCl)
-
-		cache, err := storaged.GetCacheFS()
-		if err != nil {
-			return err
+		log.Error().Err(err).Msg("failed to deploy workload")
+		result = &gridtypes.Result{
+			Error: err.Error(),
+			State: gridtypes.StateError,
 		}
-
-		switch cache.DiskType {
-		case pkg.SSDDevice:
-			r.Sru += float64(cache.Usage.Size / gib)
-		case pkg.HDDDevice:
-			r.Hru += float64(cache.Usage.Size / gib)
-		}
-
-		r.Mru += float64(minimunZosMemory / gib)
 	}
 
-	log.Info().
-		Uint16("network", wl.Network).
-		Uint16("volume", wl.Volume).
-		Uint16("zDBNamespace", wl.ZDBNamespace).
-		Uint16("container", wl.Container).
-		Uint16("k8sVM", wl.K8sVM).
-		Uint16("proxy", wl.Proxy).
-		Uint16("reverseProxy", wl.ReverseProxy).
-		Uint16("subdomain", wl.Subdomain).
-		Uint16("delegateDomain", wl.DelegateDomain).
-		Uint64("cru", r.Cru).
-		Float64("mru", r.Mru).
-		Float64("hru", r.Hru).
-		Float64("sru", r.Sru).
-		Msgf("provision statistics")
+	if result.State == gridtypes.StateError {
+		log.Error().Stringer("type", wl.Type).Str("error", result.Error).Msg("failed to deploy workload")
+	}
+	result.Created = gridtypes.Timestamp(time.Now().Unix())
+	wl.Result = *result
 
-	return e.feedback.UpdateStats(e.nodeID, wl, r)
+	if err := e.storage.Set(wl); err != nil {
+		log.Error().Err(err).Msg("failed to set workload result")
+	}
 }
 
-// Counters is a zbus stream that sends statistics from the engine
-func (e *Engine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {
+// Counters implements the zbus interface
+func (e *NativeEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {
+	//TODO: implement counters
+	// this is probably need to be moved to
 	ch := make(chan pkg.ProvisionCounters)
 	go func() {
-		for {
-			select {
-			case <-time.After(2 * time.Second):
-			case <-ctx.Done():
-			}
-
-			wls := e.statser.CurrentWorkloads()
-			pc := pkg.ProvisionCounters{
-				Container: int64(wls.Container),
-				Network:   int64(wls.Network),
-				ZDB:       int64(wls.ZDBNamespace),
-				Volume:    int64(wls.Volume),
-				VM:        int64(wls.K8sVM),
-			}
-
-			select {
-			case <-ctx.Done():
-			case ch <- pc:
-			}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Minute):
+			ch <- pkg.ProvisionCounters{}
 		}
 	}()
 
 	return ch
 }
 
-func (e *Engine) migrateToPool(ctx context.Context, r *Reservation) error {
+// DecommissionCached implements the zbus interface
+func (e *NativeEngine) DecommissionCached(id string, reason string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
 
-	oldRes, err := e.cache.Get(r.Reference)
-	if err == nil && oldRes.ID == r.Reference {
-		// we have received a reservation that reference another one.
-		// This is the sign user is trying to migrate his workloads to the new capacity pool system
-
-		log.Info().Str("reference", r.Reference).Msg("reservation referencing another one")
-
-		if string(oldRes.Type) != "network" { //we skip network cause its a PITA
-			// first let make sure both are the same
-			if !bytes.Equal(oldRes.Data, r.Data) {
-				return fmt.Errorf("trying to upgrade workloads to new version. new workload content is different from the old one. upgrade refused")
-			}
-		}
-
-		// remove the old one from the cache and store the new one
-		log.Info().Msgf("migration: remove %v from cache", oldRes.ID)
-		if err := e.cache.Remove(oldRes.ID); err != nil {
-			return err
-		}
-		log.Info().Msgf("migration: add %v to cache", r.ID)
-		if err := e.cache.Add(r); err != nil {
-			return err
-		}
-
-		r.Result.ID = r.ID
-		if err := e.signResult(&r.Result); err != nil {
-			return errors.Wrap(err, "error while signing reservation result")
-		}
-
-		if err := e.feedback.Feedback(e.nodeID, &r.Result); err != nil {
-			return err
-		}
-
-		log.Info().Str("old_id", oldRes.ID).Str("new_id", r.ID).Msg("reservation upgraded to new system")
-	}
-
-	return nil
-}
-
-// NetworkID construct a network ID based on a userID and network name
-func NetworkID(userID, name string) pkg.NetID {
-	buf := bytes.Buffer{}
-	buf.WriteString(userID)
-	buf.WriteString(name)
-	h := md5.Sum(buf.Bytes())
-	b := base58.Encode(h[:])
-	if len(b) > 13 {
-		b = b[:13]
-	}
-	return pkg.NetID(string(b))
+	return e.Deprovision(ctx, gridtypes.ID(id), reason)
 }

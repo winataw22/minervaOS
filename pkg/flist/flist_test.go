@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 var (
@@ -151,7 +152,7 @@ func TestMountUnmount(t *testing.T) {
 
 	strg.On("Path", mock.Anything).Return("/my/backend", nil)
 
-	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
+	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), zos.SSDDevice).
 		Return("/my/backend", nil)
 
 	mnt, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
@@ -180,7 +181,7 @@ func TestIsolation(t *testing.T) {
 
 	strg.On("Path", mock.Anything).Return("/my/backend", nil)
 
-	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), pkg.SSDDevice).
+	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), zos.SSDDevice).
 		Return("/my/backend", nil)
 
 	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
