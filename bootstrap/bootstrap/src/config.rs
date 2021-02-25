@@ -9,6 +9,12 @@ pub enum RunMode {
     Dev,
 }
 
+#[derive(Debug)]
+pub enum Version {
+    V2,
+    V3,
+}
+
 fn runmode() -> Result<RunMode> {
     let params = kparams::params()?;
     let mode = match params.get("runmode") {
@@ -36,10 +42,32 @@ fn runmode() -> Result<RunMode> {
     Ok(mode)
 }
 
+fn version() -> Result<Version> {
+    let params = kparams::params()?;
+    let ver = match params.get("version") {
+        Some(input) => match input {
+            Some(input) => match input.as_ref() {
+                "v2" => Version::V2,
+                "v3" => Version::V3,
+                m => {
+                    bail!("unknown version: {}", m);
+                }
+            },
+            None => Version::V2,
+        },
+        // version was not provided in cmdline
+        // so default is v2
+        None => Version::V2,
+    };
+
+    Ok(ver)
+}
+
 pub struct Config {
     pub stage: u32,
     pub debug: bool,
     pub runmode: RunMode,
+    pub version: Version,
 }
 
 impl Config {
@@ -79,6 +107,7 @@ impl Config {
             stage: stage,
             debug: matches.occurrences_of("debug") > 0,
             runmode: runmode()?,
+            version: version()?,
         })
     }
 }

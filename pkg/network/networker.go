@@ -469,7 +469,7 @@ func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
 	}
 
 	for _, addr := range addrs {
-		if addr.IP.IsGlobalUnicast() && !isULA(addr.IP) {
+		if addr.IP.IsGlobalUnicast() && !isULA(addr.IP) && !isYgg(addr.IP) {
 			return addr, nil
 		}
 	}
@@ -985,4 +985,13 @@ var ulaPrefix = net.IPNet{
 
 func isULA(ip net.IP) bool {
 	return ulaPrefix.Contains(ip)
+}
+
+var yggPrefix = net.IPNet{
+	IP:   net.ParseIP("200::"),
+	Mask: net.CIDRMask(7, 128),
+}
+
+func isYgg(ip net.IP) bool {
+	return yggPrefix.Contains(ip)
 }

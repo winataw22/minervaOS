@@ -1,1 +1,11 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/706d44faa311a105b88a21530be78698
+package primitives
+
+import (
+	"github.com/threefoldtech/zos/pkg/gridtypes"
+)
+
+// FilesystemName return a string to be used as filesystem name from
+// a reservation object
+func FilesystemName(wl *gridtypes.Workload) string {
+	return wl.ID.String()
+}

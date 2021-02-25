@@ -55,6 +55,8 @@ type Container struct {
 	Logs []logger.Logs
 	// Stats container metrics backend
 	Stats []zos.Stats
+	// Elevated privileges (to use fuse inside)
+	Elevated bool
 }
 
 // ContainerModule defines rpc interface to containerd

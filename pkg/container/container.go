@@ -186,6 +186,16 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		WithCPUCount(data.CPU),
 	}
 
+	if data.Elevated {
+		log.Warn().Msg("elevated container requested")
+
+		opts = append(
+			opts,
+			oci.WithAddedCapabilities([]string{"CAP_SYS_ADMIN"}),
+			oci.WithLinuxDevice("/dev/fuse", "rwm"),
+		)
+	}
+
 	if data.WorkingDir != "" {
 		opts = append(opts, oci.WithProcessCwd(data.WorkingDir))
 	}
