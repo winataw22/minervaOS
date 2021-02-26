@@ -13,7 +13,6 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
-	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/provision/common"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
@@ -73,7 +72,7 @@ func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workloa
 		return zos.ZDBResult{}, errors.Wrapf(err, "failed to ensure zdb containe running")
 	}
 
-	containerIPs, err := p.waitZDBIPs(ctx, nwmod.ZDBIface, cont.Network.Namespace)
+	containerIPs, err := p.waitZDBIPs(ctx, cont.Network.Namespace)
 	if err != nil {
 		return zos.ZDBResult{}, errors.Wrap(err, "failed to find IP address on zdb0 interface")
 	}
@@ -160,8 +159,6 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 		slog = log.With().Str("containerID", string(name)).Logger()
 	)
 
-	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(allocation.VolumeID))
-
 	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
 
 	rootFS, err := p.zdbRootFS()
@@ -180,7 +177,7 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 	}
 
 	// create the network namespace and macvlan for the 0-db container
-	netNsName, err := network.ZDBPrepare(hw)
+	netNsName, err := network.ZDBPrepare(allocation.VolumeID)
 	if err != nil {
 		if err := flist.Umount(rootFS); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
@@ -257,7 +254,11 @@ func (p *Primitives) zdbRun(name string, rootfs string, cmd string, netns string
 	return err
 }
 
-func (p *Primitives) waitZDBIPs(ctx context.Context, ifaceName, namespace string) ([]net.IP, error) {
+func (p *Primitives) waitZDBIPs(ctx context.Context, namespace string) ([]net.IP, error) {
+	// TODO: this method need to be abstracted, since it's now depends on the knewledge
+	// of the networking daemon internal (interfaces names)
+	// may be at least just get all ips from all interfaces inside the namespace
+	// will be a slightly better solution
 	var (
 		network      = stubs.NewNetworkerStub(p.zbus)
 		containerIPs []net.IP
@@ -265,11 +266,17 @@ func (p *Primitives) waitZDBIPs(ctx context.Context, ifaceName, namespace string
 
 	getIP := func() error {
 
-		ips, err := network.Addrs(ifaceName, namespace)
+		ips, err := network.Addrs(nwmod.ZDBPubIface, namespace)
 		if err != nil {
 			log.Debug().Err(err).Msg("not ip public found, waiting")
 			return err
 		}
+		yggIps, err := network.Addrs(nwmod.ZDBYggIface, namespace)
+		if err != nil {
+			return err
+		}
+
+		ips = append(ips, yggIps...)
 
 		var (
 			public = false
@@ -304,7 +311,7 @@ func (p *Primitives) waitZDBIPs(ctx context.Context, ifaceName, namespace string
 	if err := backoff.RetryNotify(getIP, bo, func(err error, d time.Duration) {
 		log.Debug().Err(err).Str("duration", d.String()).Msg("failed to get zdb public IP")
 	}); err != nil && len(containerIPs) == 0 {
-		return nil, errors.Wrapf(err, "failed to get an IP for interface %s", ifaceName)
+		return nil, errors.Wrapf(err, "failed to get an IP for interface")
 	}
 
 	return containerIPs, nil

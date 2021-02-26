@@ -425,7 +425,7 @@ func (s *NetworkerStub) ZDBDestroy(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) ZDBPrepare(arg0 []uint8) (ret0 string, ret1 error) {
+func (s *NetworkerStub) ZDBPrepare(arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "ZDBPrepare", args...)
 	if err != nil {

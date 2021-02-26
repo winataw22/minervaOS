@@ -36,7 +36,9 @@ import (
 const (
 
 	//ndmzBridge is the name of the ipv4 routing bridge in the ndmz namespace
-	ndmzBridge = "br-ndmz"
+	ndmzBridge    = "br-ndmz"
+	ndmzYggBridge = types.YggBridge
+
 	//dmzNamespace name of the dmz namespace
 	dmzNamespace = "ndmz"
 
@@ -48,10 +50,12 @@ const (
 	// dmzPub6 ipv6 public interface
 	dmzPub6 = "npub6"
 
+	dmzYgg = "nygg6"
+
 	//nrPubIface is the name of the public interface in a network resource
 	nrPubIface = "public"
 
-	tonrsIface = "tonrs"
+	toNrsIface = "tonrs"
 )
 
 // dmzImpl implement DMZ interface using dual stack ipv4/ipv6
@@ -92,7 +96,11 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 	defer netNS.Close()
 
 	if err := createRoutingBridge(ndmzBridge, netNS); err != nil {
-		return errors.Wrapf(err, "ndmz: createRoutingBride error")
+		return errors.Wrapf(err, "ndmz: createRoutingBridge error")
+	}
+
+	if err := createYggBridge(ndmzYggBridge, netNS); err != nil {
+		return errors.Wrapf(err, "ndmz: createYggBridge error")
 	}
 
 	if err := createPubIface6(dmzPub6, d.public, d.nodeID, netNS); err != nil {
@@ -340,8 +348,19 @@ func (d *dmzImpl) SetIP(subnet net.IPNet) error {
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		inf := dmzPub4
-		if subnet.IP.To16() != nil {
-			inf = dmzPub6
+		if ip6 := subnet.IP.To16(); ip6 != nil {
+			// this still can be an ygg address
+			// so ..
+			_, ygg, err := net.ParseCIDR("200::/7")
+			if err != nil {
+				panic(err)
+			}
+
+			if ygg.Contains(ip6) {
+				inf = dmzYgg
+			} else {
+				inf = dmzPub6
+			}
 		}
 
 		link, err := netlink.LinkByName(inf)
@@ -376,7 +395,7 @@ func (d *dmzImpl) Interfaces() ([]types.IfaceInfo, error) {
 		}
 		for _, link := range links {
 			name := link.Attrs().Name
-			if name == tonrsIface {
+			if name == toNrsIface {
 				continue
 			}
 
@@ -518,6 +537,29 @@ func createPubIface4(name, nodeID string, netNS ns.NetNS) error {
 	})
 }
 
+func createYggBridge(name string, netNS ns.NetNS) error {
+	if !bridge.Exists(name) {
+		if _, err := bridge.New(name); err != nil {
+			return errors.Wrapf(err, "couldn't create bridge %s", name)
+		}
+	}
+
+	if !ifaceutil.Exists(dmzYgg, netNS) {
+		if _, err := macvlan.Create(dmzYgg, name, netNS); err != nil {
+			return errors.Wrapf(err, "ndmz: couldn't create %s", dmzYgg)
+		}
+	}
+
+	return netNS.Do(func(_ ns.NetNS) error {
+		link, err := netlink.LinkByName(dmzYgg)
+		if err != nil {
+			return err
+		}
+
+		return netlink.LinkSetUp(link)
+	})
+}
+
 func createRoutingBridge(name string, netNS ns.NetNS) error {
 	if !bridge.Exists(name) {
 		if _, err := bridge.New(name); err != nil {
@@ -525,9 +567,9 @@ func createRoutingBridge(name string, netNS ns.NetNS) error {
 		}
 	}
 
-	if !ifaceutil.Exists(tonrsIface, netNS) {
-		if _, err := macvlan.Create(tonrsIface, name, netNS); err != nil {
-			return errors.Wrapf(err, "ndmz: couldn't create %s", tonrsIface)
+	if !ifaceutil.Exists(toNrsIface, netNS) {
+		if _, err := macvlan.Create(toNrsIface, name, netNS); err != nil {
+			return errors.Wrapf(err, "ndmz: couldn't create %s", toNrsIface)
 		}
 	}
 
@@ -537,12 +579,12 @@ func createRoutingBridge(name string, netNS ns.NetNS) error {
 
 	return netNS.Do(func(_ ns.NetNS) error {
 
-		link, err := netlink.LinkByName(tonrsIface)
+		link, err := netlink.LinkByName(toNrsIface)
 		if err != nil {
 			return err
 		}
-		if err := options.Set(tonrsIface, options.IPv6Disable(false)); err != nil {
-			return errors.Wrapf(err, "failed to enable ip6 on interface %s", tonrsIface)
+		if err := options.Set(toNrsIface, options.IPv6Disable(false)); err != nil {
+			return errors.Wrapf(err, "failed to enable ip6 on interface %s", toNrsIface)
 		}
 
 		addrs := []*netlink.Addr{

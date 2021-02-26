@@ -50,8 +50,9 @@ type Networker interface {
 	// ZDBPrepare creates a network namespace with a macvlan interface into it
 	// to allow the 0-db container to be publicly accessible
 	// it retusn the name of the network namespace created
-	// hw is an optional hardware address that will be set on the new interface
-	ZDBPrepare(hw net.HardwareAddr) (string, error)
+	// id is the zdb id (should be unique) is used to drive the hw mac
+	// address for the interface so they always get the same IP
+	ZDBPrepare(id string) (string, error)
 
 	// ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
 	// for zdb is rewind. ns param is the namespace return by the ZDBPrepare

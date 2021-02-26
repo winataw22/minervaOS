@@ -1,16 +1,1 @@
-package types
-
-const (
-	// PublicNamespace is the name of the public namespace of a node
-	// the public namespace is currently unique for a node so we hardcode its name
-	PublicNamespace = "public"
-	// PublicIface is the name of the interface we create in the public namespace
-	PublicIface = "public"
-	// GatewayNamespace is the name of the gateway namespace of a node
-	GatewayNamespace = "gateway"
-	// DefaultBridge is the name of the default bridge created
-	// by the bootstrap of networkd
-	DefaultBridge = "zos"
-	//PublicBridge name
-	PublicBridge = "br-pub"
-)
+/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/48b0347c1a1a0f95d4cdc1e1a8235450

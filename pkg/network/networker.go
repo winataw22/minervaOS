@@ -40,8 +40,11 @@ import (
 )
 
 const (
-	// ZDBIface is the name of the interface used in the 0-db network namespace
-	ZDBIface           = "zdb0"
+	// ZDBPubIface is pub interface name of the interface used in the 0-db network namespace
+	ZDBPubIface = "zdb0"
+	// ZDBYggIface is ygg interface name of the interface used in the 0-db network namespace
+	ZDBYggIface = "ygg0"
+
 	wgPortDir          = "wireguard_ports"
 	networkDir         = "networks"
 	ipamLeaseDir       = "ndmz-lease"
@@ -166,7 +169,6 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 		return join, errors.Wrap(err, "failed to load network resource")
 	}
 
-	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(containerID))
 	netNs, err := namespace.GetByName(join.Namespace)
 	if err != nil {
 		return join, errors.Wrap(err, "failed to found a valid network interface to use as parent for 0-db container")
@@ -174,7 +176,8 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 	defer netNs.Close()
 
 	if cfg.PublicIP6 {
-		if err = n.createMacVlan("pub", hw, nil, nil, netNs); err != nil {
+		hw := ifaceutil.HardwareAddrFromInputBytes([]byte(containerID))
+		if err = n.createMacVlan("pub", public.PublicBridge, hw, nil, nil, netNs); err != nil {
 			return join, errors.Wrap(err, "failed to create public macvlan interface")
 		}
 	}
@@ -185,6 +188,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 			routes []*netlink.Route
 		)
 
+		hw := ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + containerID))
 		ip, err := n.ygg.SubnetFor(hw)
 		if err != nil {
 			return join, err
@@ -214,7 +218,7 @@ func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.Conta
 			},
 		}
 
-		if err := n.createMacVlan("ygg", hw, ips, routes, netNs); err != nil {
+		if err := n.createMacVlan("ygg", types.YggBridge, hw, ips, routes, netNs); err != nil {
 			return join, errors.Wrap(err, "failed to create yggdrasil macvlan interface")
 		}
 	}
@@ -240,7 +244,10 @@ func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
 
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
-func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
+func (n networker) ZDBPrepare(id string) (string, error) {
+
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("pub:" + id))
+
 	netNSName := zdbNamespacePrefix + strings.Replace(hw.String(), ":", "", -1)
 
 	netNs, err := createNetNS(netNSName)
@@ -249,43 +256,50 @@ func (n networker) ZDBPrepare(hw net.HardwareAddr) (string, error) {
 	}
 	defer netNs.Close()
 
-	var (
-		ips    []*net.IPNet
-		routes []*netlink.Route
-	)
-
-	if n.ygg != nil {
-		ip, err := n.ygg.SubnetFor(hw)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate ygg subnet IP: %w", err)
-		}
-
-		ips = []*net.IPNet{
-			{
-				IP:   ip,
-				Mask: net.CIDRMask(64, 128),
-			},
-		}
-
-		gw, err := n.ygg.Gateway()
-		if err != nil {
-			return "", fmt.Errorf("failed to get ygg gateway IP: %w", err)
-		}
-
-		routes = []*netlink.Route{
-			{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("200::"),
-					Mask: net.CIDRMask(7, 128),
-				},
-				Gw: gw.IP,
-				// LinkIndex:... this is set by macvlan.Install
-			},
-		}
-
+	if err := n.createMacVlan(ZDBPubIface, types.PublicBridge, hw, nil, nil, netNs); err != nil {
+		return "", errors.Wrap(err, "failed to setup zdb public interface")
 	}
 
-	return netNSName, n.createMacVlan(ZDBIface, hw, ips, routes, netNs)
+	if n.ygg == nil {
+		return netNSName, nil
+	}
+
+	// new hardware address for the ygg interface
+	hw = ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + id))
+
+	ip, err := n.ygg.SubnetFor(hw)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate ygg subnet IP: %w", err)
+	}
+
+	ips := []*net.IPNet{
+		{
+			IP:   ip,
+			Mask: net.CIDRMask(64, 128),
+		},
+	}
+
+	gw, err := n.ygg.Gateway()
+	if err != nil {
+		return "", fmt.Errorf("failed to get ygg gateway IP: %w", err)
+	}
+
+	routes := []*netlink.Route{
+		{
+			Dst: &net.IPNet{
+				IP:   net.ParseIP("200::"),
+				Mask: net.CIDRMask(7, 128),
+			},
+			Gw: gw.IP,
+			// LinkIndex:... this is set by macvlan.Install
+		},
+	}
+
+	if err := n.createMacVlan(ZDBYggIface, types.YggBridge, hw, ips, routes, netNs); err != nil {
+		return "", errors.Wrap(err, "failed to setup zdb ygg interface")
+	}
+
+	return netNSName, nil
 }
 
 // ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
@@ -309,7 +323,7 @@ func (n networker) ZDBDestroy(ns string) error {
 	return namespace.Delete(nSpace)
 }
 
-func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
+func (n networker) createMacVlan(iface string, master string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
 	var macVlan *netlink.Macvlan
 	err := netNs.Do(func(_ ns.NetNS) error {
 		var err error
@@ -318,7 +332,7 @@ func (n networker) createMacVlan(iface string, hw net.HardwareAddr, ips []*net.I
 	})
 
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
-		macVlan, err = macvlan.Create(iface, public.PublicBridge, netNs)
+		macVlan, err = macvlan.Create(iface, master, netNs)
 
 		if err != nil {
 			return err
