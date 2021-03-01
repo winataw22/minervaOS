@@ -301,6 +301,27 @@ func (s *Fs) GetNetwork(id zos.NetID) (gridtypes.Workload, error) {
 	return s.get(path)
 }
 
+// Users lists available users
+func (s *Fs) Users() ([]gridtypes.ID, error) {
+	path := filepath.Join(s.root, pathByUser)
+	entities, err := ioutil.ReadDir(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, errors.Wrap(err, "failed to list users directory")
+	}
+	ids := make([]gridtypes.ID, 0, len(entities))
+	for _, entry := range entities {
+		if !entry.IsDir() {
+			continue
+		}
+
+		ids = append(ids, gridtypes.ID(entry.Name()))
+	}
+
+	return ids, nil
+}
+
 // Close makes sure the backend of the store is closed properly
 func (s *Fs) Close() error {
 	return nil

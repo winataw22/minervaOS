@@ -19,8 +19,30 @@ func (id ID) IsEmpty() bool {
 	return len(id) == 0
 }
 
+// UnmarshalJSON supports multiple formats of id
+func (id *ID) UnmarshalJSON(data []byte) error {
+	var u int64
+	if err := json.Unmarshal(data, &u); err == nil {
+		*id = ID(fmt.Sprint(u))
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*id = ID(s)
+		return nil
+	}
+
+	return fmt.Errorf("unknown id format, expecting a uint32 or string")
+}
+
 // Timestamp type
 type Timestamp int64
+
+// Time gets time from timestamp
+func (t *Timestamp) Time() time.Time {
+	return time.Unix(int64(*t), 0)
+}
 
 // UnmarshalJSON supports multiple formats
 func (t *Timestamp) UnmarshalJSON(data []byte) error {

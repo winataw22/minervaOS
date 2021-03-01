@@ -58,11 +58,20 @@ func (t WorkloadType) String() string {
 
 //Capacity the expected capacity of a workload
 type Capacity struct {
-	CRU   uint64
-	SRU   uint64
-	HRU   uint64
-	MRU   uint64
-	IPV4U uint64
+	CRU   uint64 `json:"cru"`
+	SRU   uint64 `json:"sru"`
+	HRU   uint64 `json:"hru"`
+	MRU   uint64 `json:"mru"`
+	IPV4U uint64 `json:"ipv4u"`
+}
+
+// Add increments value of capacity with o
+func (c *Capacity) Add(o *Capacity) {
+	c.CRU += o.CRU
+	c.MRU += o.MRU
+	c.SRU += o.SRU
+	c.HRU += o.HRU
+	c.IPV4U += o.IPV4U
 }
 
 // WorkloadData interface

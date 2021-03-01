@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/farmer"
 	"github.com/threefoldtech/zos/pkg/geoip"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -67,7 +68,7 @@ func retryNotify(err error, d time.Duration) {
 	log.Warn().Err(err).Str("sleep", d.String()).Msg("registration failed")
 }
 
-func registerNode(env environment.Environment, mgr pkg.IdentityManager, cl *farmer.Client, cap capacity.Capacity, loc geoip.Location) error {
+func registerNode(env environment.Environment, mgr pkg.IdentityManager, cl *farmer.Client, cap gridtypes.Capacity, loc geoip.Location) error {
 	log.Info().Str("id", mgr.NodeID().Identity()).Msg("start registration of the node")
 	log.Info().Msg("registering at farmer bot")
 

@@ -56,5 +56,4 @@ func (s *substrateClient) GetUser(id uint32) (*User, error) {
 	}
 
 	return &user, nil
-
 }

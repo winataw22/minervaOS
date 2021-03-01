@@ -2,41 +2,39 @@ package primitives
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/provision/mw"
 )
 
 type (
 	currentCapacityKey struct{}
 )
 
-// CurrentCapacity is a value that holds current system load in bytes
-type CurrentCapacity struct {
-	Cru uint64
-	Mru uint64
-	Hru uint64
-	Sru uint64
-}
-
 // GetCapacity gets current capacity from context
-func GetCapacity(ctx context.Context) CurrentCapacity {
+func GetCapacity(ctx context.Context) gridtypes.Capacity {
 	val := ctx.Value(currentCapacityKey{})
 	if val == nil {
 		panic("no current capacity injected")
 	}
 
-	return val.(CurrentCapacity)
+	return val.(gridtypes.Capacity)
 }
 
-// statsProvisioner a provisioner interceptor that keeps track
-// of consumed capacity, and reprot it to the explorer
-// when it has been changed
-type statsProvisioner struct {
+// Statistics a provisioner interceptor that keeps track
+// of consumed capacity. It also does validate of required
+// capacity and then can report that this capacity can not be fulfilled
+type Statistics struct {
 	inner    provision.Provisioner
+	total    gridtypes.Capacity
 	counters Counters
 	reserved Counters
 	mem      uint64
@@ -44,39 +42,54 @@ type statsProvisioner struct {
 	nodeID string
 }
 
-// NewStatisticsProvisioner creates a new statistics provisioner interceptor.
+// NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
-func NewStatisticsProvisioner(initial, reserved Counters, nodeID string, inner provision.Provisioner) provision.Provisioner {
+func NewStatistics(total gridtypes.Capacity, reserved Counters, nodeID string, inner provision.Provisioner) *Statistics {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
 		panic(err)
 	}
 
-	return &statsProvisioner{inner: inner, counters: initial, reserved: reserved, nodeID: nodeID, mem: vm.Total}
+	ram := math.Ceil(float64(vm.Total) / (1024 * 1024 * 1024))
+	return &Statistics{inner: inner, total: total, reserved: reserved, nodeID: nodeID, mem: uint64(ram)}
 }
 
-func (s *statsProvisioner) currentCapacity() CurrentCapacity {
-	return CurrentCapacity{
-		Cru: s.counters.CRU.Current() + s.reserved.CRU.Current(),
-		Mru: s.counters.CRU.Current() + s.reserved.MRU.Current(),
-		Hru: s.counters.CRU.Current() + s.reserved.HRU.Current(),
-		Sru: s.counters.CRU.Current() + s.reserved.SRU.Current(),
+// Current returns the current used capacity
+func (s *Statistics) Current() gridtypes.Capacity {
+	return gridtypes.Capacity{
+		CRU: s.counters.CRU.Current() + s.reserved.CRU.Current(),
+		MRU: s.counters.MRU.Current() + s.reserved.MRU.Current(),
+		HRU: s.counters.HRU.Current() + s.reserved.HRU.Current(),
+		SRU: s.counters.SRU.Current() + s.reserved.SRU.Current(),
+		//IPV4U: s.counters.CRU.Current() + s.reserved.SRU.Current(),
 	}
 }
 
-func (s *statsProvisioner) hasEnoughCapacity(c *gridtypes.Capacity) error {
-	//TODO: check required capacity here
+// Total returns the node total capacity
+func (s *Statistics) Total() gridtypes.Capacity {
+	return s.total
+}
+
+func (s *Statistics) hasEnoughCapacity(used *gridtypes.Capacity, required *gridtypes.Capacity) error {
+	// checks memory
+	if required.MRU+used.MRU > s.mem {
+		return fmt.Errorf("cannot fulfil required memory size")
+	}
+
+	//check other as well?
+
 	return nil
 }
 
-func (s *statsProvisioner) Provision(ctx context.Context, wl *gridtypes.Workload) (*gridtypes.Result, error) {
-	current := s.currentCapacity()
+// Provision implements the provisioner interface
+func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.Workload) (*gridtypes.Result, error) {
+	current := s.Current()
 	needed, err := wl.Capacity()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to calculate workload needed capacity")
 	}
 
-	if err := s.hasEnoughCapacity(&needed); err != nil {
+	if err := s.hasEnoughCapacity(&current, &needed); err != nil {
 		return nil, errors.Wrap(err, "failed to satisfy required capacity")
 	}
 
@@ -95,7 +108,8 @@ func (s *statsProvisioner) Provision(ctx context.Context, wl *gridtypes.Workload
 	return result, nil
 }
 
-func (s *statsProvisioner) Decommission(ctx context.Context, wl *gridtypes.Workload) error {
+// Decommission implements the decomission interface
+func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.Workload) error {
 	if err := s.inner.Decommission(ctx, wl); err != nil {
 		return err
 	}
@@ -105,6 +119,32 @@ func (s *statsProvisioner) Decommission(ctx context.Context, wl *gridtypes.Workl
 	}
 
 	return nil
+}
+
+type statisticsAPI struct {
+	stats *Statistics
+}
+
+// NewStatisticsAPI sets up a new statistics API and set it up on the given
+// router
+func NewStatisticsAPI(router *mux.Router, stats *Statistics) error {
+	api := statisticsAPI{stats}
+	return api.setup(router)
+}
+
+func (s *statisticsAPI) setup(router *mux.Router) error {
+	router.Path("/counters").HandlerFunc(mw.AsHandlerFunc(s.getCounters)).Methods(http.MethodGet).Name("statistics-counters")
+	return nil
+}
+
+func (s *statisticsAPI) getCounters(r *http.Request) (interface{}, mw.Response) {
+	return struct {
+		Total gridtypes.Capacity `json:"total"`
+		Used  gridtypes.Capacity `json:"used"`
+	}{
+		Total: s.stats.Total(),
+		Used:  s.stats.Current(),
+	}, nil
 }
 
 // func (s *statsProvisioner) shouldUpdateCounters(ctx context.Context, wl *gridtypes.Workload) (bool, error) {

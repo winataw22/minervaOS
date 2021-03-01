@@ -9,6 +9,7 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -31,7 +32,7 @@ func NewResourceOracle(s *stubs.StorageModuleStub) *ResourceOracle {
 }
 
 // Total returns the total amount of resource units of the node
-func (r *ResourceOracle) Total() (c Capacity, err error) {
+func (r *ResourceOracle) Total() (c gridtypes.Capacity, err error) {
 
 	c.CRU, err = r.cru()
 	if err != nil {

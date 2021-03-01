@@ -101,7 +101,7 @@ func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, route
 		}
 
 		name := link.Attrs().Name
-		// TODO: check ip is already not there, or clean up IPs before readding!
+		// TODO: check if we need to remove an IP from the nic
 		for _, ip := range ips {
 			if err := netlink.AddrAdd(link, &netlink.Addr{
 				IPNet: ip,
