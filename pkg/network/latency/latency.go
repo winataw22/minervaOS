@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Sorter lets you get the latency from a list of endpoint
@@ -79,9 +81,12 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 			}
 
 			t, err := Latency(addr)
-			if err == nil {
-				r.Latency = t
+			if err != nil {
+				log.Warn().Err(err).Str("address", addr).Msg("cannot connect to peer. skipping")
+				continue
 			}
+
+			r.Latency = t
 			out <- r
 		}
 	}
@@ -128,7 +133,7 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 // Latency does a TCP dial to host and return the amount of time it took to get a response or an error if it fails to connect
 func Latency(host string) (time.Duration, error) {
 	start := time.Now()
-	conn, err := net.Dial("tcp", host)
+	conn, err := net.DialTimeout("tcp", host, 2*time.Second)
 	if err != nil {
 		return 0, err
 	}

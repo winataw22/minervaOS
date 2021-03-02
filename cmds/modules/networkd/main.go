@@ -166,10 +166,10 @@ func waitYggdrasilBin() {
 	})
 }
 
-func fetchPeerList() yggdrasil.PeerList {
+func fetchPeerList() yggdrasil.Peers {
 	// Try to fetch public peer
 	// If we failed to do so, use the fallback hardcoded peer list
-	var pl yggdrasil.PeerList
+	var pl yggdrasil.Peers
 
 	// Do not retry more than 4 times
 	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 4)
@@ -193,7 +193,7 @@ func fetchPeerList() yggdrasil.PeerList {
 	return pl
 }
 
-func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz.DMZ) (*yggdrasil.Server, error) {
+func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz.DMZ) (*network.YggServer, error) {
 	pl := fetchPeerList()
 	peersUp := pl.Ups()
 	endpoints := make([]string, len(peersUp))
@@ -250,7 +250,7 @@ func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz
 	cfg := yggdrasil.GenerateConfig(privateKey)
 	cfg.Peers = peers
 
-	server := yggdrasil.NewServer(z, &cfg)
+	server := network.NewYggServer(z, &cfg)
 
 	go func() {
 		select {
