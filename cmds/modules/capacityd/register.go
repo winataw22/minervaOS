@@ -2,7 +2,6 @@ package capacityd
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
@@ -72,24 +71,15 @@ func registerNode(env environment.Environment, mgr pkg.IdentityManager, cl *farm
 	log.Info().Str("id", mgr.NodeID().Identity()).Msg("start registration of the node")
 	log.Info().Msg("registering at farmer bot")
 
-	hostName, err := os.Hostname()
-	if err != nil {
-		hostName = "unknown"
-	}
-
 	return cl.NodeRegister(farmer.Node{
-		ID:       mgr.NodeID().Identity(),
-		HostName: hostName,
-		FarmID:   uint32(env.FarmerID),
-		Secret:   env.FarmSecret,
+		ID:     mgr.NodeID().Identity(),
+		FarmID: uint32(env.FarmerID),
+		Secret: env.FarmSecret,
 		Location: farmer.Location{
-			Continent: loc.Continent,
-			Country:   loc.Country,
-			City:      loc.City,
+
 			Longitude: loc.Longitute,
 			Latitude:  loc.Latitude,
 		},
 		Capacity: cap,
-		//Type:     "3node",
 	})
 }

@@ -9,18 +9,14 @@ import (
 
 // Location structure
 type Location struct {
-	City      string  `json:"city"`
-	Country   string  `json:"country"`
-	Continent string  `json:"continent"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 }
 
 // Node structure
 type Node struct {
-	ID       string             `json:"node_id"`
-	HostName string             `json:"hostname"`
-	FarmID   uint32             `json:"farm_id"`
+	ID       string             `json:"node"`
+	FarmID   uint32             `json:"farm"`
 	Secret   string             `json:"secret"`
 	Location Location           `json:"location"`
 	Capacity gridtypes.Capacity `json:"capacity"`
