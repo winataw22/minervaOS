@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 
+	"github.com/threefoldtech/zos/pkg/farmer"
 	"github.com/threefoldtech/zos/pkg/kernel"
 )
 
@@ -81,10 +82,26 @@ var (
 	}
 )
 
+// MustGet returns the running environment of the node
+// panics on error
+func MustGet() Environment {
+	env, err := Get()
+	if err != nil {
+		panic(err)
+	}
+
+	return env
+}
+
 // Get return the running environment of the node
 func Get() (Environment, error) {
 	params := kernel.GetParams()
 	return getEnvironmentFromParams(params)
+}
+
+// FarmerClient gets a client to the farm
+func (v *Environment) FarmerClient() (*farmer.Client, error) {
+	return farmer.NewClientFromSubstrate(v.SubstrateURL, uint32(v.FarmerID))
 }
 
 func getEnvironmentFromParams(params kernel.Params) (Environment, error) {

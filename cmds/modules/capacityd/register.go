@@ -43,7 +43,7 @@ func registration(ctx context.Context, cl zbus.Client) error {
 		Uint64("hru", cap.HRU).
 		Msg("node capacity")
 
-	fm, err := farmer.NewClientFromSubstrate(env.SubstrateURL, uint32(env.FarmerID))
+	fm, err := env.FarmerClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to create farmer client")
 	}

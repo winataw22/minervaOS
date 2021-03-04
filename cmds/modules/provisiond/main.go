@@ -64,7 +64,7 @@ var Module cli.Command = cli.Command{
 func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
-		storageDir   string = cli.String("root")
+		rootDir      string = cli.String("root")
 		httpAddr     string = cli.String("http")
 	)
 
@@ -76,7 +76,7 @@ func action(cli *cli.Context) error {
 		}
 	}
 
-	if err := os.MkdirAll(storageDir, 0770); err != nil {
+	if err := os.MkdirAll(rootDir, 0770); err != nil {
 		return errors.Wrap(err, "failed to create cache directory")
 	}
 
@@ -135,7 +135,7 @@ func action(cli *cli.Context) error {
 	// keep track of resource units reserved and amount of workloads provisionned
 
 	// to store reservation locally on the node
-	store, err := storage.NewFSStore(filepath.Join(storageDir, "workloads"))
+	store, err := storage.NewFSStore(filepath.Join(rootDir, "workloads"))
 	if err != nil {
 		return errors.Wrap(err, "failed to create local reservation store")
 	}
@@ -217,9 +217,12 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
+	reporter, err := NewReported(store, identity, filepath.Join(rootDir, "reports"))
+	if err != nil {
+		return errors.Wrap(err, "failed to setup capacity reporter")
+	}
 	// also spawn the capacity reporter
 	go func() {
-		reporter := NewReported(store)
 		if err := reporter.Run(ctx); err != nil && err != context.Canceled {
 			log.Fatal().Err(err).Msg("capacity reported stopped unexpectedely")
 		}
