@@ -208,11 +208,9 @@ exclude_libs() {
 }
 
 github_name() {
-    if [ "$HOME" == "/home/runner" ]; then
-        echo "::set-output name=name::${1}"
-    else
-        echo "[+] github exported name: ${1}"
-    fi
+    # force github print
+    echo "::set-output name=name::${1}"
+    echo "[+] github exported name: ${1}"
 }
 
 setpackage() {

@@ -4,8 +4,7 @@ import "testing"
 
 func Test_cruToLimit(t *testing.T) {
 	type args struct {
-		cru      uint
-		totalCPU int
+		cru uint
 	}
 	tests := []struct {
 		name       string
@@ -14,45 +13,41 @@ func Test_cruToLimit(t *testing.T) {
 		wantPeriod uint64
 	}{
 		{
-			name: "1-1",
+			name: "1",
 			args: args{
-				cru:      1,
-				totalCPU: 1,
+				cru: 1,
 			},
-			wantPeriod: 1000000,
-			wantQuota:  1000000,
+			wantPeriod: 100000,
+			wantQuota:  100000,
 		},
 		{
-			name: "1-4",
+			name: "2",
 			args: args{
-				cru:      1,
-				totalCPU: 4,
+				cru: 2,
 			},
-			wantPeriod: 250000,
-			wantQuota:  1000000,
+			wantPeriod: 100000,
+			wantQuota:  200000,
 		},
 		{
-			name: "1-6",
+			name: "3",
 			args: args{
-				cru:      1,
-				totalCPU: 6,
+				cru: 3,
 			},
-			wantPeriod: 166667,
-			wantQuota:  1000000,
+			wantPeriod: 100000,
+			wantQuota:  300000,
 		},
 		{
-			name: "2-4",
+			name: "10",
 			args: args{
-				cru:      2,
-				totalCPU: 4,
+				cru: 10,
 			},
-			wantPeriod: 500000,
+			wantPeriod: 100000,
 			wantQuota:  1000000,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotQuota, gotPeriod := cruToLimit(tt.args.cru, tt.args.totalCPU)
+			gotQuota, gotPeriod := cruToLimit(tt.args.cru)
 			if gotQuota != tt.wantQuota {
 				t.Errorf("cruToLimit() gotQuota = %v, want %v", gotQuota, tt.wantQuota)
 			}

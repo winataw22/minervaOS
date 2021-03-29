@@ -361,7 +361,7 @@ func validateContainerConfig(config Container) error {
 		return fmt.Errorf("missing flist url")
 	}
 
-	if config.ContainerCapacity.Memory < 1024 {
+	if config.ContainerCapacity.Memory < 64 {
 		return fmt.Errorf("amount of memory allocated for the container cannot be lower then 1024 megabytes")
 	}
 

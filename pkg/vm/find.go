@@ -12,8 +12,8 @@ import (
 func findAll() (map[string]int, error) {
 	const (
 		proc   = "/proc"
-		search = "/firecracker"
-		idFlag = "--id"
+		search = "cloud-hypervisor"
+		idFlag = "--log-file"
 	)
 
 	found := make(map[string]int)
@@ -56,8 +56,9 @@ func findAll() (map[string]int, error) {
 					// so avoid a panic by skipping this
 					return nil
 				}
-				id := parts[i+1]
-				found[string(id)] = pid
+				logName := parts[i+1]
+				name := filepath.Base(string(logName))
+				found[name] = pid
 				// this is to stop the scan.
 				return nil
 			}

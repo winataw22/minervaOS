@@ -3,7 +3,7 @@ RUNC_CHECKSUM="e88bcb1a33e7ff0bfea495f7263826c2"
 RUNC_LINK="https://github.com/opencontainers/runc/archive/v${RUNC_VERSION}.tar.gz"
 
 dependencies_runc() {
-    apt-get install -y btrfs-tools libseccomp-dev build-essential pkg-config
+    apt-get install -y btrfs-progs libbtrfs-dev libseccomp-dev build-essential pkg-config
 
     if [ -z $GOPATH ]; then
         if command -v go > /dev/null; then
@@ -70,4 +70,3 @@ build_runc() {
 
     popd
 }
-

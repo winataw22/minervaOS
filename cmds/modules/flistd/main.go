@@ -18,7 +18,7 @@ import (
 const (
 	module = "flist"
 
-	cacheAge     = time.Hour * 24 * 30 // 30 days
+	cacheAge     = time.Hour * 24 * 3 // 3 days
 	cacheCleanup = time.Hour * 24
 )
 

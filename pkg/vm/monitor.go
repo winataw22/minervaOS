@@ -49,7 +49,7 @@ func (m *Module) monitor(ctx context.Context) error {
 	defer m.lock.Unlock()
 
 	// list all machines available under `{root}/firecracker`
-	root := filepath.Join(m.root, "firecracker")
+	root := filepath.Join(m.root, configDir)
 	items, err := ioutil.ReadDir(root)
 	if os.IsNotExist(err) {
 		return nil
@@ -63,7 +63,7 @@ func (m *Module) monitor(ctx context.Context) error {
 	}
 
 	for _, item := range items {
-		if !item.IsDir() {
+		if item.IsDir() {
 			continue
 		}
 
@@ -97,7 +97,7 @@ func (m *Module) monitorID(ctx context.Context, running map[string]int, id strin
 		// if the marker is permanent. it means that this vm
 		// is being deleted or not monitored. we don't need to take any more action here
 		// (don't try to restart or delete)
-		log.Debug().Msg("permanent delete marker is set")
+		os.RemoveAll(m.configPath(id))
 		return nil
 	}
 
@@ -110,13 +110,13 @@ func (m *Module) monitorID(ctx context.Context, running map[string]int, id strin
 
 	var reason error
 	if count < failuresBeforeDestroy {
-		log.Debug().Msg("trying to restart the vm")
-		jailed, err := JailedFromPath(filepath.Join(m.root, "firecracker", id, "root"))
+		vm, err := MachineFromFile(m.configPath(id))
+
 		if err != nil {
 			return err
 		}
 
-		if jailed.NoKeepAlive {
+		if vm.NoKeepAlive {
 			// if the permanent marker was not set, and we reach here it's possible that
 			// the vmd was restarted, hence the in-memory copy of this flag was gone. Hence
 			// we need to set it correctly, and just return
@@ -124,7 +124,8 @@ func (m *Module) monitorID(ctx context.Context, running map[string]int, id strin
 			return nil
 		}
 
-		reason = jailed.Start(ctx)
+		log.Debug().Str("name", id).Msg("trying to restart the vm")
+		reason = vm.Run(ctx, m.socketPath(id), m.logsPath(id))
 		if reason == nil {
 			reason = m.waitAndAdjOom(ctx, id)
 		}
@@ -134,13 +135,10 @@ func (m *Module) monitorID(ctx context.Context, running map[string]int, id strin
 
 	if reason != nil {
 		log.Debug().Err(reason).Msg("deleting vm due to restart error")
+		os.RemoveAll(m.configPath(id))
 
 		stub := stubs.NewProvisionStub(m.client)
 		if err := stub.DecommissionCached(id, reason.Error()); err != nil {
-			if err := m.cleanFs(id); err != nil {
-				log.Error().Err(err).Msg("failed to delete clean up unmanaged vm")
-			}
-
 			return errors.Wrapf(err, "failed to decommission reservation '%s'", id)
 		}
 	}

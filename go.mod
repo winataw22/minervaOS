@@ -26,6 +26,7 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/firecracker-microvm/firecracker-go-sdk v0.19.1-0.20200110212531-741fc8cb0f2e
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
 	github.com/gizak/termui/v3 v3.1.0
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/go-openapi/analysis v0.19.7 // indirect
@@ -45,7 +46,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6
-	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5 // indirect
+	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.1.1 // indirect

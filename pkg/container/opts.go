@@ -3,7 +3,6 @@ package container
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"path"
 
@@ -14,6 +13,9 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 )
+
+// Defines the container cpu period
+const period = 100000
 
 // withNetworkNamespace set the named network namespace to use for the container
 func withNetworkNamespace(name string) oci.SpecOpts {
@@ -108,7 +110,7 @@ func WithCPUCount(cru uint) oci.SpecOpts {
 			return fmt.Errorf("asked %d CRU while only %d are available", cru, totalCPU)
 		}
 
-		quota, period := cruToLimit(cru, totalCPU)
+		quota, period := cruToLimit(cru)
 
 		if s.Linux.Resources == nil {
 			s.Linux.Resources = &specs.LinuxResources{}
@@ -124,15 +126,8 @@ func WithCPUCount(cru uint) oci.SpecOpts {
 	}
 }
 
-func cruToLimit(cru uint, totalCPU int) (quota int64, period uint64) {
-	var (
-		required = float64(cru)
-		total    = float64(totalCPU)
-		p        float64
-	)
-	quota = int64(1000000) // 1 sec
-	p = required / total
-	p *= float64(quota)
-	p = math.Ceil(p)
-	return quota, uint64(p)
+func cruToLimit(cru uint) (int64, uint64) {
+	quota := int64(period * uint64(cru))
+
+	return quota, period
 }

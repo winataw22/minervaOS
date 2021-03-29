@@ -20,7 +20,7 @@ jobs:
     name: 'Package: containerd'
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.13
+    - name: Set up Go 1.15
       uses: actions/setup-go@v1
       with:
         go-version: 1.15
@@ -67,51 +67,11 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: containerd.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-
-
-  firecracker:
-    name: 'Package: firecracker'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v1
-
-    - name: Setup basesystem
-      run: |
-        cd bins
-        sudo ./bins-extra.sh --package basesystem
-
-    - name: Build package
-      id: package
-      run: |
-        cd bins
-        sudo ./bins-extra.sh --package firecracker
-
-    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: publish
-        user: tf-autobuilder
-        root: bins/releases/firecracker
-        name: ${{ steps.package.outputs.name }}.flist
-
-    - name: crosslink flist (tf-zos-bins)
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.hub_jwt }}
-        action: crosslink
-        user: tf-zos-bins
-        name: firecracker.flist
-        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-
 
   promtail:
     name: 'Package: promtail'
@@ -145,12 +105,11 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: promtail.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-
 
   virtwhat:
     name: 'Package: virtwhat'
@@ -184,7 +143,7 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: virtwhat.flist
@@ -222,7 +181,7 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: logtrunc.flist
@@ -260,7 +219,7 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: shim-logs.flist
@@ -298,7 +257,7 @@ jobs:
       if: success()
       uses: threefoldtech/publish-flist@master
       with:
-        token: ${{ secrets.hub_jwt }}
+        token: ${{ secrets.HUB_JWT }}
         action: crosslink
         user: tf-zos-bins
         name: yggdrasil.flist
@@ -414,7 +373,7 @@ jobs:
 
   zufs:
     name: 'Package: zufs (0-fs)'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-16.04
     steps:
     - name: Set up Go 1.15
       uses: actions/setup-go@v1
@@ -454,4 +413,42 @@ jobs:
         action: crosslink
         user: tf-zos-bins
         name: 0-fs.flist
+        target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+  cloudhypervisor:
+    name: 'Package: cloud-hypervisor'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v1
+
+    - name: Setup basesystem
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package basesystem
+
+    - name: Build package
+      id: package
+      run: |
+        cd bins
+        sudo ./bins-extra.sh --package cloudhypervisor
+
+    - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: publish
+        user: tf-autobuilder
+        root: bins/releases/cloudhypervisor
+        name: ${{ steps.package.outputs.name }}.flist
+
+    - name: crosslink flist (tf-zos-bins)
+      if: success()
+      uses: threefoldtech/publish-flist@master
+      with:
+        token: ${{ secrets.HUB_JWT }}
+        action: crosslink
+        user: tf-zos-bins
+        name: cloudhypervisor.flist
         target: tf-autobuilder/${{ steps.package.outputs.name }}.flist

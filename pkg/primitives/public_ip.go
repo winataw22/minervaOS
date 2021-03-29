@@ -39,9 +39,9 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
 	}
 
-	tapName := fmt.Sprintf("p-%s", wl.ID) // TODO: clean this up, needs to come form networkd
+	tapName := fmt.Sprintf("p-%s", wl.ID.String()) // TODO: clean this up, needs to come form networkd
 	fName := filterName(wl.ID.String())
-	mac := ifaceutil.HardwareAddrFromInputBytes(config.IP.IP.To4())
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(wl.ID.String()))
 
 	predictedIPv6, err := predictedSlaac(pubIP6Base.IP, mac.String())
 	if err != nil {

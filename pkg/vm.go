@@ -122,4 +122,5 @@ type VMModule interface {
 	Delete(name string) error
 	Exists(name string) bool
 	Logs(name string) (string, error)
+	List() ([]string, error)
 }

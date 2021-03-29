@@ -13,6 +13,7 @@ import (
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
+	"github.com/threefoldtech/zos/pkg/network/macvtap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
@@ -422,7 +423,8 @@ func (n *networker) SetupPubTap(pubIPReservationID string) (string, error) {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
 
-	_, err = tuntap.CreateTap(tapIface, public.PublicBridge)
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(pubIPReservationID))
+	_, err = macvtap.CreateMACvTap(tapIface, public.PublicBridge, hw)
 
 	return tapIface, err
 }
@@ -472,7 +474,9 @@ func (n *networker) DisconnectPubTap(pubIPReservationID string) error {
 		return errors.Wrap(err, "could not load tap device")
 	}
 
-	return netlink.LinkSetNoMaster(tap)
+	//setting the txqueue on a macvtap will prevent traffic from
+	//going over the device, effectively disconnecting it.
+	return netlink.LinkSetTxQLen(tap, 0)
 }
 
 // GetPublicIPv6Subnet returns the IPv6 prefix op the public subnet of the host

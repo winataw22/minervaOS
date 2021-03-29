@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/g0rbe/go-chattr"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 )
@@ -65,14 +66,26 @@ func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
 		return "", err
 	}
 
-	file, err := os.Create(path)
+	defer func() {
+		// clean up disk file if error
+		if err != nil {
+			os.RemoveAll(path)
+		}
+	}()
+
+	var file *os.File
+	file, err = os.Create(path)
 	if err != nil {
 		return "", err
 	}
 
 	defer file.Close()
+	if err = chattr.SetAttr(file, chattr.FS_NOCOW_FL); err != nil {
+		return "", err
+	}
 
-	return path, syscall.Fallocate(int(file.Fd()), 0, 0, size*mib)
+	err = syscall.Fallocate(int(file.Fd()), 0, 0, size*mib)
+	return path, err
 }
 
 func (d *vdiskModule) safePath(base, id string) (string, error) {

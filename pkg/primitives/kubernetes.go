@@ -23,7 +23,7 @@ type Kubernetes = zos.Kubernetes
 type KubernetesResult = zos.KubernetesResult
 
 // const k3osFlistURL = "https://hub.grid.tf/tf-official-apps/k3os.flist"
-const k3osFlistURL = "https://hub.grid.tf/lee/k3os.flist"
+const k3osFlistURL = "https://hub.grid.tf/lee/k3os-ch.flist"
 
 func (p *Primitives) kubernetesProvision(ctx context.Context, wl *gridtypes.Workload) (interface{}, error) {
 	return p.kubernetesProvisionImpl(ctx, wl)
@@ -83,7 +83,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		return result, errors.Wrap(err, "failed to decrypt namespace password")
 	}
 
-	cpu, memory, disk, err := vmSize(config.Size)
+	cpu, memory, disk, err := vmSize(&config)
 	if err != nil {
 		return result, errors.Wrap(err, "could not interpret vm size")
 	}
@@ -154,6 +154,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 
 	if needsInstall {
 		if err = p.kubernetesInstall(ctx, wl.ID.String(), cpu, memory, diskPath, imagePath, netInfo, config); err != nil {
+			vm.Delete(wl.ID.String())
 			return result, errors.Wrap(err, "failed to install k3s")
 		}
 	}
@@ -369,8 +370,9 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, rversion int, userID 
 			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get public ip config")
 		}
 
+		// the mac address uses the global workload id
 		// this needs to be the same as how we get it in the actual IP reservation
-		mac := ifaceutil.HardwareAddrFromInputBytes(pubIP.IP.To4())
+		mac := ifaceutil.HardwareAddrFromInputBytes([]byte(fmt.Sprintf("%d-1", cfg.PublicIP)))
 
 		iface := pkg.VMIface{
 			Tap:            pubIface,
@@ -436,9 +438,10 @@ func (p *Primitives) getPubIPConfig(rid gridtypes.ID) (net.IPNet, net.IP, error)
 
 // returns the vCpu's, memory, disksize for a vm size
 // memory and disk size is expressed in MiB
-func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
-
-	switch size {
+func vmSize(vm *Kubernetes) (cpu uint8, memory uint64, storage uint64, err error) {
+	switch vm.Size {
+	case 0:
+		return 0, 0, 0, fmt.Errorf("not supported size")
 	case 1:
 		// 1 vCpu, 2 GiB RAM, 50 GB disk
 		return 1, 2 * 1024, 50 * 1024, nil
@@ -495,5 +498,5 @@ func vmSize(size uint8) (cpu uint8, memory uint64, storage uint64, err error) {
 		return 1, 1 * 1024, 25 * 1024, nil
 	}
 
-	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 to 18 are supported", size)
+	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 to 18 are supported", vm.Size)
 }

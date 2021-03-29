@@ -3,7 +3,7 @@ CONTAINERD_CHECKSUM="73e6d4bad082e69e530c8ab5a9ee5118"
 CONTAINERD_LINK="https://github.com/containerd/containerd/archive/${CONTAINERD_VERSION}.tar.gz"
 
 dependencies_containerd() {
-    apt-get install -y btrfs-tools libseccomp-dev build-essential pkg-config
+    apt-get install -y btrfs-progs libbtrfs-dev libseccomp-dev build-essential pkg-config
 
     if [ -z $GOPATH ]; then
         if command -v go > /dev/null; then
@@ -76,4 +76,3 @@ build_containerd() {
 
     popd
 }
-

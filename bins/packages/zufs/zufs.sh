@@ -3,7 +3,7 @@ ZUFS_CHECKSUM="d964330175105bbfc7bf64558146100d"
 ZUFS_LINK="https://github.com/threefoldtech/0-fs/archive/v${ZUFS_VERSION}.tar.gz"
 
 dependencies_zufs() {
-    apt-get install -y git btrfs-tools libseccomp-dev build-essential pkg-config
+    apt-get install -y git btrfs-progs libseccomp-dev build-essential pkg-config
 
     . ${PKGDIR}/../golang/golang.sh
     build_golang
