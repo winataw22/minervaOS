@@ -400,6 +400,7 @@ func (c *Module) ListNS() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer client.Close()
 
 	ctx := context.Background()
 	return client.NamespaceService().List(ctx)
@@ -413,6 +414,7 @@ func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer client.Close()
 
 	ctx := namespaces.WithNamespace(context.Background(), ns)
 
