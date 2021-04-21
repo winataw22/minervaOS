@@ -8,7 +8,6 @@ import (
 
 	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 	"github.com/zaibon/httpsig"
@@ -16,7 +15,7 @@ import (
 
 // Client struct
 type Client struct {
-	id     gridtypes.ID
+	id     uint32
 	sk     ed25519.PrivateKey
 	signer *httpsig.Signer
 }
@@ -37,7 +36,7 @@ func NewClient(id uint32, seed string) (*Client, error) {
 	signer := httpsig.NewSigner(idStr, sk, httpsig.Ed25519, []string{"(created)", "date"})
 
 	return &Client{
-		id:     gridtypes.ID(idStr),
+		id:     id,
 		sk:     sk,
 		signer: signer,
 	}, nil

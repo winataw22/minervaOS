@@ -14,15 +14,15 @@ import (
 
 // Consumption struct
 type Consumption struct {
-	Workloads map[gridtypes.WorkloadType][]gridtypes.ID `json:"workloads"`
-	Capacity  gridtypes.Capacity                        `json:"capacity"`
+	Workloads map[gridtypes.WorkloadType][]gridtypes.WorkloadID `json:"workloads"`
+	Capacity  gridtypes.Capacity                                `json:"capacity"`
 }
 
 // Report is a user report
 type Report struct {
-	Timestamp   int64                        `json:"timestamp"`
-	Signature   string                       `json:"signature"`
-	Consumption map[gridtypes.ID]Consumption `json:"consumption"`
+	Timestamp   int64                  `json:"timestamp"`
+	Signature   string                 `json:"signature"`
+	Consumption map[uint32]Consumption `json:"consumption"`
 }
 
 // Challenge build a report challenge for signing

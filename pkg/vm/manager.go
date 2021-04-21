@@ -125,32 +125,6 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 		})
 	}
 
-	if !vm.Network.NewStyle {
-		// netIP is only used for the old style network, which only had 1 iface, so we
-		// just take it from the first iface config (which should be the only one)
-		netIP := vm.Network.Ifaces[0].IP4AddressCIDR
-
-		dns0 := ""
-		dns1 := ""
-		if len(vm.Network.Nameservers) > 0 {
-			dns0 = vm.Network.Nameservers[0].String()
-		}
-		if len(vm.Network.Nameservers) > 1 {
-			dns1 = vm.Network.Nameservers[1].String()
-		}
-
-		cmdline := fmt.Sprintf("ip=%s::%s:%s:::off:%s:%s:",
-			netIP.IP.String(),
-			vm.Network.Ifaces[0].IP4GatewayIP.String(), // again the old style network has a single iface so use the gw directly
-			net.IP(netIP.Mask).String(),
-			dns0,
-			dns1,
-		)
-
-		// only return the first nic should multiple be present (shouldnt be possible)
-		return nics[:1], cmdline, nil
-	}
-
 	cmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
 	for i, ifcfg := range vm.Network.Ifaces {
 		cmdLineSections = append(cmdLineSections, m.makeNetCmdLine(i, ifcfg))

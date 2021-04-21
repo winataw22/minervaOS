@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
@@ -123,17 +124,23 @@ type Kubernetes struct {
 	// when it boots.
 	SSHKeys []string `json:"ssh_keys"`
 	// PublicIP points to a reservation for a public ip
-	PublicIP gridtypes.ID `json:"public_ip"`
-
-	// PlainClusterSecret plaintext secret
-	PlainClusterSecret string `json:"-"`
+	PublicIP string `json:"public_ip"`
 
 	DatastoreEndpoint     string `json:"datastore_endpoint"`
 	DisableDefaultIngress bool   `json:"disable_default_ingress"`
 }
 
 // Valid implementation
-func (k Kubernetes) Valid() error {
+func (k Kubernetes) Valid(getter gridtypes.WorkloadGetter) error {
+	wl, err := getter.Get(k.PublicIP)
+	if err != nil {
+		return fmt.Errorf("public ip is not found")
+	}
+
+	if wl.Type != PublicIPType {
+		return errors.Wrapf(err, "workload of name '%s' is not a public ip", k.PublicIP)
+	}
+
 	return nil
 }
 
@@ -161,7 +168,7 @@ func (k Kubernetes) Challenge(b io.Writer) error {
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(b, "%s", k.PublicIP.String()); err != nil {
+	if _, err := fmt.Fprintf(b, "%s", k.PublicIP); err != nil {
 		return err
 	}
 

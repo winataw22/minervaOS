@@ -31,15 +31,15 @@ func (m ZDBMode) Valid() error {
 
 // ZDB namespace creation info
 type ZDB struct {
-	Size              uint64     `json:"size"`
-	Mode              ZDBMode    `json:"mode"`
-	PasswordEncrypted string     `json:"password_encrypted"`
-	DiskType          DeviceType `json:"disk_type"`
-	Public            bool       `json:"public"`
+	Size     uint64     `json:"size"`
+	Mode     ZDBMode    `json:"mode"`
+	Password string     `json:"password"`
+	DiskType DeviceType `json:"disk_type"`
+	Public   bool       `json:"public"`
 }
 
 //Valid implementation
-func (z ZDB) Valid() error {
+func (z ZDB) Valid(getter gridtypes.WorkloadGetter) error {
 	if z.Size == 0 {
 		return fmt.Errorf("invalid size")
 	}
@@ -63,7 +63,7 @@ func (z ZDB) Challenge(b io.Writer) error {
 	if _, err := fmt.Fprintf(b, "%s", z.Mode.String()); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(b, "%s", z.PasswordEncrypted); err != nil {
+	if _, err := fmt.Fprintf(b, "%s", z.Password); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(b, "%s", z.DiskType.String()); err != nil {

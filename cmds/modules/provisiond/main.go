@@ -131,7 +131,6 @@ func action(cli *cli.Context) error {
 	// the v1 endpoint will be used by all components to register endpoints
 	// that are specific for that component
 	v1 := router.PathPrefix("/api/v1").Subrouter()
-
 	// keep track of resource units reserved and amount of workloads provisionned
 
 	// to store reservation locally on the node
@@ -168,9 +167,9 @@ func action(cli *cli.Context) error {
 
 	// TODO: that is a test user map for development, do not commit
 	// users := mw.NewUserMap()
-	// users.AddKeyFromHex(gridtypes.ID("1"), "95d1ba20e9f5cb6cfc6182fecfa904664fb1953eba520db454d5d5afaa82d791")
+	// users.AddKeyFromHex(1, "95d1ba20e9f5cb6cfc6182fecfa904664fb1953eba520db454d5d5afaa82d791")
 
-	users, err := substrate.NewSubstrateUsers(env.SubstrateURL)
+	users, err := substrate.NewSubstrateTwins(env.SubstrateURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate users database")
 	}
@@ -180,10 +179,16 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
 
-	engine := provision.New(
+	queues := filepath.Join(rootDir, "queues")
+	if err := os.MkdirAll(queues, 0755); err != nil {
+		return errors.Wrap(err, "failed to create storage for queues")
+	}
+
+	engine, err := provision.New(
 		store,
 		statistics,
-		provision.WithUsers(users),
+		queues,
+		provision.WithTwins(users),
 		provision.WithAdmins(admins),
 		// set priority to some reservation types on boot
 		// so we always need to make sure all volumes and networks
@@ -191,6 +196,7 @@ func action(cli *cli.Context) error {
 		provision.WithStartupOrder(
 			zos.VolumeType,
 			zos.NetworkType,
+			zos.PublicIPType,
 		),
 	)
 
@@ -217,7 +223,7 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	reporter, err := NewReported(store, identity, filepath.Join(rootDir, "reports"))
+	reporter, err := NewReported(store, identity, queues)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup capacity reporter")
 	}
@@ -241,6 +247,8 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to initialize API")
 	}
 
+	// register static files
+	v1.PathPrefix("").Handler(http.StripPrefix("/api/v1", http.FileServer(http.FS(swaggerFs))))
 	httpServer := &http.Server{
 		Addr:    httpAddr,
 		Handler: router,

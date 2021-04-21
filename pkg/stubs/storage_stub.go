@@ -191,3 +191,19 @@ func (s *StorageModuleStub) Total(arg0 zos.DeviceType) (ret0 uint64, ret1 error)
 	}
 	return
 }
+
+func (s *StorageModuleStub) UpdateFilesystem(arg0 string, arg1 uint64) (ret0 pkg.Filesystem, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.Request(s.module, s.object, "UpdateFilesystem", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}

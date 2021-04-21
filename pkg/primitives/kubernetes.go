@@ -13,6 +13,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -25,7 +26,7 @@ type KubernetesResult = zos.KubernetesResult
 // const k3osFlistURL = "https://hub.grid.tf/tf-official-apps/k3os.flist"
 const k3osFlistURL = "https://hub.grid.tf/lee/k3os-ch.flist"
 
-func (p *Primitives) kubernetesProvision(ctx context.Context, wl *gridtypes.Workload) (interface{}, error) {
+func (p *Primitives) kubernetesProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.kubernetesProvisionImpl(ctx, wl)
 }
 
@@ -40,7 +41,7 @@ func ensureFList(flister pkg.Flister, url string) (string, error) {
 	return flister.NamedMount(name, url, "", pkg.ReadOnlyMountOptions)
 }
 
-func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.Workload) (result KubernetesResult, err error) {
+func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result KubernetesResult, err error) {
 	var (
 		storage = stubs.NewVDiskModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -56,7 +57,9 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		return result, errors.Wrap(err, "failed to decode reservation schema")
 	}
 
-	netID := zos.NetworkID(wl.User.String(), string(config.NetworkID))
+	deployment := provision.GetDeployment(ctx)
+
+	netID := zos.NetworkID(deployment.TwinID, string(config.NetworkID))
 
 	// check if the network tap already exists
 	// if it does, it's most likely that a vm with the same network id and node id already exists
@@ -71,17 +74,12 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	}
 
 	// check if public ipv4 is supported, should this be requested
-	if !config.PublicIP.IsEmpty() && !network.PublicIPv4Support() {
+	if len(config.PublicIP) > 0 && !network.PublicIPv4Support() {
 		return result, errors.New("public ipv4 is requested, but not supported on this node")
 	}
 
 	result.ID = wl.ID.String()
 	result.IP = config.IP.String()
-
-	config.PlainClusterSecret, err = p.decryptSecret(ctx, wl.User, config.ClusterSecret, wl.Version)
-	if err != nil {
-		return result, errors.Wrap(err, "failed to decrypt namespace password")
-	}
 
 	cpu, memory, disk, err := vmSize(&config)
 	if err != nil {
@@ -133,21 +131,21 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	}()
 
 	var pubIface string
-	if !config.PublicIP.IsEmpty() {
-		pubIface, err = network.SetupPubTap(config.PublicIP.String())
+	if len(config.PublicIP) > -0 {
+		pubIface, err = network.SetupPubTap(config.PublicIP)
 		if err != nil {
 			return result, errors.Wrap(err, "could not set up tap device for public network")
 		}
 
 		defer func() {
 			if err != nil {
-				_ = network.RemovePubTap(config.PublicIP.String())
+				_ = network.RemovePubTap(config.PublicIP)
 			}
 		}()
 	}
 
 	var netInfo pkg.VMNetworkInfo
-	netInfo, err = p.buildNetworkInfo(ctx, wl.Version, wl.User.String(), iface, pubIface, config)
+	netInfo, err = p.buildNetworkInfo(ctx, deployment, iface, pubIface, config)
 	if err != nil {
 		return result, errors.Wrap(err, "could not generate network info")
 	}
@@ -171,7 +169,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uint8, memory uint64, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
 	vm := stubs.NewVMModuleStub(p.zbus)
 
-	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.mode=install k3os.install.silent k3os.debug k3os.install.device=/dev/vda k3os.token=%s k3os.k3s_args=\"--flannel-iface=eth0\"", cfg.PlainClusterSecret)
+	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.mode=install k3os.install.silent k3os.debug k3os.install.device=/dev/vda k3os.token=%s k3os.k3s_args=\"--flannel-iface=eth0\"", cfg.ClusterSecret)
 	// if there is no server url configured, the node is set up as a master, therefore
 	// this will cause nodes with an empty master list to be implicitly treated as
 	// a master node
@@ -272,7 +270,7 @@ func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, 
 	return vm.Run(kubevm)
 }
 
-func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Workload) error {
+func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	var (
 		storage = stubs.NewVDiskModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -291,13 +289,15 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 		}
 	}
 
-	netID := zos.NetworkID(wl.User.String(), string(cfg.NetworkID))
+	deployment := provision.GetDeployment(ctx)
+
+	netID := zos.NetworkID(deployment.TwinID, string(cfg.NetworkID))
 	if err := network.RemoveTap(netID); err != nil {
 		return errors.Wrap(err, "could not clean up tap device")
 	}
 
-	if !cfg.PublicIP.IsEmpty() {
-		if err := network.RemovePubTap(cfg.PublicIP.String()); err != nil {
+	if len(cfg.PublicIP) > 0 {
+		if err := network.RemovePubTap(cfg.PublicIP); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}
 	}
@@ -309,10 +309,10 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 	return nil
 }
 
-func (p *Primitives) buildNetworkInfo(ctx context.Context, rversion int, userID string, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
+func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.Deployment, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
-	netID := zos.NetworkID(userID, string(cfg.NetworkID))
+	netID := zos.NetworkID(deployment.TwinID, string(cfg.NetworkID))
 	subnet, err := network.GetSubnet(netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource subnet")
@@ -356,23 +356,22 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, rversion int, userID 
 		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
 	}
 
-	// from this reservation version on we deploy new VM's with the custom boot script for IP
-	if rversion >= 2 {
-		networkInfo.NewStyle = true
-	}
-
-	if !cfg.PublicIP.IsEmpty() {
+	if len(cfg.PublicIP) > 0 {
 		// A public ip is set, load the reservation, extract the ip and make a config
 		// for it
+		ipWl, err := deployment.Get(cfg.PublicIP)
+		if err != nil {
+			return pkg.VMNetworkInfo{}, err
+		}
 
-		pubIP, pubGw, err := p.getPubIPConfig(cfg.PublicIP)
+		pubIP, pubGw, err := p.getPubIPConfig(ipWl, cfg.PublicIP)
 		if err != nil {
 			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get public ip config")
 		}
 
 		// the mac address uses the global workload id
 		// this needs to be the same as how we get it in the actual IP reservation
-		mac := ifaceutil.HardwareAddrFromInputBytes([]byte(fmt.Sprintf("%d-1", cfg.PublicIP)))
+		mac := ifaceutil.HardwareAddrFromInputBytes([]byte(ipWl.ID.String()))
 
 		iface := pkg.VMIface{
 			Tap:            pubIface,
@@ -391,49 +390,25 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, rversion int, userID 
 }
 
 // Get the public ip, and the gateway from the reservation ID
-func (p *Primitives) getPubIPConfig(rid gridtypes.ID) (net.IPNet, net.IP, error) {
+func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID, name string) (ip net.IPNet, gw net.IP, err error) {
 
-	panic("todo: not implemented")
+	//CRITICAL: TODO
+	// in this function we need to return the IP from the IP workload
+	// but we also need to get the Gateway IP from the farmer some how
+	// we used to get this from the explorer, but now we need another
+	// way to do this. for now the only option is to get it from the
+	// reservation itself. hence we added the gatway fields to ip data
 
-	// // TODO: check if there is a better way to do this
-	// explorerClient, err := app.ExplorerClient()
-	// if err != nil {
-	// 	return net.IPNet{}, nil, errors.Wrap(err, "could not create explorer client")
-	// }
+	ipData, err := wl.WorkloadData()
+	if err != nil {
+		return
+	}
+	data, ok := ipData.(zos.PublicIP)
+	if !ok {
+		return ip, gw, fmt.Errorf("invalid ip data in deployment")
+	}
 
-	// // explorerClient.Workloads.Get(...) is currently broken
-	// workloadDefinition, err := explorerClient.Workloads.NodeWorkloadGet(fmt.Sprintf("%d-1", rid))
-	// if err != nil {
-	// 	return net.IPNet{}, nil, errors.Wrap(err, "could not load public ip reservation")
-	// }
-	// // load IP
-	// ip, ok := workloadDefinition.(*workloads.PublicIP)
-	// if !ok {
-	// 	return net.IPNet{}, nil, errors.Wrap(err, "could not decode ip reservation")
-	// }
-	// identity := stubs.NewIdentityManagerStub(p.zbus)
-	// self := identity.NodeID().Identity()
-	// selfDescription, err := explorerClient.Directory.NodeGet(self, false)
-	// if err != nil {
-	// 	return net.IPNet{}, nil, errors.Wrap(err, "could not get our own node description")
-	// }
-	// farm, err := explorerClient.Directory.FarmGet(schema.ID(selfDescription.FarmId))
-	// if err != nil {
-	// 	return net.IPNet{}, nil, errors.Wrap(err, "could not get our own farm")
-	// }
-
-	// var pubGw schema.IP
-	// for _, ips := range farm.IPAddresses {
-	// 	if ips.ReservationID == rid {
-	// 		pubGw = ips.Gateway
-	// 		break
-	// 	}
-	// }
-	// if pubGw.IP == nil {
-	// 	return net.IPNet{}, nil, errors.New("unable to identify public ip gateway")
-	// }
-
-	// return ip.IPaddress.IPNet, pubGw.IP, nil
+	return data.IP.IPNet, data.Gateway, nil
 }
 
 // returns the vCpu's, memory, disksize for a vm size

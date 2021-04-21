@@ -142,6 +142,8 @@ type VolumeAllocater interface {
 	// to try again on a different devicetype
 	CreateFilesystem(name string, size uint64, poolType DeviceType) (Filesystem, error)
 
+	// UpdateFilesystem changes a filesystem size to given value.
+	UpdateFilesystem(name string, size uint64) (Filesystem, error)
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
 	// All data contained in the filesystem will be lost, and the

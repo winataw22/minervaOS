@@ -12,70 +12,69 @@ on:
     #  - v1.1.0
     #  - v2.1.13
     tags:
-      - 'v*-*'
+      - "v*-*"
 
 jobs:
   build:
     name: Build and upload
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.15
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.15
-      id: go
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+        id: go
 
-    - name: Checkout code into the Go module directory
-      uses: actions/checkout@v1
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v1
 
-    - name: Build binaries
-      run: |
-        cd cmds
-        make
-      env:
-        GO111MODULE: on
+      - name: Build binaries
+        run: |
+          cd cmds
+          make
+        env:
+          GO111MODULE: on
 
-    - name: Collecting files
-      run: |
-        scripts/collect.sh ${{ github.workspace }}/archive
+      - name: Collecting files
+        run: |
+          scripts/collect.sh ${{ github.workspace }}/archive
 
-    - name: Uploading flist (${{ github.ref }})
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: publish
-        user: tf-autobuilder
-        root: archive
-        name: zos-${{ github.ref }}.flist
-    
-    - name: Rename flist from zos-${{ github.ref }}.flist to zos:${{ github.ref }}.flist
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: rename
-        user: tf-autobuilder
-        name: zos-${{ github.ref }}.flist
-        target: zos:${{ github.ref }}.flist
+      - name: Uploading flist (${{ github.ref }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: publish
+          user: tf-autobuilder
+          root: archive
+          name: zos-${{ github.ref }}.flist
 
-    - name: Symlink flist (development)
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: crosslink
-        user: tf-zos
-        name: zos:development:latest.flist
-        target: tf-autobuilder/zos:${{ github.ref }}.flist
-    
-    - name: Symlink flist (testing)
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: crosslink
-        user: tf-zos
-        name: zos:testing:latest.flist
-        target: tf-autobuilder/zos:${{ github.ref }}.flist
+      - name: Rename flist from zos-${{ github.ref }}.flist to zos:${{ github.ref }}.flist
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: rename
+          user: tf-autobuilder
+          name: zos-${{ github.ref }}.flist
+          target: zos:${{ github.ref }}.flist
 
+      - name: Symlink flist (development)
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: crosslink
+          user: tf-zos
+          name: zos:development:latest.flist
+          target: tf-autobuilder/zos:${{ github.ref }}.flist
+
+      - name: Symlink flist (testing)
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: crosslink
+          user: tf-zos
+          name: zos:testing:latest.flist
+          target: tf-autobuilder/zos:${{ github.ref }}.flist

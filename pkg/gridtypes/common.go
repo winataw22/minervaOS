@@ -7,35 +7,6 @@ import (
 	"time"
 )
 
-// ID is a generic ID type
-type ID string
-
-func (id ID) String() string {
-	return string(id)
-}
-
-// IsEmpty checks if id is empty
-func (id ID) IsEmpty() bool {
-	return len(id) == 0
-}
-
-// UnmarshalJSON supports multiple formats of id
-func (id *ID) UnmarshalJSON(data []byte) error {
-	var u int64
-	if err := json.Unmarshal(data, &u); err == nil {
-		*id = ID(fmt.Sprint(u))
-		return nil
-	}
-
-	var s string
-	if err := json.Unmarshal(data, &s); err == nil {
-		*id = ID(s)
-		return nil
-	}
-
-	return fmt.Errorf("unknown id format, expecting a uint32 or string")
-}
-
 // Timestamp type
 type Timestamp int64
 

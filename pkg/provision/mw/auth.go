@@ -7,33 +7,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/zaibon/httpsig"
 )
 
-type usePublicKeyID struct{}
-type userKeyID struct{}
+type twinPublicKeyID struct{}
+type twinKeyID struct{}
 
-// UserPublicKey extracts user public key from request
-func UserPublicKey(ctx context.Context) ed25519.PublicKey {
-	value := ctx.Value(usePublicKeyID{})
+// TwinPublicKey extracts twin public key from request
+func TwinPublicKey(ctx context.Context) ed25519.PublicKey {
+	value := ctx.Value(twinPublicKeyID{})
 	return value.(ed25519.PublicKey)
 }
 
-// UserID extracts user id from request
-func UserID(ctx context.Context) gridtypes.ID {
-	value := ctx.Value(userKeyID{})
-	return value.(gridtypes.ID)
+// TwinID extracts twin id from request
+func TwinID(ctx context.Context) uint32 {
+	value := ctx.Value(twinKeyID{})
+	return value.(uint32)
 }
 
 // UserMap implements httpsig.KeyGetter for the users collections
-type UserMap map[gridtypes.ID]ed25519.PublicKey
+type UserMap map[uint32]ed25519.PublicKey
 
 // NewUserMap create a httpsig.KeyGetter that uses the users collection
 // to find the key
@@ -42,7 +42,7 @@ func NewUserMap() UserMap {
 }
 
 // AddKeyFromHex adds a user key to map from a hex string
-func (u UserMap) AddKeyFromHex(id gridtypes.ID, key string) error {
+func (u UserMap) AddKeyFromHex(id uint32, key string) error {
 	k, err := hex.DecodeString(key)
 	if err != nil {
 		return err
@@ -52,10 +52,10 @@ func (u UserMap) AddKeyFromHex(id gridtypes.ID, key string) error {
 }
 
 // GetKey implements httpsig.KeyGetter
-func (u UserMap) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
+func (u UserMap) GetKey(id uint32) (ed25519.PublicKey, error) {
 	key, ok := u[id]
 	if !ok {
-		return nil, fmt.Errorf("unknown user id '%s' in key map", id)
+		return nil, fmt.Errorf("unknown user id '%d' in key map", id)
 	}
 	return key, nil
 }
@@ -64,11 +64,16 @@ func (u UserMap) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
 var requiredHeaders = []string{"(created)", "date"}
 
 type keyGetter struct {
-	users provision.Users
+	twins provision.Twins
 }
 
 func (k *keyGetter) GetKey(id string) (interface{}, error) {
-	return k.users.GetKey(gridtypes.ID(id))
+	idUint, err := strconv.ParseUint(id, 10, 32)
+	if err != nil {
+		return nil, errors.Wrap(err, "expected uint user id")
+	}
+
+	return k.twins.GetKey(uint32(idUint))
 }
 
 func writeError(w http.ResponseWriter, err error) {
@@ -83,7 +88,7 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 // NewAuthMiddleware creates a new AuthMiddleware using the v httpsig.Verifier
-func NewAuthMiddleware(users provision.Users) mux.MiddlewareFunc {
+func NewAuthMiddleware(users provision.Twins) mux.MiddlewareFunc {
 	verifier := httpsig.NewVerifier(&keyGetter{users})
 	verifier.SetRequiredHeaders(requiredHeaders)
 	var challengeParams []string
@@ -100,7 +105,7 @@ func NewAuthMiddleware(users provision.Users) mux.MiddlewareFunc {
 	return func(handler http.Handler) http.Handler {
 		//http.Error(w http.ResponseWriter, error string, code int)
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			userID, err := verifier.Verify(req)
+			id, err := verifier.Verify(req)
 			if err != nil {
 				w.Header()["WWW-Authenticate"] = []string{challenge}
 				w.WriteHeader(http.StatusUnauthorized)
@@ -109,7 +114,16 @@ func NewAuthMiddleware(users provision.Users) mux.MiddlewareFunc {
 				return
 			}
 
-			pk, err := users.GetKey(gridtypes.ID(userID))
+			twinID, err := strconv.ParseUint(id, 10, 32)
+			if err != nil {
+				// this should never happen because we already passed
+				// the verifier but just in case
+				w.WriteHeader(http.StatusInternalServerError)
+				writeError(w, err)
+				return
+			}
+
+			pk, err := users.GetKey(uint32(twinID))
 			if err != nil {
 				w.WriteHeader(http.StatusUnauthorized)
 				writeError(w, err)
@@ -117,8 +131,8 @@ func NewAuthMiddleware(users provision.Users) mux.MiddlewareFunc {
 			}
 
 			ctx := req.Context()
-			ctx = context.WithValue(ctx, userKeyID{}, gridtypes.ID(userID))
-			ctx = context.WithValue(ctx, usePublicKeyID{}, pk)
+			ctx = context.WithValue(ctx, twinKeyID{}, uint32(twinID))
+			ctx = context.WithValue(ctx, twinPublicKeyID{}, pk)
 
 			handler.ServeHTTP(w, req.WithContext(ctx))
 		})

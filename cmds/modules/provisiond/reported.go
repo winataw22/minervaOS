@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"os"
 	"time"
 
 	"github.com/joncrlsn/dque"
@@ -70,7 +69,7 @@ func reportBuilder() interface{} {
 }
 
 // NewReported creates a new capacity reporter
-func NewReported(store *storage.Fs, identity pkg.IdentityManager, report string) (*Reporter, error) {
+func NewReported(store *storage.Fs, identity pkg.IdentityManager, root string) (*Reporter, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime environment")
@@ -81,11 +80,7 @@ func NewReported(store *storage.Fs, identity pkg.IdentityManager, report string)
 		return nil, errors.Wrap(err, "failed to create farmer client")
 	}
 
-	if err := os.MkdirAll(report, 0755); err != nil && !os.IsExist(err) {
-		return nil, errors.Wrap(err, "failed to create persisted directory for report queue")
-	}
-
-	queue, err := dque.NewOrOpen("consumption", report, 1024, reportBuilder)
+	queue, err := dque.NewOrOpen("consumption", root, 1024, reportBuilder)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup report persisted queue")
 	}
@@ -175,13 +170,13 @@ func (r *Reporter) Run(ctx context.Context) error {
 }
 
 func (r *Reporter) collect(since time.Time) (rep farmer.Report, err error) {
-	users, err := r.storage.Users()
+	users, err := r.storage.Twins()
 	if err != nil {
 		return rep, err
 	}
 
 	rep.Timestamp = since.Unix()
-	rep.Consumption = make(map[gridtypes.ID]farmer.Consumption)
+	rep.Consumption = make(map[uint32]farmer.Consumption)
 
 	for _, user := range users {
 		cap, err := r.user(since, user)
@@ -218,42 +213,47 @@ func (r *Reporter) push(report farmer.Report) error {
 	return r.queue.Enqueue(&report)
 }
 
-func (r *Reporter) user(since time.Time, user gridtypes.ID) (farmer.Consumption, error) {
+func (r *Reporter) user(since time.Time, user uint32) (farmer.Consumption, error) {
 	var m many
 	types := gridtypes.Types()
 	consumption := farmer.Consumption{
-		Workloads: make(map[gridtypes.WorkloadType][]gridtypes.ID),
+		Workloads: make(map[gridtypes.WorkloadType][]gridtypes.WorkloadID),
 	}
 
 	for _, typ := range types {
-		consumption.Workloads[typ] = make([]gridtypes.ID, 0)
-		ids, err := r.storage.ByUser(user, typ)
+		consumption.Workloads[typ] = make([]gridtypes.WorkloadID, 0)
+		ids, err := r.storage.ByTwin(user)
 		if err != nil {
 			m = m.append(errors.Wrapf(err, "failed to get reservation for user '%s' type '%s", user, typ))
 			continue
 		}
 
 		for _, id := range ids {
-			wl, err := r.storage.Get(id)
+			dl, err := r.storage.Get(user, id)
 			if err != nil {
 				m = m.append(errors.Wrapf(err, "failed to get reservation '%s'", id))
 				continue
 			}
 
-			if wl.Result.IsNil() {
-				// no results yet
-				continue
-			}
+			for i := range dl.Workloads {
+				wl := &dl.Workloads[i]
 
-			if r.shouldCount(since, &wl.Result) {
-				cap, err := wl.Capacity()
-				if err != nil {
-					m = m.append(errors.Wrapf(err, "failed to get reservation '%s' capacity", id))
+				if wl.Result.IsNil() {
+					// no results yet
 					continue
 				}
 
-				consumption.Workloads[typ] = append(consumption.Workloads[typ], id)
-				consumption.Capacity.Add(&cap)
+				if r.shouldCount(since, &wl.Result) {
+					cap, err := wl.Capacity()
+					if err != nil {
+						m = m.append(errors.Wrapf(err, "failed to get reservation '%s' capacity", id))
+						continue
+					}
+
+					wlID, _ := gridtypes.NewWorkloadID(user, id, wl.Name)
+					consumption.Workloads[typ] = append(consumption.Workloads[typ], wlID)
+					consumption.Capacity.Add(&cap)
+				}
 			}
 
 		}

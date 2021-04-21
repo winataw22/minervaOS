@@ -17,21 +17,17 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func (p *Primitives) publicIPProvision(ctx context.Context, wl *gridtypes.Workload) (interface{}, error) {
+func (p *Primitives) publicIPProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.publicIPProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Workload) (result zos.PublicIPResult, err error) {
+func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
 	config := zos.PublicIP{}
 
 	network := stubs.NewNetworkerStub(p.zbus)
 
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
 		return zos.PublicIPResult{}, errors.Wrap(err, "failed to decode reservation schema")
-	}
-
-	if err := config.Valid(); err != nil {
-		return zos.PublicIPResult{}, errors.Wrap(err, "failed to validate ip reservation")
 	}
 
 	pubIP6Base, err := network.GetPublicIPv6Subnet()
@@ -53,7 +49,7 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	return
 }
 
-func (p *Primitives) publicIPDecomission(ctx context.Context, wl *gridtypes.Workload) error {
+func (p *Primitives) publicIPDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	// Disconnect the public interface from the network if one exists
 	network := stubs.NewNetworkerStub(p.zbus)
 	fName := filterName(wl.ID.String())

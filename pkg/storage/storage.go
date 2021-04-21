@@ -339,6 +339,21 @@ func (s *Module) shutdownUnusedPools() error {
 	return nil
 }
 
+// UpdateFilesystem updates filesystem size
+func (s *Module) UpdateFilesystem(name string, size uint64) (pkg.Filesystem, error) {
+	_, volume, fs, err := s.path(name)
+	if err != nil {
+		return pkg.Filesystem{}, err
+	}
+
+	if err := volume.Limit(size); err != nil {
+		return fs, err
+	}
+
+	fs.Usage.Size = size
+	return fs, nil
+}
+
 // CreateFilesystem with the given size in a storage pool.
 func (s *Module) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
@@ -385,27 +400,30 @@ func (s *Module) ReleaseFilesystem(name string) error {
 			return err
 		}
 		for _, vol := range volumes {
-			if vol.Name() == name {
-				log.Debug().Msgf("Removing filesystem %v in volume %v", vol.Name(), pool.Name())
-				err = pool.RemoveVolume(vol.Name())
+			if vol.Name() != name {
+				continue
+			}
+			log.Debug().Msgf("Removing filesystem %v in volume %v", vol.Name(), pool.Name())
+			err = pool.RemoveVolume(vol.Name())
+			if err != nil {
+				log.Err(err).Msgf("Error removing volume %s", vol.Name())
+				return err
+			}
+			// if there is only 1 volume, unmount and shutdown pool
+			if len(volumes) == 1 {
+				err = pool.UnMount()
 				if err != nil {
-					log.Err(err).Msgf("Error removing volume %s", vol.Name())
+					log.Err(err).Msgf("Error unmounting pool %s", pool.Name())
 					return err
 				}
-				// if there is only 1 volume, unmount and shutdown pool
-				if len(volumes) == 1 {
-					err = pool.UnMount()
-					if err != nil {
-						log.Err(err).Msgf("Error unmounting pool %s", pool.Name())
-						return err
-					}
-					err = pool.Shutdown()
-					if err != nil {
-						log.Err(err).Msgf("Error shutting down pool %s", pool.Name())
-						return err
-					}
+				err = pool.Shutdown()
+				if err != nil {
+					log.Err(err).Msgf("Error shutting down pool %s", pool.Name())
+					return err
 				}
 			}
+
+			return nil
 		}
 	}
 
@@ -459,29 +477,29 @@ func (s *Module) ListFilesystems() ([]pkg.Filesystem, error) {
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *Module) Path(name string) (pkg.Filesystem, error) {
-	_, fs, err := s.path(name)
+	_, _, fs, err := s.path(name)
 	return fs, err
 }
 
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
-func (s *Module) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
+func (s *Module) path(name string) (filesystem.Pool, filesystem.Volume, pkg.Filesystem, error) {
 	for _, pool := range s.pools {
 		if _, mounted := pool.Mounted(); !mounted {
 			continue
 		}
 		filesystems, err := pool.Volumes()
 		if err != nil {
-			return nil, pkg.Filesystem{}, err
+			return nil, nil, pkg.Filesystem{}, err
 		}
 		for _, fs := range filesystems {
 			if fs.Name() == name {
 				usage, err := fs.Usage()
 				if err != nil {
-					return nil, pkg.Filesystem{}, err
+					return nil, nil, pkg.Filesystem{}, err
 				}
 
-				return pool, pkg.Filesystem{
+				return pool, fs, pkg.Filesystem{
 					ID:     fs.ID(),
 					FsType: fs.FsType(),
 					Name:   fs.Name(),
@@ -496,7 +514,7 @@ func (s *Module) path(name string) (filesystem.Pool, pkg.Filesystem, error) {
 		}
 	}
 
-	return nil, pkg.Filesystem{}, errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
+	return nil, nil, pkg.Filesystem{}, errors.Wrapf(os.ErrNotExist, "subvolume '%s' not found", name)
 }
 
 // VDiskFindCandidate find a suitbale location for creating a vdisk of the given size

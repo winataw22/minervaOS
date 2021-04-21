@@ -3,22 +3,19 @@ package substrate
 import (
 	"crypto/ed25519"
 	"fmt"
-	"strconv"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
 )
 
-type substrateUsers struct {
+type substrateTwins struct {
 	sub Substrate
 	mem *lru.Cache
 }
 
-// NewSubstrateUsers creates a substrate users db that implements the provision.Users interface.
-func NewSubstrateUsers(url string) (provision.Users, error) {
+// NewSubstrateTwins creates a substrate users db that implements the provision.Users interface.
+func NewSubstrateTwins(url string) (provision.Twins, error) {
 	sub, err := NewSubstrate(url)
 	if err != nil {
 		return nil, err
@@ -29,28 +26,23 @@ func NewSubstrateUsers(url string) (provision.Users, error) {
 		return nil, err
 	}
 
-	return &substrateUsers{
+	return &substrateTwins{
 		sub: sub,
 		mem: cache,
 	}, nil
 }
 
-func (s *substrateUsers) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
+func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
 	if value, ok := s.mem.Get(id); ok {
 		return value.(ed25519.PublicKey), nil
 	}
 
-	idUint, err := strconv.ParseUint(id.String(), 10, 32)
+	user, err := s.sub.GetTwin(id)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse user id '%s'", id.String())
+		return nil, errors.Wrapf(err, "could not get user with id '%d'", id)
 	}
 
-	user, err := s.sub.GetUser(uint32(idUint))
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get user with id '%d'", idUint)
-	}
-
-	key := user.Address.PublicKey()
+	key := user.Account.PublicKey()
 	s.mem.Add(id, key)
 	return key, nil
 }
@@ -58,12 +50,12 @@ func (s *substrateUsers) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
 type substrateAdmins struct {
 	sub  Substrate
 	twin uint32
-	mem  *lru.Cache
+	pk   ed25519.PublicKey
 }
 
-// NewSubstrateAdmins creates a substrate users db that implements the provision.Users interface.
+// NewSubstrateAdmins creates a substrate twins db that implements the provision.Users interface.
 // but it also make sure the user is an admin
-func NewSubstrateAdmins(url string, farmID uint32) (provision.Users, error) {
+func NewSubstrateAdmins(url string, farmID uint32) (provision.Twins, error) {
 	sub, err := NewSubstrate(url)
 	if err != nil {
 		return nil, err
@@ -74,51 +66,21 @@ func NewSubstrateAdmins(url string, farmID uint32) (provision.Users, error) {
 		return nil, errors.Wrap(err, "failed to get farm")
 	}
 
-	cache, err := lru.New(128)
+	twin, err := sub.GetTwin(uint32(farm.TwinID))
 	if err != nil {
 		return nil, err
 	}
-
 	return &substrateAdmins{
 		sub:  sub,
 		twin: uint32(farm.TwinID),
-		mem:  cache,
+		pk:   twin.Account.PublicKey(),
 	}, nil
 }
 
-func (s *substrateAdmins) GetKey(id gridtypes.ID) (ed25519.PublicKey, error) {
-	if value, ok := s.mem.Get(id); ok {
-		return value.(ed25519.PublicKey), nil
+func (s *substrateAdmins) GetKey(id uint32) (ed25519.PublicKey, error) {
+	if id != s.twin {
+		return nil, fmt.Errorf("twin with id '%d' is not an admin", id)
 	}
 
-	idUint, err := strconv.ParseUint(id.String(), 10, 32)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse user id '%s'", id.String())
-	}
-
-	user, err := s.sub.GetUser(uint32(idUint))
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get user with id '%d'", idUint)
-	}
-
-	key := user.Address.PublicKey()
-
-	twin, err := s.sub.GetTwin(s.twin)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get twin object")
-	}
-	found := false
-	for _, entry := range twin.Entities {
-		if entry.EntityID == types.U32(idUint) {
-			found = true
-			break
-		}
-	}
-
-	if found {
-		s.mem.Add(id, key)
-		return key, nil
-	}
-
-	return nil, fmt.Errorf("user is not a twin manager")
+	return s.pk, nil
 }

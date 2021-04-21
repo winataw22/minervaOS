@@ -131,8 +131,7 @@ type Networker interface {
 // Network type
 type Network struct {
 	zos.Network
-	NetID             NetID  `json:"net_id"`
-	WGPrivateKeyPlain string `json:"wireguard_private_key"`
+	NetID NetID `json:"net_id"`
 }
 
 // NetID type

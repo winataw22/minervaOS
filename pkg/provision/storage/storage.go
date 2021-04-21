@@ -6,48 +6,22 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
+	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/versioned"
 )
 
-const (
-	pathByID   = "by-id"
-	pathByType = "by-type"
-	pathByUser = "by-user"
-)
-
 var (
-	// workloadSchemaV1 reservation schema version 1
-	workloadSchemaV1 = versioned.MustParse("1.0.0")
+	// deploymentSchemaV1 reservation schema version 1
+	deploymentSchemaV1 = versioned.MustParse("1.0.0")
 	// ReservationSchemaLastVersion link to latest version
-	workloadSchemaLastVersion = workloadSchemaV1
-
-	typeIDfn = map[gridtypes.WorkloadType]func(*gridtypes.Workload) (string, error){
-		zos.NetworkType: networkTypeID,
-	}
+	deploymentSchemaLastVersion = deploymentSchemaV1
 )
-
-func networkTypeID(w *gridtypes.Workload) (string, error) {
-	var name struct {
-		Name string `json:"name"`
-	}
-
-	err := json.Unmarshal(w.Data, &name)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to load network name")
-	}
-	if len(name.Name) == 0 {
-		return "", fmt.Errorf("empty network name")
-	}
-
-	return string(zos.NetworkID(w.User.String(), name.Name)), nil
-}
 
 // Fs is a in reservation cache using the filesystem as backend
 type Fs struct {
@@ -63,81 +37,27 @@ func NewFSStore(root string) (*Fs, error) {
 		root: root,
 	}
 
-	for _, p := range []string{pathByID, pathByType, pathByUser} {
-		if err := os.MkdirAll(filepath.Join(root, p), 0770); err != nil {
-			return nil, err
-		}
+	if err := os.MkdirAll(root, 0770); err != nil {
+		return nil, err
 	}
 
 	return store, nil
 }
 
-func (s *Fs) pathByID(id gridtypes.ID) string {
-	// NOTE this depends on the validID has been executed on this wl
-	return filepath.Join(pathByID, id[:2].String(), id[2:4].String(), id.String())
-}
-
-func (s *Fs) pathByType(wl *gridtypes.Workload) (string, error) {
-	// by types is different than by id in 2 aspects
-	// 1- it prefix the path with `by-type/<type>`
-	// 2- the second and not so obvious difference is that
-	// it doesn't use the workload.ID instead it uses the id
-	// calculated based on the type. It falls back to workload.ID
-	// if no custom id method for that type.
-	id := wl.ID.String()
-	fn, ok := typeIDfn[wl.Type]
-	if ok {
-		var err error
-		id, err = fn(wl)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	return filepath.Join(pathByType, wl.Type.String(), id), nil
-}
-
-func (s *Fs) pathByUser(wl *gridtypes.Workload) string {
-	return filepath.Join(pathByUser, wl.User.String())
+func (s *Fs) deploymentPath(d *gridtypes.Deployment) string {
+	return filepath.Join(fmt.Sprint(d.TwinID), fmt.Sprint(d.DeploymentID))
 }
 
 func (s *Fs) rooted(p ...string) string {
 	return filepath.Join(s.root, filepath.Join(p...))
 }
 
-func (s *Fs) symlink(from, to string) error {
-	dir := filepath.Dir(from)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return errors.Wrapf(err, "failed to create base dir '%s'", dir)
-	}
-
-	rel, err := filepath.Rel(filepath.Dir(from), to)
-	if err != nil {
-		return err
-	}
-
-	if err := os.Remove(from); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to cleanup link")
-	}
-
-	return os.Symlink(rel, from)
-}
-
 // Add workload to database
-func (s *Fs) Add(wl gridtypes.Workload) error {
+func (s *Fs) Add(d gridtypes.Deployment) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if err := s.validID(wl.ID); err != nil {
-		return err
-	}
-
-	byType, err := s.pathByType(&wl)
-	if err != nil {
-		return err
-	}
-
-	path := s.rooted(s.pathByID(wl.ID))
+	path := s.rooted(s.deploymentPath(&d))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return errors.Wrap(err, "failed to crate directory")
 	}
@@ -149,41 +69,19 @@ func (s *Fs) Add(wl gridtypes.Workload) error {
 	)
 
 	if os.IsExist(err) {
-		return errors.Wrapf(provision.ErrWorkloadExists, "object '%s' exist", wl.ID)
+		return errors.Wrapf(provision.ErrDeploymentExists, "object '%d' exist", d.DeploymentID)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to open workload file")
 	}
+
 	defer file.Close()
-	writer, err := versioned.NewWriter(file, workloadSchemaLastVersion)
+	writer, err := versioned.NewWriter(file, deploymentSchemaLastVersion)
 	if err != nil {
 		return errors.Wrap(err, "failed to create versioned writer")
 	}
 
-	if err := json.NewEncoder(writer).Encode(wl); err != nil {
+	if err := json.NewEncoder(writer).Encode(d); err != nil {
 		return errors.Wrap(err, "failed to write workload data")
-	}
-
-	for _, link := range []string{
-		s.rooted(byType),
-		s.rooted(s.pathByUser(&wl), s.pathByID(wl.ID)),
-		s.rooted(s.pathByUser(&wl), byType),
-	} {
-		if err := s.symlink(link, path); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Fs) validID(id gridtypes.ID) error {
-	if len(id) < 4 {
-		// invalid id length.
-		return fmt.Errorf("invalid id length")
-	}
-
-	if strings.ContainsRune(string(id), filepath.Separator) {
-		return fmt.Errorf("invalid id format")
 	}
 
 	return nil
@@ -191,28 +89,28 @@ func (s *Fs) validID(id gridtypes.ID) error {
 
 // Set updates value of a workload, the reservation must exists
 // otherwise an error is returned
-func (s *Fs) Set(wl gridtypes.Workload) error {
+func (s *Fs) Set(dl gridtypes.Deployment) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	path := s.rooted(s.pathByID(wl.ID))
+	path := s.rooted(s.deploymentPath(&dl))
 	file, err := os.OpenFile(
 		path,
 		os.O_WRONLY|os.O_TRUNC,
 		0644,
 	)
 	if os.IsNotExist(err) {
-		return errors.Wrapf(provision.ErrWorkloadNotExists, "object '%s' does not exist", wl.ID)
+		return errors.Wrapf(provision.ErrDeploymentNotExists, "deployment '%d:%d' does not exist", dl.TwinID, dl.DeploymentID)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to open workload file")
 	}
 	defer file.Close()
-	writer, err := versioned.NewWriter(file, workloadSchemaLastVersion)
+	writer, err := versioned.NewWriter(file, deploymentSchemaLastVersion)
 	if err != nil {
 		return errors.Wrap(err, "failed to create versioned writer")
 	}
 
-	if err := json.NewEncoder(writer).Encode(wl); err != nil {
+	if err := json.NewEncoder(writer).Encode(dl); err != nil {
 		return errors.Wrap(err, "failed to write workload data")
 	}
 
@@ -220,14 +118,14 @@ func (s *Fs) Set(wl gridtypes.Workload) error {
 }
 
 // Get gets a workload by id
-func (s *Fs) get(path string) (gridtypes.Workload, error) {
+func (s *Fs) get(path string) (gridtypes.Deployment, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
 
-	var wl gridtypes.Workload
+	var wl gridtypes.Deployment
 	file, err := os.Open(path)
 	if os.IsNotExist(err) {
-		return wl, errors.Wrapf(provision.ErrWorkloadNotExists, "object '%s' does not exist", wl.ID)
+		return wl, errors.Wrapf(provision.ErrDeploymentNotExists, "deployment '%s' does not exist", path)
 	} else if err != nil {
 		return wl, errors.Wrap(err, "failed to open workload file")
 	}
@@ -237,7 +135,7 @@ func (s *Fs) get(path string) (gridtypes.Workload, error) {
 		return wl, errors.Wrap(err, "failed to load workload")
 	}
 	version := reader.Version()
-	if !version.EQ(workloadSchemaV1) {
+	if !version.EQ(deploymentSchemaV1) {
 		return wl, fmt.Errorf("invalid workload version")
 	}
 
@@ -249,74 +147,61 @@ func (s *Fs) get(path string) (gridtypes.Workload, error) {
 }
 
 // Get gets a workload by id
-func (s *Fs) Get(id gridtypes.ID) (gridtypes.Workload, error) {
-	if err := s.validID(id); err != nil {
-		return gridtypes.Workload{}, err
-	}
+func (s *Fs) Get(twin, deployment uint32) (gridtypes.Deployment, error) {
+	path := s.rooted(filepath.Join(fmt.Sprint(twin), fmt.Sprint(deployment)))
 
-	path := s.rooted(s.pathByID(id))
 	return s.get(path)
 }
 
-func (s *Fs) byType(base string, t gridtypes.WorkloadType) ([]gridtypes.ID, error) {
-	s.m.RLock()
-	defer s.m.RUnlock()
+// ByTwin return list of deployment for given twin id
+func (s *Fs) ByTwin(twin uint32) ([]uint32, error) {
+	base := filepath.Join(s.root, fmt.Sprint(twin))
 
-	dir := filepath.Join(base, pathByType, t.String())
-	entries, err := ioutil.ReadDir(dir)
+	entities, err := ioutil.ReadDir(base)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to list twin directory")
 	}
-	var results []gridtypes.ID
-	for _, entry := range entries {
-		if entry.Mode()&os.ModeSymlink == 0 {
+	ids := make([]uint32, 0, len(entities))
+	for _, entry := range entities {
+		if entry.IsDir() {
 			continue
 		}
-		target, err := os.Readlink(filepath.Join(dir, entry.Name()))
+
+		id, err := strconv.ParseUint(entry.Name(), 10, 32)
 		if err != nil {
-			return nil, err
+			log.Error().Str("name", entry.Name()).Err(err).Msg("invalid deployment id file")
+			continue
 		}
-		results = append(results, gridtypes.ID(filepath.Base(target)))
+
+		ids = append(ids, uint32(id))
 	}
 
-	return results, nil
+	return ids, nil
 }
 
-// ByType return list of reservation ids by type
-func (s *Fs) ByType(t gridtypes.WorkloadType) ([]gridtypes.ID, error) {
-	return s.byType(s.root, t)
-}
-
-// ByUser return list of reservation for a certain user by type
-func (s *Fs) ByUser(user gridtypes.ID, t gridtypes.WorkloadType) ([]gridtypes.ID, error) {
-	base := filepath.Join(s.root, pathByUser, user.String())
-	return s.byType(base, t)
-}
-
-// GetNetwork returns network object given network id
-func (s *Fs) GetNetwork(id zos.NetID) (gridtypes.Workload, error) {
-	path := filepath.Join(s.root, pathByType, zos.NetworkType.String(), id.String())
-	return s.get(path)
-}
-
-// Users lists available users
-func (s *Fs) Users() ([]gridtypes.ID, error) {
-	path := filepath.Join(s.root, pathByUser)
-	entities, err := ioutil.ReadDir(path)
+// Twins lists available users
+func (s *Fs) Twins() ([]uint32, error) {
+	entities, err := ioutil.ReadDir(s.root)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
-		return nil, errors.Wrap(err, "failed to list users directory")
+		return nil, errors.Wrap(err, "failed to list twins directory")
 	}
-	ids := make([]gridtypes.ID, 0, len(entities))
+	ids := make([]uint32, 0, len(entities))
 	for _, entry := range entities {
 		if !entry.IsDir() {
 			continue
 		}
 
-		ids = append(ids, gridtypes.ID(entry.Name()))
+		id, err := strconv.ParseUint(entry.Name(), 10, 32)
+		if err != nil {
+			log.Error().Str("name", entry.Name()).Err(err).Msg("invalid twin id directory")
+			continue
+		}
+
+		ids = append(ids, uint32(id))
 	}
 
 	return ids, nil

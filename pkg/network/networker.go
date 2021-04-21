@@ -648,7 +648,7 @@ func (n *networker) CreateNR(netNR pkg.Network) (string, error) {
 		var wg *wireguard.Wireguard
 		wg, err = public.NewWireguard(wgName)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to create wg interface for network resource '%s'", netNR.Name)
+			return "", errors.Wrapf(err, "failed to create wg interface for network resource '%s'", netNR.NetID)
 		}
 		if err = netr.SetWireguard(wg); err != nil {
 			return "", errors.Wrap(err, "failed to setup wireguard interface for network resource")
@@ -659,7 +659,7 @@ func (n *networker) CreateNR(netNR pkg.Network) (string, error) {
 		return "", errors.Wrapf(err, "failed to attach network resource to DMZ bridge")
 	}
 
-	if err = netr.ConfigureWG(netNR.WGPrivateKeyPlain); err != nil {
+	if err = netr.ConfigureWG(netNR.WGPrivateKey); err != nil {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
@@ -770,10 +770,6 @@ func (n *networker) networkOf(id string) (nr pkg.Network, err error) {
 		}
 	} else {
 		return nr, fmt.Errorf("unknown network object version (%s)", version)
-	}
-
-	if err := net.Valid(); err != nil {
-		return net, errors.Wrapf(err, "failed to validate cached network resource: %s", net.NetID)
 	}
 
 	return net, nil

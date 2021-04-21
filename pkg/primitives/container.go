@@ -31,18 +31,19 @@ type Container = zos.Container
 // ContainerResult type alias
 type ContainerResult = zos.ContainerResult
 
-func (p *Primitives) containerProvision(ctx context.Context, wl *gridtypes.Workload) (interface{}, error) {
+func (p *Primitives) containerProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.containerProvisionImpl(ctx, wl)
 }
 
 // ContainerProvision is entry point to container reservation
-func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.Workload) (ContainerResult, error) {
+func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (ContainerResult, error) {
+	deployement := provision.GetDeployment(ctx)
 	var (
 		containerClient = stubs.NewContainerModuleStub(p.zbus)
 		flistClient     = stubs.NewFlisterStub(p.zbus)
 		storageClient   = stubs.NewStorageModuleStub(p.zbus)
 		networkMgr      = stubs.NewNetworkerStub(p.zbus)
-		tenantNS        = fmt.Sprintf("ns%s", wl.User)
+		tenantNS        = fmt.Sprintf("ns%d", deployement.TwinID)
 		containerID     = wl.ID
 	)
 
@@ -64,8 +65,9 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 	if err := validateContainerConfig(config); err != nil {
 		return ContainerResult{}, errors.Wrap(err, "container provision schema not valid")
 	}
+	deployment := provision.GetDeployment(ctx)
 
-	netID := zos.NetworkID(wl.User.String(), config.Network.NetworkID)
+	netID := zos.NetworkID(deployment.TwinID, config.Network.Network)
 	log.Debug().
 		Str("network-id", string(netID)).
 		Str("config", fmt.Sprintf("%+v", config)).
@@ -73,19 +75,19 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 
 		// check to make sure the network is already installed on the node
 	if _, err := networkMgr.GetSubnet(netID); err != nil {
-		return ContainerResult{}, fmt.Errorf("network %s is not installed on this node", config.Network.NetworkID)
+		return ContainerResult{}, fmt.Errorf("network %s is not installed on this node", config.Network.Network)
 	}
 
-	cache := provision.GetEngine(ctx).Storage()
+	//cache := provision.GetEngine(ctx).Storage()
+
 	// check to make sure the requested volume are accessible
 	for _, mount := range config.Mounts {
-		volumeRes, err := cache.Get(gridtypes.ID(mount.VolumeID))
+		volume, err := deployment.GetType(mount.Volume, zos.VolumeType)
 		if err != nil {
-			return ContainerResult{}, errors.Wrapf(err, "failed to retrieve the owner of volume %s", mount.VolumeID)
+			return ContainerResult{}, err
 		}
-
-		if volumeRes.User != wl.User {
-			return ContainerResult{}, fmt.Errorf("cannot use volume %s, user %s is not the owner of it", mount.VolumeID, wl.User)
+		if !volume.IsResult(gridtypes.StateOk) {
+			return ContainerResult{}, fmt.Errorf("volume '%s' is in wrong state", mount.Volume)
 		}
 	}
 
@@ -95,37 +97,13 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	for k, v := range config.SecretEnv {
-		v, err := p.decryptSecret(ctx, wl.User, v, wl.Version)
-		if err != nil {
-			return ContainerResult{}, errors.Wrapf(err, "failed to decrypt secret env var '%s'", k)
-		}
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-
 	var logs []logger.Logs
 	for _, log := range config.Logs {
-		stdout := log.Data.Stdout
-		stderr := log.Data.Stderr
-
-		if len(log.Data.SecretStdout) > 0 {
-			stdout, err = p.decryptSecret(ctx, wl.User, log.Data.SecretStdout, wl.Version)
-			if err != nil {
-				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
-			}
-		}
-
-		if len(log.Data.SecretStderr) > 0 {
-			stderr, err = p.decryptSecret(ctx, wl.User, log.Data.SecretStderr, wl.Version)
-			if err != nil {
-				return ContainerResult{}, errors.Wrap(err, "failed to decrypt log.secret_stdout var")
-			}
-		}
 		logs = append(logs, logger.Logs{
 			Type: log.Type,
 			Data: logger.LogsRedis{
-				Stdout: stdout,
-				Stderr: stderr,
+				Stdout: log.Data.Stdout,
+				Stderr: log.Data.Stderr,
 			},
 		})
 	}
@@ -184,19 +162,26 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 		elevated = true
 	}
 
+	//deployment := provision.GetDeployment(ctx)
 	// prepare mount info for volumes
 	var mounts []pkg.MountInfo
 	for _, mount := range config.Mounts {
 		// we make sure that mountpoint in config doesn't have relative parts
 		mountpoint := path.Join("/", mount.Mountpoint)
 
+		// volume, err := deployment.Get(mount.Volume)
 		if err := os.MkdirAll(path.Join(mnt, mountpoint), 0755); err != nil {
 			return ContainerResult{}, err
 		}
 		var source pkg.Filesystem
-		source, err = storageClient.Path(mount.VolumeID)
+		volume, err := deployment.GetType(mount.Volume, zos.VolumeType)
 		if err != nil {
-			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume %s", mount.VolumeID)
+			return ContainerResult{}, errors.Wrap(err, "failed to get volume workload")
+		}
+
+		source, err = storageClient.Path(volume.ID.String())
+		if err != nil {
+			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume '%s'", mount.Volume)
 		}
 
 		mounts = append(
@@ -264,12 +249,13 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 	}, nil
 }
 
-func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.Workload) error {
+func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	deployment := provision.GetDeployment(ctx)
+
 	container := stubs.NewContainerModuleStub(p.zbus)
 	flist := stubs.NewFlisterStub(p.zbus)
 	networkMgr := stubs.NewNetworkerStub(p.zbus)
-
-	tenantNS := fmt.Sprintf("ns%s", wl.User)
+	tenantNS := fmt.Sprintf("ns%d", deployment.TwinID)
 	containerID := pkg.ContainerID(wl.ID)
 
 	var config Container
@@ -299,7 +285,7 @@ func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.Wo
 		log.Error().Err(err).Str("container", string(containerID)).Msg("failed to inspect container for decomission")
 	}
 
-	netID := zos.NetworkID(wl.User.String(), string(config.Network.NetworkID))
+	netID := zos.NetworkID(deployment.TwinID, string(config.Network.Network))
 	if _, err := networkMgr.GetSubnet(netID); err == nil { // simple check to make sure the network still exists on the node
 		if err := networkMgr.Leave(netID, string(containerID)); err != nil {
 			return errors.Wrap(err, "failed to delete container network namespace")
@@ -349,7 +335,7 @@ func (p *Primitives) waitContainerIP(ctx context.Context, ifaceName, namespace s
 }
 
 func validateContainerConfig(config Container) error {
-	if config.Network.NetworkID == "" {
+	if config.Network.Network == "" {
 		return fmt.Errorf("network ID cannot be empty")
 	}
 

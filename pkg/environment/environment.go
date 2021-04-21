@@ -31,11 +31,11 @@ type RunningMode string
 
 func (r RunningMode) String() string {
 	switch r {
-	case RunningDev3:
+	case RunningDev:
 		return "development"
 	case RunningMain:
 		return "production"
-	case RunningTest3:
+	case RunningTest:
 		return "testing"
 	}
 
@@ -45,10 +45,10 @@ func (r RunningMode) String() string {
 // Possible running mode of a node
 const (
 	//RunningDev   RunningMode = "dev"
-	RunningDev3 RunningMode = "dev3"
+	RunningDev RunningMode = "dev"
 	//RunningTest  RunningMode = "test"
-	RunningTest3 RunningMode = "test3"
-	RunningMain  RunningMode = "prod"
+	RunningTest RunningMode = "test"
+	RunningMain RunningMode = "prod"
 
 	// Orphanage is the default farmid where nodes are registered
 	// if no farmid were specified on the kernel command line
@@ -59,14 +59,14 @@ const (
 
 var (
 	envDev = Environment{
-		RunningMode:  RunningDev3,
+		RunningMode:  RunningDev,
 		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
 		FlistURL:     "zdb://hub.grid.tf:9900",
 		BinRepo:      "tf-zos-bins.dev",
 	}
 
 	envTest = Environment{
-		RunningMode: RunningTest3,
+		RunningMode: RunningTest,
 		// TODO: this should become a different substrate ?
 		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
 		FlistURL:     "zdb://hub.grid.tf:9900",
@@ -115,9 +115,9 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	}
 
 	switch RunningMode(runmode[0]) {
-	case RunningDev3:
+	case RunningDev:
 		env = envDev
-	case RunningTest3:
+	case RunningTest:
 		env = envTest
 	case RunningMain:
 		env = envProd
@@ -143,9 +143,9 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		env.Orphan = true
 
 		switch env.RunningMode {
-		case RunningDev3:
+		case RunningDev:
 			env.FarmerID = OrphanageDev
-		case RunningTest3:
+		case RunningTest:
 			env.FarmerID = OrphanageTest
 		case RunningMain:
 			env.FarmerID = OrphanageMain

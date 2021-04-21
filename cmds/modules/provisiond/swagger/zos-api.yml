@@ -1,0 +1,500 @@
+---
+openapi: 3.0.0
+info:
+  description: "Threefold ZOS API"
+  version: "0.5.0"
+  title: "ZOS"
+  termsOfService: "https://threefold.io/info/legal#/legal__terms_conditions_websites"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+tags:
+  - name: "deployment"
+    description: "Api to run deployments on node"
+    # externalDocs:
+    #   description: "Find out more"
+    #   url: "http://swagger.io"
+  - name: "network"
+    description: "Api to view or modify node networking"
+  - name: "statistics"
+    description: "view on node load"
+servers:
+  - url: "/api/v1"
+    description: "base url"
+paths:
+  /deployment:
+    post:
+      tags:
+        - "deployment"
+      summary: "Add a new pet to the store"
+      description: ""
+      operationId: "addDeployment"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Deployment"
+      security:
+        - user: []
+      responses:
+        "405":
+          description: "Invalid input"
+        "202":
+          description: "Accepted"
+    put:
+      tags:
+        - "deployment"
+      summary: "Update an existing pet"
+      description: ""
+      operationId: "updatePet"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Deployment"
+      security:
+        - user: []
+      responses:
+        "202":
+          description: "Accepted"
+  /deployment/{twin}/{id}:
+    get:
+      tags:
+        - "deployment"
+      summary: "get deployment by "
+      description: ""
+      operationId: "getDeployment"
+      parameters:
+        - name: "twin"
+          in: "path"
+          description: "twin id"
+          required: true
+          schema:
+            type: integer
+            format: uint32
+        - name: "id"
+          in: "path"
+          description: "deployment id"
+          required: true
+          schema:
+            type: integer
+            format: uint32
+      security:
+        - user: []
+      responses:
+        "404":
+          description: "deployment not found"
+        "202":
+          description: "return deployment"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+    delete:
+      tags:
+        - "deployment"
+      summary: "delete a full deployment"
+      description: ""
+      operationId: "deleteDeployment"
+      parameters:
+        - name: "twin"
+          in: "path"
+          description: "twin id"
+          required: true
+          schema:
+            type: integer
+            format: uint32
+        - name: "id"
+          in: "path"
+          description: "deployment id"
+          required: true
+          schema:
+            type: integer
+            format: uint32
+      security:
+        - user: []
+      responses:
+        "202":
+          description: "Accepted"
+        "404":
+          description: "Deployment not found"
+  /network/wireguard:
+    get:
+      tags:
+        - "network"
+      summary: "get used node wireguard ports"
+      description: "return a list of reserved wireguard ports on the node"
+      operationId: "listWireguardPorts"
+      responses:
+        "200":
+          description: "a list of reserved ports"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: uint16
+  /network/config/public:
+    get:
+      tags:
+        - "network"
+      summary: "get node public IP config"
+      description: "the node public ip config if set means the node can be used as an access point"
+      operationId: "getPublicConfig"
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicConfig"
+    post:
+      tags:
+        - "network"
+      summary: "set node public IP config"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicConfig"
+      security:
+        - farmer: []
+      responses:
+        "201":
+          description: "created"
+  /counters:
+    get:
+      tags:
+        - "statistics"
+      responses:
+        "200":
+          description: "counters"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    $ref: "#/components/schemas/Capacity"
+                  used:
+                    $ref: "#/components/schemas/Capacity"
+components:
+  securitySchemes:
+    user:
+      type: apiKey
+      in: header
+      name: "authorization"
+      description: "HTTPSIG https://tools.ietf.org/html/draft-cavage-http-signatures-08"
+    farmer:
+      type: apiKey
+      in: header
+      name: "authorization"
+      description: "Also httpsig bug only allows farmer twin calls"
+  schemas:
+    SignatureRequest:
+      type: "object"
+      properties:
+        twin_id:
+          type: integer
+          format: int32
+        required:
+          type: boolean
+        weight:
+          type: integer
+          format: uint
+    Signature:
+      type: "object"
+      properties:
+        twin_id:
+          type: integer
+          format: int32
+        signature:
+          type: string
+    SignatureRequirement:
+      type: "object"
+      properties:
+        weight_required:
+          type: integer
+          format: uint
+        requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/SignatureRequest"
+        signatures:
+          type: array
+          items:
+            $ref: "#/components/schemas/Signature"
+    Result:
+      type: "object"
+      readOnly: true
+      properties:
+        created:
+          type: integer
+          format: int64
+          description: creation timestamp
+        state:
+          type: string
+          description: status of result. if error, check error for message.
+          enum:
+            - ok
+            - error
+            - deleted
+        error:
+          type: string
+        data:
+          type: object
+          description: "result of workload deployment, dependens on the type"
+    Workload:
+      type: "object"
+      properties:
+        version:
+          type: "integer"
+          format: int32
+        name:
+          type: string
+          description: "unique workload name per deployment"
+        type:
+          type: string
+          description: "defines the type of the workload"
+          enum:
+            - container
+            - volume
+            - network
+            - zdb
+            - kubernetes
+            - ipv4
+        metadata:
+          type: "string"
+          example: "user specific metadata"
+        description:
+          type: "string"
+          example: "human readable description of workload"
+        result:
+          $ref: "#/components/schemas/Result"
+        data:
+          oneOf:
+            - $ref: "#/components/schemas/Volume"
+            - $ref: "#/components/schemas/ZDB"
+            - $ref: "#/components/schemas/Container"
+            - $ref: "#/components/schemas/PublicIP"
+            - $ref: "#/components/schemas/Kubernetes"
+    Deployment:
+      type: "object"
+      properties:
+        version:
+          type: "integer"
+          format: "int32"
+        twin_id:
+          type: "integer"
+          format: "int32"
+        deployment_id:
+          type: "integer"
+          format: "int32"
+        metadata:
+          type: "string"
+          example: "user specific metadata"
+        description:
+          type: "string"
+          example: "human readable description of deployment"
+        expiration:
+          type: "integer"
+          format: "int64"
+        signature_requirement:
+          $ref: "#/components/schemas/SignatureRequirement"
+        workloads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Workload"
+    Volume:
+      type: object
+      properties:
+        size:
+          type: integer
+          format: uint64
+        type:
+          type: string
+          enum:
+            - ssd
+            - hdd
+    ZDB:
+      type: object
+      properties:
+        size:
+          type: integer
+          format: uint64
+        disk_type:
+          type: string
+          enum:
+            - ssd
+            - hdd
+        mode:
+          type: string
+          enum:
+            - user
+            - seq
+        password:
+          type: string
+        public:
+          type: boolean
+    PublicIP:
+      type: object
+      properties:
+        ip:
+          type: string
+          format: cidr
+        gateway:
+          type: string
+          format: ip
+          description: |
+            this value here is a temporary solution to the lack of a farmer twin. Hence this information
+            should be provided by the farmer (actually both Ip and Gw should be) so for now the user has
+            to provide the exact value that is setup for this IP in the farmer network.
+    Container:
+      type: object
+      properties:
+        flist:
+          type: string
+        hub_url:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        entrypoint:
+          type: string
+        mounts:
+          type: array
+          items:
+            type: object
+            properties:
+              volume:
+                type: string
+              mountpoint:
+                type: string
+        network:
+          type: object
+          properties:
+            network:
+              type: string
+            ips:
+              type: array
+              items:
+                type: string
+                format: cidr
+            public_ip6:
+              type: boolean
+            yggdrasil_ip:
+              type: boolean
+        capacity:
+          type: object
+          properties:
+            cpu:
+              type: integer
+              format: uint
+            memory:
+              type: integer
+              description: memory in megabytes
+              format: uint64
+            disk_type:
+              type: string
+              enum:
+                - ssd
+                - hdd
+            disk_size:
+              type: integer
+              format: uint64
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum:
+                  - redis
+              data:
+                type: object
+                properties:
+                  stdout:
+                    type: string
+                  stderr:
+                    type: string
+    Kubernetes:
+      type: "object"
+      properties:
+        size:
+          type: integer
+          format: uint
+        network_id:
+          type: string
+        ip:
+          type: string
+          format: ip
+        cluster_secret:
+          type: string
+        master_ips:
+          description: "list of master Ips, if empty then this vm is master"
+          type: array
+          items:
+            type: string
+            format: ip
+        ssh_keys:
+          type: array
+          items:
+            type: string
+        public_ip:
+          description: "name of the public Ip reservation in this deployment"
+          type: string
+        datastore_endpoint:
+          type: string
+        disable_default_ingress:
+          type: boolean
+    PublicConfig:
+      type: "object"
+      properties:
+        type:
+          type: string
+          enum:
+            - macvlan
+        ipv4:
+          type: string
+          format: cidr
+        ipv6:
+          type: string
+          format: cidr
+        gw4:
+          type: string
+          format: ip
+        gw6:
+          type: string
+          format: ip
+    Capacity:
+      type: "object"
+      description: "statistics about used capacity"
+      properties:
+        cru:
+          type: integer
+          format: uint64
+        mru:
+          type: integer
+          format: uint64
+        hru:
+          type: integer
+          format: uint64
+        sru:
+          type: integer
+          format: uint64
+        ipv4u:
+          type: integer
+          format: uint64
+    ErrorResponse:
+      type: "object"
+      properties:
+        error:
+          type: "string"
+externalDocs:
+  description: "Find out more about Swagger"
+  url: "http://swagger.io"

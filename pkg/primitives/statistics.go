@@ -82,7 +82,7 @@ func (s *Statistics) hasEnoughCapacity(used *gridtypes.Capacity, required *gridt
 }
 
 // Provision implements the provisioner interface
-func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.Workload) (*gridtypes.Result, error) {
+func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (*gridtypes.Result, error) {
 	current := s.Current()
 	needed, err := wl.Capacity()
 	if err != nil {
@@ -100,7 +100,7 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.Workload) (*gr
 	}
 
 	if result.State == gridtypes.StateOk {
-		if err := s.counters.Increment(wl); err != nil {
+		if err := s.counters.Increment(wl.Workload); err != nil {
 			log.Error().Err(err).Msg("failed to increment statistics counter")
 		}
 	}
@@ -109,16 +109,26 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.Workload) (*gr
 }
 
 // Decommission implements the decomission interface
-func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.Workload) error {
+func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	if err := s.inner.Decommission(ctx, wl); err != nil {
 		return err
 	}
 
-	if err := s.counters.Decrement(wl); err != nil {
+	if err := s.counters.Decrement(wl.Workload); err != nil {
 		log.Error().Err(err).Msg("failed to decrement statistics counter")
 	}
 
 	return nil
+}
+
+// Update implements the provisioner interface
+func (s *Statistics) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (*gridtypes.Result, error) {
+	return s.inner.Update(ctx, wl)
+}
+
+// CanUpdate implements the provisioner interface
+func (s *Statistics) CanUpdate(ctx context.Context, typ gridtypes.WorkloadType) bool {
+	return s.inner.CanUpdate(ctx, typ)
 }
 
 type statisticsAPI struct {

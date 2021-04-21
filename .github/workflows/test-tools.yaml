@@ -2,41 +2,41 @@ name: Tests and Coverage for tools
 on:
   push:
     paths:
-      - 'tools/**'
-      - '.github/workflows/test-tools.yaml'
+      - "tools/**"
+      - ".github/workflows/test-tools.yaml"
 
 jobs:
   tools:
     name: Running Tools Tests
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go 1.13
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.15
-      id: go
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+        id: go
 
-    - name: Checkout code into the Go module directory
-      uses: actions/checkout@v1
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v1
 
-    - name: Get dependencies
-      run: |
-        cd tools
-        make getdeps
-      env:
-        GO111MODULE: on
+      - name: Get dependencies
+        run: |
+          cd tools
+          make getdeps
+        env:
+          GO111MODULE: on
 
-    - name: Build tools
-      run: |
-        cd tools
-        make
-      env:
-        GO111MODULE: on
+      - name: Build tools
+        run: |
+          cd tools
+          make
+        env:
+          GO111MODULE: on
 
-    - name: Run tests
-      run: |
-        export PATH=/home/runner/go/bin:$PATH
-        cd tools
-        make test
-      env:
-        GO111MODULE: on
+      - name: Run tests
+        run: |
+          export PATH=/home/runner/go/bin:$PATH
+          cd tools
+          make test
+        env:
+          GO111MODULE: on

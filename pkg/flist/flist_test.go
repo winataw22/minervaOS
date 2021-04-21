@@ -39,6 +39,14 @@ func (s *StorageMock) CreateFilesystem(name string, size uint64, poolType pkg.De
 	}, args.Error(1)
 }
 
+// CreateFilesystem create filesystem mock
+func (s *StorageMock) UpdateFilesystem(name string, size uint64) (pkg.Filesystem, error) {
+	args := s.Called(name, size)
+	return pkg.Filesystem{
+		Path: args.String(0),
+	}, args.Error(1)
+}
+
 // ReleaseFilesystem releases filesystem mock
 func (s *StorageMock) ReleaseFilesystem(name string) error {
 	args := s.Called(name)

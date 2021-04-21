@@ -32,16 +32,13 @@ const (
 )
 
 // ZDB types
-type ZDB struct {
-	zos.ZDB
-	PasswordPlain string `json:"-"`
-}
+type ZDB = zos.ZDB
 
-func (p *Primitives) zdbProvision(ctx context.Context, wl *gridtypes.Workload) (interface{}, error) {
+func (p *Primitives) zdbProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.zdbProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workload) (zos.ZDBResult, error) {
+func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (zos.ZDBResult, error) {
 	var (
 		storage = stubs.NewZDBAllocaterStub(p.zbus)
 
@@ -50,12 +47,6 @@ func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workloa
 	)
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
 		return zos.ZDBResult{}, errors.Wrap(err, "failed to decode reservation schema")
-	}
-
-	var err error
-	config.PasswordPlain, err = p.decryptSecret(ctx, wl.User, config.PasswordEncrypted, wl.Version)
-	if err != nil {
-		return zos.ZDBResult{}, errors.Wrap(err, "failed to decrypt namespace password")
 	}
 
 	// if we reached here, we need to create the 0-db namespace
@@ -334,8 +325,8 @@ func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string
 		}
 	}
 
-	if config.PasswordPlain != "" {
-		if err := zdbCl.NamespaceSetPassword(nsID, config.PasswordPlain); err != nil {
+	if config.Password != "" {
+		if err := zdbCl.NamespaceSetPassword(nsID, config.Password); err != nil {
 			return errors.Wrapf(err, "failed to set password namespace %s in 0-db: %s", nsID, containerID)
 		}
 	}
@@ -351,7 +342,7 @@ func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string
 	return nil
 }
 
-func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.Workload) error {
+func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	var (
 		storage       = stubs.NewZDBAllocaterStub(p.zbus)
 		storageClient = stubs.NewStorageModuleStub(p.zbus)

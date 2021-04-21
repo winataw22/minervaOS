@@ -16,7 +16,7 @@ type Volume struct {
 }
 
 //Valid implements WorkloadData
-func (v Volume) Valid() error {
+func (v Volume) Valid(getter gridtypes.WorkloadGetter) error {
 	if v.Size == 0 {
 		return fmt.Errorf("invalid size")
 	}

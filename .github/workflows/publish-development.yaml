@@ -2,7 +2,7 @@ name: Release (development)
 on:
   push:
     branches:
-      - '*'
+      - "*"
     tags-ignore:
       - v*
 
@@ -11,57 +11,56 @@ jobs:
     name: Build and upload
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+        id: go
 
-    - name: Set up Go 1.15
-      uses: actions/setup-go@v1
-      with:
-        go-version: 1.15
-      id: go
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v1
 
-    - name: Checkout code into the Go module directory
-      uses: actions/checkout@v1
+      - name: Build binaries
+        run: |
+          cd cmds
+          make
+        env:
+          GO111MODULE: on
 
-    - name: Build binaries
-      run: |
-        cd cmds
-        make
-      env:
-        GO111MODULE: on
+      - name: Collecting files
+        run: |
+          scripts/collect.sh ${{ github.workspace }}/archive
 
-    - name: Collecting files
-      run: |
-        scripts/collect.sh ${{ github.workspace }}/archive
+      - name: Set name of the development build
+        id: setname
+        run: |
+          echo "::set-output name=build::zos:v$(date +%y%m%d.%-H%M%S.0)-dev.flist"
 
-    - name: Set name of the development build
-      id: setname
-      run: |
-        echo "::set-output name=build::zos:v$(date +%y%m%d.%-H%M%S.0)-dev.flist"
+      - name: Publish flist (${{ github.sha }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: publish
+          user: tf-autobuilder
+          root: archive
+          name: zos-${{ github.sha }}.flist
 
-    - name: Publish flist (${{ github.sha }})
-      if: success()
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: publish
-        user: tf-autobuilder
-        root: archive
-        name: zos-${{ github.sha }}.flist
+      - name: Symlink flist (development)
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: symlink
+          user: tf-autobuilder
+          name: zos-${{ github.sha }}.flist
+          target: ${{ steps.setname.outputs.build }}
 
-    - name: Symlink flist (development)
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: symlink
-        user: tf-autobuilder
-        name: zos-${{ github.sha }}.flist
-        target: ${{ steps.setname.outputs.build }}
-
-    - name: Crosslink flist (development)
-      if: success() && github.ref == 'refs/heads/master-3'
-      uses: threefoldtech/publish-flist@master
-      with:
-        token: ${{ secrets.HUB_JWT }}
-        action: crosslink
-        user: tf-zos
-        name: zos:development-3:latest.flist
-        target: tf-autobuilder/${{ steps.setname.outputs.build }}
+      - name: Crosslink flist (development)
+        if: success() && github.ref == 'refs/heads/master-3'
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: crosslink
+          user: tf-zos
+          name: zos:development-3:latest.flist
+          target: tf-autobuilder/${{ steps.setname.outputs.build }}
