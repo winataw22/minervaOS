@@ -8,6 +8,8 @@ import (
 
 	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	zoscrypt "github.com/threefoldtech/zos/pkg/crypto"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
 	"github.com/zaibon/httpsig"
@@ -49,6 +51,8 @@ func (c *Client) Node(nodeID string) (*NodeClient, error) {
 		return nil, errors.Wrap(err, "failed to get node address")
 	}
 
+	log.Debug().Str("node-id", nodeID).Str("ip", ip.String()).Msg("found node ip")
+
 	return &NodeClient{
 		client: c,
 		ip:     ip,
@@ -60,8 +64,9 @@ func (c *Client) Node(nodeID string) (*NodeClient, error) {
 func (c *Client) nodeID(id string) *crypto.NodeID {
 	pubkey := base58.Decode(id)
 
+	curvePubkey := zoscrypt.PublicKeyToCurve25519(pubkey)
 	var box crypto.BoxPubKey
-	copy(box[:], pubkey[:])
+	copy(box[:], curvePubkey[:])
 	return crypto.GetNodeID(&box)
 }
 

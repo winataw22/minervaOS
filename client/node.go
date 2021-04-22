@@ -55,14 +55,14 @@ func (n *NodeClient) response(r *http.Response, o interface{}, codes ...int) err
 }
 
 func (n *NodeClient) url(path ...string) string {
-	url := "http://[%s]:2021/api/v1/" + filepath.Join(path...) + "/"
+	url := "http://[" + n.ip.String() + "]:2021/api/v1/" + filepath.Join(path...) + "/"
 	return url
 }
 
 // Deploy sends the workload for node to deploy. On success means the node
 // accepted the workload (it passed validation), doesn't mean it has been
 // deployed. the user then can pull on the workload status until it passes (or fail)
-func (n *NodeClient) Deploy(dl *gridtypes.Deployment) (wid string, err error) {
+func (n *NodeClient) Deploy(dl *gridtypes.Deployment, update bool) error {
 	dl.TwinID = n.client.id
 	// if err := dl.Sign(n.client.sk); err != nil {
 	// 	return wid, errors.Wrap(err, "failed to sign the workload")
@@ -71,60 +71,66 @@ func (n *NodeClient) Deploy(dl *gridtypes.Deployment) (wid string, err error) {
 	var buf bytes.Buffer
 
 	if err := json.NewEncoder(&buf).Encode(dl); err != nil {
-		return wid, errors.Wrap(err, "failed to serialize workload")
+		return errors.Wrap(err, "failed to serialize workload")
 	}
 
-	url := n.url("workloads")
+	url := n.url("deployment")
+	m := http.MethodPost
+	if update {
+		m = http.MethodPut
+	}
 
-	request, err := http.NewRequest(http.MethodPost, url, &buf)
+	request, err := http.NewRequest(m, url, &buf)
 	if err != nil {
-		return wid, errors.Wrap(err, "failed to build request")
+		return errors.Wrap(err, "failed to build request")
 	}
 
 	if err := n.client.signer.Sign(request); err != nil {
-		return wid, errors.Wrap(err, "failed to sign request")
+		return errors.Wrap(err, "failed to sign request")
 	}
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return
+		return err
 	}
 
-	if err := n.response(response, &wid, http.StatusAccepted); err != nil {
-		return wid, err
+	if err := n.response(response, nil, http.StatusAccepted); err != nil {
+		return err
 	}
 
-	return wid, nil
+	return nil
 }
 
 // Get get a workload by id
-func (n *NodeClient) Get(wid string) (wl gridtypes.Workload, err error) {
-	url := n.url("workloads", wid)
+func (n *NodeClient) Get(twin, deployment uint32) (dl gridtypes.Deployment, err error) {
+	url := n.url("deployment", fmt.Sprint(twin), fmt.Sprint(deployment))
 
-	var buf bytes.Buffer
-	request, err := http.NewRequest(http.MethodGet, url, &buf)
+	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return gridtypes.Workload{}, errors.Wrap(err, "failed to build request")
+		return dl, errors.Wrap(err, "failed to build request")
+	}
+
+	if err := n.client.signer.Sign(request); err != nil {
+		return dl, errors.Wrap(err, "failed to sign request")
 	}
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return gridtypes.Workload{}, err
+		return dl, err
 	}
 
-	if err := n.response(response, &wl, http.StatusOK); err != nil {
-		return gridtypes.Workload{}, err
+	if err := n.response(response, &dl, http.StatusOK); err != nil {
+		return dl, err
 	}
 
-	return wl, nil
+	return dl, nil
 }
 
 // Delete deletes a workload by id
 func (n *NodeClient) Delete(wid string) (err error) {
-	url := n.url("workloads", wid)
+	url := n.url("deployment", wid)
 
-	var buf bytes.Buffer
-	request, err := http.NewRequest(http.MethodDelete, url, &buf)
+	request, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to build request")
 	}
@@ -139,4 +145,27 @@ func (n *NodeClient) Delete(wid string) (err error) {
 	}
 
 	return nil
+}
+
+func (n *NodeClient) Counters() (total gridtypes.Capacity, used gridtypes.Capacity, err error) {
+	url := n.url("counters")
+
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return total, used, errors.Wrap(err, "failed to build request")
+	}
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return total, used, err
+	}
+	var result struct {
+		Total gridtypes.Capacity `json:"total"`
+		Used  gridtypes.Capacity `json:"used"`
+	}
+	if err := n.response(response, &result, http.StatusOK); err != nil {
+		return total, used, err
+	}
+
+	return result.Total, result.Used, nil
 }

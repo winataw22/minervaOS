@@ -26,7 +26,7 @@ paths:
     post:
       tags:
         - "deployment"
-      summary: "Add a new pet to the store"
+      summary: "Create a new deployment"
       description: ""
       operationId: "addDeployment"
       requestBody:
@@ -45,9 +45,9 @@ paths:
     put:
       tags:
         - "deployment"
-      summary: "Update an existing pet"
+      summary: "Update an existing deployment"
       description: ""
-      operationId: "updatePet"
+      operationId: "updateDeployment"
       requestBody:
         required: true
         content:
@@ -137,6 +137,23 @@ paths:
                 items:
                   type: integer
                   format: uint16
+  /network/publicips:
+    get:
+      tags:
+        - "network"
+      summary: "return list of reserved public ips on this node"
+      description: "return a list of reserved public ips the node"
+      operationId: "listPublicIps"
+      responses:
+        "200":
+          description: "a list of public ips"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: cidr
   /network/config/public:
     get:
       tags:
