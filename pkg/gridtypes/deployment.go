@@ -265,8 +265,8 @@ func (d *Deployment) Get(name string) (*WorkloadWithID, error) {
 
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
-		id, _ := NewWorkloadID(d.TwinID, d.DeploymentID, name)
 		if wl.Name == name {
+			id, _ := NewWorkloadID(d.TwinID, d.DeploymentID, name)
 			return &WorkloadWithID{
 				Workload: wl,
 				ID:       id,

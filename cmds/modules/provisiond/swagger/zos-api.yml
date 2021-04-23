@@ -445,8 +445,9 @@ components:
         size:
           type: integer
           format: uint
-        network_id:
+        network:
           type: string
+          description: "network name, can be from another deployment"
         ip:
           type: string
           format: ip

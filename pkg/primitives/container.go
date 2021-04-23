@@ -55,11 +55,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 	// check if workload is already deployed
 	_, err := containerClient.Inspect(tenantNS, pkg.ContainerID(containerID))
 	if err == nil {
-		log.Info().Stringer("id", containerID).Msg("container already deployed")
-		return ContainerResult{
-			ID:   string(containerID),
-			IPv4: config.Network.IPs[0].String(),
-		}, nil
+		return ContainerResult{}, provision.ErrDidNotChange
 	}
 
 	if err := validateContainerConfig(config); err != nil {

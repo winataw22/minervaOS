@@ -71,7 +71,7 @@ func (n *Network) listPublicIps(request *http.Request) (interface{}, mw.Response
 	if err != nil {
 		return nil, mw.Error(errors.Wrap(err, "failed to list twins"))
 	}
-	var ips []string
+	ips := make([]string, 0)
 	for _, twin := range twins {
 		deploymentsIDs, err := storage.ByTwin(twin)
 		if err != nil {
@@ -94,7 +94,7 @@ func (n *Network) listPublicIps(request *http.Request) (interface{}, mw.Response
 					return nil, mw.Error(err)
 				}
 
-				ip, _ := data.(zos.PublicIP)
+				ip, _ := data.(*zos.PublicIP)
 				if ip.IP.IP != nil {
 					ips = append(ips, ip.IP.String())
 				}

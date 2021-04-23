@@ -47,6 +47,12 @@ func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
 	return &withStartupOrder{t}
 }
 
+// WithRerunAll if set forces the engine to re-run all reservations
+// on engine start.
+func WithRerunAll(t bool) EngineOption {
+	return &withRerunAll{t}
+}
+
 type jobOperation int
 
 const (
@@ -77,9 +83,10 @@ type NativeEngine struct {
 
 	//options
 	// janitor Janitor
-	twins  Twins
-	admins Twins
-	order  []gridtypes.WorkloadType
+	twins    Twins
+	admins   Twins
+	order    []gridtypes.WorkloadType
+	rerunAll bool
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -133,6 +140,14 @@ func (w *withStartupOrder) apply(e *NativeEngine) {
 	}
 
 	e.order = ordered
+}
+
+type withRerunAll struct {
+	t bool
+}
+
+func (w *withRerunAll) apply(e *NativeEngine) {
+	e.rerunAll = w.t
 }
 
 type nullKeyGetter struct{}
@@ -238,15 +253,9 @@ func (e *NativeEngine) Update(ctx context.Context, update gridtypes.Deployment) 
 	// this will just calculate the update
 	// steps we run it here as a sort of validation
 	// that this update is acceptable.
-	updates, err := deployment.Upgrade(&update)
+	_, err = deployment.Upgrade(&update)
 	if err != nil {
 		return err
-	}
-
-	for _, wl := range updates.ToUpdate {
-		if !e.provisioner.CanUpdate(ctx, wl.Type) {
-			return fmt.Errorf("updating workload of type '%s' is not supported", wl.Type.String())
-		}
 	}
 
 	// all is okay we can push the job
@@ -265,12 +274,10 @@ func (e *NativeEngine) Run(root context.Context) error {
 
 	root = context.WithValue(root, engineKey{}, e)
 
-	// restart everything first
-	// TODO: potential network disconnections if network already exists.
-	// may be network manager need to do nothing if same exact network config
-	// is applied
-	if err := e.boot(root); err != nil {
-		log.Error().Err(err).Msg("error while setting up")
+	if e.rerunAll {
+		if err := e.boot(root); err != nil {
+			log.Error().Err(err).Msg("error while setting up")
+		}
 	}
 
 	for {
@@ -411,13 +418,12 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, getter gridtypes.Wo
 		workloads := getter.ByType(typ)
 
 		for _, wl := range workloads {
-			// this workload is already deleted or in error state
-			// we don't try again
-			if wl.Result.State == gridtypes.StateDeleted ||
-				wl.Result.State == gridtypes.StateError {
-				//nothing to do!
-				continue
-			}
+			// support redeployment by version update
+			// if wl.Result.State == gridtypes.StateDeleted ||
+			// 	wl.Result.State == gridtypes.StateError {
+			// 	//nothing to do!
+			// 	continue
+			// }
 
 			twin, deployment, name, _ := wl.ID.Parts()
 			log := log.With().
@@ -428,17 +434,30 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, getter gridtypes.Wo
 				Logger()
 
 			log.Debug().Msg("provisioning")
-			result, err := e.provisioner.Update(ctx, wl)
+
+			var result *gridtypes.Result
+			var err error
+			if e.provisioner.CanUpdate(ctx, wl.Type) {
+				result, err = e.provisioner.Update(ctx, wl)
+
+			} else {
+				if err := e.provisioner.Decommission(ctx, wl); err != nil {
+					log.Error().Err(err).Msg("failed to decomission workload")
+				}
+
+				result, err = e.provisioner.Provision(ctx, wl)
+			}
+
+			if result.State == gridtypes.StateError {
+				log.Error().Str("error", result.Error).Msg("failed to deploy workload")
+			}
+
 			if err != nil {
 				log.Error().Err(err).Msg("failed to deploy workload")
 				result = &gridtypes.Result{
 					Error: err.Error(),
 					State: gridtypes.StateError,
 				}
-			}
-
-			if result.State == gridtypes.StateError {
-				log.Error().Str("error", result.Error).Msg("failed to deploy workload")
 			}
 
 			result.Created = gridtypes.Timestamp(time.Now().Unix())
@@ -473,6 +492,10 @@ func (e *NativeEngine) installDeployment(ctx context.Context, getter gridtypes.W
 
 			log.Debug().Msg("provisioning")
 			result, err := e.provisioner.Provision(ctx, wl)
+			if errors.Is(err, ErrDidNotChange) {
+				continue
+			}
+
 			if err != nil {
 				log.Error().Err(err).Msg("failed to deploy workload")
 				result = &gridtypes.Result{

@@ -107,9 +107,9 @@ type Kubernetes struct {
 	// Size of the vm, this defines the amount of vCpu, memory, and the disk size
 	// Docs: docs/kubernetes/sizes.md
 	Size uint8 `json:"size"`
-	// NetworkID of the network namepsace in which to run the VM. The network
+	// Network of the network namepsace in which to run the VM. The network
 	// must be provisioned previously.
-	NetworkID NetID `json:"network_id"`
+	Network string `json:"network"`
 	// IP of the VM. The IP must be part of the subnet available in the network
 	// resource defined by the networkID on this node
 	IP net.IP `json:"ip"`
@@ -152,7 +152,7 @@ func (k Kubernetes) Challenge(b io.Writer) error {
 	if _, err := fmt.Fprintf(b, "%s", k.ClusterSecret); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(b, "%s", k.NetworkID); err != nil {
+	if _, err := fmt.Fprintf(b, "%s", k.Network); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(b, "%s", k.IP.String()); err != nil {

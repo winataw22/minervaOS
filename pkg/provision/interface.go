@@ -41,6 +41,9 @@ var (
 	ErrDeploymentExists = fmt.Errorf("exists")
 	//ErrDeploymentNotExists returned if object not exists
 	ErrDeploymentNotExists = fmt.Errorf("not exists")
+	// ErrDidNotChange special error that can be returned by the provisioner
+	// if returned the engine does no update workload data
+	ErrDidNotChange = fmt.Errorf("did not change")
 )
 
 // Storage interface

@@ -39,6 +39,10 @@ func (p *mapProvisioner) Provision(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 
 	data, err := handler(ctx, wl)
+	if errors.Is(err, ErrDidNotChange) {
+		return nil, err
+	}
+
 	return p.buildResult(wl, data, err)
 }
 
@@ -60,6 +64,10 @@ func (p *mapProvisioner) Update(ctx context.Context, wl *gridtypes.WorkloadWithI
 	}
 
 	data, err := handler(ctx, wl)
+	if errors.Is(err, ErrDidNotChange) {
+		return nil, err
+	}
+
 	return p.buildResult(wl, data, err)
 }
 

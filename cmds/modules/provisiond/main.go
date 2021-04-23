@@ -198,6 +198,7 @@ func action(cli *cli.Context) error {
 			zos.NetworkType,
 			zos.PublicIPType,
 		),
+		provision.WithRerunAll(app.IsFirstBoot(module)),
 	)
 
 	if err != nil {
@@ -222,6 +223,10 @@ func action(cli *cli.Context) error {
 			log.Fatal().Err(err).Msg("provision engine exited unexpectedely")
 		}
 	}()
+
+	if err := app.MarkBooted(module); err != nil {
+		log.Error().Err(err).Msg("failed to mark module as booted")
+	}
 
 	reporter, err := NewReported(store, identity, queues)
 	if err != nil {

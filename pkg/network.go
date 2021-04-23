@@ -83,6 +83,14 @@ type Networker interface {
 	// RemovePubTap removes the public tap device from the host namespace
 	RemovePubTap(PubIPReservationID string) error
 
+	// SetupPubIPFilter sets up filter for this public ip
+	SetupPubIPFilter(filterName string, iface string, ip string, ipv6 string, mac string) error
+
+	// RemovePubIPFilter removes the filter setted up by SetupPubIPFilter
+	RemovePubIPFilter(filterName string) error
+
+	// PubIPFilterExists checks if there is a filter installed with that name
+	PubIPFilterExists(filterName string) bool
 	// DisconnectPubTap disconnects the public tap from the network. The interface
 	// itself is not removed and will need to be cleaned up later
 	DisconnectPubTap(PubIPReservationID string) error

@@ -230,6 +230,18 @@ func (s *NetworkerStub) Leave(arg0 zos.NetID, arg1 string) (ret0 error) {
 	return
 }
 
+func (s *NetworkerStub) PubIPFilterExists(arg0 string) (ret0 bool) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "PubIPFilterExists", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) PubTapExists(arg0 string) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "PubTapExists", args...)
@@ -290,6 +302,19 @@ func (s *NetworkerStub) Ready() (ret0 error) {
 	return
 }
 
+func (s *NetworkerStub) RemovePubIPFilter(arg0 string) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.Request(s.module, s.object, "RemovePubIPFilter", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) RemovePubTap(arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "RemovePubTap", args...)
@@ -319,6 +344,19 @@ func (s *NetworkerStub) RemoveTap(arg0 zos.NetID) (ret0 error) {
 func (s *NetworkerStub) SetPublicConfig(arg0 pkg.PublicConfig) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.Request(s.module, s.object, "SetPublicConfig", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) SetupPubIPFilter(arg0 string, arg1 string, arg2 string, arg3 string, arg4 string) (ret0 error) {
+	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
+	result, err := s.client.Request(s.module, s.object, "SetupPubIPFilter", args...)
 	if err != nil {
 		panic(err)
 	}

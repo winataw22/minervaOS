@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -452,6 +453,80 @@ func (n *networker) RemovePubTap(pubIPReservationID string) error {
 	}
 
 	return ifaceutil.Delete(tapIface, nil)
+}
+
+// SetupPubIPFilter sets up filter for this public ip
+func (n *networker) SetupPubIPFilter(filterName string, iface string, ip string, ipv6 string, mac string) error {
+	if n.PubIPFilterExists(filterName) {
+		return nil
+	}
+
+	//TODO: use nft.Apply
+	cmd := exec.Command("/bin/sh", "-c",
+		fmt.Sprintf(`# add vm
+# add a chain for the vm public interface in arp and bridge
+nft 'add chain arp filter %[1]s'
+nft 'add chain bridge filter %[1]s'
+
+# make nft jump to vm chain
+nft 'add rule arp filter input iifname "%[2]s" jump %[1]s'
+nft 'add rule bridge filter forward iifname "%[2]s" jump %[1]s'
+
+# arp rule for vm
+nft 'add rule arp filter %[1]s arp operation reply arp saddr ip . arp saddr ether != { %[3]s . %[4]s } drop'
+
+# filter on L2 fowarding of non-matching ip/mac, drop RA,dhcpv6,dhcp
+nft 'add rule bridge filter %[1]s ip saddr . ether saddr != { %[3]s . %[4]s } counter drop'
+nft 'add rule bridge filter %[1]s ip6 saddr . ether saddr != { %[5]s . %[4]s } counter drop'
+nft 'add rule bridge filter %[1]s icmpv6 type nd-router-advert drop'
+nft 'add rule bridge filter %[1]s ip6 version 6 udp sport 547 drop'
+nft 'add rule bridge filter %[1]s ip version 4 udp sport 67 drop'`, filterName, iface, ip, mac, ipv6))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "could not setup firewall rules for public ip\n%s", string(output))
+	}
+
+	return nil
+}
+
+// PubIPFilterExists checks if pub ip filter
+func (n *networker) PubIPFilterExists(filterName string) bool {
+	cmd := exec.Command(
+		"/bin/sh",
+		"-c",
+		fmt.Sprintf(`nft list table bridge filter | grep "chain %s"`, filterName),
+	)
+	err := cmd.Run()
+	return err == nil
+}
+
+// RemovePubIPFilter removes the filter setted up by SetupPubIPFilter
+func (n *networker) RemovePubIPFilter(filterName string) error {
+	cmd := exec.Command("/bin/sh", "-c",
+		fmt.Sprintf(`# in bridge table
+nft 'flush chain bridge filter %[1]s'
+# jump to chain rule
+a=$( nft -a list table bridge filter | awk '/jump %[1]s/{ print $NF}' )
+nft 'delete rule bridge filter forward handle '${a}
+# chain itself
+a=$( nft -a list table bridge filter | awk '/chain %[1]s/{ print $NF}' )
+nft 'delete chain bridge filter handle '${a}
+
+# in arp table
+nft 'flush chain arp filter %[1]s'
+# jump to chain rule
+a=$( nft -a list table arp filter | awk '/jump %[1]s/{ print $NF}' )
+nft 'delete rule arp filter input handle '${a}
+# chain itself
+a=$( nft -a list table arp filter | awk '/chain %[1]s/{ print $NF}' )
+nft 'delete chain arp filter handle '${a}`, filterName))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "could not tear down firewall rules for public ip\n%s", string(output))
+	}
+	return nil
 }
 
 // DisconnectPubTap disconnects the public tap from the network. The interface

@@ -53,13 +53,17 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		needsInstall = true
 	)
 
+	if vm.Exists(wl.ID.String()) {
+		return result, provision.ErrDidNotChange
+	}
+
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
 		return result, errors.Wrap(err, "failed to decode reservation schema")
 	}
 
 	deployment := provision.GetDeployment(ctx)
 
-	netID := zos.NetworkID(deployment.TwinID, string(config.NetworkID))
+	netID := zos.NetworkID(deployment.TwinID, string(config.Network))
 
 	// check if the network tap already exists
 	// if it does, it's most likely that a vm with the same network id and node id already exists
@@ -132,14 +136,19 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 
 	var pubIface string
 	if len(config.PublicIP) > -0 {
-		pubIface, err = network.SetupPubTap(config.PublicIP)
+		ipWl, err := deployment.Get(config.PublicIP)
+		if err != nil {
+			return zos.KubernetesResult{}, err
+		}
+		name := ipWl.ID.String()
+		pubIface, err = network.SetupPubTap(name)
 		if err != nil {
 			return result, errors.Wrap(err, "could not set up tap device for public network")
 		}
 
 		defer func() {
 			if err != nil {
-				_ = network.RemovePubTap(config.PublicIP)
+				_ = network.RemovePubTap(name)
 			}
 		}()
 	}
@@ -291,7 +300,7 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 
 	deployment := provision.GetDeployment(ctx)
 
-	netID := zos.NetworkID(deployment.TwinID, string(cfg.NetworkID))
+	netID := zos.NetworkID(deployment.TwinID, string(cfg.Network))
 	if err := network.RemoveTap(netID); err != nil {
 		return errors.Wrap(err, "could not clean up tap device")
 	}
@@ -312,7 +321,7 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.Deployment, iface string, pubIface string, cfg Kubernetes) (pkg.VMNetworkInfo, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
-	netID := zos.NetworkID(deployment.TwinID, string(cfg.NetworkID))
+	netID := zos.NetworkID(deployment.TwinID, string(cfg.Network))
 	subnet, err := network.GetSubnet(netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource subnet")
@@ -398,14 +407,20 @@ func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID, name string) (
 	// we used to get this from the explorer, but now we need another
 	// way to do this. for now the only option is to get it from the
 	// reservation itself. hence we added the gatway fields to ip data
+	if wl.Type != zos.PublicIPType {
+		return ip, gw, fmt.Errorf("workload for public IP is of wrong type")
+	}
 
+	if wl.Result.State != gridtypes.StateOk {
+		return ip, gw, fmt.Errorf("public ip workload is not okay")
+	}
 	ipData, err := wl.WorkloadData()
 	if err != nil {
 		return
 	}
-	data, ok := ipData.(zos.PublicIP)
+	data, ok := ipData.(*zos.PublicIP)
 	if !ok {
-		return ip, gw, fmt.Errorf("invalid ip data in deployment")
+		return ip, gw, fmt.Errorf("invalid ip data in deployment got '%T'", ipData)
 	}
 
 	return data.IP.IPNet, data.Gateway, nil
