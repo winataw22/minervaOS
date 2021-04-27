@@ -44,24 +44,34 @@ type Statistics struct {
 
 // NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
-func NewStatistics(total gridtypes.Capacity, reserved Counters, nodeID string, inner provision.Provisioner) *Statistics {
+func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, nodeID string, inner provision.Provisioner) *Statistics {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
 		panic(err)
 	}
 
+	log.Debug().Msgf("initial used capacity %+v", initial)
+	var counters Counters
+	counters.Increment(initial)
 	ram := math.Ceil(float64(vm.Total) / (1024 * 1024 * 1024))
-	return &Statistics{inner: inner, total: total, reserved: reserved, nodeID: nodeID, mem: uint64(ram)}
+	return &Statistics{
+		inner:    inner,
+		total:    total,
+		counters: counters,
+		reserved: reserved,
+		mem:      uint64(ram),
+		nodeID:   nodeID,
+	}
 }
 
 // Current returns the current used capacity
 func (s *Statistics) Current() gridtypes.Capacity {
 	return gridtypes.Capacity{
-		CRU: s.counters.CRU.Current() + s.reserved.CRU.Current(),
-		MRU: s.counters.MRU.Current() + s.reserved.MRU.Current(),
-		HRU: s.counters.HRU.Current() + s.reserved.HRU.Current(),
-		SRU: s.counters.SRU.Current() + s.reserved.SRU.Current(),
-		//IPV4U: s.counters.CRU.Current() + s.reserved.SRU.Current(),
+		CRU:   s.counters.CRU.Current() + s.reserved.CRU.Current(),
+		MRU:   s.counters.MRU.Current() + s.reserved.MRU.Current(),
+		HRU:   s.counters.HRU.Current() + s.reserved.HRU.Current(),
+		SRU:   s.counters.SRU.Current() + s.reserved.SRU.Current(),
+		IPV4U: s.counters.IPv4.Current(),
 	}
 }
 
@@ -100,9 +110,8 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 	}
 
 	if result.State == gridtypes.StateOk {
-		if err := s.counters.Increment(wl.Workload); err != nil {
-			log.Error().Err(err).Msg("failed to increment statistics counter")
-		}
+		log.Debug().Str("type", wl.Type.String()).Str("id", wl.ID.String()).Msgf("incrmenting capacity +%+v", needed)
+		s.counters.Increment(needed)
 	}
 
 	return result, nil
@@ -113,10 +122,13 @@ func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.WorkloadWit
 	if err := s.inner.Decommission(ctx, wl); err != nil {
 		return err
 	}
-
-	if err := s.counters.Decrement(wl.Workload); err != nil {
+	cap, err := wl.Capacity()
+	if err != nil {
 		log.Error().Err(err).Msg("failed to decrement statistics counter")
+		return nil
 	}
+
+	s.counters.Decrement(cap)
 
 	return nil
 }
@@ -156,29 +168,3 @@ func (s *statisticsAPI) getCounters(r *http.Request) (interface{}, mw.Response) 
 		Used:  s.stats.Current(),
 	}, nil
 }
-
-// func (s *statsProvisioner) shouldUpdateCounters(ctx context.Context, wl *gridtypes.Workload) (bool, error) {
-// 	// rule, we always should update counters UNLESS it is a network reservation that
-// 	// already have been counted before.
-// 	if wl.Type != zos.NetworkType {
-// 		return true, nil
-// 	}
-
-// 	var nr zos.Network
-// 	if err := json.Unmarshal(wl.Data, &nr); err != nil {
-// 		return false, fmt.Errorf("failed to unmarshal network from reservation: %w", err)
-// 	}
-// 	// otherwise we check the cache if a network
-// 	// with the same id already exists
-// 	id := zos.NetworkID(wl.User.String(), nr.Name)
-// 	cache := provision.GetEngine(ctx).Storage()
-
-// 	_, err := cache.GetNetwork(id)
-// 	if errors.Is(err, provision.ErrWorkloadNotExists) {
-// 		return true, nil
-// 	} else if err != nil {
-// 		return false, err
-// 	}
-
-// 	return false, nil
-// }

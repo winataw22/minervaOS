@@ -155,6 +155,12 @@ func (s *Fs) Get(twin, deployment uint32) (gridtypes.Deployment, error) {
 
 // ByTwin return list of deployment for given twin id
 func (s *Fs) ByTwin(twin uint32) ([]uint32, error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+	return s.byTwin(twin)
+}
+
+func (s *Fs) byTwin(twin uint32) ([]uint32, error) {
 	base := filepath.Join(s.root, fmt.Sprint(twin))
 
 	entities, err := ioutil.ReadDir(base)
@@ -183,6 +189,13 @@ func (s *Fs) ByTwin(twin uint32) ([]uint32, error) {
 
 // Twins lists available users
 func (s *Fs) Twins() ([]uint32, error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	return s.twins()
+}
+
+func (s *Fs) twins() ([]uint32, error) {
 	entities, err := ioutil.ReadDir(s.root)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -197,7 +210,8 @@ func (s *Fs) Twins() ([]uint32, error) {
 
 		id, err := strconv.ParseUint(entry.Name(), 10, 32)
 		if err != nil {
-			log.Error().Str("name", entry.Name()).Err(err).Msg("invalid twin id directory")
+			log.Error().Str("name", entry.Name()).Err(err).Msg("invalid twin id directory, removing")
+			os.RemoveAll(filepath.Join(s.root, entry.Name()))
 			continue
 		}
 
@@ -205,6 +219,48 @@ func (s *Fs) Twins() ([]uint32, error) {
 	}
 
 	return ids, nil
+}
+
+// Capacity returns the total capacity of all deployments
+// that are in OK state.
+func (s *Fs) Capacity() (cap gridtypes.Capacity, err error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+
+	twins, err := s.twins()
+	if err != nil {
+		return cap, err
+	}
+
+	for _, twin := range twins {
+		ids, err := s.byTwin(twin)
+		if err != nil {
+			return cap, err
+		}
+
+		for _, id := range ids {
+			p := s.rooted(fmt.Sprint(twin), fmt.Sprint(id))
+			deployment, err := s.get(p)
+			if err != nil {
+				return cap, err
+			}
+
+			for _, wl := range deployment.Workloads {
+				if wl.Result.State != gridtypes.StateOk {
+					continue
+				}
+
+				c, err := wl.Capacity()
+				if err != nil {
+					return cap, err
+				}
+
+				cap.Add(&c)
+			}
+		}
+	}
+
+	return
 }
 
 // Close makes sure the backend of the store is closed properly

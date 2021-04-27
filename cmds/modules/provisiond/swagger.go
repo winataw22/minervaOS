@@ -23,7 +23,6 @@ type fsWithPrefix struct {
 
 func (f *fsWithPrefix) Open(name string) (fs.File, error) {
 	newName := filepath.Join(f.prefix, name)
-	log.Debug().Str("file", name).Str("re-write-name", newName).Msg("requesting file")
 	file, err := f.FS.Open(newName)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to open file")

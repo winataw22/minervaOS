@@ -44,10 +44,11 @@ func (c *AtomicValue) Current() uint64 {
 type Counters struct {
 	//types map[gridtypes.WorkloadType]AtomicValue
 
-	SRU AtomicValue // SSD storage in bytes
-	HRU AtomicValue // HDD storage in bytes
-	MRU AtomicValue // Memory storage in bytes
-	CRU AtomicValue // CPU count absolute
+	SRU  AtomicValue // SSD storage in bytes
+	HRU  AtomicValue // HDD storage in bytes
+	MRU  AtomicValue // Memory storage in bytes
+	CRU  AtomicValue // CPU count absolute
+	IPv4 AtomicValue // IPv4 count absolute
 }
 
 const (
@@ -56,31 +57,19 @@ const (
 )
 
 // Increment is called by the provision.Engine when a reservation has been provisionned
-func (c *Counters) Increment(r *gridtypes.Workload) error {
-	u, err := r.Capacity()
-	if err != nil {
-		return err
-	}
-
-	c.CRU.Increment(u.CRU)
-	c.MRU.Increment(u.MRU)
-	c.SRU.Increment(u.SRU)
-	c.HRU.Increment(u.HRU)
-
-	return nil
+func (c *Counters) Increment(cap gridtypes.Capacity) {
+	c.CRU.Increment(cap.CRU)
+	c.MRU.Increment(cap.MRU)
+	c.SRU.Increment(cap.SRU)
+	c.HRU.Increment(cap.HRU)
+	c.IPv4.Increment(cap.IPV4U)
 }
 
 // Decrement is called by the provision.Engine when a reservation has been decommissioned
-func (c *Counters) Decrement(r *gridtypes.Workload) error {
-	u, err := r.Capacity()
-	if err != nil {
-		return err
-	}
-
-	c.CRU.Decrement(u.CRU)
-	c.MRU.Decrement(u.MRU)
-	c.SRU.Decrement(u.SRU)
-	c.HRU.Decrement(u.HRU)
-
-	return nil
+func (c *Counters) Decrement(cap gridtypes.Capacity) {
+	c.CRU.Decrement(cap.CRU)
+	c.MRU.Decrement(cap.MRU)
+	c.SRU.Decrement(cap.SRU)
+	c.HRU.Decrement(cap.HRU)
+	c.IPv4.Decrement(cap.IPV4U)
 }
