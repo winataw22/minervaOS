@@ -5,21 +5,23 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/jbenet/go-base58"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	zoscrypt "github.com/threefoldtech/zos/pkg/crypto"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/crypto"
-	"github.com/zaibon/httpsig"
 )
 
 // Client struct
 type Client struct {
-	id     uint32
-	sk     ed25519.PrivateKey
-	signer *httpsig.Signer
+	id uint32
+	sk ed25519.PrivateKey
 }
 
 // NewClient creates a new instance of client
@@ -34,14 +36,38 @@ func NewClient(id uint32, seed string) (*Client, error) {
 	}
 
 	sk := ed25519.NewKeyFromSeed(seedBytes)
-	idStr := fmt.Sprint(id)
-	signer := httpsig.NewSigner(idStr, sk, httpsig.Ed25519, []string{"(created)", "date"})
 
 	return &Client{
-		id:     id,
-		sk:     sk,
-		signer: signer,
+		id: id,
+		sk: sk,
 	}, nil
+}
+
+func (c *Client) getAuthHeader() (string, error) {
+	token := jwt.New()
+	token.Set(jwt.IssuerKey, fmt.Sprint(c.id))
+	token.Set(jwt.AudienceKey, "zos")
+	now := time.Now()
+	token.Set(jwt.IssuedAtKey, now.Unix())
+	token.Set(jwt.ExpirationKey, now.Add(1*time.Minute).Unix())
+
+	//jwt.ParseHeader(hdr http.Header, name string, options ...jwt.ParseOption)
+	j, err := jwt.Sign(token, jwa.EdDSA, c.sk)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("Bearer %s", string(j)), nil
+}
+
+func (c *Client) authorize(r *http.Request) error {
+	token, err := c.getAuthHeader()
+	if err != nil {
+		return err
+	}
+
+	r.Header.Set("authorization", token)
+	return nil
 }
 
 // Node gets a client to node given its id

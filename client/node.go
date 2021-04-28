@@ -85,7 +85,7 @@ func (n *NodeClient) Deploy(dl *gridtypes.Deployment, update bool) error {
 		return errors.Wrap(err, "failed to build request")
 	}
 
-	if err := n.client.signer.Sign(request); err != nil {
+	if err := n.client.authorize(request); err != nil {
 		return errors.Wrap(err, "failed to sign request")
 	}
 
@@ -110,7 +110,7 @@ func (n *NodeClient) Get(twin, deployment uint32) (dl gridtypes.Deployment, err 
 		return dl, errors.Wrap(err, "failed to build request")
 	}
 
-	if err := n.client.signer.Sign(request); err != nil {
+	if err := n.client.authorize(request); err != nil {
 		return dl, errors.Wrap(err, "failed to sign request")
 	}
 
@@ -133,6 +133,10 @@ func (n *NodeClient) Delete(wid string) (err error) {
 	request, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to build request")
+	}
+
+	if err := n.client.authorize(request); err != nil {
+		return errors.Wrap(err, "failed to sign request")
 	}
 
 	response, err := http.DefaultClient.Do(request)

@@ -4,11 +4,12 @@ GOPATH := $(shell go env GOPATH)
 all: build
 
 getdeps:
-	@echo "Installing golint" && go get -u golang.org/x/lint/golint
-	@echo "Installing gocyclo" && go get -u github.com/fzipp/gocyclo/cmd/gocyclo
-	@echo "Installing deadcode" && go get -u github.com/remyoudompheng/go-misc/deadcode
-	@echo "Installing misspell" && go get -u github.com/client9/misspell/cmd/misspell
-	@echo "Installing ineffassign" && go get -u github.com/gordonklaus/ineffassign
+	@echo "Installing golint" && go get -u golang.org/x/lint/golint@latest
+	@echo "Installing gocyclo" && go get -u github.com/fzipp/gocyclo/cmd/gocyclo@latest
+	@echo "Installing deadcode" && go get -u github.com/remyoudompheng/go-misc/deadcode@latest
+	@echo "Installing misspell" && go get -u github.com/client9/misspell/cmd/misspell@latest
+	@echo "Installing ineffassign" && go get -u github.com/gordonklaus/ineffassign@latest
+	@echo "Installing staticcheck" && go get -u honnef.co/go/tools/cmd/staticcheck@latest
 
 verifiers: vet fmt lint cyclo spelling static #deadcode
 

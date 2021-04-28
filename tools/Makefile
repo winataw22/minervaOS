@@ -17,6 +17,8 @@ getdeps:
 	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell
 	@echo "Installing ineffassign" && go install github.com/gordonklaus/ineffassign
 	@echo "Installing statik" && go install github.com/rakyll/statik
+	@echo "Installing staticcheck" && go install honnef.co/go/tools/cmd/staticcheck
+
 
 verifiers: vet fmt lint cyclo spelling static
 
@@ -45,7 +47,7 @@ spelling:
 	misspell -i monitord -error $(shell ls **/*.go | grep -v statik)
 
 static:
-	go run honnef.co/go/tools/cmd/staticcheck -- ./...
+	staticcheck -- ./...
 
 # Builds minio, runs the verifiers then runs the tests.
 check: test

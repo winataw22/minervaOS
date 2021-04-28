@@ -200,16 +200,14 @@ paths:
                     $ref: "#/components/schemas/Capacity"
 components:
   securitySchemes:
-    user:
-      type: apiKey
-      in: header
-      name: "authorization"
-      description: "HTTPSIG https://tools.ietf.org/html/draft-cavage-http-signatures-08"
+    user: # arbitrary name for the security scheme
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     farmer:
-      type: apiKey
-      in: header
-      name: "authorization"
-      description: "Also httpsig bug only allows farmer twin calls"
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     SignatureRequest:
       type: "object"

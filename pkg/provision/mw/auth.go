@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/provision"
-	"github.com/zaibon/httpsig"
 )
 
 type twinPublicKeyID struct{}
@@ -32,10 +33,10 @@ func TwinID(ctx context.Context) uint32 {
 	return value.(uint32)
 }
 
-// UserMap implements httpsig.KeyGetter for the users collections
+// UserMap implements provision.Twins for the users collections
 type UserMap map[uint32]ed25519.PublicKey
 
-// NewUserMap create a httpsig.KeyGetter that uses the users collection
+// NewUserMap create a new UserMap that uses the users collection
 // to find the key
 func NewUserMap() UserMap {
 	return UserMap{}
@@ -51,7 +52,7 @@ func (u UserMap) AddKeyFromHex(id uint32, key string) error {
 	return nil
 }
 
-// GetKey implements httpsig.KeyGetter
+// GetKey implements interface
 func (u UserMap) GetKey(id uint32) (ed25519.PublicKey, error) {
 	key, ok := u[id]
 	if !ok {
@@ -60,23 +61,9 @@ func (u UserMap) GetKey(id uint32) (ed25519.PublicKey, error) {
 	return key, nil
 }
 
-// requiredHeaders are the parameters to be used to generated the http signature
-var requiredHeaders = []string{"(created)", "date"}
-
-type keyGetter struct {
-	twins provision.Twins
-}
-
-func (k *keyGetter) GetKey(id string) (interface{}, error) {
-	idUint, err := strconv.ParseUint(id, 10, 32)
-	if err != nil {
-		return nil, errors.Wrap(err, "expected uint user id")
-	}
-
-	return k.twins.GetKey(uint32(idUint))
-}
-
 func writeError(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusUnauthorized)
+
 	object := struct {
 		Error string `json:"error"`
 	}{
@@ -87,54 +74,51 @@ func writeError(w http.ResponseWriter, err error) {
 	}
 }
 
-// NewAuthMiddleware creates a new AuthMiddleware using the v httpsig.Verifier
+// NewAuthMiddleware creates a new AuthMiddleware using jwt signed by the caller
 func NewAuthMiddleware(users provision.Twins) mux.MiddlewareFunc {
-	verifier := httpsig.NewVerifier(&keyGetter{users})
-	verifier.SetRequiredHeaders(requiredHeaders)
-	var challengeParams []string
-	if headers := verifier.RequiredHeaders(); len(headers) > 0 {
-		challengeParams = append(challengeParams,
-			fmt.Sprintf("headers=%q", strings.Join(headers, " ")))
-	}
-
-	challenge := "Signature"
-	if len(challengeParams) > 0 {
-		challenge += fmt.Sprintf(" %s", strings.Join(challengeParams, ", "))
-	}
-
 	return func(handler http.Handler) http.Handler {
-		//http.Error(w http.ResponseWriter, error string, code int)
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			id, err := verifier.Verify(req)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token, err := jwt.ParseHeader(r.Header, "authorization",
+				jwt.WithValidate(true),
+				jwt.WithAudience("zos"),
+				jwt.WithAcceptableSkew(10*time.Second),
+			)
 			if err != nil {
-				w.Header()["WWW-Authenticate"] = []string{challenge}
-				w.WriteHeader(http.StatusUnauthorized)
-
-				writeError(w, errors.Wrap(err, "unauthorized access"))
+				writeError(w, errors.Wrap(err, "failed to parse jwt token"))
 				return
 			}
 
-			twinID, err := strconv.ParseUint(id, 10, 32)
-			if err != nil {
-				// this should never happen because we already passed
-				// the verifier but just in case
-				w.WriteHeader(http.StatusInternalServerError)
-				writeError(w, err)
+			if time.Until(token.Expiration()) > 2*time.Minute {
+				writeError(w, fmt.Errorf("the expiration date should not be more than 2 minutes"))
 				return
 			}
-
+			twinID, err := strconv.ParseUint(token.Issuer(), 10, 32)
+			if err != nil {
+				writeError(w, errors.Wrap(err, "failed to parse issued id, expecting a 32 bit uint"))
+				return
+			}
 			pk, err := users.GetKey(uint32(twinID))
 			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
-				writeError(w, err)
+				writeError(w, errors.Wrap(err, "failed to get twin public key"))
+				return
+			}
+			// reparse the token but with signature validation
+			_, err = jwt.ParseHeader(r.Header, "authorization", jwt.WithValidate(true),
+				jwt.WithAudience("zos"),
+				jwt.WithAcceptableSkew(10*time.Second),
+				jwt.WithVerify(jwa.EdDSA, pk),
+			)
+
+			if err != nil {
+				writeError(w, errors.Wrap(err, "failed to get twin public key"))
 				return
 			}
 
-			ctx := req.Context()
+			ctx := r.Context()
 			ctx = context.WithValue(ctx, twinKeyID{}, uint32(twinID))
 			ctx = context.WithValue(ctx, twinPublicKeyID{}, pk)
 
-			handler.ServeHTTP(w, req.WithContext(ctx))
+			handler.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
