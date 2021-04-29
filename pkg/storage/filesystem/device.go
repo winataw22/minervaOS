@@ -53,6 +53,7 @@ type Device struct {
 	Children   []Device       `json:"children"`
 	DiskType   zos.DeviceType `json:"-"`
 	ReadTime   uint64         `json:"-"`
+	Subsystems string         `json:"subsystems"`
 	//HasPartions is different from children, because once the
 	//devices are flattend in the device, cache, the children list is
 	//zeroed (since all devices are flat), then has partions is set to
@@ -158,7 +159,14 @@ func (l *lsblkDeviceManager) Raw(ctx context.Context) (DeviceCache, error) {
 		return nil, err
 	}
 
-	return DeviceCache(devices.BlockDevices), nil
+	filtered := devices.BlockDevices[:0]
+	for _, device := range devices.BlockDevices {
+		if device.Subsystems != "block:scsi:usb:pci" {
+			filtered = append(filtered, device)
+		}
+	}
+
+	return DeviceCache(filtered), nil
 }
 
 // scan the system for disks using the `lsblk` command
