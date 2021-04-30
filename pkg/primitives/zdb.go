@@ -13,7 +13,6 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
-	"github.com/threefoldtech/zos/pkg/provision/common"
 	"github.com/threefoldtech/zos/pkg/zdb"
 
 	"github.com/pkg/errors"
@@ -51,7 +50,7 @@ func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workloa
 
 	// if we reached here, we need to create the 0-db namespace
 	log.Debug().Msg("allocating storage for namespace")
-	allocation, err := storage.Allocate(nsID, config.DiskType, config.Size*gigabyte, config.Mode)
+	allocation, err := storage.Allocate(ctx, nsID, config.DiskType, config.Size*gigabyte, config.Mode)
 	if err != nil {
 		return zos.ZDBResult{}, errors.Wrap(err, "failed to allocate storage")
 	}
@@ -92,13 +91,13 @@ func (p *Primitives) ensureZdbContainer(ctx context.Context, allocation pkg.Allo
 
 	name := pkg.ContainerID(allocation.VolumeID)
 
-	cont, err := container.Inspect(zdbContainerNS, name)
+	cont, err := container.Inspect(ctx, zdbContainerNS, name)
 	if err != nil && strings.Contains(err.Error(), "not found") {
 		// container not found, create one
 		if err := p.createZdbContainer(ctx, allocation, mode); err != nil {
 			return cont, err
 		}
-		cont, err = container.Inspect(zdbContainerNS, name)
+		cont, err = container.Inspect(ctx, zdbContainerNS, name)
 		if err != nil {
 			return pkg.Container{}, err
 		}
@@ -111,13 +110,13 @@ func (p *Primitives) ensureZdbContainer(ctx context.Context, allocation pkg.Allo
 
 }
 
-func (p *Primitives) zdbRootFS() (string, error) {
+func (p *Primitives) zdbRootFS(ctx context.Context) (string, error) {
 	var flist = stubs.NewFlisterStub(p.zbus)
 	var err error
 	var rootFS string
 
 	for _, typ := range []zos.DeviceType{zos.HDDDevice, zos.SSDDevice} {
-		rootFS, err = flist.Mount(zdbFlistURL, "", pkg.MountOptions{
+		rootFS, err = flist.Mount(ctx, zdbFlistURL, "", pkg.MountOptions{
 			Limit:    10,
 			ReadOnly: false,
 			Type:     typ,
@@ -152,25 +151,25 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 
 	slog.Debug().Str("flist", zdbFlistURL).Msg("mounting flist")
 
-	rootFS, err := p.zdbRootFS()
+	rootFS, err := p.zdbRootFS(ctx)
 	if err != nil {
 		return err
 	}
 
 	cleanup := func() {
-		if err := cont.Delete(zdbContainerNS, name); err != nil {
+		if err := cont.Delete(ctx, zdbContainerNS, name); err != nil {
 			slog.Error().Err(err).Msg("failed to delete 0-db container")
 		}
 
-		if err := flist.Umount(rootFS); err != nil {
+		if err := flist.Umount(ctx, rootFS); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
 		}
 	}
 
 	// create the network namespace and macvlan for the 0-db container
-	netNsName, err := network.ZDBPrepare(allocation.VolumeID)
+	netNsName, err := network.ZDBPrepare(ctx, allocation.VolumeID)
 	if err != nil {
-		if err := flist.Umount(rootFS); err != nil {
+		if err := flist.Umount(ctx, rootFS); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
 		}
 
@@ -196,7 +195,7 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 
 	cmd := fmt.Sprintf("/bin/zdb --data /data --index /data --mode %s  --listen :: --port %d --socket /socket/zdb.sock --dualnet", string(mode), zdbPort)
 
-	err = p.zdbRun(string(name), rootFS, cmd, netNsName, volumePath, socketDir)
+	err = p.zdbRun(ctx, string(name), rootFS, cmd, netNsName, volumePath, socketDir)
 	if err != nil {
 		cleanup()
 		return errors.Wrap(err, "failed to create container")
@@ -219,10 +218,11 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 	return nil
 }
 
-func (p *Primitives) zdbRun(name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
+func (p *Primitives) zdbRun(ctx context.Context, name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
 	var cont = stubs.NewContainerModuleStub(p.zbus)
 
 	_, err := cont.Run(
+		ctx,
 		zdbContainerNS,
 		pkg.Container{
 			Name:        name,
@@ -257,12 +257,12 @@ func (p *Primitives) waitZDBIPs(ctx context.Context, namespace string) ([]net.IP
 
 	getIP := func() error {
 
-		ips, err := network.Addrs(nwmod.ZDBPubIface, namespace)
+		ips, err := network.Addrs(ctx, nwmod.ZDBPubIface, namespace)
 		if err != nil {
 			log.Debug().Err(err).Msg("not ip public found, waiting")
 			return err
 		}
-		yggIps, err := network.Addrs(nwmod.ZDBYggIface, namespace)
+		yggIps, err := network.Addrs(ctx, nwmod.ZDBYggIface, namespace)
 		if err != nil {
 			return err
 		}
@@ -355,7 +355,7 @@ func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.Workload
 		return errors.Wrap(err, "failed to decode reservation schema")
 	}
 
-	allocation, err := storage.Find(wl.ID.String())
+	allocation, err := storage.Find(ctx, wl.ID.String())
 	if err != nil && strings.Contains(err.Error(), "not found") {
 		return nil
 	} else if err != nil {
@@ -389,21 +389,44 @@ func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.Workload
 	// If there are no more namespaces left except for the default namespace, we can delete this subvolume
 	if len(ns) == 1 && ns[0] == "default" {
 		log.Info().Msg("decommissioning zdb container because there are no more namespaces left")
-		err = p.deleteZdbContainer(containerID)
+		err = p.deleteZdbContainer(ctx, containerID)
 		if err != nil {
 			return errors.Wrap(err, "failed to decommission zdb container")
 		}
 
 		log.Info().Msgf("deleting subvolumes of reservation: %s", allocation.VolumeID)
 		// we also need to delete the flist volume
-		return storageClient.ReleaseFilesystem(allocation.VolumeID)
+		return storageClient.ReleaseFilesystem(ctx, allocation.VolumeID)
 	}
 
 	return nil
 }
 
-func (p *Primitives) deleteZdbContainer(containerID pkg.ContainerID) error {
-	return common.DeleteZdbContainer(containerID, p.zbus)
+func (p *Primitives) deleteZdbContainer(ctx context.Context, containerID pkg.ContainerID) error {
+	container := stubs.NewContainerModuleStub(p.zbus)
+	flist := stubs.NewFlisterStub(p.zbus)
+
+	info, err := container.Inspect(ctx, "zdb", containerID)
+	if err != nil && strings.Contains(err.Error(), "not found") {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to inspect container '%s'", containerID)
+	}
+
+	if err := container.Delete(ctx, "zdb", containerID); err != nil {
+		return errors.Wrapf(err, "failed to delete container %s", containerID)
+	}
+
+	network := stubs.NewNetworkerStub(p.zbus)
+	if err := network.ZDBDestroy(ctx, info.Network.Namespace); err != nil {
+		return errors.Wrapf(err, "failed to destroy zdb network namespace")
+	}
+
+	if err := flist.Umount(ctx, info.RootFS); err != nil {
+		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
+	}
+
+	return nil
 }
 
 func socketDir(containerID pkg.ContainerID) string {
@@ -451,7 +474,7 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 
 	// Listing running zdb containers
 	log.Debug().Msg("fetching zdb containers list")
-	containers, err := contmod.List(zdbContainerNS)
+	containers, err := contmod.List(ctx, zdbContainerNS)
 	if err != nil {
 		log.Error().Err(err).Msg("could not load containers list")
 		return err
@@ -459,7 +482,7 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 
 	// fetching extected hash
 	log.Debug().Msg("fetching flist hash")
-	expected, err := flistmod.FlistHash(zdbFlistURL)
+	expected, err := flistmod.FlistHash(ctx, zdbFlistURL)
 	if err != nil {
 		log.Error().Err(err).Msg("could not load expected flist hash")
 		return err
@@ -475,14 +498,14 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 
 		log.Debug().Str("id", string(c)).Msg("inspecting container")
 
-		continfo, err := contmod.Inspect(zdbContainerNS, c)
+		continfo, err := contmod.Inspect(ctx, zdbContainerNS, c)
 
 		if err != nil {
 			log.Error().Err(err).Msg("could not inspect container")
 			continue
 		}
 
-		hash, err := flistmod.HashFromRootPath(continfo.RootFS)
+		hash, err := flistmod.HashFromRootPath(ctx, continfo.RootFS)
 		if err != nil {
 			log.Error().Err(err).Msg("could not find container running flist hash")
 			continue
@@ -518,32 +541,32 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 			}
 
 			// stopping running zdb
-			err := contmod.Delete(zdbContainerNS, c)
+			err := contmod.Delete(ctx, zdbContainerNS, c)
 			if err != nil {
 				log.Error().Err(err).Msg("could not stop running zdb container")
 				continue
 			}
 
 			// cleanup old containers rootfs
-			if err = flistmod.Umount(continfo.RootFS); err != nil {
+			if err = flistmod.Umount(ctx, continfo.RootFS); err != nil {
 				log.Error().Err(err).Str("path", continfo.RootFS).Msgf("failed to unmount old zdb container")
 			}
 
 			// restarting zdb
 
 			// mount the new flist
-			rootfs, err := p.zdbRootFS()
+			rootfs, err := p.zdbRootFS(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("could not initialize zdb rootfs")
 				continue
 			}
 
 			// respawn the container
-			err = p.zdbRun(volumeid, rootfs, zdbcmd, netns, volumepath, socketdir)
+			err = p.zdbRun(ctx, volumeid, rootfs, zdbcmd, netns, volumepath, socketdir)
 			if err != nil {
 				log.Error().Err(err).Msg("could not restart zdb container")
 
-				if err = flistmod.Umount(rootfs); err != nil {
+				if err = flistmod.Umount(ctx, rootfs); err != nil {
 					log.Error().Err(err).Str("path", rootfs).Msgf("failed to unmount zdb container")
 				}
 			}

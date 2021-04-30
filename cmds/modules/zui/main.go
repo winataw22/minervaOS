@@ -80,7 +80,7 @@ func action(ctx *cli.Context) error {
 
 	var flag signalFlag
 
-	if err := headerRenderer(client, header, &flag); err != nil {
+	if err := headerRenderer(ctx.Context, client, header, &flag); err != nil {
 		log.Error().Err(err).Msg("failed to start header renderer")
 	}
 

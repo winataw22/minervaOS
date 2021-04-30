@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/farmer"
@@ -52,7 +51,7 @@ func registration(ctx context.Context, cl zbus.Client) error {
 	exp.MaxInterval = 2 * time.Minute
 	bo := backoff.WithContext(exp, ctx)
 	err = backoff.RetryNotify(func() error {
-		return registerNode(env, mgr, fm, cap, loc)
+		return registerNode(ctx, env, mgr, fm, cap, loc)
 	}, bo, retryNotify)
 
 	if err != nil {
@@ -67,12 +66,12 @@ func retryNotify(err error, d time.Duration) {
 	log.Warn().Err(err).Str("sleep", d.String()).Msg("registration failed")
 }
 
-func registerNode(env environment.Environment, mgr pkg.IdentityManager, cl *farmer.Client, cap gridtypes.Capacity, loc geoip.Location) error {
-	log.Info().Str("id", mgr.NodeID().Identity()).Msg("start registration of the node")
+func registerNode(ctx context.Context, env environment.Environment, mgr *stubs.IdentityManagerStub, cl *farmer.Client, cap gridtypes.Capacity, loc geoip.Location) error {
+	log.Info().Str("id", mgr.NodeID(ctx).Identity()).Msg("start registration of the node")
 	log.Info().Msg("registering at farmer bot")
 
 	return cl.NodeRegister(farmer.Node{
-		ID:     mgr.NodeID().Identity(),
+		ID:     mgr.NodeID(ctx).Identity(),
 		FarmID: uint32(env.FarmerID),
 		Secret: env.FarmSecret,
 		Location: farmer.Location{

@@ -100,12 +100,13 @@ func main() {
 	}
 
 	if id {
+		ctx := context.Background()
 		client, err := zbus.NewRedisClient(broker)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to connect to zbus")
 		}
 		stub := stubs.NewIdentityManagerStub(client)
-		nodeID := stub.NodeID()
+		nodeID := stub.NodeID(ctx)
 		fmt.Println(nodeID)
 		os.Exit(0)
 	}

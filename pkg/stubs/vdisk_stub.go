@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -22,9 +23,9 @@ func NewVDiskModuleStub(client zbus.Client) *VDiskModuleStub {
 	}
 }
 
-func (s *VDiskModuleStub) Allocate(arg0 string, arg1 int64) (ret0 string, ret1 error) {
+func (s *VDiskModuleStub) Allocate(ctx context.Context, arg0 string, arg1 int64) (ret0 string, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Allocate", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Allocate", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -38,9 +39,9 @@ func (s *VDiskModuleStub) Allocate(arg0 string, arg1 int64) (ret0 string, ret1 e
 	return
 }
 
-func (s *VDiskModuleStub) Deallocate(arg0 string) (ret0 error) {
+func (s *VDiskModuleStub) Deallocate(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Deallocate", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Deallocate", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -51,9 +52,9 @@ func (s *VDiskModuleStub) Deallocate(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *VDiskModuleStub) Exists(arg0 string) (ret0 bool) {
+func (s *VDiskModuleStub) Exists(ctx context.Context, arg0 string) (ret0 bool) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Exists", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Exists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -63,9 +64,9 @@ func (s *VDiskModuleStub) Exists(arg0 string) (ret0 bool) {
 	return
 }
 
-func (s *VDiskModuleStub) Inspect(arg0 string) (ret0 pkg.VDisk, ret1 error) {
+func (s *VDiskModuleStub) Inspect(ctx context.Context, arg0 string) (ret0 pkg.VDisk, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Inspect", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Inspect", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -79,9 +80,9 @@ func (s *VDiskModuleStub) Inspect(arg0 string) (ret0 pkg.VDisk, ret1 error) {
 	return
 }
 
-func (s *VDiskModuleStub) List() (ret0 []pkg.VDisk, ret1 error) {
+func (s *VDiskModuleStub) List(ctx context.Context) (ret0 []pkg.VDisk, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "List", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "List", args...)
 	if err != nil {
 		panic(err)
 	}

@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -22,9 +23,9 @@ func NewContainerModuleStub(client zbus.Client) *ContainerModuleStub {
 	}
 }
 
-func (s *ContainerModuleStub) Delete(arg0 string, arg1 pkg.ContainerID) (ret0 error) {
+func (s *ContainerModuleStub) Delete(ctx context.Context, arg0 string, arg1 pkg.ContainerID) (ret0 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Delete", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Delete", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -35,9 +36,9 @@ func (s *ContainerModuleStub) Delete(arg0 string, arg1 pkg.ContainerID) (ret0 er
 	return
 }
 
-func (s *ContainerModuleStub) Inspect(arg0 string, arg1 pkg.ContainerID) (ret0 pkg.Container, ret1 error) {
+func (s *ContainerModuleStub) Inspect(ctx context.Context, arg0 string, arg1 pkg.ContainerID) (ret0 pkg.Container, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Inspect", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Inspect", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -51,9 +52,9 @@ func (s *ContainerModuleStub) Inspect(arg0 string, arg1 pkg.ContainerID) (ret0 p
 	return
 }
 
-func (s *ContainerModuleStub) List(arg0 string) (ret0 []pkg.ContainerID, ret1 error) {
+func (s *ContainerModuleStub) List(ctx context.Context, arg0 string) (ret0 []pkg.ContainerID, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "List", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "List", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -67,9 +68,9 @@ func (s *ContainerModuleStub) List(arg0 string) (ret0 []pkg.ContainerID, ret1 er
 	return
 }
 
-func (s *ContainerModuleStub) ListNS() (ret0 []string, ret1 error) {
+func (s *ContainerModuleStub) ListNS(ctx context.Context) (ret0 []string, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "ListNS", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ListNS", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -83,9 +84,9 @@ func (s *ContainerModuleStub) ListNS() (ret0 []string, ret1 error) {
 	return
 }
 
-func (s *ContainerModuleStub) Run(arg0 string, arg1 pkg.Container) (ret0 pkg.ContainerID, ret1 error) {
+func (s *ContainerModuleStub) Run(ctx context.Context, arg0 string, arg1 pkg.Container) (ret0 pkg.ContainerID, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Run", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Run", args...)
 	if err != nil {
 		panic(err)
 	}

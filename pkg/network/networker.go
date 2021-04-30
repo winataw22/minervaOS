@@ -20,6 +20,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
+	"github.com/threefoldtech/zos/pkg/stubs"
 
 	"github.com/vishvananda/netlink"
 
@@ -63,7 +64,7 @@ var (
 )
 
 type networker struct {
-	identity     pkg.IdentityManager
+	identity     *stubs.IdentityManagerStub
 	networkDir   string
 	ipamLeaseDir string
 	portSet      *set.UIntSet
@@ -76,7 +77,7 @@ type networker struct {
 var _ pkg.Networker = (*networker)(nil)
 
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity pkg.IdentityManager, publicCfgPath string, ndmz ndmz.DMZ, ygg *YggServer) (pkg.Networker, error) {
+func NewNetworker(identity *stubs.IdentityManagerStub, publicCfgPath string, ndmz ndmz.DMZ, ygg *YggServer) (pkg.Networker, error) {
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
@@ -794,7 +795,7 @@ func (n *networker) DeleteNR(netNR pkg.Network) error {
 
 // Set node public namespace config
 func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
-	id := n.identity.NodeID()
+	id := n.identity.NodeID(context.Background())
 	_, err := public.EnsurePublicSetup(id, &cfg)
 	if err != nil {
 		return err

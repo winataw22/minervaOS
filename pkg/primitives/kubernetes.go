@@ -30,15 +30,15 @@ func (p *Primitives) kubernetesProvision(ctx context.Context, wl *gridtypes.Work
 	return p.kubernetesProvisionImpl(ctx, wl)
 }
 
-func ensureFList(flister pkg.Flister, url string) (string, error) {
-	hash, err := flister.FlistHash(url)
+func ensureFList(ctx context.Context, flister *stubs.FlisterStub, url string) (string, error) {
+	hash, err := flister.FlistHash(ctx, url)
 	if err != nil {
 		return "", err
 	}
 
 	name := fmt.Sprintf("k8s:%s", hash)
 
-	return flister.NamedMount(name, url, "", pkg.ReadOnlyMountOptions)
+	return flister.NamedMount(ctx, name, url, "", pkg.ReadOnlyMountOptions)
 }
 
 func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result KubernetesResult, err error) {
@@ -53,7 +53,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		needsInstall = true
 	)
 
-	if vm.Exists(wl.ID.String()) {
+	if vm.Exists(ctx, wl.ID.String()) {
 		return result, provision.ErrDidNotChange
 	}
 
@@ -68,7 +68,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	// check if the network tap already exists
 	// if it does, it's most likely that a vm with the same network id and node id already exists
 	// this will cause the reservation to fail
-	exists, err := network.TapExists(netID)
+	exists, err := network.TapExists(ctx, netID)
 	if err != nil {
 		return result, errors.Wrap(err, "could not check if tap device exists")
 	}
@@ -78,7 +78,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	}
 
 	// check if public ipv4 is supported, should this be requested
-	if len(config.PublicIP) > 0 && !network.PublicIPv4Support() {
+	if len(config.PublicIP) > 0 && !network.PublicIPv4Support(ctx) {
 		return result, errors.New("public ipv4 is requested, but not supported on this node")
 	}
 
@@ -90,27 +90,27 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		return result, errors.Wrap(err, "could not interpret vm size")
 	}
 
-	if _, err = vm.Inspect(wl.ID.String()); err == nil {
+	if _, err = vm.Inspect(ctx, wl.ID.String()); err == nil {
 		// vm is already running, nothing to do here
 		return result, nil
 	}
 
-	imagePath, err := ensureFList(flist, k3osFlistURL)
+	imagePath, err := ensureFList(ctx, flist, k3osFlistURL)
 	if err != nil {
 		return result, errors.Wrap(err, "could not mount k3os flist")
 	}
 
 	var diskPath string
 	diskName := fmt.Sprintf("%s-%s", FilesystemName(wl), "vda")
-	if storage.Exists(diskName) {
+	if storage.Exists(ctx, diskName) {
 		needsInstall = false
-		info, err := storage.Inspect(diskName)
+		info, err := storage.Inspect(ctx, diskName)
 		if err != nil {
 			return result, errors.Wrap(err, "could not get path to existing disk")
 		}
 		diskPath = info.Path
 	} else {
-		diskPath, err = storage.Allocate(diskName, int64(disk))
+		diskPath, err = storage.Allocate(ctx, diskName, int64(disk))
 		if err != nil {
 			return result, errors.Wrap(err, "failed to reserve filesystem for vm")
 		}
@@ -118,19 +118,19 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	// clean up the disk anyway, even if it has already been installed.
 	defer func() {
 		if err != nil {
-			_ = storage.Deallocate(diskName)
+			_ = storage.Deallocate(ctx, diskName)
 		}
 	}()
 
 	var iface string
-	iface, err = network.SetupTap(netID)
+	iface, err = network.SetupTap(ctx, netID)
 	if err != nil {
 		return result, errors.Wrap(err, "could not set up tap device")
 	}
 
 	defer func() {
 		if err != nil {
-			_ = network.RemoveTap(netID)
+			_ = network.RemoveTap(ctx, netID)
 		}
 	}()
 
@@ -141,14 +141,14 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 			return zos.KubernetesResult{}, err
 		}
 		name := ipWl.ID.String()
-		pubIface, err = network.SetupPubTap(name)
+		pubIface, err = network.SetupPubTap(ctx, name)
 		if err != nil {
 			return result, errors.Wrap(err, "could not set up tap device for public network")
 		}
 
 		defer func() {
 			if err != nil {
-				_ = network.RemovePubTap(name)
+				_ = network.RemovePubTap(ctx, name)
 			}
 		}()
 	}
@@ -161,7 +161,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 
 	if needsInstall {
 		if err = p.kubernetesInstall(ctx, wl.ID.String(), cpu, memory, diskPath, imagePath, netInfo, config); err != nil {
-			vm.Delete(wl.ID.String())
+			vm.Delete(ctx, wl.ID.String())
 			return result, errors.Wrap(err, "failed to install k3s")
 		}
 	}
@@ -169,7 +169,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	err = p.kubernetesRun(ctx, wl.ID.String(), cpu, memory, diskPath, imagePath, netInfo, config)
 	if err != nil {
 		// attempt to delete the vm, should the process still be lingering
-		vm.Delete(wl.ID.String())
+		vm.Delete(ctx, wl.ID.String())
 	}
 
 	return result, err
@@ -221,14 +221,14 @@ func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uin
 		NoKeepAlive: true, //machine will not restarted automatically when it exists
 	}
 
-	if err := vm.Run(installVM); err != nil {
+	if err := vm.Run(ctx, installVM); err != nil {
 		return errors.Wrap(err, "could not run vm")
 	}
 
 	deadline, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 	for {
-		if !vm.Exists(name) {
+		if !vm.Exists(ctx, name) {
 			// install is done
 			break
 		}
@@ -240,14 +240,14 @@ func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uin
 			// In that case, we attempt a delete first. This will kill the vm process
 			// if it is still going. The actual resources (disk, taps, ...) should
 			// be handled by the caller.
-			logs, err := vm.Logs(name)
+			logs, err := vm.Logs(ctx, name)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get machine logs")
 			} else {
 				log.Warn().Str("vm", name).Str("type", "machine-logs").Msg(logs)
 			}
 
-			if err := vm.Delete(name); err != nil {
+			if err := vm.Delete(ctx, name); err != nil {
 				log.Warn().Err(err).Msg("could not delete vm who's install deadline expired")
 			}
 			return errors.New("failed to install vm in 5 minutes")
@@ -255,7 +255,7 @@ func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uin
 	}
 
 	// Delete the VM, the disk will be installed now
-	return vm.Delete(name)
+	return vm.Delete(ctx, name)
 }
 
 func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, memory uint64, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
@@ -276,7 +276,7 @@ func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, 
 		Disks:       disks,
 	}
 
-	return vm.Run(kubevm)
+	return vm.Run(ctx, kubevm)
 }
 
 func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
@@ -292,8 +292,8 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 		return errors.Wrap(err, "failed to decode reservation schema")
 	}
 
-	if _, err := vm.Inspect(wl.ID.String()); err == nil {
-		if err := vm.Delete(wl.ID.String()); err != nil {
+	if _, err := vm.Inspect(ctx, wl.ID.String()); err == nil {
+		if err := vm.Delete(ctx, wl.ID.String()); err != nil {
 			return errors.Wrapf(err, "failed to delete vm %s", wl.ID)
 		}
 	}
@@ -301,17 +301,17 @@ func (p *Primitives) kubernetesDecomission(ctx context.Context, wl *gridtypes.Wo
 	deployment := provision.GetDeployment(ctx)
 
 	netID := zos.NetworkID(deployment.TwinID, string(cfg.Network))
-	if err := network.RemoveTap(netID); err != nil {
+	if err := network.RemoveTap(ctx, netID); err != nil {
 		return errors.Wrap(err, "could not clean up tap device")
 	}
 
 	if len(cfg.PublicIP) > 0 {
-		if err := network.RemovePubTap(cfg.PublicIP); err != nil {
+		if err := network.RemovePubTap(ctx, cfg.PublicIP); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}
 	}
 
-	if err := storage.Deallocate(fmt.Sprintf("%s-%s", wl.ID, "vda")); err != nil {
+	if err := storage.Deallocate(ctx, fmt.Sprintf("%s-%s", wl.ID, "vda")); err != nil {
 		return errors.Wrap(err, "could not remove vDisk")
 	}
 
@@ -322,7 +322,7 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.
 	network := stubs.NewNetworkerStub(p.zbus)
 
 	netID := zos.NetworkID(deployment.TwinID, string(cfg.Network))
-	subnet, err := network.GetSubnet(netID)
+	subnet, err := network.GetSubnet(ctx, netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource subnet")
 	}
@@ -331,7 +331,7 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.
 		return pkg.VMNetworkInfo{}, fmt.Errorf("IP %s is not part of local nr subnet %s", cfg.IP.String(), subnet.String())
 	}
 
-	privNet, err := network.GetNet(netID)
+	privNet, err := network.GetNet(ctx, netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network range")
 	}
@@ -341,12 +341,12 @@ func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.
 		Mask: subnet.Mask,
 	}
 
-	gw4, gw6, err := network.GetDefaultGwIP(netID)
+	gw4, gw6, err := network.GetDefaultGwIP(ctx, netID)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get network resource default gateway")
 	}
 
-	privIP6, err := network.GetIPv6From4(netID, cfg.IP)
+	privIP6, err := network.GetIPv6From4(ctx, netID, cfg.IP)
 	if err != nil {
 		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
 	}
@@ -429,64 +429,10 @@ func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID, name string) (
 // returns the vCpu's, memory, disksize for a vm size
 // memory and disk size is expressed in MiB
 func vmSize(vm *Kubernetes) (cpu uint8, memory uint64, storage uint64, err error) {
-	switch vm.Size {
-	case 0:
-		return 0, 0, 0, fmt.Errorf("not supported size")
-	case 1:
-		// 1 vCpu, 2 GiB RAM, 50 GB disk
-		return 1, 2 * 1024, 50 * 1024, nil
-	case 2:
-		// 2 vCpu, 4 GiB RAM, 100 GB disk
-		return 2, 4 * 1024, 100 * 1024, nil
-	case 3:
-		// 2 vCpu, 8 GiB RAM, 25 GB disk
-		return 2, 8 * 1024, 25 * 1024, nil
-	case 4:
-		// 2 vCpu, 8 GiB RAM, 50 GB disk
-		return 2, 8 * 1024, 50 * 1024, nil
-	case 5:
-		// 2 vCpu, 8 GiB RAM, 200 GB disk
-		return 2, 8 * 1024, 200 * 1024, nil
-	case 6:
-		// 4 vCpu, 16 GiB RAM, 50 GB disk
-		return 4, 16 * 1024, 50 * 1024, nil
-	case 7:
-		// 4 vCpu, 16 GiB RAM, 100 GB disk
-		return 4, 16 * 1024, 100 * 1024, nil
-	case 8:
-		// 4 vCpu, 16 GiB RAM, 400 GB disk
-		return 4, 16 * 1024, 400 * 1024, nil
-	case 9:
-		// 8 vCpu, 32 GiB RAM, 100 GB disk
-		return 8, 32 * 1024, 100 * 1024, nil
-	case 10:
-		// 8 vCpu, 32 GiB RAM, 200 GB disk
-		return 8, 32 * 1024, 200 * 1024, nil
-	case 11:
-		// 8 vCpu, 32 GiB RAM, 800 GB disk
-		return 8, 32 * 1024, 800 * 1024, nil
-	case 12:
-		// 1 vCpu, 64 GiB RAM, 200 GB disk
-		return 1, 64 * 1024, 200 * 1024, nil
-	case 13:
-		// 1 mvCpu, 64 GiB RAM, 400 GB disk
-		return 1, 64 * 1024, 400 * 1024, nil
-	case 14:
-		//1 vCpu, 64 GiB RAM, 800 GB disk
-		return 1, 64 * 1024, 800 * 1024, nil
-	case 15:
-		//1 vCpu, 2 GiB RAM, 25 GB disk
-		return 1, 2 * 1024, 25 * 1024, nil
-	case 16:
-		//2 vCpu, 4 GiB RAM, 50 GB disk
-		return 2, 4 * 1024, 50 * 1024, nil
-	case 17:
-		//4 vCpu, 8 GiB RAM, 50 GB disk
-		return 4, 8 * 1024, 50 * 1024, nil
-	case 18:
-		//1 vCpu, 1 GiB RAM, 25 GB disk
-		return 1, 1 * 1024, 25 * 1024, nil
+	cap, err := vm.Capacity()
+	if err != nil {
+		return 0, 0, 0, err
 	}
 
-	return 0, 0, 0, fmt.Errorf("unsupported vm size %d, only size 1 to 18 are supported", vm.Size)
+	return uint8(cap.CRU), cap.MRU * 1024, cap.SRU * 1024, nil
 }

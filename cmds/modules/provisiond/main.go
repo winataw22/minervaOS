@@ -103,7 +103,7 @@ func action(cli *cli.Context) error {
 	}
 
 	identity := stubs.NewIdentityManagerStub(cl)
-	nodeID := identity.NodeID()
+	nodeID := identity.NodeID(cli.Context)
 
 	// block until networkd is ready to serve request from zbus
 	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
@@ -116,7 +116,7 @@ func action(cli *cli.Context) error {
 	bo := backoff.NewExponentialBackOff()
 	bo.MaxElapsedTime = 0
 	backoff.RetryNotify(func() error {
-		return network.Ready()
+		return network.Ready(cli.Context)
 	}, bo, func(err error, d time.Duration) {
 		log.Error().Err(err).Msg("networkd is not ready yet")
 	})
@@ -293,7 +293,7 @@ func action(cli *cli.Context) error {
 
 func getNodeReserved(cl zbus.Client) (counter primitives.Counters, err error) {
 	storage := stubs.NewStorageModuleStub(cl)
-	fs, err := storage.GetCacheFS()
+	fs, err := storage.GetCacheFS(context.TODO())
 	if err != nil {
 		return counter, err
 	}

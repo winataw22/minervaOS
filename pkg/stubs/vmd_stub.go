@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -22,9 +23,9 @@ func NewVMModuleStub(client zbus.Client) *VMModuleStub {
 	}
 }
 
-func (s *VMModuleStub) Delete(arg0 string) (ret0 error) {
+func (s *VMModuleStub) Delete(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Delete", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Delete", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -35,9 +36,9 @@ func (s *VMModuleStub) Delete(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *VMModuleStub) Exists(arg0 string) (ret0 bool) {
+func (s *VMModuleStub) Exists(ctx context.Context, arg0 string) (ret0 bool) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Exists", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Exists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -47,9 +48,9 @@ func (s *VMModuleStub) Exists(arg0 string) (ret0 bool) {
 	return
 }
 
-func (s *VMModuleStub) Inspect(arg0 string) (ret0 pkg.VMInfo, ret1 error) {
+func (s *VMModuleStub) Inspect(ctx context.Context, arg0 string) (ret0 pkg.VMInfo, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Inspect", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Inspect", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -63,9 +64,9 @@ func (s *VMModuleStub) Inspect(arg0 string) (ret0 pkg.VMInfo, ret1 error) {
 	return
 }
 
-func (s *VMModuleStub) List() (ret0 []string, ret1 error) {
+func (s *VMModuleStub) List(ctx context.Context) (ret0 []string, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "List", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "List", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -79,9 +80,9 @@ func (s *VMModuleStub) List() (ret0 []string, ret1 error) {
 	return
 }
 
-func (s *VMModuleStub) Logs(arg0 string) (ret0 string, ret1 error) {
+func (s *VMModuleStub) Logs(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Logs", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Logs", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -95,9 +96,9 @@ func (s *VMModuleStub) Logs(arg0 string) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *VMModuleStub) Run(arg0 pkg.VM) (ret0 error) {
+func (s *VMModuleStub) Run(ctx context.Context, arg0 pkg.VM) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Run", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Run", args...)
 	if err != nil {
 		panic(err)
 	}

@@ -53,7 +53,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 	}
 
 	// check if workload is already deployed
-	_, err := containerClient.Inspect(tenantNS, pkg.ContainerID(containerID))
+	_, err := containerClient.Inspect(ctx, tenantNS, pkg.ContainerID(containerID))
 	if err == nil {
 		return ContainerResult{}, provision.ErrDidNotChange
 	}
@@ -70,7 +70,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 		Msg("deploying network")
 
 		// check to make sure the network is already installed on the node
-	if _, err := networkMgr.GetSubnet(netID); err != nil {
+	if _, err := networkMgr.GetSubnet(ctx, netID); err != nil {
 		return ContainerResult{}, fmt.Errorf("network %s is not installed on this node", config.Network.Network)
 	}
 
@@ -110,7 +110,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 		ips[i] = ip.String()
 	}
 	var join pkg.Member
-	join, err = networkMgr.Join(netID, containerID.String(), pkg.ContainerNetworkConfig{
+	join, err = networkMgr.Join(ctx, netID, containerID.String(), pkg.ContainerNetworkConfig{
 		IPs:         ips,
 		PublicIP6:   config.Network.PublicIP6,
 		YggdrasilIP: config.Network.YggdrasilIP,
@@ -127,7 +127,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 
 	defer func() {
 		if err != nil {
-			if err := networkMgr.Leave(netID, containerID.String()); err != nil {
+			if err := networkMgr.Leave(ctx, netID, containerID.String()); err != nil {
 				log.Error().Err(err).Msgf("failed leave container network namespace")
 			}
 		}
@@ -146,7 +146,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 	}
 
 	var mnt string
-	mnt, err = flistClient.NamedMount(FilesystemName(wl), config.FList, config.HubURL, rootfsMntOpt)
+	mnt, err = flistClient.NamedMount(ctx, FilesystemName(wl), config.FList, config.HubURL, rootfsMntOpt)
 	if err != nil {
 		return ContainerResult{}, err
 	}
@@ -175,7 +175,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 			return ContainerResult{}, errors.Wrap(err, "failed to get volume workload")
 		}
 
-		source, err = storageClient.Path(volume.ID.String())
+		source, err = storageClient.Path(ctx, volume.ID.String())
 		if err != nil {
 			return ContainerResult{}, errors.Wrapf(err, "failed to get the mountpoint path of the volume '%s'", mount.Volume)
 		}
@@ -191,11 +191,11 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 
 	defer func() {
 		if err != nil {
-			if err := containerClient.Delete(tenantNS, pkg.ContainerID(containerID)); err != nil {
+			if err := containerClient.Delete(ctx, tenantNS, pkg.ContainerID(containerID)); err != nil {
 				log.Error().Err(err).Stringer("container_id", containerID).Msg("error during delete of container")
 			}
 
-			if err := flistClient.Umount(mnt); err != nil {
+			if err := flistClient.Umount(ctx, mnt); err != nil {
 				log.Error().Err(err).Str("path", mnt).Msgf("failed to unmount")
 			}
 		}
@@ -203,6 +203,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 
 	var id pkg.ContainerID
 	id, err = containerClient.Run(
+		ctx,
 		tenantNS,
 		pkg.Container{
 			Name:   containerID.String(),
@@ -259,9 +260,9 @@ func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.Wo
 		return err
 	}
 
-	info, err := container.Inspect(tenantNS, containerID)
+	info, err := container.Inspect(ctx, tenantNS, containerID)
 	if err == nil {
-		if err := container.Delete(tenantNS, containerID); err != nil {
+		if err := container.Delete(ctx, tenantNS, containerID); err != nil {
 			return errors.Wrapf(err, "failed to delete container %s", containerID)
 		}
 
@@ -273,7 +274,7 @@ func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.Wo
 			}
 		}
 
-		if err := flist.Umount(rootFS); err != nil {
+		if err := flist.Umount(ctx, rootFS); err != nil {
 			return errors.Wrapf(err, "failed to unmount flist at %s", rootFS)
 		}
 
@@ -282,8 +283,8 @@ func (p *Primitives) containerDecommission(ctx context.Context, wl *gridtypes.Wo
 	}
 
 	netID := zos.NetworkID(deployment.TwinID, string(config.Network.Network))
-	if _, err := networkMgr.GetSubnet(netID); err == nil { // simple check to make sure the network still exists on the node
-		if err := networkMgr.Leave(netID, string(containerID)); err != nil {
+	if _, err := networkMgr.GetSubnet(ctx, netID); err == nil { // simple check to make sure the network still exists on the node
+		if err := networkMgr.Leave(ctx, netID, string(containerID)); err != nil {
 			return errors.Wrap(err, "failed to delete container network namespace")
 		}
 	}
@@ -299,7 +300,7 @@ func (p *Primitives) waitContainerIP(ctx context.Context, ifaceName, namespace s
 
 	getIP := func() error {
 
-		ips, err := network.Addrs(ifaceName, namespace)
+		ips, err := network.Addrs(ctx, ifaceName, namespace)
 		if err != nil {
 			log.Debug().Err(err).Msg("not ip public found, waiting")
 			return err

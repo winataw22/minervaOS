@@ -32,54 +32,25 @@ type StorageMock struct {
 }
 
 // CreateFilesystem create filesystem mock
-func (s *StorageMock) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
-	args := s.Called(name, size, poolType)
-	return pkg.Filesystem{
-		Path: args.String(0),
-	}, args.Error(1)
-}
-
-// CreateFilesystem create filesystem mock
-func (s *StorageMock) UpdateFilesystem(name string, size uint64) (pkg.Filesystem, error) {
-	args := s.Called(name, size)
+func (s *StorageMock) CreateFilesystem(ctx context.Context, name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
+	args := s.Called(ctx, name, size, poolType)
 	return pkg.Filesystem{
 		Path: args.String(0),
 	}, args.Error(1)
 }
 
 // ReleaseFilesystem releases filesystem mock
-func (s *StorageMock) ReleaseFilesystem(name string) error {
-	args := s.Called(name)
+func (s *StorageMock) ReleaseFilesystem(ctx context.Context, name string) error {
+	args := s.Called(ctx, name)
 	return args.Error(0)
 }
 
-// ListFilesystems list filesystem mock
-func (s *StorageMock) ListFilesystems() ([]pkg.Filesystem, error) {
-	args := s.Called()
-	return nil, args.Error(1)
-}
-
 // Path implements the pkg.StorageModules interfaces
-func (s *StorageMock) Path(name string) (pkg.Filesystem, error) {
-	args := s.Called(name)
+func (s *StorageMock) Path(ctx context.Context, name string) (pkg.Filesystem, error) {
+	args := s.Called(ctx, name)
 	return pkg.Filesystem{
 		Path: args.String(0),
 	}, args.Error(1)
-}
-
-func (s *StorageMock) CanAllocate(name string, size uint64) (bool, error) {
-	args := s.Called(name, size)
-	return args.Bool(0), args.Error(1)
-}
-
-// GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
-func (s *StorageMock) GetCacheFS() (pkg.Filesystem, error) {
-	return pkg.Filesystem{}, nil
-}
-
-// GetVdiskFS return the filesystem used to store the vdisk file for the VM module
-func (s *StorageMock) GetVdiskFS() (pkg.Filesystem, error) {
-	return pkg.Filesystem{}, nil
 }
 
 type testCommander struct {
@@ -158,7 +129,7 @@ func TestMountUnmount(t *testing.T) {
 
 	flister := newFlister(root, strg, cmder)
 
-	strg.On("Path", mock.Anything).Return("/my/backend", nil)
+	strg.On("Path", mock.Anything, mock.Anything).Return("/my/backend", nil)
 
 	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), zos.SSDDevice).
 		Return("/my/backend", nil)
@@ -168,7 +139,7 @@ func TestMountUnmount(t *testing.T) {
 
 	// Trick flister into thinking that 0-fs has exited
 	os.Remove(cmder.m["pid"])
-	strg.On("ReleaseFilesystem", filepath.Base(mnt)).Return(nil)
+	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
 
 	err = flister.Umount(mnt)
 	require.NoError(t, err)
@@ -187,9 +158,9 @@ func TestIsolation(t *testing.T) {
 
 	flister := newFlister(root, strg, cmder)
 
-	strg.On("Path", mock.Anything).Return("/my/backend", nil)
+	strg.On("Path", mock.Anything, mock.Anything).Return("/my/backend", nil)
 
-	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), zos.SSDDevice).
+	strg.On("CreateFilesystem", mock.Anything, mock.Anything, mock.Anything, uint64(256*mib), zos.SSDDevice).
 		Return("/my/backend", nil)
 
 	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)

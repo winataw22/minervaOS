@@ -52,7 +52,7 @@ func (n *Network) setup(router *mux.Router) error {
 }
 
 func (n *Network) listPorts(request *http.Request) (interface{}, mw.Response) {
-	ports, err := stubs.NewNetworkerStub(n.cl).WireguardPorts()
+	ports, err := stubs.NewNetworkerStub(n.cl).WireguardPorts(request.Context())
 	if err != nil {
 		return nil, mw.Error(err)
 	}
@@ -106,7 +106,7 @@ func (n *Network) listPublicIps(request *http.Request) (interface{}, mw.Response
 }
 
 func (n *Network) getPublicConfig(request *http.Request) (interface{}, mw.Response) {
-	cfg, err := stubs.NewNetworkerStub(n.cl).GetPublicConfig()
+	cfg, err := stubs.NewNetworkerStub(n.cl).GetPublicConfig(request.Context())
 	if err != nil {
 		return nil, mw.NotFound(err)
 	}
@@ -121,7 +121,7 @@ func (n *Network) setPublicConfig(request *http.Request) (interface{}, mw.Respon
 		return nil, mw.BadRequest(err)
 	}
 
-	err := stubs.NewNetworkerStub(n.cl).SetPublicConfig(cfg)
+	err := stubs.NewNetworkerStub(n.cl).SetPublicConfig(request.Context(), cfg)
 	if err != nil {
 		return nil, mw.Error(err)
 	}

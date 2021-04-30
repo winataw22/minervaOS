@@ -24,9 +24,9 @@ func NewStorageModuleStub(client zbus.Client) *StorageModuleStub {
 	}
 }
 
-func (s *StorageModuleStub) Allocate(arg0 string, arg1 zos.DeviceType, arg2 uint64, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
+func (s *StorageModuleStub) Allocate(ctx context.Context, arg0 string, arg1 zos.DeviceType, arg2 uint64, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3}
-	result, err := s.client.Request(s.module, s.object, "Allocate", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Allocate", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -40,9 +40,9 @@ func (s *StorageModuleStub) Allocate(arg0 string, arg1 zos.DeviceType, arg2 uint
 	return
 }
 
-func (s *StorageModuleStub) BrokenDevices() (ret0 []pkg.BrokenDevice) {
+func (s *StorageModuleStub) BrokenDevices(ctx context.Context) (ret0 []pkg.BrokenDevice) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "BrokenDevices", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "BrokenDevices", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -52,9 +52,9 @@ func (s *StorageModuleStub) BrokenDevices() (ret0 []pkg.BrokenDevice) {
 	return
 }
 
-func (s *StorageModuleStub) BrokenPools() (ret0 []pkg.BrokenPool) {
+func (s *StorageModuleStub) BrokenPools(ctx context.Context) (ret0 []pkg.BrokenPool) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "BrokenPools", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "BrokenPools", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -64,9 +64,9 @@ func (s *StorageModuleStub) BrokenPools() (ret0 []pkg.BrokenPool) {
 	return
 }
 
-func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 zos.DeviceType) (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) CreateFilesystem(ctx context.Context, arg0 string, arg1 uint64, arg2 zos.DeviceType) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
-	result, err := s.client.Request(s.module, s.object, "CreateFilesystem", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "CreateFilesystem", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -80,9 +80,9 @@ func (s *StorageModuleStub) CreateFilesystem(arg0 string, arg1 uint64, arg2 zos.
 	return
 }
 
-func (s *StorageModuleStub) Find(arg0 string) (ret0 pkg.Allocation, ret1 error) {
+func (s *StorageModuleStub) Find(ctx context.Context, arg0 string) (ret0 pkg.Allocation, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Find", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Find", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -96,9 +96,9 @@ func (s *StorageModuleStub) Find(arg0 string) (ret0 pkg.Allocation, ret1 error) 
 	return
 }
 
-func (s *StorageModuleStub) GetCacheFS() (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) GetCacheFS(ctx context.Context) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "GetCacheFS", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetCacheFS", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -112,9 +112,9 @@ func (s *StorageModuleStub) GetCacheFS() (ret0 pkg.Filesystem, ret1 error) {
 	return
 }
 
-func (s *StorageModuleStub) ListFilesystems() (ret0 []pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) ListFilesystems(ctx context.Context) (ret0 []pkg.Filesystem, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "ListFilesystems", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ListFilesystems", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -147,9 +147,9 @@ func (s *StorageModuleStub) Monitor(ctx context.Context) (<-chan pkg.PoolsStats,
 	return ch, nil
 }
 
-func (s *StorageModuleStub) Path(arg0 string) (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) Path(ctx context.Context, arg0 string) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Path", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Path", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -163,9 +163,9 @@ func (s *StorageModuleStub) Path(arg0 string) (ret0 pkg.Filesystem, ret1 error) 
 	return
 }
 
-func (s *StorageModuleStub) ReleaseFilesystem(arg0 string) (ret0 error) {
+func (s *StorageModuleStub) ReleaseFilesystem(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "ReleaseFilesystem", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ReleaseFilesystem", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -176,9 +176,9 @@ func (s *StorageModuleStub) ReleaseFilesystem(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *StorageModuleStub) Total(arg0 zos.DeviceType) (ret0 uint64, ret1 error) {
+func (s *StorageModuleStub) Total(ctx context.Context, arg0 zos.DeviceType) (ret0 uint64, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Total", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Total", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -192,9 +192,9 @@ func (s *StorageModuleStub) Total(arg0 zos.DeviceType) (ret0 uint64, ret1 error)
 	return
 }
 
-func (s *StorageModuleStub) UpdateFilesystem(arg0 string, arg1 uint64) (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) UpdateFilesystem(ctx context.Context, arg0 string, arg1 uint64) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "UpdateFilesystem", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "UpdateFilesystem", args...)
 	if err != nil {
 		panic(err)
 	}

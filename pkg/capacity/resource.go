@@ -1,6 +1,7 @@
 package capacity
 
 import (
+	"context"
 	"math"
 
 	"github.com/shirou/gopsutil/cpu"
@@ -24,7 +25,7 @@ func (r *ResourceOracle) mru() (uint64, error) {
 }
 
 func (r *ResourceOracle) sru() (uint64, error) {
-	total, err := r.storage.Total(zos.SSDDevice)
+	total, err := r.storage.Total(context.TODO(), zos.SSDDevice)
 	if err != nil {
 		return 0, err
 	}
@@ -33,7 +34,7 @@ func (r *ResourceOracle) sru() (uint64, error) {
 }
 
 func (r *ResourceOracle) hru() (uint64, error) {
-	total, err := r.storage.Total(zos.HDDDevice)
+	total, err := r.storage.Total(context.TODO(), zos.HDDDevice)
 	if err != nil {
 		return 0, err
 	}

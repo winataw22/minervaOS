@@ -70,7 +70,7 @@ func action(cli *cli.Context) error {
 	}
 
 	identity := stubs.NewIdentityManagerStub(client)
-	nodeID := identity.NodeID()
+	nodeID := identity.NodeID(cli.Context)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -102,7 +102,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to host firewall rules")
 	}
 	log.Debug().Msg("starting yggdrasil")
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey(), dmz)
+	ygg, err := startYggdrasil(ctx, identity.PrivateKey(cli.Context), dmz)
 	if err != nil {
 		return errors.Wrap(err, "fail to start yggdrasil")
 	}

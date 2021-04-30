@@ -12,16 +12,16 @@ import (
 )
 
 // func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
-func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *signalFlag) error {
+func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r *signalFlag) error {
 	env, err := environment.Get()
 	if err != nil {
 		return err
 	}
 
 	identity := stubs.NewIdentityManagerStub(c)
-	nodeID := identity.NodeID()
+	nodeID := identity.NodeID(ctx)
 	var farm string
-	farmID, err := identity.FarmID()
+	farmID, err := identity.FarmID(ctx)
 	if err != nil {
 		farm = "not set"
 	} else {
@@ -30,14 +30,12 @@ func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *signalFlag) error {
 
 	h.Text = "\n    Fetching realtime node information... please wait."
 
-	var s string
-	s = "          Welcome to [Zero-OS](fg:yellow), [ThreeFold](fg:blue) Autonomous Operating System\n" +
+	s := "          Welcome to [Zero-OS](fg:yellow), [ThreeFold](fg:blue) Autonomous Operating System\n" +
 		"\n" +
 		" This is node [%s](fg:green) (farmer [%s](fg:green))\n" +
 		" running Zero-OS version [%s](fg:blue) (mode [%s](fg:cyan))"
 
 	host := stubs.NewVersionMonitorStub(c)
-	ctx := context.Background()
 	ch, err := host.Version(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to start update stream for version")

@@ -1,6 +1,7 @@
 package stubs
 
 import (
+	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
 )
@@ -22,9 +23,9 @@ func NewFlisterStub(client zbus.Client) *FlisterStub {
 	}
 }
 
-func (s *FlisterStub) FlistHash(arg0 string) (ret0 string, ret1 error) {
+func (s *FlisterStub) FlistHash(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "FlistHash", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "FlistHash", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -38,9 +39,9 @@ func (s *FlisterStub) FlistHash(arg0 string) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *FlisterStub) HashFromRootPath(arg0 string) (ret0 string, ret1 error) {
+func (s *FlisterStub) HashFromRootPath(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "HashFromRootPath", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "HashFromRootPath", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -54,9 +55,9 @@ func (s *FlisterStub) HashFromRootPath(arg0 string) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *FlisterStub) Mount(arg0 string, arg1 string, arg2 pkg.MountOptions) (ret0 string, ret1 error) {
+func (s *FlisterStub) Mount(ctx context.Context, arg0 string, arg1 string, arg2 pkg.MountOptions) (ret0 string, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
-	result, err := s.client.Request(s.module, s.object, "Mount", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Mount", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -70,9 +71,9 @@ func (s *FlisterStub) Mount(arg0 string, arg1 string, arg2 pkg.MountOptions) (re
 	return
 }
 
-func (s *FlisterStub) NamedMount(arg0 string, arg1 string, arg2 string, arg3 pkg.MountOptions) (ret0 string, ret1 error) {
+func (s *FlisterStub) NamedMount(ctx context.Context, arg0 string, arg1 string, arg2 string, arg3 pkg.MountOptions) (ret0 string, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3}
-	result, err := s.client.Request(s.module, s.object, "NamedMount", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "NamedMount", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -86,9 +87,9 @@ func (s *FlisterStub) NamedMount(arg0 string, arg1 string, arg2 string, arg3 pkg
 	return
 }
 
-func (s *FlisterStub) NamedUmount(arg0 string) (ret0 error) {
+func (s *FlisterStub) NamedUmount(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "NamedUmount", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "NamedUmount", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -99,9 +100,9 @@ func (s *FlisterStub) NamedUmount(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *FlisterStub) Umount(arg0 string) (ret0 error) {
+func (s *FlisterStub) Umount(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "Umount", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Umount", args...)
 	if err != nil {
 		panic(err)
 	}

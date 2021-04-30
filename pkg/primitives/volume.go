@@ -31,14 +31,14 @@ func (p *Primitives) volumeProvisionImpl(ctx context.Context, wl *gridtypes.Work
 	vol.ID = wl.ID.String()
 	storageClient := stubs.NewStorageModuleStub(p.zbus)
 	size := config.Size * gigabyte
-	fs, err := storageClient.Path(wl.ID.String())
+	fs, err := storageClient.Path(ctx, wl.ID.String())
 	if err == nil {
 		// todo: validate that the volume type has not been changed.
 		// filesystem exist. do we need to (resize)
 		log.Info().Stringer("id", wl.ID).Msg("volume already deployed")
 		if fs.Usage.Size != size {
 			log.Info().Stringer("id", wl.ID).Uint64("size", size).Msg("resizing volume")
-			_, err := storageClient.UpdateFilesystem(wl.ID.String(), size)
+			_, err := storageClient.UpdateFilesystem(ctx, wl.ID.String(), size)
 			if err != nil {
 				return vol, err
 			}
@@ -46,7 +46,7 @@ func (p *Primitives) volumeProvisionImpl(ctx context.Context, wl *gridtypes.Work
 		return vol, err
 	}
 
-	_, err = storageClient.CreateFilesystem(wl.ID.String(), size, config.Type)
+	_, err = storageClient.CreateFilesystem(ctx, wl.ID.String(), size, config.Type)
 
 	return vol, err
 }
@@ -59,5 +59,5 @@ func (p *Primitives) volumeProvision(ctx context.Context, wl *gridtypes.Workload
 func (p *Primitives) volumeDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	storageClient := stubs.NewStorageModuleStub(p.zbus)
 
-	return storageClient.ReleaseFilesystem(wl.ID.String())
+	return storageClient.ReleaseFilesystem(ctx, wl.ID.String())
 }

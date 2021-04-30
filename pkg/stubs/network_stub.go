@@ -25,9 +25,9 @@ func NewNetworkerStub(client zbus.Client) *NetworkerStub {
 	}
 }
 
-func (s *NetworkerStub) Addrs(arg0 string, arg1 string) (ret0 [][]uint8, ret1 error) {
+func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (ret0 [][]uint8, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Addrs", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Addrs", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -41,9 +41,9 @@ func (s *NetworkerStub) Addrs(arg0 string, arg1 string) (ret0 [][]uint8, ret1 er
 	return
 }
 
-func (s *NetworkerStub) CreateNR(arg0 pkg.Network) (ret0 string, ret1 error) {
+func (s *NetworkerStub) CreateNR(ctx context.Context, arg0 pkg.Network) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "CreateNR", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "CreateNR", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -76,9 +76,9 @@ func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 	return ch, nil
 }
 
-func (s *NetworkerStub) DeleteNR(arg0 pkg.Network) (ret0 error) {
+func (s *NetworkerStub) DeleteNR(ctx context.Context, arg0 pkg.Network) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "DeleteNR", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "DeleteNR", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -89,9 +89,9 @@ func (s *NetworkerStub) DeleteNR(arg0 pkg.Network) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) DisconnectPubTap(arg0 string) (ret0 error) {
+func (s *NetworkerStub) DisconnectPubTap(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "DisconnectPubTap", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "DisconnectPubTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -102,9 +102,9 @@ func (s *NetworkerStub) DisconnectPubTap(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) GetDefaultGwIP(arg0 zos.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
+func (s *NetworkerStub) GetDefaultGwIP(ctx context.Context, arg0 zos.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GetDefaultGwIP", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetDefaultGwIP", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -121,9 +121,9 @@ func (s *NetworkerStub) GetDefaultGwIP(arg0 zos.NetID) (ret0 []uint8, ret1 []uin
 	return
 }
 
-func (s *NetworkerStub) GetIPv6From4(arg0 zos.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetIPv6From4(ctx context.Context, arg0 zos.NetID, arg1 []uint8) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "GetIPv6From4", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetIPv6From4", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -137,9 +137,9 @@ func (s *NetworkerStub) GetIPv6From4(arg0 zos.NetID, arg1 []uint8) (ret0 net.IPN
 	return
 }
 
-func (s *NetworkerStub) GetNet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetNet(ctx context.Context, arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GetNet", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetNet", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -153,9 +153,9 @@ func (s *NetworkerStub) GetNet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) GetPublicConfig() (ret0 pkg.PublicConfig, ret1 error) {
+func (s *NetworkerStub) GetPublicConfig(ctx context.Context) (ret0 pkg.PublicConfig, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "GetPublicConfig", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetPublicConfig", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -169,9 +169,9 @@ func (s *NetworkerStub) GetPublicConfig() (ret0 pkg.PublicConfig, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) GetPublicIPv6Subnet() (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetPublicIPv6Subnet(ctx context.Context) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "GetPublicIPv6Subnet", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetPublicIPv6Subnet", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -185,9 +185,9 @@ func (s *NetworkerStub) GetPublicIPv6Subnet() (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) GetSubnet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
+func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "GetSubnet", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetSubnet", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -201,9 +201,9 @@ func (s *NetworkerStub) GetSubnet(arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) Join(arg0 zos.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
+func (s *NetworkerStub) Join(ctx context.Context, arg0 zos.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
-	result, err := s.client.Request(s.module, s.object, "Join", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Join", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -217,9 +217,9 @@ func (s *NetworkerStub) Join(arg0 zos.NetID, arg1 string, arg2 pkg.ContainerNetw
 	return
 }
 
-func (s *NetworkerStub) Leave(arg0 zos.NetID, arg1 string) (ret0 error) {
+func (s *NetworkerStub) Leave(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 error) {
 	args := []interface{}{arg0, arg1}
-	result, err := s.client.Request(s.module, s.object, "Leave", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Leave", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -230,9 +230,9 @@ func (s *NetworkerStub) Leave(arg0 zos.NetID, arg1 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) PubIPFilterExists(arg0 string) (ret0 bool) {
+func (s *NetworkerStub) PubIPFilterExists(ctx context.Context, arg0 string) (ret0 bool) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "PubIPFilterExists", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "PubIPFilterExists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -242,9 +242,9 @@ func (s *NetworkerStub) PubIPFilterExists(arg0 string) (ret0 bool) {
 	return
 }
 
-func (s *NetworkerStub) PubTapExists(arg0 string) (ret0 bool, ret1 error) {
+func (s *NetworkerStub) PubTapExists(ctx context.Context, arg0 string) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "PubTapExists", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "PubTapExists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -277,9 +277,9 @@ func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.Netlink
 	return ch, nil
 }
 
-func (s *NetworkerStub) PublicIPv4Support() (ret0 bool) {
+func (s *NetworkerStub) PublicIPv4Support(ctx context.Context) (ret0 bool) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "PublicIPv4Support", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "PublicIPv4Support", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -289,9 +289,9 @@ func (s *NetworkerStub) PublicIPv4Support() (ret0 bool) {
 	return
 }
 
-func (s *NetworkerStub) Ready() (ret0 error) {
+func (s *NetworkerStub) Ready(ctx context.Context) (ret0 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "Ready", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Ready", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -302,9 +302,9 @@ func (s *NetworkerStub) Ready() (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) RemovePubIPFilter(arg0 string) (ret0 error) {
+func (s *NetworkerStub) RemovePubIPFilter(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "RemovePubIPFilter", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "RemovePubIPFilter", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -315,9 +315,9 @@ func (s *NetworkerStub) RemovePubIPFilter(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) RemovePubTap(arg0 string) (ret0 error) {
+func (s *NetworkerStub) RemovePubTap(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "RemovePubTap", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "RemovePubTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -328,9 +328,9 @@ func (s *NetworkerStub) RemovePubTap(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) RemoveTap(arg0 zos.NetID) (ret0 error) {
+func (s *NetworkerStub) RemoveTap(ctx context.Context, arg0 zos.NetID) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "RemoveTap", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "RemoveTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -341,9 +341,9 @@ func (s *NetworkerStub) RemoveTap(arg0 zos.NetID) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) SetPublicConfig(arg0 pkg.PublicConfig) (ret0 error) {
+func (s *NetworkerStub) SetPublicConfig(ctx context.Context, arg0 pkg.PublicConfig) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "SetPublicConfig", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetPublicConfig", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -354,9 +354,9 @@ func (s *NetworkerStub) SetPublicConfig(arg0 pkg.PublicConfig) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) SetupPubIPFilter(arg0 string, arg1 string, arg2 string, arg3 string, arg4 string) (ret0 error) {
+func (s *NetworkerStub) SetupPubIPFilter(ctx context.Context, arg0 string, arg1 string, arg2 string, arg3 string, arg4 string) (ret0 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
-	result, err := s.client.Request(s.module, s.object, "SetupPubIPFilter", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPubIPFilter", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -367,9 +367,9 @@ func (s *NetworkerStub) SetupPubIPFilter(arg0 string, arg1 string, arg2 string, 
 	return
 }
 
-func (s *NetworkerStub) SetupPubTap(arg0 string) (ret0 string, ret1 error) {
+func (s *NetworkerStub) SetupPubTap(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "SetupPubTap", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPubTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -383,9 +383,9 @@ func (s *NetworkerStub) SetupPubTap(arg0 string) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) SetupTap(arg0 zos.NetID) (ret0 string, ret1 error) {
+func (s *NetworkerStub) SetupTap(ctx context.Context, arg0 zos.NetID) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "SetupTap", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupTap", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -399,9 +399,9 @@ func (s *NetworkerStub) SetupTap(arg0 zos.NetID) (ret0 string, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) TapExists(arg0 zos.NetID) (ret0 bool, ret1 error) {
+func (s *NetworkerStub) TapExists(ctx context.Context, arg0 zos.NetID) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "TapExists", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "TapExists", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -415,9 +415,9 @@ func (s *NetworkerStub) TapExists(arg0 zos.NetID) (ret0 bool, ret1 error) {
 	return
 }
 
-func (s *NetworkerStub) WireguardPorts() (ret0 []uint, ret1 error) {
+func (s *NetworkerStub) WireguardPorts(ctx context.Context) (ret0 []uint, ret1 error) {
 	args := []interface{}{}
-	result, err := s.client.Request(s.module, s.object, "WireguardPorts", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "WireguardPorts", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -450,9 +450,9 @@ func (s *NetworkerStub) YggAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 	return ch, nil
 }
 
-func (s *NetworkerStub) ZDBDestroy(arg0 string) (ret0 error) {
+func (s *NetworkerStub) ZDBDestroy(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "ZDBDestroy", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ZDBDestroy", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -463,9 +463,9 @@ func (s *NetworkerStub) ZDBDestroy(arg0 string) (ret0 error) {
 	return
 }
 
-func (s *NetworkerStub) ZDBPrepare(arg0 string) (ret0 string, ret1 error) {
+func (s *NetworkerStub) ZDBPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.Request(s.module, s.object, "ZDBPrepare", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ZDBPrepare", args...)
 	if err != nil {
 		panic(err)
 	}

@@ -27,7 +27,7 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	network := stubs.NewNetworkerStub(p.zbus)
 	fName := filterName(wl.ID.String())
 
-	if network.PubIPFilterExists(fName) {
+	if network.PubIPFilterExists(ctx, fName) {
 		return result, provision.ErrDidNotChange
 	}
 
@@ -35,7 +35,7 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 		return zos.PublicIPResult{}, errors.Wrap(err, "failed to decode reservation schema")
 	}
 
-	pubIP6Base, err := network.GetPublicIPv6Subnet()
+	pubIP6Base, err := network.GetPublicIPv6Subnet(ctx)
 	if err != nil {
 		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
 	}
@@ -49,7 +49,7 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	}
 
 	result.IP = config.IP
-	err = network.SetupPubIPFilter(fName, tapName, config.IP.IP.To4().String(), predictedIPv6, mac.String())
+	err = network.SetupPubIPFilter(ctx, fName, tapName, config.IP.IP.To4().String(), predictedIPv6, mac.String())
 	return
 }
 
@@ -57,10 +57,10 @@ func (p *Primitives) publicIPDecomission(ctx context.Context, wl *gridtypes.Work
 	// Disconnect the public interface from the network if one exists
 	network := stubs.NewNetworkerStub(p.zbus)
 	fName := filterName(wl.ID.String())
-	if err := network.RemovePubIPFilter(fName); err != nil {
+	if err := network.RemovePubIPFilter(ctx, fName); err != nil {
 		log.Error().Err(err).Msg("could not remove filter rules")
 	}
-	return network.DisconnectPubTap(wl.ID.String())
+	return network.DisconnectPubTap(ctx, wl.ID.String())
 }
 
 func filterName(reservationID string) string {

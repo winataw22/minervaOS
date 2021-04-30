@@ -138,7 +138,7 @@ func (m *Module) monitorID(ctx context.Context, running map[string]int, id strin
 		os.RemoveAll(m.configPath(id))
 
 		stub := stubs.NewProvisionStub(m.client)
-		if err := stub.DecommissionCached(id, reason.Error()); err != nil {
+		if err := stub.DecommissionCached(ctx, id, reason.Error()); err != nil {
 			return errors.Wrapf(err, "failed to decommission reservation '%s'", id)
 		}
 	}

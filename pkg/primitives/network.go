@@ -27,7 +27,7 @@ func (p *Primitives) networkProvisionImpl(ctx context.Context, wl *gridtypes.Wor
 	mgr := stubs.NewNetworkerStub(p.zbus)
 	log.Debug().Str("network", fmt.Sprintf("%+v", network)).Msg("provision network")
 
-	_, err := mgr.CreateNR(pkg.Network{
+	_, err := mgr.CreateNR(ctx, pkg.Network{
 		Network: network,
 		NetID:   zos.NetworkID(deployment.TwinID, wl.Name),
 	})
@@ -52,7 +52,7 @@ func (p *Primitives) networkDecommission(ctx context.Context, wl *gridtypes.Work
 	}
 
 	deployment := provision.GetDeployment(ctx)
-	if err := mgr.DeleteNR(pkg.Network{
+	if err := mgr.DeleteNR(ctx, pkg.Network{
 		Network: network,
 		NetID:   zos.NetworkID(deployment.TwinID, wl.Name),
 	}); err != nil {

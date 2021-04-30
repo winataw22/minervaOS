@@ -9,11 +9,11 @@ import (
 	"github.com/joncrlsn/dque"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/farmer"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
@@ -57,7 +57,7 @@ func (m many) AsError() error {
 
 // Reporter structure
 type Reporter struct {
-	identity pkg.IdentityManager
+	identity *stubs.IdentityManagerStub
 	storage  *storage.Fs
 	queue    *dque.DQue
 	farmer   *farmer.Client
@@ -69,7 +69,7 @@ func reportBuilder() interface{} {
 }
 
 // NewReported creates a new capacity reporter
-func NewReported(store *storage.Fs, identity pkg.IdentityManager, root string) (*Reporter, error) {
+func NewReported(store *storage.Fs, identity *stubs.IdentityManagerStub, root string) (*Reporter, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime environment")
@@ -90,7 +90,7 @@ func NewReported(store *storage.Fs, identity pkg.IdentityManager, root string) (
 		identity: identity,
 		queue:    queue,
 		farmer:   fm,
-		nodeID:   identity.NodeID().Identity(),
+		nodeID:   identity.NodeID(context.TODO()).Identity(),
 	}, nil
 }
 
@@ -204,7 +204,7 @@ func (r *Reporter) push(report farmer.Report) error {
 		return errors.Wrap(err, "failed to create report challenge")
 	}
 
-	signature, err := r.identity.Sign(buf.Bytes())
+	signature, err := r.identity.Sign(context.TODO(), buf.Bytes())
 	if err != nil {
 		return errors.Wrap(err, "failed to sign report")
 	}

@@ -53,7 +53,7 @@ func (f *flistModule) listMounts() (map[string]int64, error) {
 }
 
 // cleanupMount forces clean up of a mount point
-func (f *flistModule) cleanupMount(name string) error {
+func (f *flistModule) cleanupMount(ctx context.Context, name string) error {
 	path, err := f.mountpath(name)
 	if err != nil {
 		return err
@@ -80,7 +80,7 @@ func (f *flistModule) cleanupMount(name string) error {
 		log.Warn().Err(err).Str("path", path).Msg("fail to unmount flist")
 	}
 
-	fs, err := f.storage.Path(name)
+	fs, err := f.storage.Path(ctx, name)
 	if err != nil {
 		log.Warn().Err(err).Str("subvolume", name).Msg("subvolume does not exist")
 		return nil
@@ -94,7 +94,7 @@ func (f *flistModule) cleanupMount(name string) error {
 	return nil
 }
 
-func (f *flistModule) cleanupAll() error {
+func (f *flistModule) cleanupAll(ctx context.Context) error {
 	mounts, err := f.listMounts()
 	if err != nil {
 		return errors.Wrap(err, "failed to list current possible mounts")
@@ -105,7 +105,7 @@ func (f *flistModule) cleanupAll() error {
 		case -1:
 			// process has shutdown gracefully
 			log.Debug().Str("name", name).Int64("pid", pid).Msg("attempt to clean up mount")
-			f.cleanupMount(name)
+			f.cleanupMount(ctx, name)
 		case 0:
 			// the file exists, but we can't read the file content
 			// for some reason!
@@ -117,7 +117,7 @@ func (f *flistModule) cleanupAll() error {
 				// this is only possible if process does not exist.
 				// hence we need to clean up.
 				log.Debug().Str("name", name).Int64("pid", pid).Msg("attempt to clean up mount")
-				f.cleanupMount(name)
+				f.cleanupMount(ctx, name)
 			}
 			// nothing to do
 		}
@@ -136,7 +136,7 @@ func (f *flistModule) MountsCleaner(ctx context.Context, every time.Duration) {
 		case <-ctx.Done():
 		case <-time.After(every):
 			log.Debug().Msg("running cleaner job")
-			if err := f.cleanupAll(); err != nil {
+			if err := f.cleanupAll(ctx); err != nil {
 				log.Error().Err(err).Msg("failed to cleanup stall mounts")
 			}
 		}

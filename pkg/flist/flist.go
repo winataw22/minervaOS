@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
@@ -41,6 +42,26 @@ func (c cmd) Command(name string, args ...string) *exec.Cmd {
 	return c(name, args...)
 }
 
+type volumeAllocator interface {
+	// CreateFilesystem creates a filesystem with a given size. The filesystem
+	// is mounted, and the path to the mountpoint is returned. The filesystem
+	// is only attempted to be created in a pool of the given type. If no
+	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
+	// It is up to the caller to handle such a situation and decide if he wants
+	// to try again on a different devicetype
+	CreateFilesystem(ctx context.Context, name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error)
+
+	// ReleaseFilesystem signals that the named filesystem is no longer needed.
+	// The filesystem will be unmounted and subsequently removed.
+	// All data contained in the filesystem will be lost, and the
+	// space which has been reserved for this filesystem will be reclaimed.
+	ReleaseFilesystem(ctx context.Context, name string) error
+
+	// Path return the filesystem named name
+	// if no filesystem with this name exists, an error is returned
+	Path(ctx context.Context, name string) (pkg.Filesystem, error)
+}
+
 type flistModule struct {
 	// root directory where all
 	// the working file of the module will be located
@@ -55,11 +76,11 @@ type flistModule struct {
 	log        string
 	run        string
 
-	storage   pkg.VolumeAllocater
+	storage   volumeAllocator
 	commander commander
 }
 
-func newFlister(root string, storage pkg.VolumeAllocater, commander commander) pkg.Flister {
+func newFlister(root string, storage volumeAllocator, commander commander) pkg.Flister {
 	if root == "" {
 		root = defaultRoot
 	}
@@ -112,7 +133,7 @@ func (o options) Find(k string) int {
 }
 
 // New creates a new flistModule
-func New(root string, storage pkg.VolumeAllocater) pkg.Flister {
+func New(root string, storage *stubs.StorageModuleStub) pkg.Flister {
 	return newFlister(root, storage, cmd(exec.Command))
 }
 
@@ -164,6 +185,7 @@ func (f *flistModule) valid(path string) error {
 }
 
 func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (string, error) {
+	ctx := context.Background()
 	sublog := log.With().Str("url", url).Str("storage", storage).Logger()
 	sublog.Info().Msg("request to mount flist")
 
@@ -202,7 +224,7 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 	if !opts.ReadOnly {
 		sublog.Info().Msgf("check if subvolume %s already exists", name)
 		// check if the filesystem doesn't already exists
-		backend, err = f.storage.Path(name)
+		backend, err = f.storage.Path(ctx, name)
 		if err != nil {
 			sublog.Info().Msgf("create new subvolume %s", name)
 			// and only create a new one if it doesn't exist
@@ -211,7 +233,7 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 				return "", fmt.Errorf("invalid mount option, missing disk type and/or size")
 			}
 			newAllocation = true
-			backend, err = f.storage.CreateFilesystem(name, opts.Limit*mib, opts.Type)
+			backend, err = f.storage.CreateFilesystem(ctx, name, opts.Limit*mib, opts.Type)
 			if err != nil {
 				return "", errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
 			}
@@ -224,7 +246,7 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 		// we need to deallocate the filesystem
 		defer func() {
 			if newAllocation && err != nil {
-				f.storage.ReleaseFilesystem(name)
+				f.storage.ReleaseFilesystem(ctx, name)
 			}
 		}()
 	} else {
@@ -350,6 +372,7 @@ func (f *flistModule) NamedUmount(name string) error {
 
 // Umount implements the Flister.Umount interface
 func (f *flistModule) Umount(path string) error {
+	ctx := context.Background()
 	log.Info().Str("path", path).Msg("request unmount flist")
 
 	info, err := os.Stat(path)
@@ -408,7 +431,7 @@ func (f *flistModule) Umount(path string) error {
 		return nil
 	}
 
-	if err := f.storage.ReleaseFilesystem(name); err != nil {
+	if err := f.storage.ReleaseFilesystem(ctx, name); err != nil {
 		log.Error().Err(err).Msg("fail to clean up subvolume")
 	}
 
