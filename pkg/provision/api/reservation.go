@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -45,6 +46,8 @@ func (a *Workloads) createOrUpdate(request *http.Request) (interface{}, mw.Respo
 
 	if err == context.DeadlineExceeded {
 		return nil, mw.Unavailable(ctx.Err())
+	} else if errors.Is(err, provision.ErrDeploymentUpgradeValidationError) {
+		return nil, mw.BadRequest(err)
 	} else if err != nil {
 		return nil, mw.Error(err)
 	}
@@ -92,6 +95,8 @@ func (a *Workloads) delete(request *http.Request) (interface{}, mw.Response) {
 	err = a.engine.Deprovision(ctx, twin, id, "requested by user")
 	if err == context.DeadlineExceeded {
 		return nil, mw.Unavailable(ctx.Err())
+	} else if errors.Is(err, provision.ErrDeploymentNotExists) {
+		return nil, mw.NotFound(err)
 	} else if err != nil {
 		return nil, mw.Error(err)
 	}
@@ -111,7 +116,7 @@ func (a *Workloads) get(request *http.Request) (interface{}, mw.Response) {
 	}
 
 	deployment, err := a.engine.Storage().Get(twin, id)
-	if err == provision.ErrDeploymentNotExists {
+	if errors.Is(err, provision.ErrDeploymentNotExists) {
 		return nil, mw.NotFound(fmt.Errorf("workload not found"))
 	} else if err != nil {
 		return nil, mw.Error(err)

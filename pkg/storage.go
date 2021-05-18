@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -111,8 +112,8 @@ type StoragePolicy struct {
 
 // Usage struct
 type Usage struct {
-	Size uint64
-	Used uint64
+	Size gridtypes.Unit
+	Used gridtypes.Unit
 }
 
 // Filesystem represents a storage space that can be used as a filesystem
@@ -140,10 +141,10 @@ type VolumeAllocater interface {
 	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
 	// It is up to the caller to handle such a situation and decide if he wants
 	// to try again on a different devicetype
-	CreateFilesystem(name string, size uint64, poolType DeviceType) (Filesystem, error)
+	CreateFilesystem(name string, size gridtypes.Unit, poolType DeviceType) (Filesystem, error)
 
 	// UpdateFilesystem changes a filesystem size to given value.
-	UpdateFilesystem(name string, size uint64) (Filesystem, error)
+	UpdateFilesystem(name string, size gridtypes.Unit) (Filesystem, error)
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
 	// All data contained in the filesystem will be lost, and the
@@ -181,7 +182,7 @@ func (d *VDisk) Name() string {
 // VDiskModule interface
 type VDiskModule interface {
 	// AllocateDisk with given id and size, return path to virtual disk
-	Allocate(id string, size int64) (string, error)
+	Allocate(id string, size gridtypes.Unit) (string, error)
 	// DeallocateVDisk removes a virtual disk
 	Deallocate(id string) error
 	// Exists checks if disk with that ID already allocated

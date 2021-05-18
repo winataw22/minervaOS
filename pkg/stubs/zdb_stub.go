@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	gridtypes "github.com/threefoldtech/zos/pkg/gridtypes"
 	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -24,7 +25,7 @@ func NewZDBAllocaterStub(client zbus.Client) *ZDBAllocaterStub {
 	}
 }
 
-func (s *ZDBAllocaterStub) Allocate(ctx context.Context, arg0 string, arg1 zos.DeviceType, arg2 uint64, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
+func (s *ZDBAllocaterStub) Allocate(ctx context.Context, arg0 string, arg1 zos.DeviceType, arg2 gridtypes.Unit, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Allocate", args...)
 	if err != nil {

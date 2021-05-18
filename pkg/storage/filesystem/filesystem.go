@@ -7,7 +7,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 )
 
-// Usage struct
+// Usage struct (in bytes)
 type Usage struct {
 	Size uint64
 	Used uint64

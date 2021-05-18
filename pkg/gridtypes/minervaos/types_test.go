@@ -22,7 +22,7 @@ func TestWorkloadData(t *testing.T) {
 	require.IsType(&Volume{}, data)
 	volume := data.(*Volume)
 
-	require.Equal(uint64(10), volume.Size)
+	require.Equal(gridtypes.Unit(10), volume.Size)
 	require.Equal(SSDDevice, volume.Type)
 }
 

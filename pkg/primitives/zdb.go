@@ -50,7 +50,7 @@ func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workloa
 
 	// if we reached here, we need to create the 0-db namespace
 	log.Debug().Msg("allocating storage for namespace")
-	allocation, err := storage.Allocate(ctx, nsID, config.DiskType, config.Size*gigabyte, config.Mode)
+	allocation, err := storage.Allocate(ctx, nsID, config.DiskType, config.Size, config.Mode)
 	if err != nil {
 		return zos.ZDBResult{}, errors.Wrap(err, "failed to allocate storage")
 	}
@@ -117,7 +117,7 @@ func (p *Primitives) zdbRootFS(ctx context.Context) (string, error) {
 
 	for _, typ := range []zos.DeviceType{zos.HDDDevice, zos.SSDDevice} {
 		rootFS, err = flist.Mount(ctx, zdbFlistURL, "", pkg.MountOptions{
-			Limit:    10,
+			Limit:    10 * gridtypes.Megabyte,
 			ReadOnly: false,
 			Type:     typ,
 		})
@@ -335,7 +335,7 @@ func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string
 		return errors.Wrapf(err, "failed to make namespace %s public in 0-db: %s", nsID, containerID)
 	}
 
-	if err := zdbCl.NamespaceSetSize(nsID, config.Size*gigabyte); err != nil {
+	if err := zdbCl.NamespaceSetSize(nsID, uint64(config.Size)); err != nil {
 		return errors.Wrapf(err, "failed to set size on namespace %s in 0-db: %s", nsID, containerID)
 	}
 

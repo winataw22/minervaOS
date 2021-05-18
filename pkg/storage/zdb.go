@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 	"github.com/threefoldtech/zos/pkg/storage/zdbpool"
@@ -56,10 +57,10 @@ func (s *Module) Find(nsID string) (allocation pkg.Allocation, err error) {
 // Allocate is responsible to make sure the subvolume used by a 0-db as enough storage capacity
 // of specified size, type and mode
 // it returns the volume ID and its path or an error if it couldn't allocate enough storage
-func (s *Module) Allocate(nsID string, diskType pkg.DeviceType, size uint64, mode pkg.ZDBMode) (allocation pkg.Allocation, err error) {
+func (s *Module) Allocate(nsID string, diskType pkg.DeviceType, size gridtypes.Unit, mode pkg.ZDBMode) (allocation pkg.Allocation, err error) {
 	log := log.With().
 		Str("type", string(diskType)).
-		Uint64("size", size).
+		Uint64("size", uint64(size)).
 		Str("mode", string(mode)).
 		Logger()
 
@@ -165,7 +166,7 @@ type zdbcandidate struct {
 	Free uint64
 }
 
-func (s *Module) checkForZDBCandidateVolumes(size uint64, poolType pkg.DeviceType, targetMode zdbpool.IndexMode) ([]zdbcandidate, error) {
+func (s *Module) checkForZDBCandidateVolumes(size gridtypes.Unit, poolType pkg.DeviceType, targetMode zdbpool.IndexMode) ([]zdbcandidate, error) {
 	var candidates []zdbcandidate
 	for _, pool := range s.pools {
 		// ignore pools that are not mounted for now
@@ -203,7 +204,7 @@ func (s *Module) checkForZDBCandidateVolumes(size uint64, poolType pkg.DeviceTyp
 				return nil, err
 			}
 
-			if volumeUsage.Size+size > usage.Size {
+			if volumeUsage.Size+uint64(size) > usage.Size {
 				// not enough space on this volume
 				continue
 			}
@@ -226,7 +227,7 @@ func (s *Module) checkForZDBCandidateVolumes(size uint64, poolType pkg.DeviceTyp
 				candidates,
 				zdbcandidate{
 					Volume: volume,
-					Free:   usage.Size - (volumeUsage.Size + size),
+					Free:   usage.Size - (volumeUsage.Size + uint64(size)),
 				})
 		}
 	}

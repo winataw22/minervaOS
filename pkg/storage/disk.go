@@ -10,13 +10,12 @@ import (
 	"github.com/g0rbe/go-chattr"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
 const (
 	// vdiskVolumeName is the name of the volume used to store vdisks
 	vdiskVolumeName = "vdisks"
-
-	mib = 1024 * 1024
 )
 
 type vdiskModule struct {
@@ -49,14 +48,14 @@ func (d *vdiskModule) findDisk(id string) (string, error) {
 	return "", os.ErrNotExist
 }
 
-// AllocateDisk with given size, return path to virtual disk (size in MB)
-func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
+// AllocateDisk with given size, return path to virtual disk
+func (d *vdiskModule) Allocate(id string, size gridtypes.Unit) (string, error) {
 	path, err := d.findDisk(id)
 	if err == nil {
 		return path, errors.Wrapf(os.ErrExist, "disk with id '%s' already exists", id)
 	}
 
-	base, err := d.module.VDiskFindCandidate(uint64(size))
+	base, err := d.module.VDiskFindCandidate(size)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to find a candidate to host vdisk of size '%d'", size)
 	}
@@ -84,7 +83,7 @@ func (d *vdiskModule) Allocate(id string, size int64) (string, error) {
 		return "", err
 	}
 
-	err = syscall.Fallocate(int(file.Fd()), 0, 0, size*mib)
+	err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size))
 	return path, err
 }
 

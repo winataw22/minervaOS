@@ -57,9 +57,9 @@ func (t WorkloadType) String() string {
 //Capacity the expected capacity of a workload
 type Capacity struct {
 	CRU   uint64 `json:"cru"`
-	SRU   uint64 `json:"sru"`
-	HRU   uint64 `json:"hru"`
-	MRU   uint64 `json:"mru"`
+	SRU   Unit   `json:"sru"`
+	HRU   Unit   `json:"hru"`
+	MRU   Unit   `json:"mru"`
 	IPV4U uint64 `json:"ipv4u"`
 }
 

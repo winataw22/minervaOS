@@ -55,7 +55,7 @@ func (n *NodeClient) response(r *http.Response, o interface{}, codes ...int) err
 }
 
 func (n *NodeClient) url(path ...string) string {
-	url := "http://[" + n.ip.String() + "]:2021/api/v1/" + filepath.Join(path...) + "/"
+	url := "http://[" + n.ip.String() + "]:2021/api/v1/" + filepath.Join(path...)
 	return url
 }
 
@@ -64,10 +64,6 @@ func (n *NodeClient) url(path ...string) string {
 // deployed. the user then can pull on the workload status until it passes (or fail)
 func (n *NodeClient) Deploy(dl *gridtypes.Deployment, update bool) error {
 	dl.TwinID = n.client.id
-	// if err := dl.Sign(n.client.sk); err != nil {
-	// 	return wid, errors.Wrap(err, "failed to sign the workload")
-	// }
-
 	var buf bytes.Buffer
 
 	if err := json.NewEncoder(&buf).Encode(dl); err != nil {
@@ -127,8 +123,8 @@ func (n *NodeClient) Get(twin, deployment uint32) (dl gridtypes.Deployment, err 
 }
 
 // Delete deletes a workload by id
-func (n *NodeClient) Delete(wid string) (err error) {
-	url := n.url("deployment", wid)
+func (n *NodeClient) Delete(twin, deployment uint32) (err error) {
+	url := n.url("deployment", fmt.Sprint(twin), fmt.Sprint(deployment))
 
 	request, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
@@ -144,7 +140,7 @@ func (n *NodeClient) Delete(wid string) (err error) {
 		return err
 	}
 
-	if err := n.response(response, &wid, http.StatusOK); err != nil {
+	if err := n.response(response, nil, http.StatusAccepted); err != nil {
 		return err
 	}
 

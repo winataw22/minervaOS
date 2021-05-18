@@ -3,6 +3,8 @@ package pkg
 import (
 	"fmt"
 	"net"
+
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
 //go:generate zbusc -module vmd -version 0.0.1 -name manager -package stubs github.com/threefoldtech/zos/pkg+VMModule stubs/vmd_stub.go
@@ -51,8 +53,8 @@ type VM struct {
 	Name string
 	// CPU is number of cores assigned to the VM
 	CPU uint8
-	// Memory size in Mib
-	Memory int64
+	// Memory size
+	Memory gridtypes.Unit
 	// Network is network info
 	Network VMNetworkInfo
 	// KernelImage path to uncompressed linux kernel ELF

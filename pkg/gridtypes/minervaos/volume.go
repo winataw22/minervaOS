@@ -9,8 +9,8 @@ import (
 
 // Volume defines a mount point
 type Volume struct {
-	// Size of the volume in GiB
-	Size uint64 `json:"size"`
+	// Size of the volume
+	Size gridtypes.Unit `json:"size"`
 	// Type of disk underneath the volume
 	Type DeviceType `json:"type"`
 }

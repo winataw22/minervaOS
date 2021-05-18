@@ -31,11 +31,11 @@ func (m ZDBMode) Valid() error {
 
 // ZDB namespace creation info
 type ZDB struct {
-	Size     uint64     `json:"size"`
-	Mode     ZDBMode    `json:"mode"`
-	Password string     `json:"password"`
-	DiskType DeviceType `json:"disk_type"`
-	Public   bool       `json:"public"`
+	Size     gridtypes.Unit `json:"size"`
+	Mode     ZDBMode        `json:"mode"`
+	Password string         `json:"password"`
+	DiskType DeviceType     `json:"disk_type"`
+	Public   bool           `json:"public"`
 }
 
 //Valid implementation

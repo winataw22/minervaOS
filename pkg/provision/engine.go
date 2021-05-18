@@ -235,6 +235,11 @@ func (e *NativeEngine) Deprovision(ctx context.Context, twin, id uint32, reason 
 		return err
 	}
 
+	log.Debug().
+		Uint32("twin", deployment.TwinID).
+		Uint32("deployment", deployment.DeploymentID).
+		Msg("schedule for deprovision")
+
 	job := engineJob{
 		Target: deployment,
 		Op:     opDeprovision,
@@ -255,7 +260,7 @@ func (e *NativeEngine) Update(ctx context.Context, update gridtypes.Deployment) 
 	// that this update is acceptable.
 	_, err = deployment.Upgrade(&update)
 	if err != nil {
-		return err
+		return errors.Wrap(ErrDeploymentUpgradeValidationError, err.Error())
 	}
 
 	// all is okay we can push the job

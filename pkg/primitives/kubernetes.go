@@ -85,10 +85,14 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	result.ID = wl.ID.String()
 	result.IP = config.IP.String()
 
-	cpu, memory, disk, err := vmSize(&config)
+	cap, err := config.Capacity()
 	if err != nil {
 		return result, errors.Wrap(err, "could not interpret vm size")
 	}
+	// cpu, memory, disk, err := vmSize(&config)
+	// if err != nil {
+	// 	return result, errors.Wrap(err, "could not interpret vm size")
+	// }
 
 	if _, err = vm.Inspect(ctx, wl.ID.String()); err == nil {
 		// vm is already running, nothing to do here
@@ -110,7 +114,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 		}
 		diskPath = info.Path
 	} else {
-		diskPath, err = storage.Allocate(ctx, diskName, int64(disk))
+		diskPath, err = storage.Allocate(ctx, diskName, cap.SRU)
 		if err != nil {
 			return result, errors.Wrap(err, "failed to reserve filesystem for vm")
 		}
@@ -160,13 +164,13 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	}
 
 	if needsInstall {
-		if err = p.kubernetesInstall(ctx, wl.ID.String(), cpu, memory, diskPath, imagePath, netInfo, config); err != nil {
+		if err = p.kubernetesInstall(ctx, wl.ID.String(), uint8(cap.CRU), cap.MRU, diskPath, imagePath, netInfo, config); err != nil {
 			vm.Delete(ctx, wl.ID.String())
 			return result, errors.Wrap(err, "failed to install k3s")
 		}
 	}
 
-	err = p.kubernetesRun(ctx, wl.ID.String(), cpu, memory, diskPath, imagePath, netInfo, config)
+	err = p.kubernetesRun(ctx, wl.ID.String(), uint8(cap.CRU), cap.MRU, diskPath, imagePath, netInfo, config)
 	if err != nil {
 		// attempt to delete the vm, should the process still be lingering
 		vm.Delete(ctx, wl.ID.String())
@@ -175,7 +179,7 @@ func (p *Primitives) kubernetesProvisionImpl(ctx context.Context, wl *gridtypes.
 	return result, err
 }
 
-func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uint8, memory uint64, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
+func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uint8, memory gridtypes.Unit, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
 	vm := stubs.NewVMModuleStub(p.zbus)
 
 	cmdline := fmt.Sprintf("console=ttyS0 reboot=k panic=1 k3os.mode=install k3os.install.silent k3os.debug k3os.install.device=/dev/vda k3os.token=%s k3os.k3s_args=\"--flannel-iface=eth0\"", cfg.ClusterSecret)
@@ -212,7 +216,7 @@ func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uin
 	installVM := pkg.VM{
 		Name:        name,
 		CPU:         cpu,
-		Memory:      int64(memory),
+		Memory:      memory,
 		Network:     networkInfo,
 		KernelImage: imagePath + "/k3os-vmlinux",
 		InitrdImage: imagePath + "/k3os-initrd-amd64",
@@ -258,7 +262,7 @@ func (p *Primitives) kubernetesInstall(ctx context.Context, name string, cpu uin
 	return vm.Delete(ctx, name)
 }
 
-func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, memory uint64, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
+func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, memory gridtypes.Unit, diskPath string, imagePath string, networkInfo pkg.VMNetworkInfo, cfg Kubernetes) error {
 	vm := stubs.NewVMModuleStub(p.zbus)
 
 	disks := make([]pkg.VMDisk, 1)
@@ -268,7 +272,7 @@ func (p *Primitives) kubernetesRun(ctx context.Context, name string, cpu uint8, 
 	kubevm := pkg.VM{
 		Name:        name,
 		CPU:         cpu,
-		Memory:      int64(memory),
+		Memory:      memory,
 		Network:     networkInfo,
 		KernelImage: imagePath + "/k3os-vmlinux",
 		InitrdImage: imagePath + "/k3os-initrd-amd64",
@@ -424,15 +428,4 @@ func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID, name string) (
 	}
 
 	return data.IP.IPNet, data.Gateway, nil
-}
-
-// returns the vCpu's, memory, disksize for a vm size
-// memory and disk size is expressed in MiB
-func vmSize(vm *Kubernetes) (cpu uint8, memory uint64, storage uint64, err error) {
-	cap, err := vm.Capacity()
-	if err != nil {
-		return 0, 0, 0, err
-	}
-
-	return uint8(cap.CRU), cap.MRU * 1024, cap.SRU * 1024, nil
 }

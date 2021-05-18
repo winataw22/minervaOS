@@ -6,16 +6,16 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
-// AtomicValue value for safe increment/decrement
-type AtomicValue uint64
+// AtomicUnit value for safe increment/decrement
+type AtomicUnit gridtypes.Unit
 
 // Increment counter atomically by one
-func (c *AtomicValue) Increment(v uint64) uint64 {
-	return atomic.AddUint64((*uint64)(c), v)
+func (c *AtomicUnit) Increment(v gridtypes.Unit) gridtypes.Unit {
+	return gridtypes.Unit(atomic.AddUint64((*uint64)(c), uint64(v)))
 }
 
 // Decrement counter atomically by one
-func (c *AtomicValue) Decrement(v uint64) uint64 {
+func (c *AtomicUnit) Decrement(v gridtypes.Unit) gridtypes.Unit {
 	// spinlock until the decrement succeeds
 	for {
 		current := c.Current()
@@ -28,15 +28,15 @@ func (c *AtomicValue) Decrement(v uint64) uint64 {
 		n := current - dec
 		// only swap if `current`, and therefore the above calculations,
 		// are still valid
-		if atomic.CompareAndSwapUint64((*uint64)(c), current, n) {
-			return n
+		if atomic.CompareAndSwapUint64((*uint64)(c), uint64(current), uint64(n)) {
+			return gridtypes.Unit(n)
 		}
 	}
 }
 
 // Current returns the current value
-func (c *AtomicValue) Current() uint64 {
-	return atomic.LoadUint64((*uint64)(c))
+func (c *AtomicUnit) Current() gridtypes.Unit {
+	return gridtypes.Unit(atomic.LoadUint64((*uint64)(c)))
 }
 
 // Counters tracks the amount of primitives workload deployed and
@@ -44,11 +44,11 @@ func (c *AtomicValue) Current() uint64 {
 type Counters struct {
 	//types map[gridtypes.WorkloadType]AtomicValue
 
-	SRU  AtomicValue // SSD storage in bytes
-	HRU  AtomicValue // HDD storage in bytes
-	MRU  AtomicValue // Memory storage in bytes
-	CRU  AtomicValue // CPU count absolute
-	IPv4 AtomicValue // IPv4 count absolute
+	SRU  AtomicUnit // SSD storage in bytes
+	HRU  AtomicUnit // HDD storage in bytes
+	MRU  AtomicUnit // Memory storage in bytes
+	CRU  AtomicUnit // CPU count absolute
+	IPv4 AtomicUnit // IPv4 count absolute
 }
 
 const (
@@ -58,18 +58,18 @@ const (
 
 // Increment is called by the provision.Engine when a reservation has been provisionned
 func (c *Counters) Increment(cap gridtypes.Capacity) {
-	c.CRU.Increment(cap.CRU)
+	c.CRU.Increment(gridtypes.Unit(cap.CRU))
 	c.MRU.Increment(cap.MRU)
 	c.SRU.Increment(cap.SRU)
 	c.HRU.Increment(cap.HRU)
-	c.IPv4.Increment(cap.IPV4U)
+	c.IPv4.Increment(gridtypes.Unit(cap.IPV4U))
 }
 
 // Decrement is called by the provision.Engine when a reservation has been decommissioned
 func (c *Counters) Decrement(cap gridtypes.Capacity) {
-	c.CRU.Decrement(cap.CRU)
+	c.CRU.Decrement(gridtypes.Unit(cap.CRU))
 	c.MRU.Decrement(cap.MRU)
 	c.SRU.Decrement(cap.SRU)
 	c.HRU.Decrement(cap.HRU)
-	c.IPv4.Decrement(cap.IPV4U)
+	c.IPv4.Decrement(gridtypes.Unit(cap.IPV4U))
 }

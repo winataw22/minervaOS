@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
 const (
@@ -287,7 +288,7 @@ func (m *Module) Run(vm pkg.VM) error {
 		},
 		Config: Config{
 			CPU:       CPU(vm.CPU),
-			Mem:       MemMib(vm.Memory),
+			Mem:       MemMib(vm.Memory / gridtypes.Megabyte),
 			HTEnabled: false,
 		},
 		Interfaces:  nics,

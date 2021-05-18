@@ -11,11 +11,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-const (
-	// gigabyte to byte conversion
-	gigabyte uint64 = 1024 * 1024 * 1024
-)
-
 // Volume defines a mount point
 type Volume = zos.Volume
 
@@ -30,14 +25,14 @@ func (p *Primitives) volumeProvisionImpl(ctx context.Context, wl *gridtypes.Work
 
 	vol.ID = wl.ID.String()
 	storageClient := stubs.NewStorageModuleStub(p.zbus)
-	size := config.Size * gigabyte
+	size := config.Size
 	fs, err := storageClient.Path(ctx, wl.ID.String())
 	if err == nil {
 		// todo: validate that the volume type has not been changed.
 		// filesystem exist. do we need to (resize)
 		log.Info().Stringer("id", wl.ID).Msg("volume already deployed")
 		if fs.Usage.Size != size {
-			log.Info().Stringer("id", wl.ID).Uint64("size", size).Msg("resizing volume")
+			log.Info().Stringer("id", wl.ID).Uint64("size", uint64(size)).Msg("resizing volume")
 			_, err := storageClient.UpdateFilesystem(ctx, wl.ID.String(), size)
 			if err != nil {
 				return vol, err

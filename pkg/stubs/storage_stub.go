@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	gridtypes "github.com/threefoldtech/zos/pkg/gridtypes"
 	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -24,7 +25,7 @@ func NewStorageModuleStub(client zbus.Client) *StorageModuleStub {
 	}
 }
 
-func (s *StorageModuleStub) Allocate(ctx context.Context, arg0 string, arg1 zos.DeviceType, arg2 uint64, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
+func (s *StorageModuleStub) Allocate(ctx context.Context, arg0 string, arg1 zos.DeviceType, arg2 gridtypes.Unit, arg3 zos.ZDBMode) (ret0 pkg.Allocation, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Allocate", args...)
 	if err != nil {
@@ -64,7 +65,7 @@ func (s *StorageModuleStub) BrokenPools(ctx context.Context) (ret0 []pkg.BrokenP
 	return
 }
 
-func (s *StorageModuleStub) CreateFilesystem(ctx context.Context, arg0 string, arg1 uint64, arg2 zos.DeviceType) (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) CreateFilesystem(ctx context.Context, arg0 string, arg1 gridtypes.Unit, arg2 zos.DeviceType) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "CreateFilesystem", args...)
 	if err != nil {
@@ -192,7 +193,7 @@ func (s *StorageModuleStub) Total(ctx context.Context, arg0 zos.DeviceType) (ret
 	return
 }
 
-func (s *StorageModuleStub) UpdateFilesystem(ctx context.Context, arg0 string, arg1 uint64) (ret0 pkg.Filesystem, ret1 error) {
+func (s *StorageModuleStub) UpdateFilesystem(ctx context.Context, arg0 string, arg1 gridtypes.Unit) (ret0 pkg.Filesystem, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "UpdateFilesystem", args...)
 	if err != nil {

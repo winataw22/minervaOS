@@ -19,6 +19,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
@@ -340,13 +341,13 @@ func (s *Module) shutdownUnusedPools() error {
 }
 
 // UpdateFilesystem updates filesystem size
-func (s *Module) UpdateFilesystem(name string, size uint64) (pkg.Filesystem, error) {
+func (s *Module) UpdateFilesystem(name string, size gridtypes.Unit) (pkg.Filesystem, error) {
 	_, volume, fs, err := s.path(name)
 	if err != nil {
 		return pkg.Filesystem{}, err
 	}
 
-	if err := volume.Limit(size); err != nil {
+	if err := volume.Limit(uint64(size)); err != nil {
 		return fs, err
 	}
 
@@ -355,7 +356,7 @@ func (s *Module) UpdateFilesystem(name string, size uint64) (pkg.Filesystem, err
 }
 
 // CreateFilesystem with the given size in a storage pool.
-func (s *Module) CreateFilesystem(name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error) {
+func (s *Module) CreateFilesystem(name string, size gridtypes.Unit, poolType pkg.DeviceType) (pkg.Filesystem, error) {
 	log.Info().Msgf("Creating new volume with size %d", size)
 	if strings.HasPrefix(name, "zdb") {
 		return pkg.Filesystem{}, fmt.Errorf("invalid volume name. zdb prefix is reserved")
@@ -377,8 +378,8 @@ func (s *Module) CreateFilesystem(name string, size uint64, poolType pkg.DeviceT
 		Name:   fs.Name(),
 		Path:   fs.Path(),
 		Usage: pkg.Usage{
-			Size: usage.Size,
-			Used: usage.Used,
+			Size: gridtypes.Unit(usage.Size),
+			Used: gridtypes.Unit(usage.Used),
 		},
 		DiskType: poolType,
 	}, nil
@@ -463,8 +464,8 @@ func (s *Module) ListFilesystems() ([]pkg.Filesystem, error) {
 				Name:   v.Name(),
 				Path:   v.Path(),
 				Usage: pkg.Usage{
-					Size: usage.Size,
-					Used: usage.Used,
+					Size: gridtypes.Unit(usage.Size),
+					Used: gridtypes.Unit(usage.Used),
 				},
 				DiskType: pool.Type(),
 			})
@@ -505,8 +506,8 @@ func (s *Module) path(name string) (filesystem.Pool, filesystem.Volume, pkg.File
 					Name:   fs.Name(),
 					Path:   fs.Path(),
 					Usage: pkg.Usage{
-						Size: usage.Size,
-						Used: usage.Used,
+						Size: gridtypes.Unit(usage.Size),
+						Used: gridtypes.Unit(usage.Used),
 					},
 					DiskType: pool.Type(),
 				}, nil
@@ -518,7 +519,7 @@ func (s *Module) path(name string) (filesystem.Pool, filesystem.Volume, pkg.File
 }
 
 // VDiskFindCandidate find a suitbale location for creating a vdisk of the given size
-func (s *Module) VDiskFindCandidate(size uint64) (path string, err error) {
+func (s *Module) VDiskFindCandidate(size gridtypes.Unit) (path string, err error) {
 	candidates, err := s.findCandidates(size, zos.SSDDevice)
 	if err != nil {
 		return path, err
@@ -663,13 +664,13 @@ func (s *Module) ensureCache() error {
 // createSubvolWithQuota creates a subvolume with the given name and limits it to the given size
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this methods does set a quota limit equal to size on the created volume
-func (s *Module) createSubvolWithQuota(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
+func (s *Module) createSubvolWithQuota(size gridtypes.Unit, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	volume, err := s.createSubvol(size, name, poolType)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = volume.Limit(size); err != nil {
+	if err = volume.Limit(uint64(size)); err != nil {
 		log.Error().Err(err).Str("volume", volume.Path()).Msg("failed to set volume size limit")
 		return nil, err
 	}
@@ -680,7 +681,7 @@ func (s *Module) createSubvolWithQuota(size uint64, name string, poolType pkg.De
 // createSubvol creates a subvolume with the given name
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this method does not set any quota on the subvolume, for this uses createSubvolWithQuota
-func (s *Module) createSubvol(size uint64, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
+func (s *Module) createSubvol(size gridtypes.Unit, name string, poolType pkg.DeviceType) (filesystem.Volume, error) {
 	var err error
 
 	if poolType != zos.HDDDevice && poolType != zos.SSDDevice {
@@ -713,7 +714,7 @@ type candidate struct {
 	Available uint64
 }
 
-func (s *Module) findCandidates(size uint64, poolType pkg.DeviceType) ([]candidate, error) {
+func (s *Module) findCandidates(size gridtypes.Unit, poolType pkg.DeviceType) ([]candidate, error) {
 
 	// Look for candidates in mounted pools first
 	candidates, err := s.checkForCandidates(size, poolType, true)
@@ -741,7 +742,7 @@ func (s *Module) findCandidates(size uint64, poolType pkg.DeviceType) ([]candida
 	return candidates, nil
 }
 
-func (s *Module) checkForCandidates(size uint64, poolType pkg.DeviceType, mounted bool) ([]candidate, error) {
+func (s *Module) checkForCandidates(size gridtypes.Unit, poolType pkg.DeviceType, mounted bool) ([]candidate, error) {
 	var candidates []candidate
 	for _, pool := range s.pools {
 		_, poolIsMounted := pool.Mounted()
@@ -780,10 +781,10 @@ func (s *Module) checkForCandidates(size uint64, poolType pkg.DeviceType, mounte
 		log.Debug().
 			Uint64("max size", usage.Size).
 			Uint64("reserved", reserved).
-			Uint64("new size", reserved+size).
+			Uint64("new size", reserved+uint64(size)).
 			Msgf("usage of pool %s", pool.Name())
 		// Make sure adding this filesystem would not bring us over the disk limit
-		if reserved+size > usage.Size {
+		if reserved+uint64(size) > usage.Size {
 			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
 
 			if !poolIsMounted && !mounted {

@@ -37,9 +37,9 @@ func registration(ctx context.Context, cl zbus.Client) error {
 
 	log.Debug().
 		Uint64("cru", cap.CRU).
-		Uint64("mru", cap.MRU).
-		Uint64("sru", cap.SRU).
-		Uint64("hru", cap.HRU).
+		Uint64("mru", uint64(cap.MRU)).
+		Uint64("sru", uint64(cap.SRU)).
+		Uint64("hru", uint64(cap.HRU)).
 		Msg("node capacity")
 
 	fm, err := env.FarmerClient()

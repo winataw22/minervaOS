@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -49,7 +50,7 @@ type volumeAllocator interface {
 	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
 	// It is up to the caller to handle such a situation and decide if he wants
 	// to try again on a different devicetype
-	CreateFilesystem(ctx context.Context, name string, size uint64, poolType pkg.DeviceType) (pkg.Filesystem, error)
+	CreateFilesystem(ctx context.Context, name string, size gridtypes.Unit, poolType pkg.DeviceType) (pkg.Filesystem, error)
 
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
@@ -233,7 +234,7 @@ func (f *flistModule) mount(name, url, storage string, opts pkg.MountOptions) (s
 				return "", fmt.Errorf("invalid mount option, missing disk type and/or size")
 			}
 			newAllocation = true
-			backend, err = f.storage.CreateFilesystem(ctx, name, opts.Limit*mib, opts.Type)
+			backend, err = f.storage.CreateFilesystem(ctx, name, opts.Limit, opts.Type)
 			if err != nil {
 				return "", errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
 			}

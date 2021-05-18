@@ -99,7 +99,7 @@ func (i *Interface) getType() (InterfaceType, int, error) {
 type Interfaces []Interface
 
 // MemMib is memory size in mib
-type MemMib int64
+type MemMib uint64
 
 func (m MemMib) String() string {
 	return fmt.Sprintf("size=%dM", int64(m))

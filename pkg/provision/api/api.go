@@ -31,7 +31,7 @@ func (a *Workloads) setup(router *mux.Router) error {
 		mw.NewAuthMiddleware(a.engine.Twins()),
 	)
 
-	workloads.Path("/").HandlerFunc(mw.AsHandlerFunc(a.createOrUpdate)).Methods(http.MethodPost, http.MethodPut).Name("workload-create-or-update")
+	workloads.Path("").HandlerFunc(mw.AsHandlerFunc(a.createOrUpdate)).Methods(http.MethodPost, http.MethodPut).Name("workload-create-or-update")
 	workloads.Path("/{twin}/{id}").HandlerFunc(mw.AsHandlerFunc(a.get)).Methods(http.MethodGet).Name("workload-get")
 	workloads.Path("/{twin}/{id}").HandlerFunc(mw.AsHandlerFunc(a.delete)).Methods(http.MethodDelete).Name("workload-delete")
 	return nil

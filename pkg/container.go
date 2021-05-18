@@ -5,6 +5,7 @@ package pkg
 
 import (
 	"github.com/threefoldtech/zos/pkg/container/logger"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -49,8 +50,8 @@ type Container struct {
 	Interactive bool
 	// CPU count limit
 	CPU uint
-	// Memory limit in bytes
-	Memory uint64
+	// Memory limit in
+	Memory gridtypes.Unit
 	// Logs backends
 	Logs []logger.Logs
 	// Stats container metrics backend

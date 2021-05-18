@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rusart/muxprom"
@@ -142,16 +143,16 @@ func action(cli *cli.Context) error {
 
 	provisioners := primitives.NewPrimitivesProvisioner(cl)
 
-	// update initial capacity with
-	reserved, err := getNodeReserved(cl)
-	if err != nil {
-		return errors.Wrap(err, "failed to get node reserved capacity")
-	}
 	cap, err := capacity.NewResourceOracle(stubs.NewStorageModuleStub(cl)).Total()
 	if err != nil {
 		return errors.Wrap(err, "failed to get node capacity")
 	}
 
+	// update initial capacity with
+	reserved, err := getNodeReserved(cl, cap)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node reserved capacity")
+	}
 	var current gridtypes.Capacity
 	if !app.IsFirstBoot(module) {
 		// if this is the first boot of this module.
@@ -273,9 +274,16 @@ func action(cli *cli.Context) error {
 
 	// register static files
 	v1.PathPrefix("").Handler(http.StripPrefix("/api/v1", http.FileServer(http.FS(swaggerFs))))
+	r := handlers.LoggingHandler(os.Stderr, router)
+	r = handlers.CORS(
+		handlers.AllowedOrigins([]string{"*"}),
+		handlers.AllowedHeaders([]string{"Content-Type"}),
+		handlers.ExposedHeaders([]string{"Pages"}),
+	)(r)
+
 	httpServer := &http.Server{
 		Addr:    httpAddr,
-		Handler: router,
+		Handler: r,
 	}
 
 	utils.OnDone(ctx, func(_ error) {
@@ -291,14 +299,15 @@ func action(cli *cli.Context) error {
 	return nil
 }
 
-func getNodeReserved(cl zbus.Client) (counter primitives.Counters, err error) {
+func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter primitives.Counters, err error) {
+	// fill in reserved storage
 	storage := stubs.NewStorageModuleStub(cl)
 	fs, err := storage.GetCacheFS(context.TODO())
 	if err != nil {
 		return counter, err
 	}
 
-	var v *primitives.AtomicValue
+	var v *primitives.AtomicUnit
 	switch fs.DiskType {
 	case zos.HDDDevice:
 		v = &counter.HRU
@@ -308,8 +317,16 @@ func getNodeReserved(cl zbus.Client) (counter primitives.Counters, err error) {
 		return counter, fmt.Errorf("unknown cache disk type '%s'", fs.DiskType)
 	}
 
-	v.Increment(fs.Usage.Size / gib)
-	counter.MRU.Increment(2)
+	v.Increment(fs.Usage.Size)
+
+	// we reserve 10% of memory to ZOS itself, with a min of 2G
+	counter.MRU.Increment(
+		gridtypes.Max(
+			available.MRU*10/100,
+			2*gridtypes.Gigabyte,
+		),
+	)
+
 	return
 }
 

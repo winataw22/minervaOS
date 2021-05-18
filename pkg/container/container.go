@@ -182,7 +182,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		removeRunMount(),
 		withNetworkNamespace(data.Network.Namespace),
 		withMounts(data.Mounts),
-		WithMemoryLimit(data.Memory),
+		WithMemoryLimit(uint64(data.Memory)),
 		WithCPUCount(data.CPU),
 	}
 

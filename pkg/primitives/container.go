@@ -216,7 +216,7 @@ func (p *Primitives) containerProvisionImpl(ctx context.Context, wl *gridtypes.W
 			Entrypoint:  config.Entrypoint,
 			Interactive: config.Interactive,
 			CPU:         config.ContainerCapacity.CPU,
-			Memory:      config.ContainerCapacity.Memory * mib,
+			Memory:      config.ContainerCapacity.Memory,
 			Logs:        logs,
 			Stats:       config.Stats,
 			Elevated:    elevated,
