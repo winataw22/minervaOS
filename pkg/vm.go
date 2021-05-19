@@ -87,7 +87,7 @@ func (vm *VM) Validate() error {
 		return fmt.Errorf("kernel-image is required")
 	}
 
-	if vm.Memory < 512 {
+	if vm.Memory < 512*gridtypes.Megabyte {
 		return fmt.Errorf("invalid memory must not be less than 512M")
 	}
 
