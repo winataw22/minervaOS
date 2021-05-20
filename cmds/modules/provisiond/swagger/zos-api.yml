@@ -275,6 +275,7 @@ components:
           type: string
           description: "defines the type of the workload"
           enum:
+            - network
             - container
             - volume
             - network
@@ -291,6 +292,7 @@ components:
           $ref: "#/components/schemas/Result"
         data:
           oneOf:
+            - $ref: "#/components/schemas/Network"
             - $ref: "#/components/schemas/Volume"
             - $ref: "#/components/schemas/ZDB"
             - $ref: "#/components/schemas/Container"
@@ -468,6 +470,39 @@ components:
           type: string
         disable_default_ingress:
           type: boolean
+    Network:
+      type: "object"
+      properties:
+        ip_range:
+          type: string
+          description: "must be ipv4 /16"
+          format: cidr
+        subnet:
+          type: string
+          format: cidr
+        wireguard_private_key:
+          type: string
+        wireguard_listen_port:
+          type: integer
+        peers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Peer"
+    Peer:
+      type: "object"
+      properties:
+        subnet:
+          type: string
+          format: cidr
+        wireguard_public_key:
+          type: string
+        allowed_ips:
+          type: array
+          items:
+            type: string
+            format: cidr
+        endpoint:
+          type: string
     PublicConfig:
       type: "object"
       properties:

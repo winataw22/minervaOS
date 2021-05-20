@@ -51,11 +51,6 @@ type Counters struct {
 	IPv4 AtomicUnit // IPv4 count absolute
 }
 
-const (
-	mib = uint64(1024 * 1024)
-	gib = uint64(mib * 1024)
-)
-
 // Increment is called by the provision.Engine when a reservation has been provisionned
 func (c *Counters) Increment(cap gridtypes.Capacity) {
 	c.CRU.Increment(gridtypes.Unit(cap.CRU))

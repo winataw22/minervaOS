@@ -46,6 +46,10 @@ func (a *Workloads) createOrUpdate(request *http.Request) (interface{}, mw.Respo
 
 	if err == context.DeadlineExceeded {
 		return nil, mw.Unavailable(ctx.Err())
+	} else if errors.Is(err, provision.ErrDeploymentExists) {
+		return nil, mw.Conflict(err)
+	} else if errors.Is(err, provision.ErrDeploymentNotExists) {
+		return nil, mw.NotFound(err)
 	} else if errors.Is(err, provision.ErrDeploymentUpgradeValidationError) {
 		return nil, mw.BadRequest(err)
 	} else if err != nil {
