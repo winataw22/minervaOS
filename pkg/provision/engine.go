@@ -444,7 +444,6 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, getter gridtypes.Wo
 			var err error
 			if e.provisioner.CanUpdate(ctx, wl.Type) {
 				result, err = e.provisioner.Update(ctx, wl)
-
 			} else {
 				if err := e.provisioner.Decommission(ctx, wl); err != nil {
 					log.Error().Err(err).Msg("failed to decomission workload")
@@ -453,16 +452,16 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, getter gridtypes.Wo
 				result, err = e.provisioner.Provision(ctx, wl)
 			}
 
-			if result.State == gridtypes.StateError {
-				log.Error().Str("error", result.Error).Msg("failed to deploy workload")
-			}
-
 			if err != nil {
 				log.Error().Err(err).Msg("failed to deploy workload")
 				result = &gridtypes.Result{
 					Error: err.Error(),
 					State: gridtypes.StateError,
 				}
+			}
+
+			if result.State == gridtypes.StateError {
+				log.Error().Str("error", result.Error).Msg("failed to deploy workload")
 			}
 
 			result.Created = gridtypes.Timestamp(time.Now().Unix())
