@@ -47,6 +47,8 @@ var (
 	// ErrDeploymentUpgradeValidationError error, is returned if the deployment
 	// failed to compute upgrade steps
 	ErrDeploymentUpgradeValidationError = fmt.Errorf("upgrade validation error")
+	// ErrInvalidVersion invalid version error
+	ErrInvalidVersion = fmt.Errorf("invalid version")
 )
 
 // Storage interface

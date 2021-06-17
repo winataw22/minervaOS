@@ -6,7 +6,6 @@ package pkg
 import (
 	"github.com/threefoldtech/zos/pkg/container/logger"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 // ContainerID type
@@ -28,6 +27,12 @@ type NetworkInfo struct {
 type MountInfo struct {
 	Source string // source of the mount point on the host
 	Target string // target of mount inside the container
+}
+
+// Stats endpoints
+type Stats struct {
+	Type     string `bson:"type" json:"type"`
+	Endpoint string `bson:"endpoint" json:"endpoint"`
 }
 
 //Container creation info
@@ -55,7 +60,7 @@ type Container struct {
 	// Logs backends
 	Logs []logger.Logs
 	// Stats container metrics backend
-	Stats []zos.Stats
+	Stats []Stats
 	// Elevated privileges (to use fuse inside)
 	Elevated bool
 }

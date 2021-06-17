@@ -71,38 +71,9 @@ func (s *FlisterStub) Mount(ctx context.Context, arg0 string, arg1 string, arg2 
 	return
 }
 
-func (s *FlisterStub) NamedMount(ctx context.Context, arg0 string, arg1 string, arg2 string, arg3 pkg.MountOptions) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2, arg3}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "NamedMount", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *FlisterStub) NamedUmount(ctx context.Context, arg0 string) (ret0 error) {
+func (s *FlisterStub) Unmount(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "NamedUmount", args...)
-	if err != nil {
-		panic(err)
-	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *FlisterStub) Umount(ctx context.Context, arg0 string) (ret0 error) {
-	args := []interface{}{arg0}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "Umount", args...)
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Unmount", args...)
 	if err != nil {
 		panic(err)
 	}

@@ -49,7 +49,7 @@ table inet filter {
     ip6 daddr ff02::/64 accept
     tcp dport { {{.YggPorts}} } accept
     # port for provisiond
-    iifname "ygg0" tcp dport 2021 accept
+    tcp dport 2021 accept
     ip6 nexthdr icmpv6 accept
     iifname "npub6" counter drop
     iifname "npub4" counter drop

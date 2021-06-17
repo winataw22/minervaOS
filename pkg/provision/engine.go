@@ -216,6 +216,10 @@ func (e *NativeEngine) Admins() Twins {
 
 // Provision workload
 func (e *NativeEngine) Provision(ctx context.Context, deployment gridtypes.Deployment) error {
+	if deployment.Version != 0 {
+		return errors.Wrap(ErrInvalidVersion, "expected version to be 0 on deployment creation")
+	}
+
 	if err := e.storage.Add(deployment); err != nil {
 		return err
 	}
@@ -407,7 +411,7 @@ func (e *NativeEngine) uninstallDeployment(ctx context.Context, getter gridtypes
 				Str("type", wl.Type.String()).
 				Logger()
 
-			log.Debug().Str("workload", wl.Name).Msg("de-provisioning")
+			log.Debug().Str("workload", string(wl.Name)).Msg("de-provisioning")
 			if wl.Result.State == gridtypes.StateDeleted {
 				//nothing to do!
 				continue
@@ -550,7 +554,7 @@ func (e *NativeEngine) DecommissionCached(id string, reason string) error {
 		return err
 	}
 
-	wl, err := dl.Get(name)
+	wl, err := dl.Get(gridtypes.Name(name))
 	if err != nil {
 		return err
 	}

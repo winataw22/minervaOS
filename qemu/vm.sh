@@ -78,7 +78,7 @@ echo "boot $image"
 qemu-system-x86_64 -kernel $image \
     -m $(( mem * 1024 )) \
     -enable-kvm \
-    -cpu host \
+    -cpu host,host-phys-bits \
     -smp $smp \
     -uuid $uuid \
     -netdev bridge,id=zos0,br=${bridge} -device virtio-net-pci,netdev=zos0,mac="${basemac}1" \

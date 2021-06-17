@@ -134,6 +134,7 @@ func (f *flistModule) MountsCleaner(ctx context.Context, every time.Duration) {
 	for {
 		select {
 		case <-ctx.Done():
+			return
 		case <-time.After(every):
 			log.Debug().Msg("running cleaner job")
 			if err := f.cleanupAll(ctx); err != nil {
@@ -155,6 +156,7 @@ func (f *flistModule) CacheCleaner(ctx context.Context, every time.Duration, age
 	for {
 		select {
 		case <-ctx.Done():
+			return
 		case <-time.After(every):
 			log.Debug().Msg("running cache cleaner job")
 			if err := f.cleanCache(time.Now(), age); err != nil {

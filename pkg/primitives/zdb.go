@@ -119,7 +119,6 @@ func (p *Primitives) zdbRootFS(ctx context.Context) (string, error) {
 		rootFS, err = flist.Mount(ctx, zdbFlistURL, "", pkg.MountOptions{
 			Limit:    10 * gridtypes.Megabyte,
 			ReadOnly: false,
-			Type:     typ,
 		})
 
 		if err != nil {
@@ -161,7 +160,7 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 			slog.Error().Err(err).Msg("failed to delete 0-db container")
 		}
 
-		if err := flist.Umount(ctx, rootFS); err != nil {
+		if err := flist.Unmount(ctx, string(name)); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
 		}
 	}
@@ -169,7 +168,7 @@ func (p *Primitives) createZdbContainer(ctx context.Context, allocation pkg.Allo
 	// create the network namespace and macvlan for the 0-db container
 	netNsName, err := network.ZDBPrepare(ctx, allocation.VolumeID)
 	if err != nil {
-		if err := flist.Umount(ctx, rootFS); err != nil {
+		if err := flist.Unmount(ctx, string(name)); err != nil {
 			slog.Error().Err(err).Str("path", rootFS).Msgf("failed to unmount")
 		}
 
@@ -422,7 +421,7 @@ func (p *Primitives) deleteZdbContainer(ctx context.Context, containerID pkg.Con
 		return errors.Wrapf(err, "failed to destroy zdb network namespace")
 	}
 
-	if err := flist.Umount(ctx, info.RootFS); err != nil {
+	if err := flist.Unmount(ctx, string(containerID)); err != nil {
 		return errors.Wrapf(err, "failed to unmount flist at %s", info.RootFS)
 	}
 
@@ -548,7 +547,7 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 			}
 
 			// cleanup old containers rootfs
-			if err = flistmod.Umount(ctx, continfo.RootFS); err != nil {
+			if err = flistmod.Unmount(ctx, volumeid); err != nil {
 				log.Error().Err(err).Str("path", continfo.RootFS).Msgf("failed to unmount old zdb container")
 			}
 
@@ -566,7 +565,7 @@ func (p *Primitives) upgradeRunningZdb(ctx context.Context) error {
 			if err != nil {
 				log.Error().Err(err).Msg("could not restart zdb container")
 
-				if err = flistmod.Umount(ctx, rootfs); err != nil {
+				if err = flistmod.Unmount(ctx, volumeid); err != nil {
 					log.Error().Err(err).Str("path", rootfs).Msgf("failed to unmount zdb container")
 				}
 			}

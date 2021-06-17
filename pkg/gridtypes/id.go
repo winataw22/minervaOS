@@ -51,12 +51,12 @@ func (i WorkloadID) Parts() (twin, deployment uint32, name string, err error) {
 }
 
 // IsValidName validates workload name
-func IsValidName(n string) error {
+func IsValidName(n Name) error {
 	if len(n) == 0 {
 		return fmt.Errorf("name cannot be empty")
 	}
 
-	if !nameMatch.MatchString(n) {
+	if !nameMatch.MatchString(string(n)) {
 		return fmt.Errorf("unsupported character in workload name")
 	}
 
@@ -64,7 +64,7 @@ func IsValidName(n string) error {
 }
 
 // NewWorkloadID creates a new global ID from it's parts
-func NewWorkloadID(twin uint32, deployment uint32, name string) (WorkloadID, error) {
+func NewWorkloadID(twin uint32, deployment uint32, name Name) (WorkloadID, error) {
 	if err := IsValidName(name); err != nil {
 		return "", err
 	}

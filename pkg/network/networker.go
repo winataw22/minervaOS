@@ -355,7 +355,7 @@ func (n networker) createMacVlan(iface string, master string, hw net.HardwareAdd
 
 // SetupTap interface in the network resource. We only allow 1 tap interface to be
 // set up per NR currently
-func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
+func (n *networker) SetupTap(networkID pkg.NetID, name string) (string, error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
 
 	localNR, err := n.networkOf(string(networkID))
@@ -373,7 +373,7 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 		return "", errors.Wrap(err, "could not get network namespace bridge")
 	}
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(name)
 	if err != nil {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -383,10 +383,10 @@ func (n *networker) SetupTap(networkID pkg.NetID) (string, error) {
 	return tapIface, err
 }
 
-func (n *networker) TapExists(networkID pkg.NetID) (bool, error) {
-	log.Info().Str("network-id", string(networkID)).Msg("Checking if tap interface exists")
+func (n *networker) TapExists(name string) (bool, error) {
+	log.Info().Str("tap-name", string(name)).Msg("Checking if tap interface exists")
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(name)
 	if err != nil {
 		return false, errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -395,10 +395,10 @@ func (n *networker) TapExists(networkID pkg.NetID) (bool, error) {
 }
 
 // RemoveTap in the network resource.
-func (n *networker) RemoveTap(networkID pkg.NetID) error {
-	log.Info().Str("network-id", string(networkID)).Msg("Removing tap interface")
+func (n *networker) RemoveTap(name string) error {
+	log.Info().Str("tap-name", string(name)).Msg("Removing tap interface")
 
-	tapIface, err := tapName(networkID)
+	tapIface, err := tapName(name)
 	if err != nil {
 		return errors.Wrap(err, "could not get network namespace tap device name")
 	}
@@ -1051,9 +1051,9 @@ func createNetNS(name string) (ns.NetNS, error) {
 	return netNs, nil
 }
 
-// tapName returns the name of the tap device for a network namespace
-func tapName(netID pkg.NetID) (string, error) {
-	name := fmt.Sprintf("t-%s", netID)
+// tapName prefixes the tap name with a t-
+func tapName(tname string) (string, error) {
+	name := fmt.Sprintf("t-%s", tname)
 	if len(name) > 15 {
 		return "", errors.Errorf("tap name too long %s", name)
 	}

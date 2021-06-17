@@ -99,7 +99,7 @@ type Workload struct {
 	//Version is version of reservation object
 	Version int `json:"version"`
 	//Name is unique workload name per deployment  (required)
-	Name string `json:"name"`
+	Name Name `json:"name"`
 	// Type of the reservation (container, zdb, vm, etc...)
 	Type WorkloadType `json:"type"`
 	// Data is the reservation type arguments.

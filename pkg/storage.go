@@ -181,8 +181,16 @@ func (d *VDisk) Name() string {
 
 // VDiskModule interface
 type VDiskModule interface {
-	// AllocateDisk with given id and size, return path to virtual disk
+	// AllocateDisk with given id and size and an optional source disk, return path to virtual disk
 	Allocate(id string, size gridtypes.Unit) (string, error)
+
+	// Writes an image image to disk with id
+	WriteImage(id string, image string) error
+
+	// EnsureFilesystem ensures disk has a valid filesystem
+	// this method is idempotent
+	EnsureFilesystem(id string) error
+
 	// DeallocateVDisk removes a virtual disk
 	Deallocate(id string) error
 	// Exists checks if disk with that ID already allocated

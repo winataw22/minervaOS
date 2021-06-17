@@ -60,14 +60,13 @@ type Networker interface {
 
 	// SetupTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
-	SetupTap(networkID NetID) (string, error)
+	SetupTap(networkID NetID, name string) (string, error)
 
-	// TapExists checks if the tap device exists already
-	TapExists(networkID NetID) (bool, error)
+	// TapExists checks if the tap device with the given name exists already
+	TapExists(name string) (bool, error)
 
-	// RemoveTap removes the tap device from the network namespace
-	// of the networkID
-	RemoveTap(networkID NetID) error
+	// RemoveTap removes the tap device with the given name
+	RemoveTap(name string) error
 
 	// PublicIPv4Support enabled on this node for reservations
 	PublicIPv4Support() bool

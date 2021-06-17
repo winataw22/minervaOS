@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"text/template"
 	"time"
@@ -85,6 +86,10 @@ func (t *testCommander) args(args ...string) (map[string]string, []string) {
 }
 
 func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
+	if name == "mountpoint" {
+		return exec.Command("true")
+	}
+
 	if name != "g8ufs" {
 		t.Fatal("invalid command name, expected 'g8ufs'")
 	}
@@ -99,6 +104,20 @@ func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
 	require.NoError(t.T, err)
 
 	return exec.Command("sh", "-c", script.String())
+}
+
+type testSystem struct {
+	mock.Mock
+}
+
+func (t *testSystem) Mount(source string, target string, fstype string, flags uintptr, data string) (err error) {
+	args := t.Called(source, target, fstype, flags, data)
+	return args.Error(0)
+}
+
+func (t *testSystem) Unmount(target string, flags int) error {
+	args := t.Called(target, flags)
+	return args.Error(0)
 }
 
 func TestCommander(t *testing.T) {
@@ -128,21 +147,65 @@ func TestMountUnmount(t *testing.T) {
 
 	defer os.RemoveAll(root)
 
-	flister := newFlister(root, strg, cmder)
+	sys := &testSystem{}
+	flister := newFlister(root, strg, cmder, sys)
 
-	strg.On("Path", mock.Anything, mock.Anything).Return("/my/backend", nil)
+	backend, err := ioutil.TempDir("", "flist_backend")
+	require.NoError(t, err)
+	defer os.RemoveAll(backend)
 
-	strg.On("CreateFilesystem", mock.Anything, uint64(256*mib), zos.SSDDevice).
-		Return("/my/backend", nil)
+	strg.On("Path", mock.Anything, mock.Anything).Return(backend, nil)
 
-	mnt, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
+	name := "test"
+	strg.On("CreateFilesystem", name, uint64(256*mib), zos.SSDDevice).
+		Return(backend, nil)
+
+	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
+
+	mnt, err := flister.Mount(name, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
 	require.NoError(t, err)
 
 	// Trick flister into thinking that 0-fs has exited
 	os.Remove(cmder.m["pid"])
 	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
 
-	err = flister.Umount(mnt)
+	sys.On("Unmount", mnt, syscall.MNT_DETACH).Return(nil)
+
+	err = flister.Unmount(name)
+	require.NoError(t, err)
+}
+
+func TestMountUnmountRO(t *testing.T) {
+	cmder := &testCommander{T: t}
+	strg := &StorageMock{}
+
+	root, err := ioutil.TempDir("", "flist_root")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(root)
+
+	sys := &testSystem{}
+	flister := newFlister(root, strg, cmder, sys)
+
+	backend, err := ioutil.TempDir("", "flist_backend")
+	require.NoError(t, err)
+	defer os.RemoveAll(backend)
+
+	name := "test"
+
+	flist := mock.Anything
+	sys.On("Mount", flist, filepath.Join(root, "mountpoint", name), "bind", uintptr(syscall.MS_BIND), "").Return(nil)
+
+	mnt, err := flister.Mount(name, "https://hub.grid.tf/thabet/redis.flist", pkg.ReadOnlyMountOptions)
+	require.NoError(t, err)
+
+	// Trick flister into thinking that 0-fs has exited
+	os.Remove(cmder.m["pid"])
+	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
+
+	sys.On("Unmount", mnt, syscall.MNT_DETACH).Return(nil)
+
+	err = flister.Unmount(name)
 	require.NoError(t, err)
 }
 
@@ -157,33 +220,35 @@ func TestIsolation(t *testing.T) {
 
 	defer os.RemoveAll(root)
 
-	flister := newFlister(root, strg, cmder)
+	sys := &testSystem{}
 
-	strg.On("Path", mock.Anything, mock.Anything).Return("/my/backend", nil)
+	flister := newFlister(root, strg, cmder, sys)
+
+	backend, err := ioutil.TempDir("", "flist_backend")
+	require.NoError(err)
+	defer os.RemoveAll(backend)
+	strg.On("Path", mock.Anything, mock.Anything).Return(backend, nil)
 
 	strg.On("CreateFilesystem", mock.Anything, mock.Anything, mock.Anything, uint64(256*mib), zos.SSDDevice).
-		Return("/my/backend", nil)
+		Return(backend, nil)
 
-	path1, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
+	name1 := "test1"
+	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name1), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
+
+	name2 := "test2"
+	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name2), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
+
+	path1, err := flister.Mount(name1, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
 	require.NoError(err)
 	args1 := cmder.m
 
-	path2, err := flister.Mount("https://hub.grid.tf/thabet/redis.flist", "", pkg.DefaultMountOptions)
+	path2, err := flister.Mount(name2, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
 	require.NoError(err)
 	args2 := cmder.m
 
 	require.NotEqual(path1, path2)
-	require.NotEqual(args1, args2)
+	require.Equal(args1, args2)
 
-	// the 2 mounts since they are exactly the same flist
-	// should have same meta, and of course same cache
-	// but a different backend and pid
-	require.Equal(args1["cache"], args2["cache"])
-	require.Equal(args1["meta"], args2["meta"])
-	//TODO: the backend url is return by the storage mock, this is why this
-	// is failing.
-	// require.NotEqual(args1["backend"], args2["backend"])
-	require.NotEqual(args1["pid"], args2["pid"])
 }
 
 func TestDownloadFlist(t *testing.T) {
@@ -196,7 +261,9 @@ func TestDownloadFlist(t *testing.T) {
 	require.NoError(err)
 	defer os.RemoveAll(root)
 
-	x := newFlister(root, strg, cmder)
+	sys := &testSystem{}
+
+	x := newFlister(root, strg, cmder, sys)
 
 	f, ok := x.(*flistModule)
 	require.True(ok)

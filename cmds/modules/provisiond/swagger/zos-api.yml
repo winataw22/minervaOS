@@ -281,6 +281,7 @@ components:
             - network
             - zdb
             - kubernetes
+            - virtualmachine
             - ipv4
         metadata:
           type: "string"
@@ -298,6 +299,7 @@ components:
             - $ref: "#/components/schemas/Container"
             - $ref: "#/components/schemas/PublicIP"
             - $ref: "#/components/schemas/Kubernetes"
+            - $ref: "#/components/schemas/VirtualMachine"
     Deployment:
       type: "object"
       properties:
@@ -440,36 +442,22 @@ components:
                   stderr:
                     type: string
     Kubernetes:
-      type: "object"
-      properties:
-        size:
-          type: integer
-          format: uint
-        network:
-          type: string
-          description: "network name, can be from another deployment"
-        ip:
-          type: string
-          format: ip
-        cluster_secret:
-          type: string
-        master_ips:
-          description: "list of master Ips, if empty then this vm is master"
-          type: array
-          items:
-            type: string
-            format: ip
-        ssh_keys:
-          type: array
-          items:
-            type: string
-        public_ip:
-          description: "name of the public Ip reservation in this deployment"
-          type: string
-        datastore_endpoint:
-          type: string
-        disable_default_ingress:
-          type: boolean
+      allOf:
+        - $ref: '#/components/schemas/VirtualMachine'
+        - type: "object"
+          properties:
+            cluster_secret:
+              type: string
+            master_ips:
+              description: "list of master Ips, if empty then this vm is master"
+              type: array
+              items:
+                type: string
+                format: ip
+            datastore_endpoint:
+              type: string
+            disable_default_ingress:
+              type: boolean
     Network:
       type: "object"
       properties:
@@ -503,6 +491,27 @@ components:
             format: cidr
         endpoint:
           type: string
+    VirtualMachine:
+      type: "object"
+      properties:
+        name:
+          type: string
+          description: "e.g. ubuntu-20.04, empty for k8s"
+        size:
+          type: integer
+          format: uint
+        network:
+          type: string
+          description: "network name, can be from another deployment"
+        ip:
+          type: string
+          format: ip
+        ssh_keys:
+          type: array
+          items:
+            type: string
+        public_ip:
+          description: "name of the public Ip reservation in this deployment"
     PublicConfig:
       type: "object"
       properties:

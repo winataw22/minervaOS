@@ -328,7 +328,7 @@ func (s *NetworkerStub) RemovePubTap(ctx context.Context, arg0 string) (ret0 err
 	return
 }
 
-func (s *NetworkerStub) RemoveTap(ctx context.Context, arg0 zos.NetID) (ret0 error) {
+func (s *NetworkerStub) RemoveTap(ctx context.Context, arg0 string) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "RemoveTap", args...)
 	if err != nil {
@@ -383,8 +383,8 @@ func (s *NetworkerStub) SetupPubTap(ctx context.Context, arg0 string) (ret0 stri
 	return
 }
 
-func (s *NetworkerStub) SetupTap(ctx context.Context, arg0 zos.NetID) (ret0 string, ret1 error) {
-	args := []interface{}{arg0}
+func (s *NetworkerStub) SetupTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupTap", args...)
 	if err != nil {
 		panic(err)
@@ -399,7 +399,7 @@ func (s *NetworkerStub) SetupTap(ctx context.Context, arg0 zos.NetID) (ret0 stri
 	return
 }
 
-func (s *NetworkerStub) TapExists(ctx context.Context, arg0 zos.NetID) (ret0 bool, ret1 error) {
+func (s *NetworkerStub) TapExists(ctx context.Context, arg0 string) (ret0 bool, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "TapExists", args...)
 	if err != nil {

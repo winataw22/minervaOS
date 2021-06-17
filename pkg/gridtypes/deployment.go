@@ -21,7 +21,7 @@ var (
 // WorkloadGetter is used to get a workload by name inside
 // the deployment context. Mainly used to validate dependency
 type WorkloadGetter interface {
-	Get(name string) (*WorkloadWithID, error)
+	Get(name Name) (*WorkloadWithID, error)
 }
 
 // WorkloadByTypeGetter is used to get a list of workloads
@@ -154,9 +154,14 @@ func (d *Deployment) Challenge(w io.Writer) error {
 
 // Valid validates deployment structure
 func (d *Deployment) Valid() error {
-	names := make(map[string]struct{})
+	names := make(map[Name]struct{})
+	current := d.Version
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
+		if wl.Version > current {
+			return fmt.Errorf("workload version cannot be higher than deployment version")
+		}
+
 		name := wl.Name
 		if err := IsValidName(name); err != nil {
 			return errors.Wrapf(err, "name '%s' is invalid", name)
@@ -258,7 +263,7 @@ func (d *Deployment) Verify(getter KeyGetter) error {
 }
 
 // Get a workload by name
-func (d *Deployment) Get(name string) (*WorkloadWithID, error) {
+func (d *Deployment) Get(name Name) (*WorkloadWithID, error) {
 	if err := IsValidName(name); err != nil {
 		return nil, err
 	}
@@ -278,7 +283,7 @@ func (d *Deployment) Get(name string) (*WorkloadWithID, error) {
 }
 
 // GetType gets a reservation by name if only of the correct type.
-func (d *Deployment) GetType(name string, typ WorkloadType) (*WorkloadWithID, error) {
+func (d *Deployment) GetType(name Name, typ WorkloadType) (*WorkloadWithID, error) {
 	wl, err := d.Get(name)
 	if err != nil {
 		return nil, err
@@ -331,7 +336,7 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 		return nil, fmt.Errorf("expecting deployment version %d, got %d", expected, n.Version)
 	}
 
-	current := make(map[string]*Workload)
+	current := make(map[Name]*Workload)
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
 

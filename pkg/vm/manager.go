@@ -30,6 +30,20 @@ const (
 	defaultKernelArgs = "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules"
 )
 
+var (
+	protectedKernelEnv = map[string]struct{}{
+		"init":       {},
+		"root":       {},
+		"rootfstype": {},
+		"console":    {},
+		"net_eth1":   {},
+		"net_eth2":   {},
+		"net_dns":    {},
+		"panic":      {},
+		"reboot":     {},
+	}
+)
+
 // Module implements the VMModule interface
 type Module struct {
 	root     string
@@ -73,14 +87,21 @@ func NewVMModule(cl zbus.Client, root string) (*Module, error) {
 
 func (m *Module) makeDevices(vm *pkg.VM) ([]Disk, error) {
 	var drives []Disk
-	for i, disk := range vm.Disks {
-		id := fmt.Sprintf("%d", i+2)
+	if vm.Boot.Type == pkg.BootDisk {
+		drives = append(drives, Disk{
+			ID:         "1",
+			Path:       vm.Boot.Path,
+			RootDevice: true,
+			ReadOnly:   false,
+		})
+	}
+	for _, disk := range vm.Disks {
+		id := fmt.Sprintf("%d", len(drives)+1)
 
 		drives = append(drives, Disk{
-			ID:         id,
-			ReadOnly:   disk.ReadOnly,
-			RootDevice: disk.Root,
-			Path:       disk.Path,
+			ID:       id,
+			ReadOnly: false,
+			Path:     disk.Path,
 		})
 	}
 
@@ -262,10 +283,46 @@ func (m *Module) Run(vm pkg.VM) error {
 		return err
 	}
 
-	var kargs strings.Builder
-	kargs.WriteString(vm.KernelArgs)
-	if kargs.Len() == 0 {
-		kargs.WriteString(defaultKernelArgs)
+	cmdline := vm.KernelArgs
+	if cmdline == nil {
+		cmdline = pkg.KernelArgs{}
+	}
+
+	var fs []VirtioFS
+	var env map[string]string
+	if vm.Boot.Type == pkg.BootVirtioFS {
+		// booting from a virtiofs. the vm is basically
+		// running as a container. hence we set extra cmdline
+		// arguments
+		cmdline["root"] = virtioRootFsTag
+		cmdline["rootfstype"] = "virtiofs"
+
+		// we add the fs for booting.
+		fs = []VirtioFS{
+			{Tag: virtioRootFsTag, Path: vm.Boot.Path},
+		}
+		// we set the environment
+		env = vm.Environment
+		// add we also add disk mounts
+		for i, mnt := range vm.Disks {
+			name := fmt.Sprintf("vd%c", 'a'+i)
+			cmdline[name] = mnt.Target
+		}
+	} else {
+		// if with no virtio fs we can only
+		// set the given environment to the linux kernel
+		// but this is not safe.
+		// TODO: Should we only allow UPPER_CASE
+		// env to pass to avoid overriding other params ?!
+		for k, v := range vm.Environment {
+			if strings.HasPrefix(k, "vd") {
+				continue
+			}
+			if _, ok := protectedKernelEnv[k]; ok {
+				continue
+			}
+			cmdline[k] = v
+		}
 	}
 
 	nics, args, err := m.makeNetwork(&vm)
@@ -273,11 +330,18 @@ func (m *Module) Run(vm pkg.VM) error {
 		return err
 	}
 
+	var kargs strings.Builder
+	kargs.WriteString(args)
+
 	if kargs.Len() != 0 {
 		kargs.WriteRune(' ')
 	}
 
-	kargs.WriteString(args)
+	if len(cmdline) > 0 {
+		kargs.WriteString(cmdline.String())
+	} else {
+		kargs.WriteString(defaultKernelArgs)
+	}
 
 	machine := Machine{
 		ID: vm.Name,
@@ -291,8 +355,10 @@ func (m *Module) Run(vm pkg.VM) error {
 			Mem:       MemMib(vm.Memory / gridtypes.Megabyte),
 			HTEnabled: false,
 		},
+		FS:          fs,
 		Interfaces:  nics,
 		Disks:       devices,
+		Environment: env,
 		NoKeepAlive: vm.NoKeepAlive,
 	}
 

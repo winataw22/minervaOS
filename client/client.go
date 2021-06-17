@@ -79,11 +79,16 @@ func (c *Client) Node(nodeID string) (*NodeClient, error) {
 
 	log.Debug().Str("node-id", nodeID).Str("ip", ip.String()).Msg("found node ip")
 
+	return c.NodeWithIP(ip), nil
+
+}
+
+// NodeWithIP return a client to node given node IP
+func (c *Client) NodeWithIP(ip net.IP) *NodeClient {
 	return &NodeClient{
 		client: c,
 		ip:     ip,
-	}, nil
-
+	}
 }
 
 // NodeID returns the yggdrasil node ID of s
