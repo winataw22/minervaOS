@@ -1,1 +1,1 @@
-../../../../etc/zinit/redis.yaml
+exec: redis-server --protected-mode no --unixsocket /var/run/redis.sock

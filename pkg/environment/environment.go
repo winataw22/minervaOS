@@ -60,7 +60,7 @@ const (
 var (
 	envDev = Environment{
 		RunningMode:  RunningDev,
-		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		SubstrateURL: "wss://substrate01.threefold.io",
 		FlistURL:     "zdb://hub.grid.tf:9900",
 		BinRepo:      "tf-zos-bins.dev",
 	}
@@ -68,7 +68,7 @@ var (
 	envTest = Environment{
 		RunningMode: RunningTest,
 		// TODO: this should become a different substrate ?
-		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		SubstrateURL: "wss://substrate01.threefold.io",
 		FlistURL:     "zdb://hub.grid.tf:9900",
 		BinRepo:      "tf-zos-bins.test",
 	}
@@ -76,7 +76,7 @@ var (
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode:  RunningMain,
-		SubstrateURL: "wss://explorer.devnet.grid.tf/ws",
+		SubstrateURL: "wss://substrate01.threefold.io",
 		FlistURL:     "zdb://hub.grid.tf:9900",
 		BinRepo:      "tf-zos-bins",
 	}

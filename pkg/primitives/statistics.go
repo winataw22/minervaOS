@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/provision/mw"
+	"github.com/threefoldtech/zos/pkg/rmb"
 )
 
 type (
@@ -217,6 +218,32 @@ func (s *statisticsAPI) setup(router *mux.Router) error {
 }
 
 func (s *statisticsAPI) getCounters(r *http.Request) (interface{}, mw.Response) {
+	return struct {
+		Total gridtypes.Capacity `json:"total"`
+		Used  gridtypes.Capacity `json:"used"`
+	}{
+		Total: s.stats.Total(),
+		Used:  s.stats.Current(),
+	}, nil
+}
+
+type statisticsMessageBus struct {
+	stats *Statistics
+}
+
+// NewStatisticsMessageBus register statistics handlers for message bus
+func NewStatisticsMessageBus(router rmb.Router, stats *Statistics) error {
+	api := statisticsMessageBus{stats}
+	return api.setup(router)
+}
+
+func (s *statisticsMessageBus) setup(router rmb.Router) error {
+	sub := router.Subroute("statistics")
+	sub.WithHandler("get", s.getCounters)
+	return nil
+}
+
+func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) (interface{}, error) {
 	return struct {
 		Total gridtypes.Capacity `json:"total"`
 		Used  gridtypes.Capacity `json:"used"`

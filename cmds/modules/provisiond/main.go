@@ -3,13 +3,11 @@ package provisiond
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rusart/muxprom"
@@ -20,8 +18,9 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/primitives"
-	"github.com/threefoldtech/zos/pkg/provision/api"
+	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
+	"github.com/threefoldtech/zos/pkg/rmb"
 	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/urfave/cli/v2"
 
@@ -67,8 +66,10 @@ func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 		rootDir      string = cli.String("root")
-		httpAddr     string = cli.String("http")
 	)
+
+	ctx := context.Background()
+	ctx, _ = utils.WithSignal(ctx)
 
 	// keep checking if limited-cache flag is set
 	if app.CheckFlag(app.LimitedCache) {
@@ -130,9 +131,17 @@ func action(cli *cli.Context) error {
 	)
 	prom.Instrument()
 
+	mBus, err := rmb.New(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "Failed to initialize message bus")
+	}
+
+	zosRouter := mBus.Subroute("zos")
+	zosRouter.Use(rmb.LoggerMiddleware)
+
 	// the v1 endpoint will be used by all components to register endpoints
 	// that are specific for that component
-	v1 := router.PathPrefix("/api/v1").Subrouter()
+	//v1 := router.PathPrefix("/api/v1").Subrouter()
 	// keep track of resource units reserved and amount of workloads provisionned
 
 	// to store reservation locally on the node
@@ -178,8 +187,7 @@ func action(cli *cli.Context) error {
 		provisioners,
 	)
 
-	// add endpoint for statistics
-	if err := primitives.NewStatisticsAPI(v1, statistics); err != nil {
+	if err := primitives.NewStatisticsMessageBus(zosRouter, statistics); err != nil {
 		return errors.Wrap(err, "failed to create statistics api")
 	}
 
@@ -231,13 +239,10 @@ func action(cli *cli.Context) error {
 		Str("broker", msgBrokerCon).
 		Msg("starting provision module")
 
-	ctx := context.Background()
-	ctx, _ = utils.WithSignal(ctx)
-
 	// call the runtime upgrade before running engine
 	provisioners.RuntimeUpgrade(ctx)
 
-	// spawn the entine
+	// spawn the engine
 	go func() {
 		if err := engine.Run(ctx); err != nil && err != context.Canceled {
 			log.Fatal().Err(err).Msg("provision engine exited unexpectedely")
@@ -270,31 +275,16 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("zbus server stopped")
 	}()
 
-	if err := setupAPIs(v1, cl, engine); err != nil {
-		return errors.Wrap(err, "failed to initialize API")
+	setupMessageBusses(zosRouter, cl, engine)
+
+	log.Info().Msg("running messagebus")
+
+	for _, handler := range mBus.Handlers() {
+		log.Debug().Msgf("registered handler: %s", handler)
 	}
 
-	// register static files
-	v1.PathPrefix("").Handler(http.StripPrefix("/api/v1", http.FileServer(http.FS(swaggerFs))))
-	r := handlers.LoggingHandler(os.Stderr, router)
-	r = handlers.CORS(
-		handlers.AllowedOrigins([]string{"*"}),
-		handlers.AllowedHeaders([]string{"Content-Type"}),
-		handlers.ExposedHeaders([]string{"Pages"}),
-	)(r)
-
-	httpServer := &http.Server{
-		Addr:    httpAddr,
-		Handler: r,
-	}
-
-	utils.OnDone(ctx, func(_ error) {
-		log.Info().Msg("shutting down")
-		httpServer.Close()
-	})
-
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return errors.Wrap(err, "http api exited unexpectedely")
+	if err := mBus.Run(ctx); err != nil && err != context.Canceled {
+		return errors.Wrap(err, "message bus error")
 	}
 
 	log.Info().Msg("provision engine stopped")
@@ -332,17 +322,11 @@ func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter prim
 	return
 }
 
-func setupAPIs(v1 *mux.Router, cl zbus.Client, engine provision.Engine) error {
+func setupMessageBusses(router rmb.Router, cl zbus.Client, engine provision.Engine) error {
 
-	_, err := api.NewWorkloadsAPI(v1, engine)
-	if err != nil {
-		return errors.Wrap(err, "failed to setup workload api")
-	}
+	_ = mbus.NewDeploymentMessageBus(router, engine)
 
-	_, err = api.NewNetworkAPI(v1, engine, cl)
-	if err != nil {
-		return errors.Wrap(err, "failed to setup network api")
-	}
+	_ = mbus.NewNetworkMessagebus(router, engine, cl)
 
 	return nil
 }
