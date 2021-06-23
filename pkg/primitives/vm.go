@@ -1,11 +1,11 @@
 package primitives
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"net"
 	"path/filepath"
 
 	"github.com/jbenet/go-base58"
@@ -74,7 +74,7 @@ func (p *Primitives) mountsToDisks(ctx context.Context, deployment gridtypes.Dep
 
 	return results, nil
 }
-func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result KubernetesResult, err error) {
+func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZMachineResult, err error) {
 	var (
 		storage = stubs.NewVDiskModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -93,24 +93,12 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	}
 	// Should config.Vaid() be called here?
 
-	deployment := provision.GetDeployment(ctx)
-
 	// the config is validated by the engine. we now only support only one
 	// private network
+	if len(config.Network.Interfaces) != 1 {
+		return result, fmt.Errorf("only one private network is support")
+	}
 	netConfig := config.Network.Interfaces[0]
-	netID := zos.NetworkID(deployment.TwinID, netConfig.Network)
-
-	// hash to avoid tapName > 16 errors
-	tapName := hashDeployment(wl.ID)
-
-	exists, err := network.TapExists(ctx, tapName)
-	if err != nil {
-		return result, errors.Wrap(err, "could not check if tap device exists")
-	}
-
-	if exists {
-		return result, errors.New("found a tap device with the same name. shouldn't happen")
-	}
 
 	// check if public ipv4 is supported, should this be requested
 	if !config.Network.PublicIP.IsEmpty() && !network.PublicIPv4Support(ctx) {
@@ -120,17 +108,54 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	result.ID = wl.ID.String()
 	result.IP = netConfig.IP.String()
 
+	deployment := provision.GetDeployment(ctx)
+
+	networkInfo := pkg.VMNetworkInfo{
+		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
+	}
+
+	defer func() {
+		if err != nil {
+			for _, nic := range networkInfo.Ifaces {
+				if nic.Public {
+					network.DisconnectPubTap(ctx, nic.Tap)
+				} else {
+					network.RemoveTap(ctx, nic.Tap)
+				}
+			}
+		}
+	}()
+
+	for _, nic := range config.Network.Interfaces {
+		inf, err := p.newPrivNetworkInterface(ctx, deployment, wl, nic)
+		if err != nil {
+			return result, err
+		}
+		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
+	}
+
+	if !config.Network.PublicIP.IsEmpty() {
+		inf, err := p.newPubNetworkInterface(ctx, deployment, config)
+		if err != nil {
+			return result, err
+		}
+		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
+	}
+
+	if config.Network.Planetary {
+		inf, err := p.newYggNetworkInterface(ctx, wl)
+		if err != nil {
+			return result, err
+		}
+
+		log.Debug().Msgf("Planetary: %+v", inf)
+		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
+	}
 	// - mount flist RO
 	mnt, err := flist.Mount(ctx, wl.ID.String(), config.FList, pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return result, errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
 	}
-
-	// defer func() {
-	// 	if err != nil {
-	// 		flist.Unmount(ctx, wl.ID.String())
-	// 	}
-	// }()
 
 	var imageInfo FListInfo
 	// - detect type (container or VM)
@@ -231,44 +256,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	// - Attach mounts
 	// - boot
 
-	var iface string
-	iface, err = network.SetupTap(ctx, netID, tapName)
-	if err != nil {
-		return result, errors.Wrap(err, "could not set up tap device")
-	}
-
-	defer func() {
-		if err != nil {
-			_ = network.RemoveTap(ctx, tapName)
-		}
-	}()
-
-	var pubIface string
-	if len(config.Network.PublicIP) > -0 {
-		ipWl, err := deployment.Get(config.Network.PublicIP)
-		if err != nil {
-			return zos.KubernetesResult{}, err
-		}
-		name := ipWl.ID.String()
-		pubIface, err = network.SetupPubTap(ctx, name)
-		if err != nil {
-			return result, errors.Wrap(err, "could not set up tap device for public network")
-		}
-
-		defer func() {
-			if err != nil {
-				_ = network.RemovePubTap(ctx, name)
-			}
-		}()
-	}
-
-	var netInfo pkg.VMNetworkInfo
-	netInfo, err = p.buildNetworkInfo(ctx, deployment, iface, pubIface, config)
-	if err != nil {
-		return result, errors.Wrap(err, "could not generate network info")
-	}
-
-	err = p.vmRun(ctx, wl.ID.String(), &config, boot, disks, imageInfo, cmd, netInfo)
+	err = p.vmRun(ctx, wl.ID.String(), &config, boot, disks, imageInfo, cmd, networkInfo)
 	if err != nil {
 		// attempt to delete the vm, should the process still be lingering
 		vm.Delete(ctx, wl.ID.String())
@@ -300,10 +288,12 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 		log.Error().Err(err).Msg("failed to unmount machine flist")
 	}
 
-	tapName := hashDeployment(wl.ID)
+	for _, inf := range cfg.Network.Interfaces {
+		tapName := tapNameFromName(wl.ID, string(inf.Network))
 
-	if err := network.RemoveTap(ctx, tapName); err != nil {
-		return errors.Wrap(err, "could not clean up tap device")
+		if err := network.RemoveTap(ctx, tapName); err != nil {
+			return errors.Wrap(err, "could not clean up tap device")
+		}
 	}
 
 	if len(cfg.Network.PublicIP) > 0 {
@@ -351,10 +341,12 @@ func (p *Primitives) vmRun(
 	return vm.Run(ctx, kubevm)
 }
 
-func hashDeployment(wid gridtypes.WorkloadID) string {
-	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprint(wid))
-	h := md5.Sum(buf.Bytes())
+func tapNameFromName(id gridtypes.WorkloadID, network string) string {
+	m := md5.New()
+
+	fmt.Fprintf(m, "%s:%s", id.String(), network)
+
+	h := m.Sum(nil)
 	b := base58.Encode(h[:])
 	if len(b) > 13 {
 		b = b[:13]

@@ -516,7 +516,7 @@ func (f *flistModule) Unmount(name string) error {
 	}
 
 	if f.valid(mountpoint) == ErrAlreadyMounted {
-		if err := f.system.Unmount(mountpoint, syscall.MNT_DETACH); err != nil {
+		if err := f.system.Unmount(mountpoint, 0); err != nil {
 			log.Error().Err(err).Str("path", mountpoint).Msg("fail to umount flist")
 		}
 	}

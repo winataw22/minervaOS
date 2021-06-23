@@ -21,11 +21,16 @@ type MachineInterface struct {
 type MachineNetwork struct {
 	PublicIP   gridtypes.Name     `json:"public_ip"`
 	Interfaces []MachineInterface `json:"interfaces"`
+	Planetary  bool               `json:"planetary"`
 }
 
 // Challenge builder
 func (n *MachineNetwork) Challenge(w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "%s", n.PublicIP); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "%t", n.Planetary); err != nil {
 		return err
 	}
 

@@ -122,5 +122,6 @@ func (c *Module) Watch(ctx context.Context) {
 		}
 
 		log.Err(err).Msg("error while watching events from containerd")
+		<-time.After(3 * time.Second)
 	}
 }

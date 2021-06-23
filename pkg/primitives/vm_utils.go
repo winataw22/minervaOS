@@ -16,91 +16,126 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-// Kubernetes type
-type Kubernetes = zos.Kubernetes
-
-// KubernetesResult type
-type KubernetesResult = zos.KubernetesResult
-
-func (p *Primitives) buildNetworkInfo(ctx context.Context, deployment gridtypes.Deployment, iface string, pubIface string, cfg ZMachine) (pkg.VMNetworkInfo, error) {
+func (p *Primitives) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
-	netConfig := cfg.Network.Interfaces[0]
-	netID := zos.NetworkID(deployment.TwinID, netConfig.Network)
-	subnet, err := network.GetSubnet(ctx, netID)
+
+	//TODO: if we use `ygg` as a network name. this will conflict
+	//if the user has a network that is called `ygg`.
+	tapName := tapNameFromName(wl.ID, "ygg")
+	iface, err := network.SetupYggTap(ctx, tapName)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network resource subnet")
+		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
 	}
 
-	if !subnet.Contains(netConfig.IP) {
-		return pkg.VMNetworkInfo{}, fmt.Errorf("IP %s is not part of local nr subnet %s", netConfig.IP.String(), subnet.String())
+	out := pkg.VMIface{
+		Tap: iface.Name,
+		MAC: iface.HW.String(),
+		IPs: []net.IPNet{
+			iface.IP,
+		},
+		Routes: []pkg.Route{
+			{
+				Net: net.IPNet{
+					IP:   net.ParseIP("200::"),
+					Mask: net.CIDRMask(7, 128),
+				},
+				Gateway: iface.Gateway.IP,
+			},
+		},
+		Public: false,
+	}
+
+	return out, nil
+}
+
+func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.Deployment, wl *gridtypes.WorkloadWithID, inf zos.MachineInterface) (pkg.VMIface, error) {
+	network := stubs.NewNetworkerStub(p.zbus)
+	netID := zos.NetworkID(dl.TwinID, inf.Network)
+
+	subnet, err := network.GetSubnet(ctx, netID)
+	if err != nil {
+		return pkg.VMIface{}, errors.Wrapf(err, "could not get network resource subnet")
+	}
+
+	if !subnet.Contains(inf.IP) {
+		return pkg.VMIface{}, fmt.Errorf("IP %s is not part of local nr subnet %s", inf.IP.String(), subnet.String())
 	}
 
 	privNet, err := network.GetNet(ctx, netID)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrapf(err, "could not get network range")
+		return pkg.VMIface{}, errors.Wrapf(err, "could not get network range")
 	}
 
 	addrCIDR := net.IPNet{
-		IP:   netConfig.IP,
+		IP:   inf.IP,
 		Mask: subnet.Mask,
 	}
 
 	gw4, gw6, err := network.GetDefaultGwIP(ctx, netID)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get network resource default gateway")
+		return pkg.VMIface{}, errors.Wrap(err, "could not get network resource default gateway")
 	}
 
-	privIP6, err := network.GetIPv6From4(ctx, netID, netConfig.IP)
+	privIP6, err := network.GetIPv6From4(ctx, netID, inf.IP)
 	if err != nil {
-		return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
+		return pkg.VMIface{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
 	}
 
-	networkInfo := pkg.VMNetworkInfo{
-		Ifaces: []pkg.VMIface{{
-			Tap:            iface,
-			MAC:            "", // rely on static IP configuration so we don't care here
-			IP4AddressCIDR: addrCIDR,
-			IP4GatewayIP:   net.IP(gw4),
-			IP4Net:         privNet,
-			IP6AddressCIDR: privIP6,
-			IP6GatewayIP:   gw6,
-			Public:         false,
-		}},
-		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
+	tapName := tapNameFromName(wl.ID, string(inf.Network))
+	iface, err := network.SetupPrivTap(ctx, netID, tapName)
+	if err != nil {
+		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
 	}
 
-	pubIP := cfg.Network.PublicIP
-	if len(pubIP) > 0 {
-		// A public ip is set, load the reservation, extract the ip and make a config
-		// for it
-		ipWl, err := deployment.Get(pubIP)
-		if err != nil {
-			return pkg.VMNetworkInfo{}, err
-		}
-
-		pubIP, pubGw, err := p.getPubIPConfig(ipWl)
-		if err != nil {
-			return pkg.VMNetworkInfo{}, errors.Wrap(err, "could not get public ip config")
-		}
-
-		// the mac address uses the global workload id
-		// this needs to be the same as how we get it in the actual IP reservation
-		mac := ifaceutil.HardwareAddrFromInputBytes([]byte(ipWl.ID.String()))
-
-		iface := pkg.VMIface{
-			Tap:            pubIface,
-			MAC:            mac.String(), // mac so we always get the same IPv6 from slaac
-			IP4AddressCIDR: pubIP,
-			IP4GatewayIP:   pubGw,
-			// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
-			//
-			Public: true,
-		}
-
-		networkInfo.Ifaces = append(networkInfo.Ifaces, iface)
+	out := pkg.VMIface{
+		Tap: iface,
+		MAC: "", // rely on static IP configuration so we don't care here
+		IPs: []net.IPNet{
+			addrCIDR, privIP6,
+		},
+		Routes: []pkg.Route{
+			{Net: privNet, Gateway: gw4},
+		},
+		IP4DefaultGateway: net.IP(gw4),
+		IP6DefaultGateway: gw6,
+		Public:            false,
 	}
 
-	return networkInfo, nil
+	return out, nil
+}
+
+func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment gridtypes.Deployment, cfg ZMachine) (pkg.VMIface, error) {
+	network := stubs.NewNetworkerStub(p.zbus)
+	ipWl, err := deployment.Get(cfg.Network.PublicIP)
+	if err != nil {
+		return pkg.VMIface{}, err
+	}
+	name := ipWl.ID.String()
+
+	pubIP, pubGw, err := p.getPubIPConfig(ipWl)
+	if err != nil {
+		return pkg.VMIface{}, errors.Wrap(err, "could not get public ip config")
+	}
+
+	pubIface, err := network.SetupPubTap(ctx, name)
+	if err != nil {
+		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device for public network")
+	}
+
+	// the mac address uses the global workload id
+	// this needs to be the same as how we get it in the actual IP reservation
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(ipWl.ID.String()))
+
+	return pkg.VMIface{
+		Tap: pubIface,
+		MAC: mac.String(), // mac so we always get the same IPv6 from slaac
+		IPs: []net.IPNet{
+			pubIP,
+		},
+		IP4DefaultGateway: pubGw,
+		// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
+		Public: true,
+	}, nil
 }
 
 // Get the public ip, and the gateway from the reservation ID

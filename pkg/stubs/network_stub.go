@@ -201,35 +201,6 @@ func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net
 	return
 }
 
-func (s *NetworkerStub) Join(ctx context.Context, arg0 zos.NetID, arg1 string, arg2 pkg.ContainerNetworkConfig) (ret0 pkg.Member, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "Join", args...)
-	if err != nil {
-		panic(err)
-	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *NetworkerStub) Leave(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 error) {
-	args := []interface{}{arg0, arg1}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "Leave", args...)
-	if err != nil {
-		panic(err)
-	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
-	}
-	return
-}
-
 func (s *NetworkerStub) PubIPFilterExists(ctx context.Context, arg0 string) (ret0 bool) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "PubIPFilterExists", args...)
@@ -354,6 +325,22 @@ func (s *NetworkerStub) SetPublicConfig(ctx context.Context, arg0 pkg.PublicConf
 	return
 }
 
+func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPrivTap", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) SetupPubIPFilter(ctx context.Context, arg0 string, arg1 string, arg2 string, arg3 string, arg4 string) (ret0 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPubIPFilter", args...)
@@ -383,9 +370,9 @@ func (s *NetworkerStub) SetupPubTap(ctx context.Context, arg0 string) (ret0 stri
 	return
 }
 
-func (s *NetworkerStub) SetupTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupTap", args...)
+func (s *NetworkerStub) SetupYggTap(ctx context.Context, arg0 string) (ret0 pkg.YggdrasilTap, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupYggTap", args...)
 	if err != nil {
 		panic(err)
 	}

@@ -128,123 +128,6 @@ func (n *networker) WireguardPorts() ([]uint, error) {
 	return n.portSet.List()
 }
 
-func (n *networker) Join(networkdID pkg.NetID, containerID string, cfg pkg.ContainerNetworkConfig) (join pkg.Member, err error) {
-	// TODO:
-	// 1- Make sure this network id is actually deployed
-	// 2- Check if the requested network config is doable
-	// 3- Create a new namespace, then create a veth pair inside this namespace
-	// 4- Hook one end to the NR bridge
-	// 5- Assign IP to the veth endpoint inside the namespace.
-	// 6- return the namespace name
-
-	log.Info().Str("network-id", string(networkdID)).Msg("joining network")
-
-	localNR, err := n.networkOf(string(networkdID))
-	if err != nil {
-		return join, errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
-	}
-
-	ipv4Only, err := n.ndmz.IsIPv4Only()
-	if err != nil {
-		return join, errors.Wrap(err, "failed to check ipv6 support")
-	}
-	if cfg.PublicIP6 && ipv4Only {
-		return join, errors.Errorf("this node runs in IPv4 only mode and you asked for a public IPv6. Impossible to fulfill the request")
-	}
-
-	netRes, err := nr.New(localNR)
-	if err != nil {
-		return join, errors.Wrap(err, "failed to load network resource")
-	}
-
-	ips := make([]net.IP, len(cfg.IPs))
-	for i, addr := range cfg.IPs {
-		ips[i] = net.ParseIP(addr)
-	}
-
-	join, err = netRes.Join(nr.ContainerConfig{
-		ContainerID: containerID,
-		IPs:         ips,
-		PublicIP6:   cfg.PublicIP6,
-		IPv4Only:    ipv4Only,
-	})
-	if err != nil {
-		return join, errors.Wrap(err, "failed to load network resource")
-	}
-
-	netNs, err := namespace.GetByName(join.Namespace)
-	if err != nil {
-		return join, errors.Wrap(err, "failed to found a valid network interface to use as parent for 0-db container")
-	}
-	defer netNs.Close()
-
-	if cfg.PublicIP6 {
-		hw := ifaceutil.HardwareAddrFromInputBytes([]byte(containerID))
-		if err = n.createMacVlan("pub", public.PublicBridge, hw, nil, nil, netNs); err != nil {
-			return join, errors.Wrap(err, "failed to create public macvlan interface")
-		}
-	}
-
-	if cfg.YggdrasilIP {
-		var (
-			ips    []*net.IPNet
-			routes []*netlink.Route
-		)
-
-		hw := ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + containerID))
-		ip, err := n.ygg.SubnetFor(hw)
-		if err != nil {
-			return join, err
-		}
-
-		ips = []*net.IPNet{
-			{
-				IP:   ip,
-				Mask: net.CIDRMask(64, 128),
-			},
-		}
-		join.YggdrasilIP = ip
-
-		gw, err := n.ygg.Gateway()
-		if err != nil {
-			return join, err
-		}
-
-		routes = []*netlink.Route{
-			{
-				Dst: &net.IPNet{
-					IP:   net.ParseIP("200::"),
-					Mask: net.CIDRMask(7, 128),
-				},
-				Gw: gw.IP,
-				// LinkIndex:... this is set by macvlan.Install
-			},
-		}
-
-		if err := n.createMacVlan("ygg", types.YggBridge, hw, ips, routes, netNs); err != nil {
-			return join, errors.Wrap(err, "failed to create yggdrasil macvlan interface")
-		}
-	}
-
-	return join, nil
-}
-
-func (n *networker) Leave(networkdID pkg.NetID, containerID string) error {
-	log.Info().Str("network-id", string(networkdID)).Msg("leaving network")
-
-	localNR, err := n.networkOf(string(networkdID))
-	if err != nil {
-		return errors.Wrapf(err, "couldn't load network with id (%s)", networkdID)
-	}
-
-	netRes, err := nr.New(localNR)
-	if err != nil {
-		return errors.Wrap(err, "failed to load network resource")
-	}
-
-	return netRes.Leave(containerID)
-}
-
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
 func (n networker) ZDBPrepare(id string) (string, error) {
@@ -355,7 +238,7 @@ func (n networker) createMacVlan(iface string, master string, hw net.HardwareAdd
 
 // SetupTap interface in the network resource. We only allow 1 tap interface to be
 // set up per NR currently
-func (n *networker) SetupTap(networkID pkg.NetID, name string) (string, error) {
+func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (string, error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
 
 	localNR, err := n.networkOf(string(networkID))
@@ -376,6 +259,10 @@ func (n *networker) SetupTap(networkID pkg.NetID, name string) (string, error) {
 	tapIface, err := tapName(name)
 	if err != nil {
 		return "", errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	if ifaceutil.Exists(tapIface, nil) {
+		return tapIface, nil
 	}
 
 	_, err = tuntap.CreateTap(tapIface, bridgeName)
@@ -429,6 +316,43 @@ func (n *networker) SetupPubTap(pubIPReservationID string) (string, error) {
 	_, err = macvtap.CreateMACvTap(tapIface, public.PublicBridge, hw)
 
 	return tapIface, err
+}
+
+// SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
+func (n *networker) SetupYggTap(name string) (tap pkg.YggdrasilTap, err error) {
+	log.Info().Str("pubip-res-id", string(name)).Msg("Setting up public tap interface")
+
+	tapIface, err := tapName(name)
+	if err != nil {
+		return tap, errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	tap.Name = tapIface
+
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + name))
+	tap.HW = hw
+	ip, err := n.ygg.SubnetFor(hw)
+	if err != nil {
+		return tap, err
+	}
+
+	tap.IP = net.IPNet{
+		IP:   ip,
+		Mask: net.CIDRMask(64, 128),
+	}
+
+	gw, err := n.ygg.Gateway()
+	if err != nil {
+		return tap, err
+	}
+
+	tap.Gateway = gw
+	if ifaceutil.Exists(tapIface, nil) {
+		return tap, nil
+	}
+
+	_, err = tuntap.CreateTap(tapIface, types.YggBridge)
+	return tap, err
 }
 
 // PubTapExists checks if the tap device for the public network exists already

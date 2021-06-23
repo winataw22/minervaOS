@@ -1,1 +1,66 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/c983cd24f9e18c785e38f13f04218cf3
+package mbus
+
+import (
+	"context"
+
+	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/rmb"
+)
+
+// Deployments message bus API
+type Deployments struct {
+	engine provision.Engine
+}
+
+// NewDeploymentMessageBus creates and register a new deployment api
+func NewDeploymentMessageBus(router rmb.Router, engine provision.Engine) *Deployments {
+
+	d := Deployments{
+		engine: engine,
+	}
+
+	d.setup(router)
+	return &d
+}
+
+func (d *Deployments) setup(router rmb.Router) {
+	sub := router.Subroute("deployment")
+
+	// zos deployment handlers
+	sub.WithHandler("deploy", d.deployHandler)
+	sub.WithHandler("update", d.updateHandler)
+	sub.WithHandler("delete", d.deleteHandler)
+	sub.WithHandler("get", d.getHandler)
+}
+
+func (d *Deployments) updateHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	data, err := d.createOrUpdate(ctx, payload, true)
+	if err != nil {
+		return nil, err.Err()
+	}
+	return data, nil
+}
+
+func (d *Deployments) deployHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	data, err := d.createOrUpdate(ctx, payload, false)
+	if err != nil {
+		return nil, err.Err()
+	}
+	return data, nil
+}
+
+func (d *Deployments) deleteHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	data, err := d.delete(ctx, payload)
+	if err != nil {
+		return nil, err.Err()
+	}
+	return data, nil
+}
+
+func (d *Deployments) getHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	data, err := d.get(ctx, payload)
+	if err != nil {
+		return nil, err.Err()
+	}
+	return data, nil
+}

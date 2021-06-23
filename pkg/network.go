@@ -26,6 +26,14 @@ type ContainerNetworkConfig struct {
 	YggdrasilIP bool
 }
 
+// YggdrasilTap structure
+type YggdrasilTap struct {
+	Name    string
+	HW      net.HardwareAddr
+	IP      net.IPNet
+	Gateway net.IPNet
+}
+
 //Networker is the interface for the network module
 type Networker interface {
 	// Ready return nil is networkd is ready to operate
@@ -37,15 +45,17 @@ type Networker interface {
 	// Delete a network resource
 	DeleteNR(Network) error
 
-	// Join a network (with network id) will create a new isolated namespace
-	// that is hooked to the network bridge with a veth pair, and assign it a
-	// new IP from the network resource range. The method return the new namespace
-	// name.
-	// The member name specifies the name of the member, and must be unique
-	// The NetID is the network id to join
-	Join(networkdID NetID, containerID string, cfg ContainerNetworkConfig) (join Member, err error)
-	// Leave delete a container nameapce created by Join
-	Leave(networkdID NetID, containerID string) (err error)
+	// deprecated all uses taps now
+
+	// // Join a network (with network id) will create a new isolated namespace
+	// // that is hooked to the network bridge with a veth pair, and assign it a
+	// // new IP from the network resource range. The method return the new namespace
+	// // name.
+	// // The member name specifies the name of the member, and must be unique
+	// // The NetID is the network id to join
+	// Join(networkdID NetID, containerID string, cfg ContainerNetworkConfig) (join Member, err error)
+	// // Leave delete a container nameapce created by Join
+	// Leave(networkdID NetID, containerID string) (err error)
 
 	// ZDBPrepare creates a network namespace with a macvlan interface into it
 	// to allow the 0-db container to be publicly accessible
@@ -58,9 +68,12 @@ type Networker interface {
 	// for zdb is rewind. ns param is the namespace return by the ZDBPrepare
 	ZDBDestroy(ns string) error
 
-	// SetupTap sets up a tap device in the network namespace for the networkID. It is hooked
+	// SetupPrivTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
-	SetupTap(networkID NetID, name string) (string, error)
+	SetupPrivTap(networkID NetID, name string) (string, error)
+
+	// SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
+	SetupYggTap(name string) (YggdrasilTap, error)
 
 	// TapExists checks if the tap device with the given name exists already
 	TapExists(name string) (bool, error)
@@ -117,11 +130,15 @@ type Networker interface {
 
 	WireguardPorts() ([]uint, error)
 
+	// Public Config
+
 	// Set node public namespace config
 	SetPublicConfig(cfg PublicConfig) error
 
 	// Get node public namespace config
 	GetPublicConfig() (PublicConfig, error)
+
+	// Monitoring methods
 
 	// ZOSAddresses monitoring streams for ZOS bridge IPs
 	ZOSAddresses(ctx context.Context) <-chan NetlinkAddresses

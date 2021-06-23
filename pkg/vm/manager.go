@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -26,10 +27,17 @@ const (
 	socketDir = "/var/run/cloud-hypervisor"
 	configDir = "config"
 	logsDir   = "logs"
-
-	defaultKernelArgs = "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules"
 )
 
+var (
+	//defaultKernelArgs if no args are set
+	defaultKernelArgs = pkg.KernelArgs{
+		"rw":      "",
+		"console": "ttyS0",
+		"reboot":  "k",
+		"panic":   "1",
+	}
+)
 var (
 	protectedKernelEnv = map[string]struct{}{
 		"init":       {},
@@ -126,7 +134,25 @@ func (m *Module) Exists(id string) bool {
 	return err == nil
 }
 
-func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
+func (m *Module) buildRouteParam(defaultGw net.IP, table map[string]string) string {
+	var buf bytes.Buffer
+	if defaultGw != nil {
+		buf.WriteString(fmt.Sprintf("default,%s", defaultGw.String()))
+	}
+
+	for k, v := range table {
+		if buf.Len() > 0 {
+			buf.WriteRune(';')
+		}
+		buf.WriteString(k)
+		buf.WriteRune(',')
+		buf.WriteString(v)
+	}
+
+	return buf.String()
+}
+
+func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
 	// assume there is always at least 1 iface present
 
 	// we do 2 things here:
@@ -138,53 +164,65 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, string, error) {
 	// method uses a custom script inside the image to set proper IP. The config
 	// is also passed through the command line.
 
+	args := pkg.KernelArgs{}
+	v4Routes := make(map[string]string)
+	v6Routes := make(map[string]string)
+	var defaultGw4 net.IP
+	var defaultGw6 net.IP
+
 	nics := make([]Interface, 0, len(vm.Network.Ifaces))
 	for i, ifcfg := range vm.Network.Ifaces {
-		nics = append(nics, Interface{
+		nic := Interface{
 			ID:  fmt.Sprintf("eth%d", i),
 			Tap: ifcfg.Tap,
 			Mac: ifcfg.MAC,
-		})
+		}
+		nics = append(nics, nic)
+
+		var ips []string
+		for _, ip := range ifcfg.IPs {
+			ips = append(ips, ip.String())
+		}
+		// configure nic ips
+		args[fmt.Sprintf("net_%s", nic.ID)] = strings.Join(ips, ";")
+		// configure nic routes
+		if defaultGw4 == nil && ifcfg.IP4DefaultGateway != nil {
+			defaultGw4 = ifcfg.IP4DefaultGateway
+		}
+
+		if defaultGw6 == nil && ifcfg.IP6DefaultGateway != nil {
+			defaultGw6 = ifcfg.IP6DefaultGateway
+		}
+		// one extra check to always use public nic as default
+		// gw
+		if ifcfg.Public && ifcfg.IP4DefaultGateway != nil {
+			defaultGw4 = ifcfg.IP4DefaultGateway
+		}
+
+		// inserting extra routes in right places
+		for _, route := range ifcfg.Routes {
+			table := v4Routes
+			if route.Net.IP.To4() == nil {
+				table = v6Routes
+			}
+			gw := nic.ID
+			if route.Gateway != nil {
+				gw = route.Gateway.String()
+			}
+			table[route.Net.String()] = gw
+		}
 	}
 
-	cmdLineSections := make([]string, 0, len(vm.Network.Ifaces)+1)
-	for i, ifcfg := range vm.Network.Ifaces {
-		cmdLineSections = append(cmdLineSections, m.makeNetCmdLine(i, ifcfg))
-	}
+	args["net_r4"] = m.buildRouteParam(defaultGw4, v4Routes)
+	args["net_r6"] = m.buildRouteParam(defaultGw6, v6Routes)
+
 	dnsSection := make([]string, 0, len(vm.Network.Nameservers))
 	for _, ns := range vm.Network.Nameservers {
 		dnsSection = append(dnsSection, ns.String())
 	}
-	cmdLineSections = append(cmdLineSections, fmt.Sprintf("net_dns=%s", strings.Join(dnsSection, ",")))
+	args["net_dns"] = strings.Join(dnsSection, ";")
 
-	cmdline := strings.Join(cmdLineSections, " ")
-
-	return nics, cmdline, nil
-}
-
-func (m *Module) makeNetCmdLine(idx int, ifcfg pkg.VMIface) string {
-	// net_%ifacename=%ip4_cidr,$ip4_gw[,$ip4_route],$ipv6_cidr,$ipv6_gw,public|priv
-	ip4Elems := make([]string, 0, 3)
-	ip4Elems = append(ip4Elems, ifcfg.IP4AddressCIDR.String())
-	ip4Elems = append(ip4Elems, ifcfg.IP4GatewayIP.String())
-	if len(ifcfg.IP4Net.IP) > 0 {
-		ip4Elems = append(ip4Elems, ifcfg.IP4Net.String())
-	}
-
-	ip6Elems := make([]string, 0, 3)
-	if ifcfg.IP6AddressCIDR.IP.To16() != nil {
-		ip6Elems = append(ip6Elems, ifcfg.IP6AddressCIDR.String())
-		ip6Elems = append(ip6Elems, ifcfg.IP6GatewayIP.String())
-	} else {
-		ip6Elems = append(ip6Elems, "slaac")
-	}
-
-	privPub := "priv"
-	if ifcfg.Public {
-		privPub = "public"
-	}
-
-	return fmt.Sprintf("net_eth%d=%s,%s,%s", idx, strings.Join(ip4Elems, ","), strings.Join(ip6Elems, ","), privPub)
+	return nics, args, nil
 }
 
 func (m *Module) tail(path string) (string, error) {
@@ -286,6 +324,7 @@ func (m *Module) Run(vm pkg.VM) error {
 	cmdline := vm.KernelArgs
 	if cmdline == nil {
 		cmdline = pkg.KernelArgs{}
+		cmdline.Extend(defaultKernelArgs)
 	}
 
 	var fs []VirtioFS
@@ -330,25 +369,14 @@ func (m *Module) Run(vm pkg.VM) error {
 		return err
 	}
 
-	var kargs strings.Builder
-	kargs.WriteString(args)
-
-	if kargs.Len() != 0 {
-		kargs.WriteRune(' ')
-	}
-
-	if len(cmdline) > 0 {
-		kargs.WriteString(cmdline.String())
-	} else {
-		kargs.WriteString(defaultKernelArgs)
-	}
+	cmdline.Extend(args)
 
 	machine := Machine{
 		ID: vm.Name,
 		Boot: Boot{
 			Kernel: vm.KernelImage,
 			Initrd: vm.InitrdImage,
-			Args:   kargs.String(),
+			Args:   cmdline.String(),
 		},
 		Config: Config{
 			CPU:       CPU(vm.CPU),

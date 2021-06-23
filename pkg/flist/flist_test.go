@@ -169,7 +169,7 @@ func TestMountUnmount(t *testing.T) {
 	os.Remove(cmder.m["pid"])
 	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
 
-	sys.On("Unmount", mnt, syscall.MNT_DETACH).Return(nil)
+	sys.On("Unmount", mnt, 0).Return(nil)
 
 	err = flister.Unmount(name)
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestMountUnmountRO(t *testing.T) {
 	os.Remove(cmder.m["pid"])
 	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
 
-	sys.On("Unmount", mnt, syscall.MNT_DETACH).Return(nil)
+	sys.On("Unmount", mnt, 0).Return(nil)
 
 	err = flister.Unmount(name)
 	require.NoError(t, err)
