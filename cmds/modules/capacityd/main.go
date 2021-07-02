@@ -65,15 +65,21 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("shutting down")
 	})
 
-	if err := registration(ctx, redis); err != nil {
+	mon(ctx, server)
+
+	go func() {
+		if err := server.Run(ctx); err != nil && err != context.Canceled {
+			log.Error().Err(err).Msg("unexpected error")
+		}
+	}()
+
+	twin, err := registration(ctx, redis)
+	if err != nil {
 		return errors.Wrap(err, "failed during node registration")
 	}
 
-	mon(ctx, server)
+	log.Info().Uint32("twin", twin).Msg("node has been registered")
+	log.Debug().Msg("start message bus")
 
-	if err := server.Run(ctx); err != nil && err != context.Canceled {
-		return errors.Wrap(err, "unexpected error")
-	}
-
-	return nil
+	return runMsgBus(ctx, twin)
 }

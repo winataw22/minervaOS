@@ -1,9 +1,11 @@
 package substrate
 
 import (
+	"crypto/ed25519"
+	"fmt"
 	"net"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	"github.com/pkg/errors"
 )
 
@@ -27,17 +29,37 @@ func (t *Twin) IPAddress() net.IP {
 	return net.ParseIP(t.IP)
 }
 
-func (s *substrateClient) GetTwin(id uint32) (*Twin, error) {
-	meta, err := s.cl.RPC.State.GetMetadataLatest()
+// GetTwinsByPubKey gets a twin with public key
+func (s *Substrate) GetTwinsByPubKey(pk []byte) ([]uint32, error) {
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinsByPubkey", pk, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get substrate meta")
+		return nil, errors.Wrap(err, "failed to create substrate query key")
+	}
+	var ids []types.U32
+	ok, err := s.cl.RPC.State.GetStorageLatest(key, &ids)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to lookup entity")
 	}
 
+	if !ok {
+		return nil, nil
+	}
+
+	results := make([]uint32, 0, len(ids))
+	for _, id := range ids {
+		results = append(results, uint32(id))
+	}
+
+	return results, nil
+}
+
+// GetTwin gets a twin
+func (s *Substrate) GetTwin(id uint32) (*Twin, error) {
 	bytes, err := types.EncodeToBytes(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "substrate: encoding error building query arguments")
 	}
-	key, err := types.CreateStorageKey(meta, "TfgridModule", "Twins", bytes, nil)
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "Twins", bytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create substrate query key")
 	}
@@ -68,4 +90,32 @@ func (s *substrateClient) GetTwin(id uint32) (*Twin, error) {
 	}
 
 	return &twin, nil
+}
+
+// CreateTwin creates a twin
+func (s *Substrate) CreateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
+	c, err := types.NewCall(s.meta, "TfgridModule.create_twin", ip.String())
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create call")
+	}
+
+	if err := s.call(sk, c); err != nil {
+		return 0, err
+	}
+
+	identity, err := Identity(sk)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := s.GetTwinsByPubKey(identity.PublicKey)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get node from chain, probably failed to create")
+	}
+
+	if len(result) == 0 {
+		return 0, fmt.Errorf("no twins found")
+	}
+
+	return result[len(result)-1], nil
 }

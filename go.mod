@@ -4,14 +4,14 @@ go 1.16
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/ChainSafe/go-schnorrkel v0.0.0-20210318173838-ccb5cd955283 // indirect
 	github.com/Microsoft/go-winio v0.4.18 // indirect
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/alexflint/go-filemutex v1.1.0
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2
-	github.com/centrifuge/go-substrate-rpc-client/v2 v2.1.0
+	github.com/centrifuge/go-substrate-rpc-client/v3 v3.0.2
 	github.com/containerd/cgroups v1.0.1
 	github.com/containerd/containerd v1.5.0-rc.2
 	github.com/containerd/typeurl v1.0.2
@@ -20,10 +20,8 @@ require (
 	github.com/coreos/go-iptables v0.6.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/ethereum/go-ethereum v1.10.2 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
-	github.com/garyburd/redigo v1.6.2
 	github.com/gizak/termui/v3 v3.1.0
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-redis/redis v6.15.9+incompatible
@@ -33,14 +31,12 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.2.0
-	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/hanwen/go-fuse/v2 v2.1.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/klauspost/compress v1.12.1 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/lestrrat-go/jwx v1.1.7
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.7 // indirect
@@ -56,16 +52,16 @@ require (
 	github.com/rusart/muxprom v0.0.0-20200609120753-9173fa27435a
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.0.0-20201023143004-874930cb3ce0 // indirect
-	github.com/shirou/gopsutil v3.21.3+incompatible
+	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
 	github.com/threefoldtech/zbus v0.1.4
-	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/cli/v2 v2.3.0
+	github.com/vedhavyas/go-subkey v1.0.2 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
@@ -74,16 +70,13 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20210415154028-4f45737414dc
 	golang.org/x/net v0.0.0-20210420210106-798c2154c571 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20210420205809-ac73e9fd8988
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210420162539-3c870d7478d2 // indirect
 	google.golang.org/grpc v1.37.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	gotest.tools v2.2.0+incompatible
 )
 

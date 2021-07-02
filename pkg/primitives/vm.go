@@ -203,6 +203,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 			Type: pkg.BootVirtioFS,
 			Path: mnt,
 		}
+		cmd["host"] = string(wl.Name)
 		// change the root boot to use the right virtiofs tag
 		cmd["init"] = config.Entrypoint
 

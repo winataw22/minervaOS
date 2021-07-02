@@ -1,5 +1,1 @@
-exec: true
-oneshot: true
-after:
-  - boot
-  - networkd
+../../../../etc/zinit/capacityd.yaml

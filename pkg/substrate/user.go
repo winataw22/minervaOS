@@ -1,7 +1,7 @@
 package substrate
 
 import (
-	"github.com/centrifuge/go-substrate-rpc-client/v2/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	"github.com/pkg/errors"
 )
 
@@ -15,17 +15,13 @@ type User struct {
 	Address   AccountID
 }
 
-func (s *substrateClient) GetUser(id uint32) (*User, error) {
-	meta, err := s.cl.RPC.State.GetMetadataLatest()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get substrate meta")
-	}
-
+// GetUser with id
+func (s *Substrate) GetUser(id uint32) (*User, error) {
 	bytes, err := types.EncodeToBytes(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "substrate: encoding error building query arguments")
 	}
-	key, err := types.CreateStorageKey(meta, "TfgridModule", "Entities", bytes, nil)
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "Entities", bytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create substrate query key")
 	}

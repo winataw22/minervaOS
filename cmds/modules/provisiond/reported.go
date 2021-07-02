@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/pkg/substrate"
 )
 
 const (
@@ -57,11 +58,11 @@ func (m many) AsError() error {
 
 // Reporter structure
 type Reporter struct {
-	identity *stubs.IdentityManagerStub
-	storage  *storage.Fs
-	queue    *dque.DQue
-	farmer   *farmer.Client
-	nodeID   string
+	identity  *stubs.IdentityManagerStub
+	storage   *storage.Fs
+	queue     *dque.DQue
+	substrate *substrate.Substrate
+	nodeID    string
 }
 
 func reportBuilder() interface{} {
@@ -75,9 +76,9 @@ func NewReported(store *storage.Fs, identity *stubs.IdentityManagerStub, root st
 		return nil, errors.Wrap(err, "failed to get runtime environment")
 	}
 
-	fm, err := env.FarmerClient()
+	sub, err := env.GetSubstrate()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create farmer client")
+		return nil, errors.Wrap(err, "failed to create substrate client")
 	}
 
 	queue, err := dque.NewOrOpen("consumption", root, 1024, reportBuilder)
@@ -86,11 +87,11 @@ func NewReported(store *storage.Fs, identity *stubs.IdentityManagerStub, root st
 	}
 
 	return &Reporter{
-		storage:  store,
-		identity: identity,
-		queue:    queue,
-		farmer:   fm,
-		nodeID:   identity.NodeID(context.TODO()).Identity(),
+		storage:   store,
+		identity:  identity,
+		queue:     queue,
+		substrate: sub,
+		nodeID:    identity.NodeID(context.TODO()).Identity(),
 	}, nil
 }
 
@@ -104,9 +105,11 @@ func (r *Reporter) pushOne() error {
 
 	// DEBUG
 	log.Debug().Int64("timestamp", report.Timestamp).Msg("sending capacity report")
-	if err := r.farmer.NodeReport(r.nodeID, *report); err != nil {
-		return errors.Wrap(err, "failed to publish consumption report")
-	}
+	// TODO: push report to chain
+	panic("not implemented")
+	// if err := r.substrate.NodeReport(r.nodeID, *report); err != nil {
+	// 	return errors.Wrap(err, "failed to publish consumption report")
+	// }
 
 	// only removed if report is reported to
 	// farmer

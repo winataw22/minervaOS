@@ -10,7 +10,7 @@ import (
 )
 
 type substrateTwins struct {
-	sub Substrate
+	sub *Substrate
 	mem *lru.Cache
 }
 
@@ -32,6 +32,7 @@ func NewSubstrateTwins(url string) (provision.Twins, error) {
 	}, nil
 }
 
+// GetKey gets twins public key
 func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
 	if value, ok := s.mem.Get(id); ok {
 		return value.(ed25519.PublicKey), nil
@@ -48,7 +49,7 @@ func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
 }
 
 type substrateAdmins struct {
-	sub  Substrate
+	sub  *Substrate
 	twin uint32
 	pk   ed25519.PublicKey
 }
@@ -77,6 +78,7 @@ func NewSubstrateAdmins(url string, farmID uint32) (provision.Twins, error) {
 	}, nil
 }
 
+// GetKey gets twin public key if twin is valid admin
 func (s *substrateAdmins) GetKey(id uint32) (ed25519.PublicKey, error) {
 	if id != s.twin {
 		return nil, fmt.Errorf("twin with id '%d' is not an admin", id)

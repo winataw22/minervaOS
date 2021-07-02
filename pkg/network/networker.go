@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/macvtap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
@@ -21,6 +23,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/pkg/substrate"
 
 	"github.com/vishvananda/netlink"
 
@@ -722,10 +725,52 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	id := n.identity.NodeID(context.Background())
 	_, err := public.EnsurePublicSetup(id, &cfg)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to apply public config")
 	}
 
-	return public.SavePublicConfig(n.publicConfig, &cfg)
+	if err := public.SavePublicConfig(n.publicConfig, &cfg); err != nil {
+		return errors.Wrap(err, "failed to store public config")
+	}
+
+	// this is kinda dirty, but we need to update the node public config
+	// on the block-chain. so ...
+	env := environment.MustGet()
+	sub, err := env.GetSubstrate()
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to substrate")
+	}
+	sk := n.identity.PrivateKey(context.Background())
+	identity, err := substrate.Identity(sk)
+	if err != nil {
+		return err
+	}
+	nodeID, err := sub.GetNodeByPubKey(identity.PublicKey)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node by public key")
+	}
+	node, err := sub.GetNode(nodeID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get node with id: %d", nodeID)
+	}
+
+	subCfg := substrate.OptionPublicConfig{
+		HasValue: true,
+		AsValue: substrate.PublicConfig{
+			IPv4: cfg.IPv4.String(),
+			IPv6: cfg.IPv6.String(),
+			GWv4: cfg.GW4.String(),
+			GWv6: cfg.GW6.String(),
+		},
+	}
+
+	if reflect.DeepEqual(node.PublicConfig, subCfg) {
+		//nothing to do
+		return nil
+	}
+	// update the node
+	node.PublicConfig = subCfg
+	_, err = sub.UpdateNode(sk, *node)
+	return err
 }
 
 // Get node public namespace config

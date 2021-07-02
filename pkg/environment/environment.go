@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 
-	"github.com/threefoldtech/zos/pkg/farmer"
 	"github.com/threefoldtech/zos/pkg/kernel"
+	"github.com/threefoldtech/zos/pkg/substrate"
 )
 
 // Environment holds information about running environment of a node
@@ -99,9 +99,9 @@ func Get() (Environment, error) {
 	return getEnvironmentFromParams(params)
 }
 
-// FarmerClient gets a client to the farm
-func (v *Environment) FarmerClient() (*farmer.Client, error) {
-	return farmer.NewClientFromSubstrate(v.SubstrateURL, uint32(v.FarmerID))
+// GetSubstrate gets a client to subsrate blockchain
+func (e *Environment) GetSubstrate() (*substrate.Substrate, error) {
+	return substrate.NewSubstrate(e.SubstrateURL)
 }
 
 func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
