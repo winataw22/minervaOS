@@ -186,32 +186,12 @@ func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uin
 	if err != nil {
 		return 0, err
 	}
-	twins, err := sub.GetTwinsByPubKey(identity.PublicKey)
-	if err != nil {
+	twin, err := sub.GetTwinByPubKey(identity.PublicKey)
+	if errors.Is(err, substrate.ErrNotFound) {
+		return sub.CreateTwin(sk, ip)
+	} else if err != nil {
 		return 0, errors.Wrap(err, "failed to list twins")
 	}
-	ipStr := ip.String()
 
-	for i := len(twins) - 1; i >= 0; i-- {
-		// why we do this in reverse u may ask!
-		// since when we create a new twin, it gets
-		// a higher id number. Doing this in reverse
-		// has a better chance to hit the "latest"
-		// created twin with the most updated value
-		// since GetTwin operation is kinda slow.
-
-		id := twins[i]
-
-		twin, err := sub.GetTwin(id)
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed to get twin with id: %d", id)
-		}
-
-		if twin.IP == ipStr {
-			return uint32(twin.ID), nil
-		}
-	}
-
-	// no match? we create on
-	return sub.CreateTwin(sk, ip)
+	return twin, nil
 }

@@ -2,7 +2,6 @@ package substrate
 
 import (
 	"crypto/ed25519"
-	"fmt"
 	"net"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
@@ -30,27 +29,22 @@ func (t *Twin) IPAddress() net.IP {
 }
 
 // GetTwinsByPubKey gets a twin with public key
-func (s *Substrate) GetTwinsByPubKey(pk []byte) ([]uint32, error) {
-	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinsByPubkey", pk, nil)
+func (s *Substrate) GetTwinByPubKey(pk []byte) (uint32, error) {
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinsByPubkeyID", pk, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create substrate query key")
+		return 0, errors.Wrap(err, "failed to create substrate query key")
 	}
-	var ids []types.U32
-	ok, err := s.cl.RPC.State.GetStorageLatest(key, &ids)
+	var id types.U32
+	ok, err := s.cl.RPC.State.GetStorageLatest(key, &id)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to lookup entity")
+		return 0, errors.Wrap(err, "failed to lookup entity")
 	}
 
-	if !ok {
-		return nil, nil
+	if !ok || id == 0 {
+		return 0, errors.Wrap(ErrNotFound, "twin not found")
 	}
 
-	results := make([]uint32, 0, len(ids))
-	for _, id := range ids {
-		results = append(results, uint32(id))
-	}
-
-	return results, nil
+	return uint32(id), nil
 }
 
 // GetTwin gets a twin
@@ -100,7 +94,7 @@ func (s *Substrate) CreateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error)
 	}
 
 	if err := s.call(sk, c); err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "failed to create twin")
 	}
 
 	identity, err := Identity(sk)
@@ -108,14 +102,5 @@ func (s *Substrate) CreateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error)
 		return 0, err
 	}
 
-	result, err := s.GetTwinsByPubKey(identity.PublicKey)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get node from chain, probably failed to create")
-	}
-
-	if len(result) == 0 {
-		return 0, fmt.Errorf("no twins found")
-	}
-
-	return result[len(result)-1], nil
+	return s.GetTwinByPubKey(identity.PublicKey)
 }
