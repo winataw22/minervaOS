@@ -159,7 +159,7 @@ func (d *Deployment) Valid() error {
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
 		if wl.Version > current {
-			return fmt.Errorf("workload version cannot be higher than deployment version")
+			return fmt.Errorf("workload '%s' version '%d' cannot be higher than deployment version '%d'", wl.Name, wl.Version, current)
 		}
 
 		name := wl.Name

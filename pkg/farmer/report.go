@@ -22,7 +22,7 @@ type Consumption struct {
 type Report struct {
 	Timestamp   int64                  `json:"timestamp"`
 	Signature   string                 `json:"signature"`
-	Consumption map[uint32]Consumption `json:"consumption"`
+	Consumption map[uint64]Consumption `json:"consumption"`
 }
 
 // Challenge build a report challenge for signing

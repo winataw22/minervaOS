@@ -6,7 +6,9 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
@@ -204,4 +206,95 @@ func getFlistInfo(imagePath string) (FListInfo, error) {
 	}
 
 	return FListInfo{Initrd: initrd, Kernel: kernel, ImagePath: image}, nil
+}
+
+type startup struct {
+	Entries map[string]entry `toml:"startup"`
+}
+
+type entry struct {
+	Name string
+	Args args
+}
+
+type args struct {
+	Name string
+	Dir  string
+	Args []string
+	Env  map[string]string
+}
+
+func (e entry) Entrypoint() string {
+	if e.Name == "core.system" ||
+		e.Name == "core.base" && e.Args.Name != "" {
+		var buf strings.Builder
+
+		buf.WriteString(e.Args.Name)
+		for _, arg := range e.Args.Args {
+			buf.WriteRune(' ')
+			arg = strings.Replace(arg, "\"", "\\\"", -1)
+			buf.WriteRune('"')
+			buf.WriteString(arg)
+			buf.WriteRune('"')
+		}
+
+		return buf.String()
+	}
+
+	return ""
+}
+
+func (e entry) WorkingDir() string {
+	return e.Args.Dir
+}
+
+func (e entry) Envs() map[string]string {
+	return e.Args.Env
+}
+
+// This code is backward compatible with flist .startup.toml file
+// where the flist can define an Entrypoint and some initial environment
+// variables. this is used *with* the container configuration like this
+// - if no zmachine entry point is defined, use the one from .startup.toml
+// - if envs are defined in flist, merge with the env variables from the
+func fListStartup(data *zos.ZMachine, path string) error {
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "failed to load startup file '%s'", path)
+	}
+
+	defer f.Close()
+
+	log.Info().Msg("startup file found")
+	startup := startup{}
+	if _, err := toml.DecodeReader(f, &startup); err != nil {
+		return err
+	}
+
+	entry, ok := startup.Entries["entry"]
+	if !ok {
+		return nil
+	}
+
+	data.Env = mergeEnvs(entry.Envs(), data.Env)
+
+	if data.Entrypoint == "" && entry.Entrypoint() != "" {
+		data.Entrypoint = entry.Entrypoint()
+	}
+	return nil
+}
+
+// mergeEnvs new into base
+func mergeEnvs(base, new map[string]string) map[string]string {
+	if len(base) == 0 {
+		return new
+	}
+
+	for k, v := range new {
+		base[k] = v
+	}
+
+	return base
 }

@@ -179,7 +179,7 @@ func (r *Reporter) collect(since time.Time) (rep farmer.Report, err error) {
 	}
 
 	rep.Timestamp = since.Unix()
-	rep.Consumption = make(map[uint32]farmer.Consumption)
+	rep.Consumption = make(map[uint64]farmer.Consumption)
 
 	for _, user := range users {
 		cap, err := r.user(since, user)
@@ -194,7 +194,7 @@ func (r *Reporter) collect(since time.Time) (rep farmer.Report, err error) {
 			continue
 		}
 
-		rep.Consumption[user] = cap
+		rep.Consumption[uint64(user)] = cap
 	}
 
 	return
@@ -256,9 +256,11 @@ func (r *Reporter) user(since time.Time, user uint32) (farmer.Consumption, error
 					wlID, _ := gridtypes.NewWorkloadID(user, id, wl.Name)
 					consumption.Workloads[typ] = append(consumption.Workloads[typ], wlID)
 					consumption.Capacity.Add(&cap)
+
+					// special handling for ZMachine types. if they exist
+					// we also need to get network usage.
 				}
 			}
-
 		}
 	}
 

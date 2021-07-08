@@ -96,6 +96,22 @@ func (s *VMModuleStub) Logs(ctx context.Context, arg0 string) (ret0 string, ret1
 	return
 }
 
+func (s *VMModuleStub) Metrics(ctx context.Context) (ret0 pkg.MachineMetrics, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Metrics", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *VMModuleStub) Run(ctx context.Context, arg0 pkg.VM) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Run", args...)

@@ -1,0 +1,21 @@
+@startuml
+actor User as user
+participant "Grid DB" as db
+entity "Node" as node
+
+user -> db: Create a reservation contract
+db -> user: Gets contract ID
+user --> node: Send contract ID
+note right
+    Dotted lines are messages sent over RMB
+end note
+node -> db: Get and validate contract\nand read deployment data
+node --> user: Response with Accepted or Error
+group if accepted
+    node -> node: Apply Deployment
+    user --> node: Poll on Deployment status and information
+    ...
+    node -> db: consumption reports ever <b>X</b> amount of minutes
+end group
+db -> user: Billing based on node reports
+@enduml

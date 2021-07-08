@@ -187,6 +187,24 @@ type VMInfo struct {
 	CPU int64
 }
 
+// NetMetric aggregated metrics from a single network
+type NetMetric struct {
+	NetRxPackets uint64 `json:"net_rx_packets"`
+	NetRxBytes   uint64 `json:"net_rx_bytes"`
+	NetTxPackets uint64 `json:"net_tx_packets"`
+	NetTxBytes   uint64 `json:"net_tx_bytes"`
+}
+
+// MachineMetric is a container for metrics from multiple networks
+// currently only groped as private (wiregaurd + yggdrasil), and public (public Ips)
+type MachineMetric struct {
+	Private NetMetric
+	Public  NetMetric
+}
+
+// MachineMetrics container for metrics from multiple machines
+type MachineMetrics map[string]MachineMetric
+
 // VMModule defines the virtual machine module interface
 type VMModule interface {
 	Run(vm VM) error
@@ -195,4 +213,5 @@ type VMModule interface {
 	Exists(name string) bool
 	Logs(name string) (string, error)
 	List() ([]string, error)
+	Metrics() (MachineMetrics, error)
 }

@@ -28,7 +28,7 @@ func (t *Twin) IPAddress() net.IP {
 	return net.ParseIP(t.IP)
 }
 
-// GetTwinsByPubKey gets a twin with public key
+// GetTwinByPubKey gets a twin with public key
 func (s *Substrate) GetTwinByPubKey(pk []byte) (uint32, error) {
 	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinsByPubkeyID", pk, nil)
 	if err != nil {

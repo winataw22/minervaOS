@@ -7,16 +7,53 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
-func findAll() (map[string]int, error) {
+// Process struct
+type Process struct {
+	Pid  int
+	Args []string
+}
+
+// GetParam gets a value for a parm passed to process cmdline
+func (p *Process) GetParam(arg string) ([]string, bool) {
+	s := -1
+	for i := 0; i < len(p.Args); i++ {
+		if p.Args[i] == arg {
+			s = i
+			break
+		}
+	}
+	if s == -1 {
+		// not found
+		return nil, false
+	}
+	s++
+	var params []string
+	for ; s < len(p.Args); s++ {
+		param := p.Args[s]
+		if strings.HasPrefix(param, "-") {
+			break
+		}
+		if len(param) == 0 {
+			continue
+		}
+		params = append(params, param)
+	}
+
+	return params, true
+}
+
+// FindAll finds all running cloud-hypervisor processes
+func FindAll() (map[string]Process, error) {
 	const (
 		proc   = "/proc"
 		search = "cloud-hypervisor"
 		idFlag = "--log-file"
 	)
 
-	found := make(map[string]int)
+	found := make(map[string]Process)
 	err := filepath.Walk(proc, func(path string, info os.FileInfo, _ error) error {
 		if path == proc {
 			// assend into /proc
@@ -46,23 +83,19 @@ func findAll() (map[string]int, error) {
 		if string(parts[0]) != search {
 			return nil
 		}
-
-		// a firecracker instance, now find id
-		for i, part := range parts {
-			if string(part) == idFlag {
-				// a hit
-				if i == len(parts)-1 {
-					// --id some how is last element of the array
-					// so avoid a panic by skipping this
-					return nil
-				}
-				logName := parts[i+1]
-				name := filepath.Base(string(logName))
-				found[name] = pid
-				// this is to stop the scan.
-				return nil
-			}
+		args := make([]string, 0, len(parts))
+		for _, p := range parts {
+			args = append(args, string(p))
 		}
+
+		ps := Process{Pid: pid, Args: args}
+		values, ok := ps.GetParam(idFlag)
+		if !ok || len(values) == 0 {
+			// could not find the --log-file flag!
+			return nil
+		}
+		id := filepath.Base(values[0])
+		found[id] = ps
 
 		return nil
 	})
@@ -70,16 +103,17 @@ func findAll() (map[string]int, error) {
 	return found, err
 }
 
-func find(name string) (int, error) {
-	machines, err := findAll()
+// Find find CH process by vm name
+func Find(name string) (Process, error) {
+	machines, err := FindAll()
 	if err != nil {
-		return 0, err
+		return Process{}, err
 	}
 
-	pid, ok := machines[name]
+	ps, ok := machines[name]
 	if !ok {
-		return 0, fmt.Errorf("vm '%s' not found", name)
+		return Process{}, fmt.Errorf("vm '%s' not found", name)
 	}
 
-	return pid, nil
+	return ps, nil
 }

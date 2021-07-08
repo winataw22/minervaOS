@@ -57,7 +57,7 @@ func (m *Module) monitor(ctx context.Context) error {
 		return err
 	}
 
-	running, err := findAll()
+	running, err := FindAll()
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (m *Module) monitor(ctx context.Context) error {
 	return nil
 }
 
-func (m *Module) monitorID(ctx context.Context, running map[string]int, id string) error {
+func (m *Module) monitorID(ctx context.Context, running map[string]Process, id string) error {
 	log := log.With().Str("id", id).Logger()
 
 	if _, ok := running[id]; ok {

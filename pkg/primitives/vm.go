@@ -203,6 +203,11 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 			Type: pkg.BootVirtioFS,
 			Path: mnt,
 		}
+
+		if err := fListStartup(&config, filepath.Join(mnt, ".startup.toml")); err != nil {
+			return result, errors.Wrap(err, "failed to apply startup config from flist")
+		}
+
 		cmd["host"] = string(wl.Name)
 		// change the root boot to use the right virtiofs tag
 		cmd["init"] = config.Entrypoint
