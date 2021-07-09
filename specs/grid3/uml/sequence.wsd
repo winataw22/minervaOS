@@ -5,7 +5,7 @@ entity "Node" as node
 
 user -> db: Create a reservation contract
 db -> user: Gets contract ID
-user --> node: Send contract ID
+user --> node: contract id + deployment
 note right
     Dotted lines are messages sent over RMB
 end note
