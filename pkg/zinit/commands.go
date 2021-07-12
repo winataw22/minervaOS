@@ -87,7 +87,7 @@ func (s *ServiceState) Is(state PossibleState) bool {
 
 // Exited is true if the service state in a (stopped) state
 func (s *ServiceState) Exited() bool {
-	return s.Is(ServiceStateSuccess) || s.Is(ServiceStateError) || s.Is(ServiceStateFailure)
+	return s.Is(ServiceStateSuccess) || s.Is(ServiceStateError) || s.Is(ServiceStateFailure) || s.Is(ServiceStateBlocked)
 }
 
 // MarshalYAML implements the  yaml.Unmarshaler interface

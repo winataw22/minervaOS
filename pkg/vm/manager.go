@@ -439,13 +439,13 @@ func (m *Module) waitAndAdjOom(ctx context.Context, name string) error {
 		return err
 	}
 
-	pid, err := Find(name)
+	ps, err := Find(name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find vm with id '%s'", name)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join("/proc/", fmt.Sprint(pid), "oom_adj"), []byte("-17"), 0644); err != nil {
-		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", name, pid.Pid)
+	if err := ioutil.WriteFile(filepath.Join("/proc/", fmt.Sprint(ps.Pid), "oom_adj"), []byte("-17"), 0644); err != nil {
+		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", name, ps.Pid)
 	}
 
 	return nil

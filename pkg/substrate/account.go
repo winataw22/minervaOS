@@ -24,6 +24,22 @@ func (a AccountID) PublicKey() ed25519.PublicKey {
 	return ed25519.PublicKey(a[:])
 }
 
+// String return string representation of account
+func (a AccountID) String() string {
+	address, _ := subkey.SS58Address(a[:], 42)
+	return address
+}
+
+// MarshalJSON implementation
+func (a AccountID) MarshalJSON() ([]byte, error) {
+	address, err := subkey.SS58Address(a[:], 42)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(address)
+}
+
 // keyringPairFromSecret creates KeyPair based on seed/phrase and network
 // Leave network empty for default behavior
 func keyringPairFromSecret(seedOrPhrase string, network uint8) (signature.KeyringPair, error) {
@@ -60,14 +76,14 @@ curl --header "Content-Type: application/json" \
 */
 
 func (s *Substrate) activateAccount(identity signature.KeyringPair) error {
-	const url = "https://api.substrate01.threefold.io/activate"
+	const activationDefaultURL = "https://explorer.devnet.grid.tf/activate"
 
 	var buf bytes.Buffer
 	json.NewEncoder(&buf).Encode(map[string]string{
 		"substrateAccountID": identity.Address,
 	})
 
-	response, err := http.Post(url, "application/json", &buf)
+	response, err := http.Post(activationDefaultURL, "application/json", &buf)
 	if err != nil {
 		return errors.Wrap(err, "failed to call activation service")
 	}

@@ -12,13 +12,12 @@ all: _base explorer
 .PHONY: output clean
 
 getdeps:
-	@echo "Installing golint" && go install golang.org/x/lint/golint
-	@echo "Installing gocyclo" && go install github.com/fzipp/gocyclo/cmd/gocyclo
-	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell
-	@echo "Installing ineffassign" && go install github.com/gordonklaus/ineffassign
-	@echo "Installing statik" && go install github.com/rakyll/statik
-	@echo "Installing staticcheck" && go install honnef.co/go/tools/cmd/staticcheck
-
+	@echo "Installing golint" && go install golang.org/x/lint/golint@latest
+	@echo "Installing gocyclo" && go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+	@echo "Installing deadcode" && go install github.com/remyoudompheng/go-misc/deadcode@latest
+	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell@latest
+	@echo "Installing ineffassign" && go install github.com/gordonklaus/ineffassign@latest
+	@echo "Installing staticcheck" && go install honnef.co/go/tools/cmd/staticcheck@latest
 
 verifiers: vet fmt lint cyclo spelling static
 

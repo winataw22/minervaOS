@@ -18,6 +18,13 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
+var (
+	networkResourceNet = net.IPNet{
+		IP:   net.ParseIP("100.64.0.0"),
+		Mask: net.IPv4Mask(0xff, 0xff, 0, 0),
+	}
+)
+
 func (p *Primitives) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
@@ -97,6 +104,7 @@ func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.D
 		},
 		Routes: []pkg.Route{
 			{Net: privNet, Gateway: gw4},
+			{Net: networkResourceNet, Gateway: gw4},
 		},
 		IP4DefaultGateway: net.IP(gw4),
 		IP6DefaultGateway: gw6,
