@@ -39,12 +39,22 @@ type KeyGetter interface {
 type Deployment struct {
 	Version              int                  `json:"version"`
 	TwinID               uint32               `json:"twin_id"`
-	DeploymentID         uint32               `json:"deployment_id"`
+	ContractID           uint32               `json:"contract_id"`
 	Metadata             string               `json:"metadata"`
 	Description          string               `json:"description"`
 	Expiration           Timestamp            `json:"expiration"`
 	SignatureRequirement SignatureRequirement `json:"signature_requirement"`
 	Workloads            []Workload           `json:"workloads"`
+}
+
+// SetError sets an error on ALL workloads. this is mostly
+// an error caused by validation AFTTER the deployment was initially accepted
+func (d *Deployment) SetError(err error) {
+	for i := range d.Workloads {
+		wl := &d.Workloads[i]
+		wl.Result.State = StateError
+		wl.Result.Error = err.Error()
+	}
 }
 
 // WorkloadWithID wrapper around workload type
@@ -127,9 +137,13 @@ func (d *Deployment) Challenge(w io.Writer) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "%d", d.DeploymentID); err != nil {
-		return err
-	}
+	// ContractID is intentionally removed from the hash calculations
+	// because the contract is created on the blockchain first (requires this hash)
+	// then set on the deployment before send to the node
+	//
+	// if _, err := fmt.Fprintf(w, "%d", d.ContractID); err != nil {
+	// 	return err
+	// }
 
 	if _, err := fmt.Fprintf(w, "%s", d.Metadata); err != nil {
 		return err
@@ -271,7 +285,7 @@ func (d *Deployment) Get(name Name) (*WorkloadWithID, error) {
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
 		if wl.Name == name {
-			id, _ := NewWorkloadID(d.TwinID, d.DeploymentID, name)
+			id, _ := NewWorkloadID(d.TwinID, d.ContractID, name)
 			return &WorkloadWithID{
 				Workload: wl,
 				ID:       id,
@@ -301,7 +315,7 @@ func (d *Deployment) ByType(typ WorkloadType) []*WorkloadWithID {
 	for i := range d.Workloads {
 		wl := &d.Workloads[i]
 		if wl.Type == typ {
-			id, err := NewWorkloadID(d.TwinID, d.DeploymentID, wl.Name)
+			id, err := NewWorkloadID(d.TwinID, d.ContractID, wl.Name)
 			if err != nil {
 				log.Warn().Err(err).Msg("deployment has invalid name. please run validation")
 				continue
@@ -321,13 +335,14 @@ func (d *Deployment) ByType(typ WorkloadType) []*WorkloadWithID {
 }
 
 // Upgrade validates n as an updated version of d, and return an Upgrade description
-// for the steps that the node needs to take.
+// for the steps that the node needs to take to move from d to n. unchanged workloads results
+// will be set on n as is
 func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 	if err := n.Valid(); err != nil {
 		return nil, errors.Wrap(err, "new deployment is invalid")
 	}
 
-	if d.TwinID != n.TwinID || d.DeploymentID != n.DeploymentID {
+	if d.TwinID != n.TwinID || d.ContractID != n.ContractID {
 		return nil, fmt.Errorf("cannot change deployment or twin id")
 	}
 
@@ -349,7 +364,7 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 
 	for i := range n.Workloads {
 		l := &n.Workloads[i]
-		id, err := NewWorkloadID(n.TwinID, n.DeploymentID, l.Name)
+		id, err := NewWorkloadID(n.TwinID, n.ContractID, l.Name)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get build workload ID")
 		}
@@ -387,7 +402,7 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 	}
 
 	for _, wl := range current {
-		id, _ := NewWorkloadID(d.TwinID, d.DeploymentID, wl.Name)
+		id, _ := NewWorkloadID(d.TwinID, d.ContractID, wl.Name)
 
 		remove = append(remove, &WorkloadWithID{
 			Workload: wl,

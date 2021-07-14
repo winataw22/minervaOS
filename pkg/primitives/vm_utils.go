@@ -150,13 +150,6 @@ func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment grid
 
 // Get the public ip, and the gateway from the reservation ID
 func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID) (ip net.IPNet, gw net.IP, err error) {
-
-	//CRITICAL: TODO
-	// in this function we need to return the IP from the IP workload
-	// but we also need to get the Gateway IP from the farmer some how
-	// we used to get this from the explorer, but now we need another
-	// way to do this. for now the only option is to get it from the
-	// reservation itself. hence we added the gatway fields to ip data
 	if wl.Type != zos.PublicIPType {
 		return ip, gw, fmt.Errorf("workload for public IP is of wrong type")
 	}
@@ -164,16 +157,13 @@ func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID) (ip net.IPNet,
 	if wl.Result.State != gridtypes.StateOk {
 		return ip, gw, fmt.Errorf("public ip workload is not okay")
 	}
-	ipData, err := wl.WorkloadData()
-	if err != nil {
-		return
-	}
-	data, ok := ipData.(*zos.PublicIP)
-	if !ok {
-		return ip, gw, fmt.Errorf("invalid ip data in deployment got '%T'", ipData)
+
+	var result zos.PublicIPResult
+	if err := wl.Result.Unmarshal(&result); err != nil {
+		return ip, gw, errors.Wrap(err, "failed to load ip config")
 	}
 
-	return data.IP.IPNet, data.Gateway, nil
+	return result.IP.IPNet, result.Gateway, nil
 }
 
 func getFlistInfo(imagePath string) (FListInfo, error) {

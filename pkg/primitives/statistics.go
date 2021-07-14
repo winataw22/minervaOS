@@ -40,8 +40,6 @@ type Statistics struct {
 	counters Counters
 	reserved Counters
 	mem      gridtypes.Unit
-
-	nodeID string
 }
 
 // round the given value to the lowest gigabyte
@@ -51,7 +49,7 @@ func roundTotalMemory(t gridtypes.Unit) gridtypes.Unit {
 
 // NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
-func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, nodeID string, inner provision.Provisioner) *Statistics {
+func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, inner provision.Provisioner) *Statistics {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
 		panic(err)
@@ -69,7 +67,6 @@ func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, nodeID 
 		counters: counters,
 		reserved: reserved,
 		mem:      gridtypes.Unit(vm.Total),
-		nodeID:   nodeID,
 	}
 }
 

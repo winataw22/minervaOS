@@ -3,6 +3,7 @@ package provision
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/substrate"
 
 	"github.com/rs/zerolog/log"
 )
@@ -45,6 +47,21 @@ func WithAdmins(g Twins) EngineOption {
 // in an nondeterministic order
 func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
 	return &withStartupOrder{t}
+}
+
+// WithSubstrate sets the substrate client. If set it will
+// be used by the engine to fetch (and validate) the deployment contract
+// then contract with be available on the deployment context
+func WithSubstrate(sk ed25519.PrivateKey, sub *substrate.Substrate) EngineOption {
+	if len(sk) != ed25519.PrivateKeySize {
+		panic("invalid node private key")
+	}
+	kp, err := substrate.Identity(sk)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get node identity: %s", err))
+	}
+
+	return &withSubstrate{kp.Address, sub}
 }
 
 // WithRerunAll if set forces the engine to re-run all reservations
@@ -87,6 +104,9 @@ type NativeEngine struct {
 	admins   Twins
 	order    []gridtypes.WorkloadType
 	rerunAll bool
+	//substrate specific attributes
+	address string
+	sub     *substrate.Substrate
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -115,6 +135,16 @@ type withAdminsKeyGetter struct {
 
 func (o *withAdminsKeyGetter) apply(e *NativeEngine) {
 	e.admins = o.g
+}
+
+type withSubstrate struct {
+	address string
+	sub     *substrate.Substrate
+}
+
+func (o *withSubstrate) apply(e *NativeEngine) {
+	e.address = o.address
+	e.sub = o.sub
 }
 
 type withStartupOrder struct {
@@ -158,6 +188,8 @@ func (n *nullKeyGetter) GetKey(id uint32) (ed25519.PublicKey, error) {
 
 type engineKey struct{}
 type deploymentKey struct{}
+type contractKey struct{}
+type substrateKey struct{}
 
 // GetEngine gets engine from context
 func GetEngine(ctx context.Context) Engine {
@@ -166,7 +198,22 @@ func GetEngine(ctx context.Context) Engine {
 
 // GetDeployment gets a copy of the current deployment
 func GetDeployment(ctx context.Context) gridtypes.Deployment {
-	return ctx.Value(deploymentKey{}).(gridtypes.Deployment)
+	// we store the pointer on the context so changed to deployment object
+	// actually reflect into the value.
+	dl := ctx.Value(deploymentKey{}).(*gridtypes.Deployment)
+	// BUT we always return a copy so caller of GetDeployment can NOT manipulate
+	// other attributed on the object.
+	return *dl
+}
+
+// GetContract of deployment. panics if engine has no substrate set.
+func GetContract(ctx context.Context) *substrate.Contract {
+	return ctx.Value(contractKey{}).(*substrate.Contract)
+}
+
+// GetSubstrate if engine has substrate set, panics otherwise
+func GetSubstrate(ctx context.Context) *substrate.Substrate {
+	return ctx.Value(substrateKey{}).(*substrate.Substrate)
 }
 
 // New creates a new engine. Once started, the engine
@@ -241,7 +288,7 @@ func (e *NativeEngine) Deprovision(ctx context.Context, twin, id uint32, reason 
 
 	log.Debug().
 		Uint32("twin", deployment.TwinID).
-		Uint32("deployment", deployment.DeploymentID).
+		Uint32("contract", deployment.ContractID).
 		Msg("schedule for deprovision")
 
 	job := engineJob{
@@ -254,7 +301,7 @@ func (e *NativeEngine) Deprovision(ctx context.Context, twin, id uint32, reason 
 
 // Update workloads
 func (e *NativeEngine) Update(ctx context.Context, update gridtypes.Deployment) error {
-	deployment, err := e.storage.Get(update.TwinID, update.DeploymentID)
+	deployment, err := e.storage.Get(update.TwinID, update.ContractID)
 	if err != nil {
 		return err
 	}
@@ -297,8 +344,21 @@ func (e *NativeEngine) Run(root context.Context) error {
 			<-time.After(2 * time.Second)
 			continue
 		}
+
 		job := obj.(*engineJob)
-		ctx := context.WithValue(root, deploymentKey{}, job.Target)
+		ctx := context.WithValue(root, deploymentKey{}, &job.Target)
+
+		// contract processing
+		ctx, err = e.contract(ctx, &job.Target)
+		if err != nil {
+			job.Target.SetError(err)
+			if err := e.storage.Set(job.Target); err != nil {
+				log.Error().Err(err).Msg("failed to set deployment global error")
+			}
+
+			continue
+		}
+
 		switch job.Op {
 		case opProvision:
 			e.installDeployment(ctx, &job.Target)
@@ -326,7 +386,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 			// and update to reflect the current result on those workloads.
 			update, err := job.Source.Upgrade(&job.Target)
 			if err != nil {
-				log.Error().Err(err).Uint32("twin", job.Target.TwinID).Uint32("id", job.Target.DeploymentID).Msg("failed to get update procedure")
+				log.Error().Err(err).Uint32("twin", job.Target.TwinID).Uint32("id", job.Target.ContractID).Msg("failed to get update procedure")
 				break
 			}
 
@@ -341,6 +401,37 @@ func (e *NativeEngine) Run(root context.Context) error {
 
 		e.queue.Dequeue()
 	}
+}
+
+// contract validates and injects the deployment contracts is substrate is configured
+// for this instance of the provision engine.
+func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (context.Context, error) {
+	if e.sub == nil {
+		return ctx, nil
+	}
+
+	ctx = context.WithValue(ctx, substrateKey{}, e.sub)
+	// if substrate is set. we need to get contract
+	contract, err := e.sub.GetContract(uint64(dl.ContractID))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get deployment contract")
+	}
+
+	ctx = context.WithValue(ctx, contractKey{}, contract)
+	if contract.Node.String() != e.address {
+		return nil, fmt.Errorf("invalid node address in contract")
+	}
+
+	hash, err := dl.ChallengeHash()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compute deployment hash")
+	}
+
+	if contract.DeploymentHash != hex.EncodeToString(hash) {
+		return nil, errors.Wrap(err, "deployment hash messmatch")
+	}
+
+	return ctx, nil
 }
 
 // boot will make sure to re-deploy all stored reservation
@@ -501,6 +592,7 @@ func (e *NativeEngine) installDeployment(ctx context.Context, getter gridtypes.W
 			log.Debug().Msg("provisioning")
 			result, err := e.provisioner.Provision(ctx, wl)
 			if errors.Is(err, ErrDidNotChange) {
+				log.Debug().Msg("result did not change")
 				continue
 			}
 

@@ -14,7 +14,11 @@ func runMsgBus(ctx context.Context, twin uint32) error {
 	// todo: make it argument or parse from broker
 	const redis = "/var/run/redis.sock"
 	for {
-		cmd := exec.CommandContext(ctx, "msgbusd", fmt.Sprint(twin), redis)
+		cmd := exec.CommandContext(ctx,
+			"msgbusd",
+			"--twin", fmt.Sprint(twin),
+			"--redis", redis)
+
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 

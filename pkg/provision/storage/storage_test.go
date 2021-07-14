@@ -45,10 +45,10 @@ func TestStorageAdd(t *testing.T) {
 	twin := uint32(1)
 	id := uint32(1)
 	err = store.Add(gridtypes.Deployment{
-		TwinID:       twin,
-		DeploymentID: id,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      twin,
+		ContractID:  id,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",
@@ -76,10 +76,10 @@ func TestStorageSet(t *testing.T) {
 	twin := uint32(1)
 	id := uint32(1)
 	deployment := gridtypes.Deployment{
-		TwinID:       twin,
-		DeploymentID: id,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      twin,
+		ContractID:  id,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",
@@ -112,10 +112,10 @@ func TestStorageGet(t *testing.T) {
 	twin := uint32(1)
 	id := uint32(1)
 	deployment := gridtypes.Deployment{
-		TwinID:       twin,
-		DeploymentID: id,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      twin,
+		ContractID:  id,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",
@@ -128,7 +128,7 @@ func TestStorageGet(t *testing.T) {
 	err = store.Add(deployment)
 	require.NoError(err)
 
-	loaded, err := store.Get(deployment.TwinID, deployment.DeploymentID)
+	loaded, err := store.Get(deployment.TwinID, deployment.ContractID)
 	require.NoError(err)
 	require.Equal(deployment.Description, loaded.Description)
 	require.Equal(deployment.Metadata, loaded.Metadata)
@@ -145,10 +145,10 @@ func TestStorageByTwin(t *testing.T) {
 	require.NoError(err)
 
 	deployment1 := gridtypes.Deployment{
-		TwinID:       1,
-		DeploymentID: 1,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      1,
+		ContractID:  1,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",
@@ -162,10 +162,10 @@ func TestStorageByTwin(t *testing.T) {
 	require.NoError(err)
 
 	deployment2 := gridtypes.Deployment{
-		TwinID:       1,
-		DeploymentID: 2,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      1,
+		ContractID:  2,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",
@@ -179,10 +179,10 @@ func TestStorageByTwin(t *testing.T) {
 	require.NoError(err)
 
 	deployment3 := gridtypes.Deployment{
-		TwinID:       2,
-		DeploymentID: 1,
-		Metadata:     "meta",
-		Description:  "descriptions",
+		TwinID:      2,
+		ContractID:  1,
+		Metadata:    "meta",
+		Description: "descriptions",
 		Workloads: []gridtypes.Workload{
 			{
 				Name: "volume",

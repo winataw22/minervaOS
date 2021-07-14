@@ -1,4 +1,4 @@
-package substrate
+package provision
 
 import (
 	"crypto/ed25519"
@@ -6,21 +6,16 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/substrate"
 )
 
 type substrateTwins struct {
-	sub *Substrate
+	sub *substrate.Substrate
 	mem *lru.Cache
 }
 
 // NewSubstrateTwins creates a substrate users db that implements the provision.Users interface.
-func NewSubstrateTwins(url string) (provision.Twins, error) {
-	sub, err := NewSubstrate(url)
-	if err != nil {
-		return nil, err
-	}
-
+func NewSubstrateTwins(sub *substrate.Substrate) (Twins, error) {
 	cache, err := lru.New(1024)
 	if err != nil {
 		return nil, err
@@ -49,19 +44,14 @@ func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
 }
 
 type substrateAdmins struct {
-	sub  *Substrate
+	sub  *substrate.Substrate
 	twin uint32
 	pk   ed25519.PublicKey
 }
 
 // NewSubstrateAdmins creates a substrate twins db that implements the provision.Users interface.
 // but it also make sure the user is an admin
-func NewSubstrateAdmins(url string, farmID uint32) (provision.Twins, error) {
-	sub, err := NewSubstrate(url)
-	if err != nil {
-		return nil, err
-	}
-
+func NewSubstrateAdmins(sub *substrate.Substrate, farmID uint32) (Twins, error) {
 	farm, err := sub.GetFarm(farmID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get farm")

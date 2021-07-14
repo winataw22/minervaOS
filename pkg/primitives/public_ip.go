@@ -3,7 +3,6 @@ package primitives
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -21,18 +20,81 @@ func (p *Primitives) publicIPProvision(ctx context.Context, wl *gridtypes.Worklo
 	return p.publicIPProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
-	config := zos.PublicIP{}
+func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
+	//Okay, this implementation is tricky but will be simplified once we store the reserved IP
+	//on the contract.
 
+	// Okay, so first (and easiest path) is that the Ip was already
+	// assigned, hence we can simply use it again. this is usually
+	// the case if the node is rerunning the same workload deployment for
+	// some reason.
+	if !wl.Result.IsNil() && wl.Result.State == gridtypes.StateOk {
+		if err := wl.Result.Unmarshal(&result); err != nil {
+			return result, errors.Wrap(err, "failed to load public ip result")
+		}
+
+		return result, nil
+	}
+	// otherwise we do the following:
+
+	// - We need to get the contract and the farm object this node belongs to
+	deployment := provision.GetDeployment(ctx)
+	contract := provision.GetContract(ctx)
+
+	// - now we find out ALL ips belonging to this contract
+	reserved := contract.PublicIPs
+
+	// make sure we have enough reserved IPs
+	ipWorkloads := deployment.ByType(zos.PublicIPType)
+	if len(ipWorkloads) > len(reserved) {
+		return result, fmt.Errorf("required %d ips while contract has %d ip reserved", len(ipWorkloads), len(reserved))
+	}
+
+	usedIPs := make(map[string]struct{})
+
+	for _, ipWl := range ipWorkloads {
+		if wl.Name == ipWl.Name {
+			// we don't need this.
+			continue
+		}
+
+		if ipWl.Result.IsNil() || ipWl.Result.State != gridtypes.StateOk {
+			continue
+		}
+		var used zos.PublicIPResult
+		if err := ipWl.Result.Unmarshal(&used); err != nil {
+			return result, errors.Wrap(err, "failed to ")
+		}
+
+		usedIPs[used.IP.String()] = struct{}{}
+	}
+
+	// otherwise we go over the list of IPs and take the first free one
+	for _, ip := range reserved {
+		if _, ok := usedIPs[ip.IP]; !ok {
+			// free ip. we can just take it
+			ipNet, err := gridtypes.ParseIPNet(ip.IP)
+			if err != nil {
+				return result, fmt.Errorf("found a mullformed ip address in contract object '%s'", ip.IP)
+			}
+			gw := net.ParseIP(ip.Gateway)
+			if gw == nil {
+				return result, fmt.Errorf("found a mullformed gateway address in farm object '%s'", ip.Gateway)
+			}
+
+			return zos.PublicIPResult{IP: ipNet, Gateway: gw}, nil
+		}
+	}
+
+	return result, fmt.Errorf("could not allocate public IP address to workload")
+}
+
+func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 	fName := filterName(wl.ID.String())
 
 	if network.PubIPFilterExists(ctx, fName) {
 		return result, provision.ErrDidNotChange
-	}
-
-	if err := json.Unmarshal(wl.Data, &config); err != nil {
-		return zos.PublicIPResult{}, errors.Wrap(err, "failed to decode reservation schema")
 	}
 
 	pubIP6Base, err := network.GetPublicIPv6Subnet(ctx)
@@ -48,8 +110,12 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
 	}
 
-	result.IP = config.IP
-	err = network.SetupPubIPFilter(ctx, fName, tapName, config.IP.IP.To4().String(), predictedIPv6, mac.String())
+	result, err = p.getAssignedPublicIP(ctx, wl)
+	if err != nil {
+		return zos.PublicIPResult{}, err
+	}
+
+	err = network.SetupPubIPFilter(ctx, fName, tapName, result.IP.IP.String(), predictedIPv6, mac.String())
 	return
 }
 

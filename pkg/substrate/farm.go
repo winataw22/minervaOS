@@ -46,6 +46,14 @@ type Farm struct {
 	CertificationType CertificationType
 	CountryID         types.U32
 	CityID            types.U32
+	PublicIPs         []PublicIP
+}
+
+// PublicIP structure
+type PublicIP struct {
+	IP         string
+	Gateway    string
+	ContractID types.U64
 }
 
 // GetFarm gets a farm with ID

@@ -262,6 +262,11 @@ type Result struct {
 	Data json.RawMessage `json:"data"`
 }
 
+// Unmarshal a shortcut for json.Unmarshal
+func (r *Result) Unmarshal(v interface{}) error {
+	return json.Unmarshal(r.Data, v)
+}
+
 // IsNil checks if Result is the zero values
 func (r *Result) IsNil() bool {
 	// ideally this should be implemented like this

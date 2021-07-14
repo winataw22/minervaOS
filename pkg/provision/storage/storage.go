@@ -45,7 +45,7 @@ func NewFSStore(root string) (*Fs, error) {
 }
 
 func (s *Fs) deploymentPath(d *gridtypes.Deployment) string {
-	return filepath.Join(fmt.Sprint(d.TwinID), fmt.Sprint(d.DeploymentID))
+	return filepath.Join(fmt.Sprint(d.TwinID), fmt.Sprint(d.ContractID))
 }
 
 func (s *Fs) rooted(p ...string) string {
@@ -69,7 +69,7 @@ func (s *Fs) Add(d gridtypes.Deployment) error {
 	)
 
 	if os.IsExist(err) {
-		return errors.Wrapf(provision.ErrDeploymentExists, "object '%d' exist", d.DeploymentID)
+		return errors.Wrapf(provision.ErrDeploymentExists, "object '%d' exist", d.ContractID)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to open workload file")
 	}
@@ -100,7 +100,7 @@ func (s *Fs) Set(dl gridtypes.Deployment) error {
 		0644,
 	)
 	if os.IsNotExist(err) {
-		return errors.Wrapf(provision.ErrDeploymentNotExists, "deployment '%d:%d' does not exist", dl.TwinID, dl.DeploymentID)
+		return errors.Wrapf(provision.ErrDeploymentNotExists, "deployment '%d:%d' does not exist", dl.TwinID, dl.ContractID)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to open workload file")
 	}

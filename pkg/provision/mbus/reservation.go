@@ -3,10 +3,10 @@ package mbus
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/provision/mw"
@@ -27,10 +27,16 @@ func (d *Deployments) createOrUpdate(ctx context.Context, payload []byte, update
 		return nil, mw.BadRequest(err)
 	}
 
-	deployment.TwinID = rmb.GetTwinID(ctx)
+	if deployment.TwinID != rmb.GetTwinID(ctx) {
+		return nil, mw.UnAuthorized(fmt.Errorf("twin id mismatch (deployment: %d, message: %d)", deployment.TwinID, rmb.GetTwinID(ctx)))
+	}
+
 	if err := deployment.Verify(d.engine.Twins()); err != nil {
 		return nil, mw.UnAuthorized(err)
 	}
+
+	// we need to ge the contract here and make sure
+	// we can validate the contract against it.
 
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()

@@ -2,6 +2,7 @@ package provisiond
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,7 +22,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
 	"github.com/threefoldtech/zos/pkg/rmb"
-	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -105,7 +105,7 @@ func action(cli *cli.Context) error {
 	}
 
 	identity := stubs.NewIdentityManagerStub(cl)
-	nodeID := identity.NodeID(cli.Context)
+	sk := ed25519.PrivateKey(identity.PrivateKey(ctx))
 
 	// block until networkd is ready to serve request from zbus
 	// this is used to prevent uptime and online status to the explorer if the node is not in a fully ready
@@ -183,7 +183,6 @@ func action(cli *cli.Context) error {
 		cap,
 		current,
 		reserved,
-		nodeID.Identity(),
 		provisioners,
 	)
 
@@ -195,12 +194,16 @@ func action(cli *cli.Context) error {
 	// users := mw.NewUserMap()
 	// users.AddKeyFromHex(1, "95d1ba20e9f5cb6cfc6182fecfa904664fb1953eba520db454d5d5afaa82d791")
 
-	users, err := substrate.NewSubstrateTwins(env.SubstrateURL)
+	sub, err := env.GetSubstrate()
+	if err != nil {
+		return errors.Wrap(err, "failed to get connection to substrate")
+	}
+	users, err := provision.NewSubstrateTwins(sub)
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate users database")
 	}
 
-	admins, err := substrate.NewSubstrateAdmins(env.SubstrateURL, uint32(env.FarmerID))
+	admins, err := provision.NewSubstrateAdmins(sub, uint32(env.FarmerID))
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
@@ -216,6 +219,7 @@ func action(cli *cli.Context) error {
 		queues,
 		provision.WithTwins(users),
 		provision.WithAdmins(admins),
+		provision.WithSubstrate(sk, sub),
 		// set priority to some reservation types on boot
 		// so we always need to make sure all volumes and networks
 		// comes first.
