@@ -149,7 +149,7 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 	}
 
 	// we add extra overhead for some workload types here
-	if wl.Type == zos.KubernetesType {
+	if wl.Type == zos.ZMachineType {
 		// we add the min of 5% of allocated memory or 1G
 		needed.MRU += gridtypes.Min(needed.MRU*5/100, gridtypes.Gigabyte)
 	} // TODO: other types ?

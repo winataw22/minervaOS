@@ -19,7 +19,7 @@ type Engine interface {
 	// means that workload has been committed to storage (accepts)
 	// and will be processes later
 	Provision(ctx context.Context, wl gridtypes.Deployment) error
-	Deprovision(ctx context.Context, twin, id uint32, reason string) error
+	Deprovision(ctx context.Context, twin uint32, id uint64, reason string) error
 	Update(ctx context.Context, update gridtypes.Deployment) error
 	Storage() Storage
 	Twins() Twins
@@ -55,9 +55,9 @@ var (
 type Storage interface {
 	Add(wl gridtypes.Deployment) error
 	Set(wl gridtypes.Deployment) error
-	Get(twin, deployment uint32) (gridtypes.Deployment, error)
+	Get(twin uint32, deployment uint64) (gridtypes.Deployment, error)
 	Twins() ([]uint32, error)
-	ByTwin(twin uint32) ([]uint32, error)
+	ByTwin(twin uint32) ([]uint64, error)
 }
 
 // Janitor interface

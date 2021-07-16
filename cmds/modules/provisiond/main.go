@@ -257,19 +257,17 @@ func action(cli *cli.Context) error {
 		log.Error().Err(err).Msg("failed to mark module as booted")
 	}
 
-	//TODO: uncomment me
-
-	// reporter, err := NewReported(store, identity, queues)
-	// if err != nil {
-	// 	return errors.Wrap(err, "failed to setup capacity reporter")
-	// }
-	// // also spawn the capacity reporter
-	// go func() {
-	// 	if err := reporter.Run(ctx); err != nil && err != context.Canceled {
-	// 		log.Fatal().Err(err).Msg("capacity reported stopped unexpectedely")
-	// 	}
-	// 	log.Info().Msg("capacity reported stopped")
-	// }()
+	reporter, err := NewReporter(engine, cl, queues)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup capacity reporter")
+	}
+	// also spawn the capacity reporter
+	go func() {
+		if err := reporter.Run(ctx); err != nil && err != context.Canceled {
+			log.Fatal().Err(err).Msg("capacity reported stopped unexpectedely")
+		}
+		log.Info().Msg("capacity reported stopped")
+	}()
 
 	// and start the zbus server in the back ground
 	go func() {

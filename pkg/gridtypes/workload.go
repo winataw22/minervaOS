@@ -104,8 +104,6 @@ type Workload struct {
 	Type WorkloadType `json:"type"`
 	// Data is the reservation type arguments.
 	Data json.RawMessage `json:"data"`
-	// Date of creation
-	Created Timestamp `json:"created"`
 	// Metadata is custom user metadata
 	Metadata string `json:"metadata"`
 	//Description

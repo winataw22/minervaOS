@@ -39,7 +39,7 @@ type KeyGetter interface {
 type Deployment struct {
 	Version              int                  `json:"version"`
 	TwinID               uint32               `json:"twin_id"`
-	ContractID           uint32               `json:"contract_id"`
+	ContractID           uint64               `json:"contract_id"`
 	Metadata             string               `json:"metadata"`
 	Description          string               `json:"description"`
 	Expiration           Timestamp            `json:"expiration"`
@@ -161,6 +161,10 @@ func (d *Deployment) Challenge(w io.Writer) error {
 		if err := wl.Challenge(w); err != nil {
 			return err
 		}
+	}
+
+	if err := d.SignatureRequirement.Challenge(w); err != nil {
+		return err
 	}
 
 	return nil

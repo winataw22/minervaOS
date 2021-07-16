@@ -77,12 +77,14 @@ Once the contract is terminated, the Ips are returned back to the farmer pool.
 Each farmer object is assigned a Pricing Policy object:
 The pricing policy defines:
 - Currency (TFT, USD, etc…) _we will probably drop that_
+- Unit (Bytes, Kilobyte, Megabyte, Gigabytes)
 - SU
 - CU
 - NU
 
 ## General notes:
 - Each price defines a price for a single UNIT/SECOND. So for example SU is the price of a single Storage Unit per second where a Storage Unit can be 1 Gigabyte
+- NU is an exception because that's the price PER unit (regardless of number of seconds). For example if NU is 10 and Unit ig Gigabyte, so 1 Gigabyte of network traffic costs 10 mill.
 - Price is defined as `mil` of the currency. 1 UNIT = 1,000,000,0 mil
 
 ### Example:

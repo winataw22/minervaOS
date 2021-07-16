@@ -59,7 +59,7 @@ func (a *Workloads) createOrUpdate(request *http.Request) (interface{}, mw.Respo
 	return nil, mw.Accepted()
 }
 
-func (a *Workloads) parseIDs(request *http.Request) (twin, id uint32, err error) {
+func (a *Workloads) parseIDs(request *http.Request) (twin uint32, id uint64, err error) {
 	twinVar := mux.Vars(request)["twin"]
 	if len(twinVar) == 0 {
 		return twin, id, fmt.Errorf("invalid twin id format")
@@ -74,12 +74,12 @@ func (a *Workloads) parseIDs(request *http.Request) (twin, id uint32, err error)
 		return twin, id, err
 	}
 
-	idU, err := strconv.ParseUint(idVar, 10, 32)
+	idU, err := strconv.ParseUint(idVar, 10, 64)
 	if err != nil {
 		return twin, id, err
 	}
 
-	return uint32(twinU), uint32(idU), nil
+	return uint32(twinU), idU, nil
 }
 
 func (a *Workloads) delete(request *http.Request) (interface{}, mw.Response) {

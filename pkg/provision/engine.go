@@ -280,7 +280,7 @@ func (e *NativeEngine) Provision(ctx context.Context, deployment gridtypes.Deplo
 }
 
 // Deprovision workload
-func (e *NativeEngine) Deprovision(ctx context.Context, twin, id uint32, reason string) error {
+func (e *NativeEngine) Deprovision(ctx context.Context, twin uint32, id uint64, reason string) error {
 	deployment, err := e.storage.Get(twin, id)
 	if err != nil {
 		return err
@@ -288,7 +288,7 @@ func (e *NativeEngine) Deprovision(ctx context.Context, twin, id uint32, reason 
 
 	log.Debug().
 		Uint32("twin", deployment.TwinID).
-		Uint32("contract", deployment.ContractID).
+		Uint64("contract", deployment.ContractID).
 		Msg("schedule for deprovision")
 
 	job := engineJob{
@@ -348,15 +348,23 @@ func (e *NativeEngine) Run(root context.Context) error {
 		job := obj.(*engineJob)
 		ctx := context.WithValue(root, deploymentKey{}, &job.Target)
 
-		// contract processing
-		ctx, err = e.contract(ctx, &job.Target)
-		if err != nil {
-			job.Target.SetError(err)
-			if err := e.storage.Set(job.Target); err != nil {
-				log.Error().Err(err).Msg("failed to set deployment global error")
+		// contract validation
+		// this should ONLY be done on provosion and update operation
+		if job.Op != opDeprovision {
+			// otherwise, contract validation is needed
+			ctx, err = e.contract(ctx, &job.Target)
+			if err != nil {
+				log.Error().Err(err).Uint64("contract", job.Target.ContractID).Msg("contact validation fails")
+				job.Target.SetError(err)
+				if err := e.storage.Set(job.Target); err != nil {
+					log.Error().Err(err).Msg("failed to set deployment global error")
+				}
+				e.queue.Dequeue()
+
+				continue
 			}
 
-			continue
+			log.Debug().Uint64("contract", job.Target.ContractID).Msg("contact validation pass")
 		}
 
 		switch job.Op {
@@ -386,7 +394,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 			// and update to reflect the current result on those workloads.
 			update, err := job.Source.Upgrade(&job.Target)
 			if err != nil {
-				log.Error().Err(err).Uint32("twin", job.Target.TwinID).Uint32("id", job.Target.ContractID).Msg("failed to get update procedure")
+				log.Error().Err(err).Uint32("twin", job.Target.TwinID).Uint64("id", job.Target.ContractID).Msg("failed to get update procedure")
 				break
 			}
 
@@ -418,6 +426,7 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 	}
 
 	ctx = context.WithValue(ctx, contractKey{}, contract)
+
 	if contract.Node.String() != e.address {
 		return nil, fmt.Errorf("invalid node address in contract")
 	}
@@ -428,7 +437,7 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 	}
 
 	if contract.DeploymentHash != hex.EncodeToString(hash) {
-		return nil, errors.Wrap(err, "deployment hash messmatch")
+		return nil, fmt.Errorf("contract hash does not match deployment hash")
 	}
 
 	return ctx, nil
@@ -452,7 +461,7 @@ func (e *NativeEngine) boot(root context.Context) error {
 		for _, id := range ids {
 			dl, err := storage.Get(twin, id)
 			if err != nil {
-				log.Error().Err(err).Uint32("twin", twin).Uint32("id", id).Msg("failed to load deployment")
+				log.Error().Err(err).Uint32("twin", twin).Uint64("id", id).Msg("failed to load deployment")
 				continue
 			}
 			// unfortunately we have to inject this value here
@@ -497,7 +506,7 @@ func (e *NativeEngine) uninstallDeployment(ctx context.Context, getter gridtypes
 			twin, deployment, name, _ := wl.ID.Parts()
 			log := log.With().
 				Uint32("twin", twin).
-				Uint32("deployment", deployment).
+				Uint64("deployment", deployment).
 				Str("name", name).
 				Str("type", wl.Type.String()).
 				Logger()
@@ -528,7 +537,7 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, getter gridtypes.Wo
 			twin, deployment, name, _ := wl.ID.Parts()
 			log := log.With().
 				Uint32("twin", twin).
-				Uint32("deployment", deployment).
+				Uint64("deployment", deployment).
 				Str("name", name).
 				Str("type", wl.Type.String()).
 				Logger()
@@ -584,7 +593,7 @@ func (e *NativeEngine) installDeployment(ctx context.Context, getter gridtypes.W
 			twin, deployment, name, _ := wl.ID.Parts()
 			log := log.With().
 				Uint32("twin", twin).
-				Uint32("deployment", deployment).
+				Uint64("deployment", deployment).
 				Str("name", name).
 				Str("type", wl.Type.String()).
 				Logger()

@@ -11,9 +11,14 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/centrifuge/go-substrate-rpc-client/v3/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
+	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
 	"github.com/vedhavyas/go-subkey"
 	subkeyEd25519 "github.com/vedhavyas/go-subkey/ed25519"
+)
+
+const (
+	network = 42
 )
 
 // AccountID type
@@ -26,18 +31,32 @@ func (a AccountID) PublicKey() ed25519.PublicKey {
 
 // String return string representation of account
 func (a AccountID) String() string {
-	address, _ := subkey.SS58Address(a[:], 42)
+	address, _ := subkey.SS58Address(a[:], network)
 	return address
 }
 
 // MarshalJSON implementation
 func (a AccountID) MarshalJSON() ([]byte, error) {
-	address, err := subkey.SS58Address(a[:], 42)
+	address, err := subkey.SS58Address(a[:], network)
 	if err != nil {
 		return nil, err
 	}
 
 	return json.Marshal(address)
+}
+
+// FromAddress creates an AccountID from a SS58 address
+func FromAddress(address string) (account AccountID, err error) {
+	bytes := base58.Decode(address)
+	if len(bytes) != 3+len(account) {
+		return account, fmt.Errorf("invalid address length")
+	}
+	if bytes[0] != network {
+		return account, fmt.Errorf("invalid address format")
+	}
+
+	copy(account[:], bytes[1:len(account)+1])
+	return
 }
 
 // keyringPairFromSecret creates KeyPair based on seed/phrase and network

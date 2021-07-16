@@ -14,7 +14,7 @@ import (
 )
 
 type idArgs struct {
-	DeploymentID uint32 `json:"deployment_id"`
+	ContractID uint64 `json:"contract_id"`
 }
 
 func (d *Deployments) createOrUpdate(ctx context.Context, payload []byte, update bool) (interface{}, mw.Response) {
@@ -73,7 +73,7 @@ func (d *Deployments) delete(ctx context.Context, payload []byte) (interface{}, 
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
-	err = d.engine.Deprovision(ctx, rmb.GetTwinID(ctx), args.DeploymentID, "requested by user")
+	err = d.engine.Deprovision(ctx, rmb.GetTwinID(ctx), args.ContractID, "requested by user")
 	if err == context.DeadlineExceeded {
 		return nil, mw.Unavailable(ctx.Err())
 	} else if errors.Is(err, provision.ErrDeploymentNotExists) {
@@ -92,7 +92,7 @@ func (d *Deployments) get(ctx context.Context, payload []byte) (interface{}, mw.
 		return nil, mw.Error(err)
 	}
 
-	deployment, err := d.engine.Storage().Get(rmb.GetTwinID(ctx), args.DeploymentID)
+	deployment, err := d.engine.Storage().Get(rmb.GetTwinID(ctx), args.ContractID)
 	if errors.Is(err, provision.ErrDeploymentNotExists) {
 		return nil, mw.NotFound(fmt.Errorf("workload not found"))
 	} else if err != nil {

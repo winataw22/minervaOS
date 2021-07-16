@@ -195,6 +195,24 @@ type NetMetric struct {
 	NetTxBytes   uint64 `json:"net_tx_bytes"`
 }
 
+// Nu calculate network units
+func (n *NetMetric) Nu() float64 {
+	const (
+		// weights knobs for nu calculations
+		bytes   float64 = 1.0
+		packets float64 = 0.2
+		rx      float64 = 1.0
+		tx      float64 = 1.0
+	)
+
+	nu := float64(n.NetRxBytes)*bytes*rx +
+		float64(n.NetTxBytes)*bytes*tx +
+		float64(n.NetRxPackets)*packets*rx +
+		float64(n.NetTxPackets)*packets*tx
+
+	return nu
+}
+
 // MachineMetric is a container for metrics from multiple networks
 // currently only groped as private (wiregaurd + yggdrasil), and public (public Ips)
 type MachineMetric struct {

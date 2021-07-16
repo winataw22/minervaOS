@@ -45,7 +45,7 @@ func (i WorkloadID) String() string {
 }
 
 // Parts split id into building parts
-func (i WorkloadID) Parts() (twin, deployment uint32, name string, err error) {
+func (i WorkloadID) Parts() (twin uint32, deployment uint64, name string, err error) {
 	_, err = fmt.Sscanf(string(i), "%d-%d-%s", &twin, &deployment, &name)
 	return
 }
@@ -64,7 +64,7 @@ func IsValidName(n Name) error {
 }
 
 // NewWorkloadID creates a new global ID from it's parts
-func NewWorkloadID(twin uint32, deployment uint32, name Name) (WorkloadID, error) {
+func NewWorkloadID(twin uint32, deployment uint64, name Name) (WorkloadID, error) {
 	if err := IsValidName(name); err != nil {
 		return "", err
 	}

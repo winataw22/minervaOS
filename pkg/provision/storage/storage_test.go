@@ -43,7 +43,7 @@ func TestStorageAdd(t *testing.T) {
 	require.NoError(err)
 
 	twin := uint32(1)
-	id := uint32(1)
+	id := uint64(1)
 	err = store.Add(gridtypes.Deployment{
 		TwinID:      twin,
 		ContractID:  id,
@@ -74,7 +74,7 @@ func TestStorageSet(t *testing.T) {
 	require.NoError(err)
 
 	twin := uint32(1)
-	id := uint32(1)
+	id := uint64(1)
 	deployment := gridtypes.Deployment{
 		TwinID:      twin,
 		ContractID:  id,
@@ -110,7 +110,7 @@ func TestStorageGet(t *testing.T) {
 	store, err := NewFSStore(root)
 	require.NoError(err)
 	twin := uint32(1)
-	id := uint32(1)
+	id := uint64(1)
 	deployment := gridtypes.Deployment{
 		TwinID:      twin,
 		ContractID:  id,

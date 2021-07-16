@@ -38,7 +38,6 @@ func (p *Primitives) zMountProvision(ctx context.Context, wl *gridtypes.Workload
 }
 
 func (p *Primitives) zMountDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
-	storageClient := stubs.NewStorageModuleStub(p.zbus)
-
-	return storageClient.ReleaseFilesystem(ctx, wl.ID.String())
+	vdisk := stubs.NewVDiskModuleStub(p.zbus)
+	return vdisk.Deallocate(ctx, wl.ID.String())
 }
