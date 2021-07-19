@@ -92,17 +92,14 @@ func (s *Substrate) GetNodeContracts(pk []byte, state ContractState) ([]Contract
 		return nil, errors.Wrap(err, "failed to create substrate query key")
 	}
 	var contracts []Contract
-	ok, err := s.cl.RPC.State.GetStorageLatest(key, &contracts)
+	_, err = s.cl.RPC.State.GetStorageLatest(key, &contracts)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to lookup contracts")
 	}
 
-	if !ok {
-		return nil, errors.Wrap(ErrNotFound, "contracts not found")
-	}
-
 	return contracts, nil
 }
+
 func (s *Substrate) getContract(key types.StorageKey) (*Contract, error) {
 	raw, err := s.cl.RPC.State.GetStorageRawLatest(key)
 	if err != nil {

@@ -95,7 +95,7 @@ curl --header "Content-Type: application/json" \
 */
 
 func (s *Substrate) activateAccount(identity signature.KeyringPair) error {
-	const activationDefaultURL = "https://explorer.devnet.grid.tf/activate"
+	const activationDefaultURL = "https://explorer.devnet.grid.tf/activation/activate"
 
 	var buf bytes.Buffer
 	json.NewEncoder(&buf).Encode(map[string]string{

@@ -173,7 +173,11 @@ func (s *Substrate) getNode(key types.StorageKey) (*Node, error) {
 
 // CreateNode creates a node
 func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
-	c, err := types.NewCall(s.meta, "TfgridModule.create_node", node)
+	c, err := types.NewCall(s.meta, "TfgridModule.create_node",
+		node.FarmID, node.Resources, node.Location,
+		node.CountryID, node.CityID, node.Role, node.PublicConfig,
+	)
+
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create call")
 	}
@@ -193,7 +197,10 @@ func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 
 // UpdateNode updates a node
 func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
-	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node)
+	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node.FarmID, node.Resources, node.Location,
+		node.CountryID, node.CityID, node.Role, node.PublicConfig,
+	)
+
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create call")
 	}

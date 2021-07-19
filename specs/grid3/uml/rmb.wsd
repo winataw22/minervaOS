@@ -1,1 +1,19 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/4521800785b1f3052b08d0f7d5442b32
+@startuml
+actor Client as cl
+participant RMB as rmb
+participant Node as zos
+
+cl --> rmb: Create an RMB message \n(cmd: zos.deployment.deploy, dat: base64(json(deployment)))
+rmb -> zos: Decode payload(dat). \nSo node receive a deployment object
+zos -> zos: Verify hash against contract hash\nVerify signature of the twin
+zos -> rmb: Accepted Or Error
+rmb --> cl: Response from the node
+group If valid
+zos -> zos: Deploy
+end group
+...
+cl --> rmb: Get Deployment (cmd: zos.deployment.get)
+rmb -> zos: Call get method
+zos -> rmb: Get Response
+rmb --> cl: Response
+@enduml
