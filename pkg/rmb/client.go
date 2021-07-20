@@ -22,6 +22,12 @@ type redisClient struct {
 	pool *redis.Pool
 }
 
+// Default return instance of to default (local) rmb
+// shortcut for NewClient(DefaultAddress)
+func Default() (Client, error) {
+	return NewClient(DefaultAddress)
+}
+
 // NewClient creates a new rmb client. the given address should
 // be to the local redis. If not provided, default redis address
 // is used

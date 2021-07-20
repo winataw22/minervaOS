@@ -145,6 +145,8 @@ func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) error {
 	for event := range sub.Chan() {
 		if event.IsFinalized {
 			break
+		} else if event.IsDropped || event.IsInvalid {
+			return fmt.Errorf("failed to make call")
 		}
 	}
 

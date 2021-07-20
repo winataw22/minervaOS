@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -19,7 +18,10 @@ var (
 	workloadTypes = map[WorkloadType]WorkloadData{}
 )
 
-// RegisterType register a new workload type
+// RegisterType register a new workload type. This is used by zos to "declare"
+// the workload types it supports. please check `zos` sub package for all
+// supported types.
+// Note: a user never need to call this, it's done by zos libraries.
 func RegisterType(t WorkloadType, d WorkloadData) {
 	if reflect.TypeOf(d).Kind() != reflect.Struct {
 		panic("only structures are supported")
@@ -96,7 +98,13 @@ func MustMarshal(data WorkloadData) json.RawMessage {
 
 // Workload struct
 type Workload struct {
-	//Version is version of reservation object
+	// Version is version of reservation object. On deployment creation, version must be 0
+	// then only workloads that need to be updated must match the version of the deployment object.
+	// if a deployment update message is sent to a node it does the following:
+	// - validate deployment version
+	// - check workloads list, if a version is not matching the new deployment version, the workload is untouched
+	// - if a workload version is same as deployment, the workload is "updated"
+	// - if a workload is removed, the workload is deleted.
 	Version int `json:"version"`
 	//Name is unique workload name per deployment  (required)
 	Name Name `json:"name"`
@@ -104,11 +112,12 @@ type Workload struct {
 	Type WorkloadType `json:"type"`
 	// Data is the reservation type arguments.
 	Data json.RawMessage `json:"data"`
-	// Metadata is custom user metadata
+	// Metadata is user specific meta attached to deployment, can be used to link this
+	// deployment to other external systems for automation
 	Metadata string `json:"metadata"`
-	//Description
+	//Description human readale description of the workload
 	Description string `json:"description"`
-	// Result of reservation
+	// Result of reservation, set by the node
 	Result Result `json:"result"`
 }
 
@@ -185,52 +194,6 @@ func (w *Workload) Capacity() (Capacity, error) {
 	}
 
 	return data.Capacity()
-}
-
-// //Sign signs the signature given the private key
-// func (w *Workload) Sign(sk ed25519.PrivateKey) error {
-// 	if len(sk) != ed25519.PrivateKeySize {
-// 		return fmt.Errorf("invalid secure key")
-// 	}
-
-// 	var buf bytes.Buffer
-// 	if err := w.Challenge(&buf); err != nil {
-// 		return errors.Wrap(err, "failed to create the signature challenge")
-// 	}
-
-// 	w.Signature = hex.EncodeToString(ed25519.Sign(sk, buf.Bytes()))
-
-// 	return nil
-// }
-
-// AppendTag appends tags
-func AppendTag(t, n Tag) Tag {
-	if t == nil {
-		t = Tag{}
-	}
-
-	for k, v := range n {
-		t[k] = v
-	}
-
-	return t
-}
-
-// Tag is custom tag to mark certain reservations
-type Tag map[string]string
-
-func (t Tag) String() string {
-	var builder strings.Builder
-	for k, v := range t {
-		if builder.Len() != 0 {
-			builder.WriteString(", ")
-		}
-		builder.WriteString(k)
-		builder.WriteString(": ")
-		builder.WriteString(v)
-	}
-
-	return builder.String()
 }
 
 // ResultState type

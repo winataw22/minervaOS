@@ -37,14 +37,33 @@ type KeyGetter interface {
 
 // Deployment structure
 type Deployment struct {
-	Version              int                  `json:"version"`
-	TwinID               uint32               `json:"twin_id"`
-	ContractID           uint64               `json:"contract_id"`
-	Metadata             string               `json:"metadata"`
-	Description          string               `json:"description"`
-	Expiration           Timestamp            `json:"expiration"`
+	// Version must be set to 0 on deployment creation. And then it has to
+	// be incremented with each call to update.
+	Version int `json:"version"`
+	// TwinID is the id of the twin sendign the deployment. A twin then can only
+	// `get` status about deployments he owns.
+	TwinID uint32 `json:"twin_id"`
+	// ContractID the contract must be "pre created" on substrate before the deployment is
+	// sent to the node. The node will then validate that this deployment hash, will match the
+	// hash attached to this contract.
+	// the flow should go as follows:
+	// - fill in ALL deployment details (metadata, and workloads)
+	// - calculate the deployment hash (by calling ChallengeHash method)
+	// - create the contract with the right hash
+	// - set the contract id on the deployment object
+	// - send deployment to node.
+	ContractID uint64 `json:"contract_id"`
+	// Metadata is user specific meta attached to deployment, can be used to link this
+	// deployment to other external systems for automation
+	Metadata string `json:"metadata"`
+	// Description is human readable description of the deployment
+	Description string `json:"description"`
+	// Expiration [deprecated] is not used
+	Expiration Timestamp `json:"expiration"`
+	// SignatureRequirement specifications
 	SignatureRequirement SignatureRequirement `json:"signature_requirement"`
-	Workloads            []Workload           `json:"workloads"`
+	// Workloads is a list of workloads associated with this deployment
+	Workloads []Workload `json:"workloads"`
 }
 
 // SetError sets an error on ALL workloads. this is mostly
@@ -59,12 +78,13 @@ func (d *Deployment) SetError(err error) {
 
 // WorkloadWithID wrapper around workload type
 // that holds the global workload ID
+// Note: you never need to construct this manually
 type WorkloadWithID struct {
 	*Workload
 	ID WorkloadID
 }
 
-// SignatureRequest struct
+// SignatureRequest struct a signature request of a twin
 type SignatureRequest struct {
 	TwinID   uint32 `json:"twin_id"`
 	Required bool   `json:"required"`
@@ -94,7 +114,42 @@ type Signature struct {
 	Signature string `json:"signature"`
 }
 
-// SignatureRequirement struct
+// SignatureRequirement struct describes the signatures that are needed to be valid
+// for the node to accept the deployment
+// for example
+// SignatureRequirement{
+// 	WeightRequired: 1,
+// 	Requests: []gridtypes.SignatureRequest{
+// 		{
+// 			TwinID: twinID,
+// 			Weight: 1,
+// 		},
+// 	},
+// }
+// basically states that a total signature weight of 1 is required for the node to accept
+// the deployment.
+// the list of acceptable signatures is one from twin with `twinID` and his signature weight is 1
+// So, in this example this twin signature is enough.
+// You can build a more sophisticated signature request to allow multiple twins to sign for example
+// SignatureRequirement{
+// 	WeightRequired: 2,
+// 	Requests: []gridtypes.SignatureRequest{
+// 		{
+// 			TwinID: Twin1,
+// 			Weight: 1,
+// 		},
+// 		{
+// 			TwinID: Twin2,
+// 			Weight: 1,
+// 		},
+// 		{
+// 			TwinID: Twin3,
+// 			Required: true,
+// 			Weight: 1,
+// 		},
+// 	},
+// },
+// this means that twin3 must sign + one of either (twin1 or twin2) to have the right signature weight
 type SignatureRequirement struct {
 	Requests       []SignatureRequest `json:"requests"`
 	WeightRequired uint               `json:"weight_required"`
@@ -116,8 +171,11 @@ func (r *SignatureRequirement) Challenge(w io.Writer) error {
 	return nil
 }
 
-// ChallengeHash computes the hash of the challenge signed
-// by the user. used for validation
+// ChallengeHash computes the hash of the deployment. The hash is needed for the following
+// - signing the deployment (done automatically by call to "Sign")
+// - contract creation, the contract need to be created by this hash exactly BEFORE sending the
+//   deployment to the node
+// - node verifies the hash to make sure it matches hash of the contract
 func (d *Deployment) ChallengeHash() ([]byte, error) {
 	hash := md5.New()
 	if err := d.Challenge(hash); err != nil {
@@ -223,7 +281,8 @@ func (d *Deployment) Sign(twin uint32, sk ed25519.PrivateKey) error {
 	return nil
 }
 
-// Verify verifies user signature
+// Verify verifies user signatures is mainly used by the node
+// to verify that all attached signatures are valid.
 func (d *Deployment) Verify(getter KeyGetter) error {
 	message, err := d.ChallengeHash()
 	if err != nil {

@@ -775,6 +775,8 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 
 // Get node public namespace config
 func (n *networker) GetPublicConfig() (pkg.PublicConfig, error) {
+	// TODO: instea of loading, this actually must get
+	// from reality.
 	cfg, err := public.LoadPublicConfig(n.publicConfig)
 	if err != nil {
 		return pkg.PublicConfig{}, err
