@@ -744,10 +744,16 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	if err != nil {
 		return err
 	}
-	nodeID, err := sub.GetNodeByPubKey(identity.PublicKey)
+	twin, err := sub.GetTwinByPubKey(identity.PublicKey)
 	if err != nil {
-		return errors.Wrap(err, "failed to get node by public key")
+		return errors.Wrap(err, "failed to get node twin by public key")
 	}
+
+	nodeID, err := sub.GetNodeByTwinID(twin)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node by twin id")
+	}
+
 	node, err := sub.GetNode(nodeID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get node with id: %d", nodeID)

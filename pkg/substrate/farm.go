@@ -10,9 +10,8 @@ import (
 
 // CertificationType is a substrate enum
 type CertificationType struct {
-	IsNone   bool
-	IsSilver bool
-	IsGold   bool
+	IsDiy       bool
+	IsCertified bool
 }
 
 // Decode implementation for the enum type
@@ -24,11 +23,9 @@ func (p *CertificationType) Decode(decoder scale.Decoder) error {
 
 	switch b {
 	case 0:
-		p.IsNone = true
+		p.IsDiy = true
 	case 1:
-		p.IsSilver = true
-	case 2:
-		p.IsGold = true
+		p.IsCertified = true
 	default:
 		return fmt.Errorf("unknown CertificateType value")
 	}

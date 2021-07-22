@@ -101,15 +101,16 @@ type Node struct {
 	Location     Location
 	CountryID    types.U32
 	CityID       types.U32
-	Address      AccountID
-	Role         Role
 	PublicConfig OptionPublicConfig
 }
 
-//GetNodeByPubKey by an SS58 address
-func (s *Substrate) GetNodeByPubKey(pk []byte) (uint32, error) {
-
-	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "NodesByPubkeyID", pk, nil)
+//GetNodeByTwinID gets a node by twin id
+func (s *Substrate) GetNodeByTwinID(twin uint32) (uint32, error) {
+	bytes, err := types.EncodeToBytes(twin)
+	if err != nil {
+		return 0, err
+	}
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "NodeIdByTwinID", bytes, nil)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create substrate query key")
 	}
@@ -173,9 +174,13 @@ func (s *Substrate) getNode(key types.StorageKey) (*Node, error) {
 
 // CreateNode creates a node
 func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
+	if node.TwinID == 0 {
+		return 0, fmt.Errorf("twin id is required")
+	}
+
 	c, err := types.NewCall(s.meta, "TfgridModule.create_node",
 		node.FarmID, node.Resources, node.Location,
-		node.CountryID, node.CityID, node.Role, node.PublicConfig,
+		node.CountryID, node.CityID, node.PublicConfig,
 	)
 
 	if err != nil {
@@ -186,19 +191,18 @@ func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 		return 0, errors.Wrap(err, "failed to create node")
 	}
 
-	identity, err := Identity(sk)
-	if err != nil {
-		return 0, err
-	}
-
-	return s.GetNodeByPubKey(identity.PublicKey)
+	return s.GetNodeByTwinID(uint32(node.TwinID))
 
 }
 
 // UpdateNode updates a node
 func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
+	if node.TwinID == 0 {
+		return 0, fmt.Errorf("twin id is required")
+	}
+
 	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node.FarmID, node.Resources, node.Location,
-		node.CountryID, node.CityID, node.Role, node.PublicConfig,
+		node.CountryID, node.CityID, node.PublicConfig,
 	)
 
 	if err != nil {
@@ -209,10 +213,5 @@ func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 		return 0, errors.Wrap(err, "failed to update node")
 	}
 
-	identity, err := Identity(sk)
-	if err != nil {
-		return 0, err
-	}
-
-	return s.GetNodeByPubKey(identity.PublicKey)
+	return s.GetNodeByTwinID(uint32(node.TwinID))
 }

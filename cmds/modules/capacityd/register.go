@@ -112,15 +112,29 @@ func registerNode(
 	log.Info().Msg("registering node on blockchain")
 
 	sk := ed25519.PrivateKey(mgr.PrivateKey(ctx))
-	identity, err := substrate.Identity(sk)
-	if err != nil {
-		return 0, err
+
+	if _, err := sub.EnsureAccount(sk); err != nil {
+		return 0, errors.Wrap(err, "failed to ensure account")
 	}
 
-	nodeID, err := sub.GetNodeByPubKey(identity.PublicKey)
+	// make sure the node twin exists
+	cfg := yggdrasil.GenerateConfig(sk)
+	address, err := cfg.Address()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get yggdrasil address")
+	}
+
+	twinID, err := ensureTwin(sub, sk, address)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to ensure twin")
+	}
+
+	nodeID, err := sub.GetNodeByTwinID(twinID)
 	if err != nil && !errors.Is(err, substrate.ErrNotFound) {
 		return 0, err
 	} else if err == nil {
+		// node exists. we validate everything is good
+		// otherwise we update the node
 		log.Debug().Uint32("node", nodeID).Msg("node already found on blockchain")
 		node, err := sub.GetNode(nodeID)
 		if err != nil {
@@ -145,23 +159,6 @@ func registerNode(
 		return uint32(node.TwinID), err
 	}
 
-	if _, err := sub.EnsureAccount(sk); err != nil {
-		return 0, errors.Wrap(err, "failed to ensure account")
-	}
-
-	// so here is node not found. we need to create one.
-	// first we need to get the ygg IP
-	cfg := yggdrasil.GenerateConfig(sk)
-	address, err := cfg.Address()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get yggdrasil address")
-	}
-
-	twinID, err := ensureTwin(sub, sk, address)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to ensure twin")
-	}
-
 	// create node
 	_, err = sub.CreateNode(sk, substrate.Node{
 		FarmID:       types.U32(env.FarmerID),
@@ -170,7 +167,6 @@ func registerNode(
 		Location:     location,
 		CountryID:    0,
 		CityID:       0,
-		Role:         substrate.Role{IsNode: true},
 		PublicConfig: pubCfg,
 	})
 

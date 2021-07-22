@@ -30,7 +30,7 @@ func (t *Twin) IPAddress() net.IP {
 
 // GetTwinByPubKey gets a twin with public key
 func (s *Substrate) GetTwinByPubKey(pk []byte) (uint32, error) {
-	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinsByPubkeyID", pk, nil)
+	key, err := types.CreateStorageKey(s.meta, "TfgridModule", "TwinIdByAccountID", pk, nil)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create substrate query key")
 	}
