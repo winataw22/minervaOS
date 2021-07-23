@@ -201,7 +201,7 @@ func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 		return 0, fmt.Errorf("twin id is required")
 	}
 
-	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node.FarmID, node.Resources, node.Location,
+	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node.ID, node.FarmID, node.Resources, node.Location,
 		node.CountryID, node.CityID, node.PublicConfig,
 	)
 

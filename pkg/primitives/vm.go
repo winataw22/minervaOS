@@ -302,6 +302,13 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 		}
 	}
 
+	if cfg.Network.Planetary {
+		tapName := tapNameFromName(wl.ID, "ygg")
+		if err := network.RemoveTap(ctx, tapName); err != nil {
+			return errors.Wrap(err, "could not clean up tap device")
+		}
+	}
+
 	if len(cfg.Network.PublicIP) > 0 {
 		deployment := provision.GetDeployment(ctx)
 		ipWl, err := deployment.Get(cfg.Network.PublicIP)

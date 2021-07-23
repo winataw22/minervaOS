@@ -66,6 +66,7 @@ package client
 
 import (
 	"context"
+	"net"
 
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -143,6 +144,17 @@ func (n *NodeClient) Counters(ctx context.Context) (total gridtypes.Capacity, us
 func (n *NodeClient) NetworkListWGPorts(ctx context.Context) ([]uint16, error) {
 	const cmd = "zos.network.list_wg_ports"
 	var result []uint16
+
+	if err := n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (n *NodeClient) NetworkListInterfaces(ctx context.Context) (map[string][]net.IP, error) {
+	const cmd = "zos.network.interfaces"
+	var result map[string][]net.IP
 
 	if err := n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
 		return nil, err

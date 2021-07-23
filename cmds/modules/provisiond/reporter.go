@@ -72,6 +72,7 @@ type Report struct {
 // Reporter structure
 type Reporter struct {
 	cl        zbus.Client
+	nodeID    uint32
 	sk        ed25519.PrivateKey
 	engine    provision.Engine
 	queue     *dque.DQue
@@ -83,7 +84,7 @@ func reportBuilder() interface{} {
 }
 
 // NewReporter creates a new capacity reporter
-func NewReporter(engine provision.Engine, cl zbus.Client, root string) (*Reporter, error) {
+func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root string) (*Reporter, error) {
 	env, err := environment.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get runtime environment")
@@ -114,6 +115,7 @@ func NewReporter(engine provision.Engine, cl zbus.Client, root string) (*Reporte
 	return &Reporter{
 		cl:        cl,
 		engine:    engine,
+		nodeID:    nodeID,
 		sk:        sk,
 		queue:     queue,
 		substrate: sub,
@@ -188,13 +190,9 @@ func (r *Reporter) synchronize(ctx context.Context, reported []Consumption) erro
 		local[report.ContractID] = report
 	}
 
-	identity, err := substrate.Identity(r.sk)
-	if err != nil {
-		return errors.Wrap(err, "failed to get node identity")
-	}
 	// the idea here is that we bring ALL active node contracts from chain.
 	// then compare it with what we have atm (the one we just reported)
-	contracts, err := r.substrate.GetNodeContracts(identity.PublicKey, substrate.ContractState{IsCreated: true})
+	contracts, err := r.substrate.GetNodeContracts(r.nodeID, substrate.ContractState{IsCreated: true})
 	if err != nil {
 		return err
 	}

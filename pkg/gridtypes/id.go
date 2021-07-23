@@ -7,7 +7,10 @@ import (
 )
 
 var (
-	nameMatch = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	nameMatch     = regexp.MustCompile("^[a-zA-Z0-9_]+$")
+	reservedNames = map[Name]struct{}{
+		"ygg": {},
+	}
 )
 
 // DeploymentID is a global unique id for a deployment
@@ -60,6 +63,9 @@ func IsValidName(n Name) error {
 		return fmt.Errorf("unsupported character in workload name")
 	}
 
+	if _, ok := reservedNames[n]; ok {
+		return fmt.Errorf("invalid name '%s' is reserved", n)
+	}
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
@@ -107,6 +108,70 @@ func setupPublicBridge(br *netlink.Bridge) error {
 	}
 
 	return nil
+}
+
+// GetPublicSetup gets the public setup from reality
+// or error if node has no public setup
+func GetPublicSetup() (pkg.PublicConfig, error) {
+	if !namespace.Exists(types.PublicNamespace) {
+		return pkg.PublicConfig{}, fmt.Errorf("no public config")
+	}
+
+	namespace, err := namespace.GetByName(types.PublicNamespace)
+	if err != nil {
+		return pkg.PublicConfig{}, err
+	}
+	var cfg pkg.PublicConfig
+	err = namespace.Do(func(_ ns.NetNS) error {
+		link, err := netlink.LinkByName(types.PublicIface)
+		if err != nil {
+			return errors.Wrap(err, "failed to get public interface")
+		}
+
+		ips, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return errors.Wrap(err, "failed to get public ipv4")
+		}
+		if len(ips) > 0 {
+			cfg.IPv4 = gridtypes.IPNet{IPNet: *ips[0].IPNet}
+		}
+		routes, err := netlink.RouteListFiltered(netlink.FAMILY_V4, nil, 0)
+		if err != nil {
+			return errors.Wrap(err, "failed to get ipv4 default gateway")
+		}
+		for _, r := range routes {
+			if r.Dst == nil {
+				cfg.GW4 = r.Gw
+				break
+			}
+		}
+
+		ips, err = netlink.AddrList(link, netlink.FAMILY_V6)
+		if err != nil {
+			return errors.Wrap(err, "failed to get public ipv4")
+		}
+
+		for _, ip := range ips {
+			if ip.IP.IsGlobalUnicast() && !ifaceutil.IsULA(ip.IP) {
+				cfg.IPv6 = gridtypes.IPNet{IPNet: *ips[0].IPNet}
+			}
+		}
+
+		routes, err = netlink.RouteListFiltered(netlink.FAMILY_V6, nil, 0)
+		if err != nil {
+			return errors.Wrap(err, "failed to get ipv4 default gateway")
+		}
+		for _, r := range routes {
+			if r.Dst == nil {
+				cfg.GW6 = r.Gw
+				break
+			}
+		}
+
+		return nil
+	})
+
+	return cfg, err
 }
 
 // EnsurePublicSetup create the public setup, it's okay to have inf == nil

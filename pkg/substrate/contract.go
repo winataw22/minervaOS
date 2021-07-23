@@ -53,17 +53,14 @@ func (r ContractState) Encode(encoder scale.Encoder) (err error) {
 // Contract structure
 type Contract struct {
 	Versioned
-	ContractID         types.U64
-	TwinID             types.U32
-	Node               AccountID
-	Data               []byte
-	DeploymentHash     string
-	PublicIPsCount     types.U32
-	State              ContractState
-	LastUpdated        types.U64
-	PreviousNUReported types.U64
-	PublicIPs          []PublicIP
-	UnBilled           types.U64
+	ContractID     types.U64
+	TwinID         types.U32
+	Node           types.U32
+	DeploymentData []byte
+	DeploymentHash string
+	PublicIPsCount types.U32
+	State          ContractState
+	PublicIPs      []PublicIP
 }
 
 // GetContract we should not have calls to create contract, instead only get
@@ -82,12 +79,16 @@ func (s *Substrate) GetContract(id uint64) (*Contract, error) {
 }
 
 // GetNodeContracts gets all contracts on a node (pk) in given state
-func (s *Substrate) GetNodeContracts(pk []byte, state ContractState) ([]Contract, error) {
+func (s *Substrate) GetNodeContracts(node uint32, state ContractState) ([]Contract, error) {
+	nodeBytes, err := types.EncodeToBytes(node)
+	if err != nil {
+		return nil, err
+	}
 	stateBytes, err := types.EncodeToBytes(state)
 	if err != nil {
 		return nil, err
 	}
-	key, err := types.CreateStorageKey(s.meta, "SmartContractModule", "NodeContracts", pk, stateBytes, nil)
+	key, err := types.CreateStorageKey(s.meta, "SmartContractModule", "NodeContracts", nodeBytes, stateBytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create substrate query key")
 	}

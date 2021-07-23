@@ -564,8 +564,17 @@ func (n networker) Addrs(iface string, netns string) ([]net.IP, error) {
 		if err != nil {
 			return errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
 		}
-		ips = make([]net.IP, len(addrs))
+		ips = make([]net.IP, 0, len(addrs))
 		for i, addr := range addrs {
+			ip := addr.IP
+			if ip6 := ip.To16(); ip6 != nil {
+				// ipv6
+				if !ip6.IsGlobalUnicast() || ifaceutil.IsULA(ip6) {
+					// skip if not global or is ula address
+					continue
+				}
+			}
+
 			ips[i] = addr.IP
 		}
 		return nil
@@ -759,6 +768,11 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 		return errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 	}
 
+	cfg, err = public.GetPublicSetup()
+	if err != nil {
+		return errors.Wrap(err, "failed to get public setup")
+	}
+
 	subCfg := substrate.OptionPublicConfig{
 		HasValue: true,
 		AsValue: substrate.PublicConfig{
@@ -783,11 +797,11 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 func (n *networker) GetPublicConfig() (pkg.PublicConfig, error) {
 	// TODO: instea of loading, this actually must get
 	// from reality.
-	cfg, err := public.LoadPublicConfig(n.publicConfig)
+	cfg, err := public.GetPublicSetup()
 	if err != nil {
 		return pkg.PublicConfig{}, err
 	}
-	return *cfg, nil
+	return cfg, nil
 }
 
 func (n *networker) networkOf(id string) (nr pkg.Network, err error) {

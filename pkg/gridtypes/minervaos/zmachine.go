@@ -151,6 +151,12 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 		}
 	}
 
+	for _, ifc := range v.Network.Interfaces {
+		if ifc.Network == "ygg" { //reserved temporary
+			return fmt.Errorf("ygg is not a valid network name")
+		}
+	}
+
 	return nil
 }
 

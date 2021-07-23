@@ -52,16 +52,8 @@ func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
 // WithSubstrate sets the substrate client. If set it will
 // be used by the engine to fetch (and validate) the deployment contract
 // then contract with be available on the deployment context
-func WithSubstrate(sk ed25519.PrivateKey, sub *substrate.Substrate) EngineOption {
-	if len(sk) != ed25519.PrivateKeySize {
-		panic("invalid node private key")
-	}
-	kp, err := substrate.Identity(sk)
-	if err != nil {
-		panic(fmt.Sprintf("failed to get node identity: %s", err))
-	}
-
-	return &withSubstrate{kp.Address, sub}
+func WithSubstrate(node uint32, sub *substrate.Substrate) EngineOption {
+	return &withSubstrate{node, sub}
 }
 
 // WithRerunAll if set forces the engine to re-run all reservations
@@ -105,8 +97,8 @@ type NativeEngine struct {
 	order    []gridtypes.WorkloadType
 	rerunAll bool
 	//substrate specific attributes
-	address string
-	sub     *substrate.Substrate
+	nodeID uint32
+	sub    *substrate.Substrate
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -138,12 +130,12 @@ func (o *withAdminsKeyGetter) apply(e *NativeEngine) {
 }
 
 type withSubstrate struct {
-	address string
-	sub     *substrate.Substrate
+	nodeID uint32
+	sub    *substrate.Substrate
 }
 
 func (o *withSubstrate) apply(e *NativeEngine) {
-	e.address = o.address
+	e.nodeID = o.nodeID
 	e.sub = o.sub
 }
 
@@ -427,7 +419,7 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 
 	ctx = context.WithValue(ctx, contractKey{}, contract)
 
-	if contract.Node.String() != e.address {
+	if uint32(contract.Node) != e.nodeID {
 		return nil, fmt.Errorf("invalid node address in contract")
 	}
 

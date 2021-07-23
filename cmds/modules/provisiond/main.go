@@ -22,6 +22,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
 	"github.com/threefoldtech/zos/pkg/rmb"
+	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -208,6 +209,21 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
 
+	kp, err := substrate.Identity(sk)
+	if err != nil {
+		return errors.Wrap(err, "failed to get substrate keypair from secure key")
+	}
+
+	twin, err := sub.GetTwinByPubKey(kp.PublicKey)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node twin id")
+	}
+
+	node, err := sub.GetNodeByTwinID(twin)
+	if err != nil {
+		return errors.Wrap(err, "failed to get node from twin")
+	}
+
 	queues := filepath.Join(rootDir, "queues")
 	if err := os.MkdirAll(queues, 0755); err != nil {
 		return errors.Wrap(err, "failed to create storage for queues")
@@ -219,7 +235,7 @@ func action(cli *cli.Context) error {
 		queues,
 		provision.WithTwins(users),
 		provision.WithAdmins(admins),
-		provision.WithSubstrate(sk, sub),
+		provision.WithSubstrate(node, sub),
 		// set priority to some reservation types on boot
 		// so we always need to make sure all volumes and networks
 		// comes first.
@@ -257,7 +273,7 @@ func action(cli *cli.Context) error {
 		log.Error().Err(err).Msg("failed to mark module as booted")
 	}
 
-	reporter, err := NewReporter(engine, cl, queues)
+	reporter, err := NewReporter(engine, node, cl, queues)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup capacity reporter")
 	}
