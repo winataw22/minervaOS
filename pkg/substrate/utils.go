@@ -93,30 +93,30 @@ func (s *Substrate) sign(e *types.Extrinsic, signer signature.KeyringPair, o typ
 	return nil
 }
 
-func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) error {
+func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) (hash types.Hash, err error) {
 
 	// Create the extrinsic
 	ext := types.NewExtrinsic(call)
 
 	genesisHash, err := s.cl.RPC.Chain.GetBlockHash(0)
 	if err != nil {
-		return errors.Wrap(err, "failed to get genesisHash")
+		return hash, errors.Wrap(err, "failed to get genesisHash")
 	}
 
 	rv, err := s.cl.RPC.State.GetRuntimeVersionLatest()
 	if err != nil {
-		return err
+		return hash, err
 	}
 
 	identity, err := Identity(sk)
 	if err != nil {
-		return err
+		return hash, err
 	}
 
 	//node.Address =identity.PublicKey
 	account, err := s.getAccount(identity, s.meta)
 	if err != nil {
-		return errors.Wrap(err, "failed to get account")
+		return hash, errors.Wrap(err, "failed to get account")
 	}
 
 	o := types.SignatureOptions{
@@ -131,24 +131,25 @@ func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) error {
 
 	err = s.sign(&ext, identity, o)
 	if err != nil {
-		return errors.Wrap(err, "failed to sign")
+		return hash, errors.Wrap(err, "failed to sign")
 	}
 
 	// Send the extrinsic
 	sub, err := s.cl.RPC.Author.SubmitAndWatchExtrinsic(ext)
 	if err != nil {
-		return errors.Wrap(err, "failed to submit extrinsic")
+		return hash, errors.Wrap(err, "failed to submit extrinsic")
 	}
 
 	defer sub.Unsubscribe()
 
 	for event := range sub.Chan() {
 		if event.IsFinalized {
+			hash = event.AsFinalized
 			break
 		} else if event.IsDropped || event.IsInvalid {
-			return fmt.Errorf("failed to make call")
+			return hash, fmt.Errorf("failed to make call")
 		}
 	}
 
-	return nil
+	return hash, nil
 }

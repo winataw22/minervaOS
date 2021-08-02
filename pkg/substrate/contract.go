@@ -63,6 +63,23 @@ type Contract struct {
 	PublicIPs      []PublicIP
 }
 
+// CreateContract creates a contract for deployment
+func (s *Substrate) CreateContract(sk ed25519.PrivateKey, node uint32, body []byte, hash string, publicIPs uint32) (uint64, error) {
+	c, err := types.NewCall(s.meta, "SmartContractModule.create_contract",
+		node, body, hash, publicIPs,
+	)
+
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create call")
+	}
+
+	if _, err := s.call(sk, c); err != nil {
+		return 0, errors.Wrap(err, "failed to create node")
+	}
+
+	return s.GetContractWithHash(node, hash)
+}
+
 // GetContract we should not have calls to create contract, instead only get
 func (s *Substrate) GetContract(id uint64) (*Contract, error) {
 	bytes, err := types.EncodeToBytes(id)
@@ -76,6 +93,33 @@ func (s *Substrate) GetContract(id uint64) (*Contract, error) {
 	}
 
 	return s.getContract(key)
+}
+
+// GetContractWithHash gets a contract given the node id and hash
+func (s *Substrate) GetContractWithHash(node uint32, hash string) (uint64, error) {
+	nodeBytes, err := types.EncodeToBytes(node)
+	if err != nil {
+		return 0, err
+	}
+	hashBytes, err := types.EncodeToBytes(hash)
+	if err != nil {
+		return 0, err
+	}
+	key, err := types.CreateStorageKey(s.meta, "SmartContractModule", "ContractIDByNodeIDAndHash", nodeBytes, hashBytes, nil)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create substrate query key")
+	}
+	var contract types.U64
+	_, err = s.cl.RPC.State.GetStorageLatest(key, &contract)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to lookup contracts")
+	}
+
+	if contract == 0 {
+		return 0, errors.Wrap(ErrNotFound, "contract not found")
+	}
+
+	return uint64(contract), nil
 }
 
 // GetNodeContracts gets all contracts on a node (pk) in given state
@@ -154,7 +198,7 @@ func (s *Substrate) Report(sk ed25519.PrivateKey, consumptions []Consumption) er
 		return errors.Wrap(err, "failed to create call")
 	}
 
-	if err := s.call(sk, c); err != nil {
+	if _, err := s.call(sk, c); err != nil {
 		return errors.Wrap(err, "failed to create report")
 	}
 

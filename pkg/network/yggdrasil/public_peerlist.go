@@ -24,11 +24,11 @@ var PeerListFallback = Peers{
 
 // NodeInfo is the know information about an yggdrasil public node
 type NodeInfo struct {
-	Endpoint  string
-	Up        bool
-	Address   string
-	BoxPubKey string
-	LastSeen  int
+	Endpoint   string `json:"-"`
+	Up         bool   `json:"up"`
+	BoxPubKey  string `json:"key"`
+	LastSeen   int    `json:"last_seen"`
+	ProtoMinor int    `json:"proto_minor"`
 }
 
 // Peers is a peers list
@@ -51,6 +51,10 @@ func FetchPeerList() (Peers, error) {
 	var peers Peers
 	for _, nodes := range pl {
 		for endpoint, node := range nodes {
+			if node.ProtoMinor != 4 {
+				continue
+			}
+
 			node.Endpoint = endpoint
 			peers = append(peers, node)
 		}

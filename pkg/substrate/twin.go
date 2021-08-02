@@ -93,8 +93,27 @@ func (s *Substrate) CreateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error)
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if err := s.call(sk, c); err != nil {
+	if _, err := s.call(sk, c); err != nil {
 		return 0, errors.Wrap(err, "failed to create twin")
+	}
+
+	identity, err := Identity(sk)
+	if err != nil {
+		return 0, err
+	}
+
+	return s.GetTwinByPubKey(identity.PublicKey)
+}
+
+// UpdateTwin updates a twin
+func (s *Substrate) UpdateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
+	c, err := types.NewCall(s.meta, "TfgridModule.update_twin", ip.String())
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create call")
+	}
+
+	if _, err := s.call(sk, c); err != nil {
+		return 0, errors.Wrap(err, "failed to update twin")
 	}
 
 	identity, err := Identity(sk)

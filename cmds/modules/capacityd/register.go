@@ -182,12 +182,22 @@ func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uin
 	if err != nil {
 		return 0, err
 	}
-	twin, err := sub.GetTwinByPubKey(identity.PublicKey)
+	twinID, err := sub.GetTwinByPubKey(identity.PublicKey)
 	if errors.Is(err, substrate.ErrNotFound) {
 		return sub.CreateTwin(sk, ip)
 	} else if err != nil {
 		return 0, errors.Wrap(err, "failed to list twins")
 	}
 
-	return twin, nil
+	twin, err := sub.GetTwin(twinID)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get twin object")
+	}
+
+	if twin.IP == ip.String() {
+		return twinID, nil
+	}
+
+	// update twin to new ip
+	return sub.UpdateTwin(sk, ip)
 }

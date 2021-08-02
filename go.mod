@@ -20,6 +20,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/ethereum/go-ethereum v1.10.4 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
 	github.com/gizak/termui/v3 v3.1.0
@@ -39,7 +40,6 @@ require (
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/klauspost/compress v1.12.1 // indirect
 	github.com/lestrrat-go/jwx v1.1.7
-	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.7 // indirect
 	github.com/mdlayher/netlink v1.4.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
@@ -67,12 +67,12 @@ require (
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
-	github.com/yggdrasil-network/yggdrasil-go v0.3.16
+	github.com/yggdrasil-network/yggdrasil-go v0.4.0
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/crypto v0.0.0-20210415154028-4f45737414dc
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
-	golang.org/x/net v0.0.0-20210420210106-798c2154c571 // indirect
-	golang.org/x/sys v0.0.0-20210420205809-ac73e9fd8988
+	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b // indirect
+	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	google.golang.org/appengine v1.6.7 // indirect
@@ -80,6 +80,7 @@ require (
 	google.golang.org/grpc v1.37.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
+	zombiezen.com/go/capnproto2 v2.18.0+incompatible // indirect
 )
 
 replace github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
