@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/stubs"
-	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/threefoldtech/zos/pkg/upgrade"
 
 	"github.com/cenkalti/backoff/v3"
@@ -108,16 +107,7 @@ func main() {
 		}
 		stub := stubs.NewIdentityManagerStub(client)
 		nodeID := stub.NodeID(ctx)
-		fmt.Println("NodeID:", nodeID)
-
-		sk := stub.PrivateKey(ctx)
-		identity, err := substrate.Identity(sk)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "failed to get node identity:", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("Address:", identity.Address)
+		fmt.Println(nodeID)
 		os.Exit(0)
 	}
 

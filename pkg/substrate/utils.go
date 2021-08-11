@@ -1,10 +1,8 @@
 package substrate
 
 import (
-	"crypto/ed25519"
 	"fmt"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v3/signature"
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	"github.com/pkg/errors"
 	"github.com/vedhavyas/go-subkey"
@@ -36,7 +34,7 @@ func signBytes(data []byte, privateKeyURI string) ([]byte, error) {
 }
 
 // Sign adds a signature to the extrinsic
-func (s *Substrate) sign(e *types.Extrinsic, signer signature.KeyringPair, o types.SignatureOptions) error {
+func (s *Substrate) sign(e *types.Extrinsic, signer *Identity, o types.SignatureOptions) error {
 	if e.Type() != types.ExtrinsicVersion4 {
 		return fmt.Errorf("unsupported extrinsic version: %v (isSigned: %v, type: %v)", e.Version, e.IsSigned(), e.Type())
 	}
@@ -93,8 +91,7 @@ func (s *Substrate) sign(e *types.Extrinsic, signer signature.KeyringPair, o typ
 	return nil
 }
 
-func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) (hash types.Hash, err error) {
-
+func (s *Substrate) call(identity *Identity, call types.Call) (hash types.Hash, err error) {
 	// Create the extrinsic
 	ext := types.NewExtrinsic(call)
 
@@ -104,11 +101,6 @@ func (s *Substrate) call(sk ed25519.PrivateKey, call types.Call) (hash types.Has
 	}
 
 	rv, err := s.cl.RPC.State.GetRuntimeVersionLatest()
-	if err != nil {
-		return hash, err
-	}
-
-	identity, err := Identity(sk)
 	if err != nil {
 		return hash, err
 	}

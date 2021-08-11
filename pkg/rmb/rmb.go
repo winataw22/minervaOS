@@ -66,7 +66,7 @@ func (m *messageBusSubrouter) call(ctx context.Context, route string, payload []
 	if ok {
 		defer func() {
 			if rec := recover(); rec != nil {
-				err = fmt.Errorf("handler panicked with: %s", err)
+				err = fmt.Errorf("handler panicked with: %s", rec)
 			}
 		}()
 

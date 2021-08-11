@@ -3,7 +3,6 @@ package provisiond
 import (
 	"context"
 	"crypto/ed25519"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -209,7 +208,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
 
-	kp, err := substrate.Identity(sk)
+	kp, err := substrate.IdentityFromSecureKey(sk)
 	if err != nil {
 		return errors.Wrap(err, "failed to get substrate keypair from secure key")
 	}
@@ -260,7 +259,7 @@ func action(cli *cli.Context) error {
 		Msg("starting provision module")
 
 	// call the runtime upgrade before running engine
-	provisioners.RuntimeUpgrade(ctx)
+	provisioners.InitializeZDB(ctx)
 
 	// spawn the engine
 	go func() {
@@ -312,22 +311,12 @@ func action(cli *cli.Context) error {
 func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter primitives.Counters, err error) {
 	// fill in reserved storage
 	storage := stubs.NewStorageModuleStub(cl)
-	fs, err := storage.GetCacheFS(context.TODO())
+	fs, err := storage.Cache(context.TODO())
 	if err != nil {
 		return counter, err
 	}
 
-	var v *primitives.AtomicUnit
-	switch fs.DiskType {
-	case zos.HDDDevice:
-		v = &counter.HRU
-	case zos.SSDDevice:
-		v = &counter.SRU
-	default:
-		return counter, fmt.Errorf("unknown cache disk type '%s'", fs.DiskType)
-	}
-
-	v.Increment(fs.Usage.Size)
+	counter.SRU.Increment(fs.Usage.Size)
 
 	// we reserve 10% of memory to ZOS itself, with a min of 2G
 	counter.MRU.Increment(

@@ -73,7 +73,7 @@ type Report struct {
 type Reporter struct {
 	cl        zbus.Client
 	nodeID    uint32
-	sk        ed25519.PrivateKey
+	identity  substrate.Identity
 	engine    provision.Engine
 	queue     *dque.DQue
 	substrate *substrate.Substrate
@@ -109,14 +109,15 @@ func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root st
 		return nil, errors.Wrap(err, "failed to setup report persisted queue")
 	}
 
-	identity := stubs.NewIdentityManagerStub(cl)
-	sk := ed25519.PrivateKey(identity.PrivateKey(context.TODO()))
+	idMgr := stubs.NewIdentityManagerStub(cl)
+	sk := ed25519.PrivateKey(idMgr.PrivateKey(context.TODO()))
+	id, err := substrate.IdentityFromSecureKey(sk)
 
 	return &Reporter{
 		cl:        cl,
 		engine:    engine,
 		nodeID:    nodeID,
-		sk:        sk,
+		identity:  id,
 		queue:     queue,
 		substrate: sub,
 	}, nil
@@ -137,7 +138,7 @@ func (r *Reporter) pushOne() ([]Consumption, error) {
 	for _, cmp := range report.Consumption {
 		consumptions = append(consumptions, cmp.Consumption)
 	}
-	if err := r.substrate.Report(r.sk, consumptions); err != nil {
+	if err := r.substrate.Report(&r.identity, consumptions); err != nil {
 		return nil, errors.Wrap(err, "failed to publish consumption report")
 	}
 

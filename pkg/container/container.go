@@ -352,12 +352,16 @@ func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, e
 	if err != nil {
 		return result, err
 	}
-
 	spec, err := container.Spec(ctx)
 	if err != nil {
 		return result, err
 	}
+	info, err := container.Info(ctx)
+	if err != nil {
+		return pkg.Container{}, err
+	}
 
+	result.CreatedAt = info.CreatedAt
 	result.RootFS = spec.Root.Path
 	result.Name = container.ID()
 

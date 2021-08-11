@@ -76,8 +76,8 @@ func (p *testPool) FsType() string {
 	return "test"
 }
 
-func (p *testPool) Mounted() (string, bool) {
-	return p.Path(), true
+func (p *testPool) Mounted() (string, error) {
+	return p.Path(), nil
 }
 
 func (p *testPool) Mount() (string, error) {
@@ -90,14 +90,6 @@ func (p *testPool) MountWithoutScan() (string, error) {
 
 func (p *testPool) UnMount() error {
 	return fmt.Errorf("UnMount not implemented")
-}
-
-func (p *testPool) AddDevice(_ *filesystem.Device) error {
-	return fmt.Errorf("AddDevice not implemented")
-}
-
-func (p *testPool) RemoveDevice(_ *filesystem.Device) error {
-	return fmt.Errorf("RemoveDevice not implemented")
 }
 
 func (p *testPool) Type() zos.DeviceType {
@@ -123,8 +115,8 @@ func (p *testPool) RemoveVolume(name string) error {
 	return args.Error(1)
 }
 
-func (p *testPool) Devices() []*filesystem.Device {
-	return []*filesystem.Device{}
+func (p *testPool) Device() filesystem.Device {
+	return nil
 }
 
 func (p *testPool) Shutdown() error {
@@ -154,19 +146,9 @@ func TestCreateSubvol(t *testing.T) {
 		ptype: zos.SSDDevice,
 	}
 
-	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
-		usage: filesystem.Usage{
-			Size: 100000,
-			Used: 0,
-		},
-		ptype: zos.HDDDevice,
-	}
-
 	mod := Module{
-		pools: []filesystem.Pool{
-			pool1, pool2, pool3,
+		ssds: []filesystem.Pool{
+			pool1, pool2,
 		},
 	}
 
@@ -174,14 +156,13 @@ func TestCreateSubvol(t *testing.T) {
 		name: "sub",
 	}
 
-	pool1.On("AddVolume", "sub").Return(sub, nil)
+	pool2.On("AddVolume", "sub").Return(sub, nil)
 	sub.On("Limit", uint64(500)).Return(nil)
 
 	pool1.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
-	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvolWithQuota(500, "sub", zos.SSDDevice)
+	_, err := mod.createSubvolWithQuota(500, "sub")
 
 	require.NoError(err)
 }
@@ -220,8 +201,11 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	}
 
 	mod := Module{
-		pools: []filesystem.Pool{
-			pool1, pool2, pool3,
+		ssds: []filesystem.Pool{
+			pool1, pool2,
+		},
+		hdds: []filesystem.Pool{
+			pool3,
 		},
 	}
 
@@ -229,14 +213,14 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 		name: "sub",
 	}
 
-	pool1.On("AddVolume", "sub").Return(sub, nil)
+	pool2.On("AddVolume", "sub").Return(sub, nil)
 	sub.On("Limit", uint64(0)).Return(nil)
 
 	pool1.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.createSubvolWithQuota(0, "sub", zos.SSDDevice)
+	_, err := mod.createSubvolWithQuota(0, "sub")
 
 	require.NoError(err)
 }
@@ -275,15 +259,18 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	}
 
 	mod := Module{
-		pools: []filesystem.Pool{
-			pool1, pool2, pool3,
+		ssds: []filesystem.Pool{
+			pool1, pool2,
+		},
+		hdds: []filesystem.Pool{
+			pool3,
 		},
 	}
 
 	// from the data above the create subvol will prefer pool 2 because it
 	// after adding the subvol, it will still has more space.
 
-	_, err := mod.createSubvolWithQuota(20000, "sub", zos.SSDDevice)
+	_, err := mod.createSubvolWithQuota(20000, "sub")
 
 	require.EqualError(err, "Not enough space left in pools of this type ssd")
 }
@@ -322,7 +309,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 	}
 
 	mod := Module{
-		pools: []filesystem.Pool{
+		ssds: []filesystem.Pool{
 			pool1, pool2, pool3,
 		},
 	}
@@ -338,63 +325,9 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.VDiskFindCandidate(500)
+	_, err := mod.diskFindCandidate(500)
 
 	require.NoError(err)
-}
-
-func TestVDiskFindCandidatesWrongType(t *testing.T) {
-	require := require.New(t)
-
-	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
-		usage: filesystem.Usage{
-			Size: 10000,
-			Used: 100,
-		},
-		ptype: zos.SSDDevice,
-	}
-
-	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
-		usage: filesystem.Usage{
-			Size: 10000,
-			Used: 100,
-		},
-		ptype: zos.SSDDevice,
-	}
-
-	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
-		usage: filesystem.Usage{
-			Size: 100000,
-			Used: 0,
-		},
-		ptype: zos.HDDDevice,
-	}
-
-	mod := Module{
-		pools: []filesystem.Pool{
-			pool1, pool2, pool3,
-		},
-	}
-
-	sub := &testVolume{
-		name: vdiskVolumeName,
-	}
-
-	pool3.On("AddVolume", vdiskVolumeName).Return(sub, nil)
-
-	pool1.On("Volumes").Return([]filesystem.Volume{sub}, nil)
-	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
-	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
-
-	_, err := mod.VDiskFindCandidate(10000)
-	require.EqualError(err, "Not enough space left in pools of this type ssd")
-
 }
 
 func TestVDiskFindCandidatesNoSpace(t *testing.T) {
@@ -431,7 +364,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	}
 
 	mod := Module{
-		pools: []filesystem.Pool{
+		ssds: []filesystem.Pool{
 			pool1, pool2, pool3,
 		},
 	}
@@ -446,7 +379,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	pool2.On("Volumes").Return([]filesystem.Volume{}, nil)
 	pool3.On("Volumes").Return([]filesystem.Volume{}, nil)
 
-	_, err := mod.VDiskFindCandidate(10000)
+	_, err := mod.diskFindCandidate(10000)
 	require.NoError(err)
 
 	if ok := pool3.AssertCalled(t, "AddVolume", vdiskVolumeName); !ok {

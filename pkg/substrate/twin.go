@@ -1,7 +1,6 @@
 package substrate
 
 import (
-	"crypto/ed25519"
 	"net"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
@@ -87,38 +86,28 @@ func (s *Substrate) GetTwin(id uint32) (*Twin, error) {
 }
 
 // CreateTwin creates a twin
-func (s *Substrate) CreateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
+func (s *Substrate) CreateTwin(identity *Identity, ip net.IP) (uint32, error) {
 	c, err := types.NewCall(s.meta, "TfgridModule.create_twin", ip.String())
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(sk, c); err != nil {
+	if _, err := s.call(identity, c); err != nil {
 		return 0, errors.Wrap(err, "failed to create twin")
-	}
-
-	identity, err := Identity(sk)
-	if err != nil {
-		return 0, err
 	}
 
 	return s.GetTwinByPubKey(identity.PublicKey)
 }
 
 // UpdateTwin updates a twin
-func (s *Substrate) UpdateTwin(sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
+func (s *Substrate) UpdateTwin(identity *Identity, ip net.IP) (uint32, error) {
 	c, err := types.NewCall(s.meta, "TfgridModule.update_twin", ip.String())
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(sk, c); err != nil {
+	if _, err := s.call(identity, c); err != nil {
 		return 0, errors.Wrap(err, "failed to update twin")
-	}
-
-	identity, err := Identity(sk)
-	if err != nil {
-		return 0, err
 	}
 
 	return s.GetTwinByPubKey(identity.PublicKey)

@@ -10,7 +10,6 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/storage"
 	"github.com/threefoldtech/zos/pkg/utils"
 )
@@ -62,13 +61,6 @@ func action(cli *cli.Context) error {
 	}
 
 	server.Register(zbus.ObjectID{Name: "storage", Version: "0.0.1"}, storageModule)
-
-	vdiskModule, err := storage.NewVDiskModule(storageModule)
-	if err != nil {
-		log.Error().Err(err).Bool("limited-cache", app.CheckFlag(app.LimitedCache)).Msg("failed to initialize virtual disk module")
-	} else {
-		server.Register(zbus.ObjectID{Name: "vdisk", Version: "0.0.1"}, vdiskModule)
-	}
 
 	log.Info().
 		Str("broker", msgBrokerCon).

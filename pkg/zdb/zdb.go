@@ -20,6 +20,7 @@ type Client interface {
 	Namespaces() ([]string, error)
 	NamespaceSetSize(name string, size uint64) error
 	NamespaceSetPassword(name, password string) error
+	NamespaceSetMode(name, mode string) error
 	NamespaceSetPublic(name string, public bool) error
 	DBSize() (uint64, error)
 }

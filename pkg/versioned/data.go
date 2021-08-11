@@ -127,7 +127,9 @@ func WriteFile(filename string, version Version, data []byte, perm os.FileMode) 
 	if err != nil {
 		return err
 	}
-	_, err = writer.Write(data)
+	if _, err = writer.Write(data); err != nil {
+		return err
+	}
 
-	return err
+	return file.Sync()
 }

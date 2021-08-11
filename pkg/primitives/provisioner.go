@@ -1,8 +1,6 @@
 package primitives
 
 import (
-	"context"
-
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -25,20 +23,16 @@ func NewPrimitivesProvisioner(zbus zbus.Client) *Primitives {
 	}
 
 	provisioners := map[gridtypes.WorkloadType]provision.DeployFunction{
-		// zos.ContainerType:      p.containerProvision,
-		zos.ZMountType:  p.zMountProvision,
-		zos.NetworkType: p.networkProvision,
-		zos.ZDBType:     p.zdbProvision,
-		// zos.KubernetesType:     p.kubernetesProvision,
+		zos.ZMountType:   p.zMountProvision,
+		zos.NetworkType:  p.networkProvision,
+		zos.ZDBType:      p.zdbProvision,
 		zos.ZMachineType: p.virtualMachineProvision,
 		zos.PublicIPType: p.publicIPProvision,
 	}
 	decommissioners := map[gridtypes.WorkloadType]provision.RemoveFunction{
-		// zos.ContainerType:      p.containerDecommission,
-		zos.ZMountType:  p.zMountDecommission,
-		zos.NetworkType: p.networkDecommission,
-		zos.ZDBType:     p.zdbDecommission,
-		// zos.KubernetesType:     p.kubernetesDecomission,
+		zos.ZMountType:   p.zMountDecommission,
+		zos.NetworkType:  p.networkDecommission,
+		zos.ZDBType:      p.zdbDecommission,
 		zos.ZMachineType: p.vmDecomission,
 		zos.PublicIPType: p.publicIPDecomission,
 	}
@@ -51,9 +45,4 @@ func NewPrimitivesProvisioner(zbus zbus.Client) *Primitives {
 	p.Provisioner = provision.NewMapProvisioner(provisioners, decommissioners, updaters)
 
 	return p
-}
-
-// RuntimeUpgrade runs upgrade needed when provision daemon starts
-func (p *Primitives) RuntimeUpgrade(ctx context.Context) {
-	p.upgradeRunningZdb(ctx)
 }

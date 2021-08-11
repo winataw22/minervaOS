@@ -3,6 +3,7 @@ package filesystem
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -21,6 +22,17 @@ func (t *TestExecuter) run(ctx context.Context, name string, args ...string) ([]
 
 	result := t.Called(inputs...)
 	return result.Get(0).([]byte), result.Error(1)
+}
+
+type TestMap map[string]interface{}
+
+func (m TestMap) Bytes() []byte {
+	bytes, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+
+	return bytes
 }
 
 func TestGetMountTarget(t *testing.T) {

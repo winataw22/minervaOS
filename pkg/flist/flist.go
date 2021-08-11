@@ -23,7 +23,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -64,17 +63,17 @@ type volumeAllocator interface {
 	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
 	// It is up to the caller to handle such a situation and decide if he wants
 	// to try again on a different devicetype
-	CreateFilesystem(ctx context.Context, name string, size gridtypes.Unit, poolType pkg.DeviceType) (pkg.Filesystem, error)
+	VolumeCreate(ctx context.Context, name string, size gridtypes.Unit) (pkg.Volume, error)
 
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
 	// All data contained in the filesystem will be lost, and the
 	// space which has been reserved for this filesystem will be reclaimed.
-	ReleaseFilesystem(ctx context.Context, name string) error
+	VolumeDelete(ctx context.Context, name string) error
 
 	// Path return the filesystem named name
 	// if no filesystem with this name exists, an error is returned
-	Path(ctx context.Context, name string) (pkg.Filesystem, error)
+	VolumeLookup(ctx context.Context, name string) (pkg.Volume, error)
 }
 
 type flistModule struct {
@@ -301,7 +300,7 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 	}
 
 	// check if the filesystem doesn't already exists
-	backend, err := f.storage.Path(ctx, name)
+	backend, err := f.storage.VolumeLookup(ctx, name)
 	newAllocation := false
 	if err != nil {
 		log.Info().Msgf("create new subvolume %s", name)
@@ -311,7 +310,7 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 			return fmt.Errorf("invalid mount option, missing disk type")
 		}
 		newAllocation = true
-		backend, err = f.storage.CreateFilesystem(ctx, name, size, zos.SSDDevice)
+		backend, err = f.storage.VolumeCreate(ctx, name, size)
 		if err != nil {
 			return errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
 		}
@@ -322,7 +321,7 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 		// we need to deallocate the filesystem
 
 		if newAllocation && err != nil {
-			f.storage.ReleaseFilesystem(ctx, name)
+			f.storage.VolumeDelete(ctx, name)
 		}
 	}()
 
@@ -527,7 +526,7 @@ func (f *flistModule) Unmount(name string) error {
 	// - delete the volume, this should be done only for RW (TODO)
 	// mounts, but for now it's still safe to try to remove the subvolume anyway
 	// this will work only for rw mounts.
-	if err := f.storage.ReleaseFilesystem(context.Background(), name); err != nil {
+	if err := f.storage.VolumeDelete(context.Background(), name); err != nil {
 		log.Error().Err(err).Msg("fail to clean up subvolume")
 	}
 

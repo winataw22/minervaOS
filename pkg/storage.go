@@ -11,21 +11,8 @@ import (
 
 //go:generate mkdir -p stubs
 //go:generate zbusc -module storage -version 0.0.1 -name storage -package stubs github.com/threefoldtech/zos/pkg+StorageModule stubs/storage_stub.go
-//go:generate zbusc -module storage -version 0.0.1 -name vdisk -package stubs github.com/threefoldtech/zos/pkg+VDiskModule stubs/vdisk_stub.go
 
 // RaidProfile type
-type RaidProfile string
-
-const (
-	// Single profile
-	Single RaidProfile = "single"
-	// Raid0 profile
-	Raid0 RaidProfile = "raid0"
-	// Raid1 profile
-	Raid1 RaidProfile = "raid1"
-	// Raid10 profile
-	Raid10 RaidProfile = "raid10"
-)
 
 // ErrNotEnoughSpace indicates that there is not enough space in a pool
 // of the requested type to create the filesystem
@@ -70,100 +57,99 @@ type (
 	}
 )
 
-// Validate make sure profile is correct
-func (p RaidProfile) Validate() error {
-	if _, ok := raidProfiles[p]; !ok {
-		return fmt.Errorf("not supported raid profile '%s'", p)
-	}
-
-	return nil
-}
-
-var (
-	raidProfiles = map[RaidProfile]struct{}{
-		Single: {}, Raid1: {}, Raid10: {},
-	}
-	// DefaultPolicy value
-	DefaultPolicy = StoragePolicy{
-		Raid: Single,
-	}
-
-	// NullPolicy does not create pools
-	NullPolicy = StoragePolicy{}
-)
-
-// StoragePolicy describes the pool creation policy
-type StoragePolicy struct {
-	// Raid profile for this policy
-	Raid RaidProfile
-	// Number of disks to use in a single pool
-	// note that, the disks count must be valid for
-	// the chosen raid profile.
-	Disks uint8
-
-	// Only create this amount of storage pools. Default to 0 -> unlimited.
-	// The spared disks can later be used in automatic repair if a physical
-	// disk got corrupt or bad.
-	// Note that if it's set to 0 (unlimited), some disks might be spared anyway
-	// in case the number of disks required in the policy doesn't add up to pools
-	// for example, a pool of 2s on a machine with 5 disks.
-	MaxPools uint8
-}
-
 // Usage struct
 type Usage struct {
 	Size gridtypes.Unit
 	Used gridtypes.Unit
 }
 
-// Filesystem represents a storage space that can be used as a filesystem
-type Filesystem struct {
-	// Filesystem ID
-	ID int
-	// Path of the Filesystem
-	Path string
-	// Usage reports the current usage of the Filesystem
+// Volume struct is a btrfs subvolume
+type Volume struct {
+	Name  string
+	Path  string
 	Usage Usage
-	// Name of the Filesystem
-	Name string
-	// FsType of the Filesystem
-	FsType string
-	// DiskType of the Filesystem
-	DiskType DeviceType
 }
 
-// VolumeAllocater is the zbus interface of the storage module responsible
-// for volume allocation
-type VolumeAllocater interface {
-	// CreateFilesystem creates a filesystem with a given size. The filesystem
-	// is mounted, and the path to the mountpoint is returned. The filesystem
-	// is only attempted to be created in a pool of the given type. If no
-	// more space is available in such a pool, `ErrNotEnoughSpace` is returned.
-	// It is up to the caller to handle such a situation and decide if he wants
-	// to try again on a different devicetype
-	CreateFilesystem(name string, size gridtypes.Unit, poolType DeviceType) (Filesystem, error)
+// Device struct is a full hdd
+type Device struct {
+	Path  string
+	ID    string
+	Usage Usage
+}
 
-	// UpdateFilesystem changes a filesystem size to given value.
-	UpdateFilesystem(name string, size gridtypes.Unit) (Filesystem, error)
-	// ReleaseFilesystem signals that the named filesystem is no longer needed.
-	// The filesystem will be unmounted and subsequently removed.
-	// All data contained in the filesystem will be lost, and the
-	// space which has been reserved for this filesystem will be reclaimed.
-	ReleaseFilesystem(name string) error
+// StorageModule is the storage subsystem interface
+// this should allow you to work with the following types of storage medium
+// - full disks (device) (these are used by zdb)
+// - subvolumes these are used as a read-write layers for 0-fs mounts
+// - vdisks are used by zmachines
+// this works as following:
+// a storage module maintains a list of ALL disks on the system
+// separated in 2 sets of pools (SSDs, and HDDs)
+// ssd pools can only be used for
+// - subvolumes
+// - vdisks
+// hdd pools are only used by zdb as one disk
+type StorageModule interface {
+	// Cache method return information about zos cache volume
+	Cache() (Volume, error)
 
-	// ListFilesystems return all the filesystem managed by storeaged present on the nodes
-	// this can be an expensive call on server with a lot of disk, don't use it in a
-	// intensive loop
-	// Special filesystem like internal cache and vdisk are not return by this function
-	// to access them use the GetCacheFS or GetVdiskFS
-	ListFilesystems() ([]Filesystem, error)
+	// Total gives the total amount of storage available for a device type
+	Total(kind DeviceType) (uint64, error)
+	// BrokenPools lists the broken storage pools that have been detected
+	BrokenPools() []BrokenPool
+	// BrokenDevices lists the broken devices that have been detected
+	BrokenDevices() []BrokenDevice
+	//Monitor returns stats stream about pools
+	Monitor(ctx context.Context) <-chan PoolsStats
 
-	// Path return the filesystem named name
-	// if no filesystem with this name exists, an error is returned
-	Path(name string) (Filesystem, error)
+	// Volume management
 
-	// GetCacheFS return the special filesystem used by 0-OS to store internal state and flist cache
-	GetCacheFS() (Filesystem, error)
+	// VolumeCreate creates a new volume
+	VolumeCreate(name string, size gridtypes.Unit) (Volume, error)
+
+	// VolumeUpdate updates the size of an existing volume
+	VolumeUpdate(name string, size gridtypes.Unit) error
+
+	// VolumeLookup return volume information for given name
+	VolumeLookup(name string) (Volume, error)
+
+	// VolumeDelete deletes a volume by name
+	VolumeDelete(name string) error
+
+	// VolumeList list all volumes
+	VolumeList() ([]Volume, error)
+
+	// Virtual disk management
+
+	// DiskCreate creates a virtual disk given name and size
+	DiskCreate(name string, size gridtypes.Unit) (VDisk, error)
+
+	// DiskWrite writes the given raw image to disk
+	DiskWrite(name string, image string) error
+
+	// DiskFormat makes sure disk has filesystem, if it already formatted nothing happens
+	DiskFormat(name string) error
+
+	// DiskLookup looks up vdisk by name
+	DiskLookup(name string) (VDisk, error)
+
+	// DiskExists checks if disk exists
+	DiskExists(name string) bool
+
+	// DiskDelete deletes a disk
+	DiskDelete(name string) error
+
+	DiskList() ([]VDisk, error)
+	// Device management
+
+	//Devices list all "allocated" devices
+	Devices() ([]Device, error)
+
+	// DeviceAllocate allocates a new device (formats and give a new ID)
+	DeviceAllocate(min gridtypes.Unit) (Device, error)
+
+	// DeviceLookup inspects a previously allocated device
+	DeviceLookup(name string) (Device, error)
 }
 
 // VDisk info returned by a call to inspect
@@ -177,42 +163,4 @@ type VDisk struct {
 // Name returns the Name part of the disk path
 func (d *VDisk) Name() string {
 	return filepath.Base(d.Path)
-}
-
-// VDiskModule interface
-type VDiskModule interface {
-	// AllocateDisk with given id and size and an optional source disk, return path to virtual disk
-	Allocate(id string, size gridtypes.Unit) (string, error)
-
-	// Writes an image image to disk with id
-	WriteImage(id string, image string) error
-
-	// EnsureFilesystem ensures disk has a valid filesystem
-	// this method is idempotent
-	EnsureFilesystem(id string) error
-
-	// DeallocateVDisk removes a virtual disk
-	Deallocate(id string) error
-	// Exists checks if disk with that ID already allocated
-	Exists(id string) bool
-	// Inspect return info about the disk
-	Inspect(id string) (VDisk, error)
-	// List lists all the available vdisks
-	List() ([]VDisk, error)
-}
-
-// StorageModule defines the api for storage
-type StorageModule interface {
-	VolumeAllocater
-	ZDBAllocater
-
-	// Total gives the total amount of storage available for a device type
-	Total(kind DeviceType) (uint64, error)
-	// BrokenPools lists the broken storage pools that have been detected
-	BrokenPools() []BrokenPool
-	// BrokenDevices lists the broken devices that have been detected
-	BrokenDevices() []BrokenDevice
-
-	//Monitor returns stats stream about pools
-	Monitor(ctx context.Context) <-chan PoolsStats
 }

@@ -108,6 +108,7 @@ func (h *HubClient) List(repo string) ([]FListInfo, error) {
 // path to the extraced meta data directory. the returned path is in format
 // {cache}/{hash}/
 func (h *HubClient) Download(cache, flist string) (string, error) {
+	log.Info().Str("cache", cache).Str("flist", flist).Msg("attempt downloading flist")
 	var info FullFListInfo
 	for {
 		var err error
@@ -136,9 +137,12 @@ func (h *HubClient) Download(cache, flist string) (string, error) {
 	downloaded := filepath.Join(cache, info.Hash)
 	extracted := fmt.Sprintf("%s.d", downloaded)
 
-	if _, err := os.Stat(filepath.Join(extracted, dbFileName)); err == nil {
+	if stat, err := os.Stat(filepath.Join(extracted, dbFileName)); err == nil {
 		// already exists.
-		return extracted, nil
+		if stat.Size() > 0 {
+			log.Info().Str("flist", flist).Msg("already cached")
+			return extracted, nil
+		}
 	}
 
 	u, err := url.Parse(hubBaseURL)

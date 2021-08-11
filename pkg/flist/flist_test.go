@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 var (
@@ -34,23 +33,23 @@ type StorageMock struct {
 }
 
 // CreateFilesystem create filesystem mock
-func (s *StorageMock) CreateFilesystem(ctx context.Context, name string, size gridtypes.Unit, poolType pkg.DeviceType) (pkg.Filesystem, error) {
-	args := s.Called(ctx, name, size, poolType)
-	return pkg.Filesystem{
+func (s *StorageMock) VolumeCreate(ctx context.Context, name string, size gridtypes.Unit) (pkg.Volume, error) {
+	args := s.Called(ctx, name, size)
+	return pkg.Volume{
 		Path: args.String(0),
 	}, args.Error(1)
 }
 
 // ReleaseFilesystem releases filesystem mock
-func (s *StorageMock) ReleaseFilesystem(ctx context.Context, name string) error {
+func (s *StorageMock) VolumeDelete(ctx context.Context, name string) error {
 	args := s.Called(ctx, name)
 	return args.Error(0)
 }
 
 // Path implements the pkg.StorageModules interfaces
-func (s *StorageMock) Path(ctx context.Context, name string) (pkg.Filesystem, error) {
+func (s *StorageMock) VolumeLookup(ctx context.Context, name string) (pkg.Volume, error) {
 	args := s.Called(ctx, name)
-	return pkg.Filesystem{
+	return pkg.Volume{
 		Path: args.String(0),
 	}, args.Error(1)
 }
@@ -154,10 +153,10 @@ func TestMountUnmount(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(backend)
 
-	strg.On("Path", mock.Anything, mock.Anything).Return(backend, nil)
+	strg.On("VolumeLookup", mock.Anything, mock.Anything).Return(backend, nil)
 
 	name := "test"
-	strg.On("CreateFilesystem", name, uint64(256*mib), zos.SSDDevice).
+	strg.On("VolumeCreate", name, uint64(256*mib)).
 		Return(backend, nil)
 
 	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
@@ -167,7 +166,7 @@ func TestMountUnmount(t *testing.T) {
 
 	// Trick flister into thinking that 0-fs has exited
 	os.Remove(cmder.m["pid"])
-	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
+	strg.On("VolumeDelete", mock.Anything, filepath.Base(mnt)).Return(nil)
 
 	sys.On("Unmount", mnt, 0).Return(nil)
 
@@ -201,7 +200,7 @@ func TestMountUnmountRO(t *testing.T) {
 
 	// Trick flister into thinking that 0-fs has exited
 	os.Remove(cmder.m["pid"])
-	strg.On("ReleaseFilesystem", mock.Anything, filepath.Base(mnt)).Return(nil)
+	strg.On("VolumeDelete", mock.Anything, filepath.Base(mnt)).Return(nil)
 
 	sys.On("Unmount", mnt, 0).Return(nil)
 
@@ -227,9 +226,9 @@ func TestIsolation(t *testing.T) {
 	backend, err := ioutil.TempDir("", "flist_backend")
 	require.NoError(err)
 	defer os.RemoveAll(backend)
-	strg.On("Path", mock.Anything, mock.Anything).Return(backend, nil)
+	strg.On("VolumeLookup", mock.Anything, mock.Anything).Return(backend, nil)
 
-	strg.On("CreateFilesystem", mock.Anything, mock.Anything, mock.Anything, uint64(256*mib), zos.SSDDevice).
+	strg.On("VolumeCreate", mock.Anything, mock.Anything, mock.Anything, uint64(256*mib)).
 		Return(backend, nil)
 
 	name1 := "test1"

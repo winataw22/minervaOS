@@ -112,8 +112,11 @@ func registerNode(
 	log.Info().Msg("registering node on blockchain")
 
 	sk := ed25519.PrivateKey(mgr.PrivateKey(ctx))
-
-	if _, err := sub.EnsureAccount(sk); err != nil {
+	id, err := substrate.IdentityFromSecureKey(sk)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := sub.EnsureAccount(&id); err != nil {
 		return 0, errors.Wrap(err, "failed to ensure account")
 	}
 
@@ -155,12 +158,12 @@ func registerNode(
 		node.Location = location
 
 		log.Debug().Msg("node data have changing, issuing an update node")
-		_, err = sub.UpdateNode(sk, *node)
+		_, err = sub.UpdateNode(&id, *node)
 		return uint32(node.TwinID), err
 	}
 
 	// create node
-	_, err = sub.CreateNode(sk, substrate.Node{
+	_, err = sub.CreateNode(&id, substrate.Node{
 		FarmID:       types.U32(env.FarmerID),
 		TwinID:       types.U32(twinID),
 		Resources:    resources,
@@ -178,13 +181,13 @@ func registerNode(
 }
 
 func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
-	identity, err := substrate.Identity(sk)
+	identity, err := substrate.IdentityFromSecureKey(sk)
 	if err != nil {
 		return 0, err
 	}
 	twinID, err := sub.GetTwinByPubKey(identity.PublicKey)
 	if errors.Is(err, substrate.ErrNotFound) {
-		return sub.CreateTwin(sk, ip)
+		return sub.CreateTwin(&identity, ip)
 	} else if err != nil {
 		return 0, errors.Wrap(err, "failed to list twins")
 	}
@@ -199,5 +202,5 @@ func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uin
 	}
 
 	// update twin to new ip
-	return sub.UpdateTwin(sk, ip)
+	return sub.UpdateTwin(&identity, ip)
 }

@@ -3,6 +3,7 @@ package identity
 import (
 	"os"
 
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/crypto"
 
 	"github.com/pkg/errors"
@@ -29,6 +30,9 @@ func NewManager(path string) (pkg.IdentityManager, error) {
 			return nil, errors.Wrap(err, "failed to persist key seed")
 		}
 	} else if err != nil {
+		if err := os.Remove(path); err != nil {
+			log.Error().Err(err).Msg("failed to delete corrupt seed file")
+		}
 		return nil, errors.Wrap(err, "failed to load seed")
 	} else {
 		pair, err = FromSeed(seed)

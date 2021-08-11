@@ -1,7 +1,6 @@
 package substrate
 
 import (
-	"crypto/ed25519"
 	"fmt"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v3/scale"
@@ -173,7 +172,7 @@ func (s *Substrate) getNode(key types.StorageKey) (*Node, error) {
 }
 
 // CreateNode creates a node
-func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
+func (s *Substrate) CreateNode(identity *Identity, node Node) (uint32, error) {
 	if node.TwinID == 0 {
 		return 0, fmt.Errorf("twin id is required")
 	}
@@ -187,7 +186,7 @@ func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(sk, c); err != nil {
+	if _, err := s.call(identity, c); err != nil {
 		return 0, errors.Wrap(err, "failed to create node")
 	}
 
@@ -196,7 +195,7 @@ func (s *Substrate) CreateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 }
 
 // UpdateNode updates a node
-func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error) {
+func (s *Substrate) UpdateNode(identity *Identity, node Node) (uint32, error) {
 	if node.TwinID == 0 {
 		return 0, fmt.Errorf("twin id is required")
 	}
@@ -209,7 +208,7 @@ func (s *Substrate) UpdateNode(sk ed25519.PrivateKey, node Node) (uint32, error)
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(sk, c); err != nil {
+	if _, err := s.call(identity, c); err != nil {
 		return 0, errors.Wrap(err, "failed to update node")
 	}
 

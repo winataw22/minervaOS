@@ -94,7 +94,7 @@ curl --header "Content-Type: application/json" \
   https://api.substrate01.threefold.io/activate
 */
 
-func (s *Substrate) activateAccount(identity signature.KeyringPair) error {
+func (s *Substrate) activateAccount(identity *Identity) error {
 	const activationDefaultURL = "https://explorer.devnet.grid.tf/activation/activate"
 
 	var buf bytes.Buffer
@@ -119,11 +119,7 @@ func (s *Substrate) activateAccount(identity signature.KeyringPair) error {
 
 // EnsureAccount makes sure account is available on blockchain
 // if not, it uses activation service to create one
-func (s *Substrate) EnsureAccount(sk ed25519.PrivateKey) (info types.AccountInfo, err error) {
-	identity, err := Identity(sk)
-	if err != nil {
-		return
-	}
+func (s *Substrate) EnsureAccount(identity *Identity) (info types.AccountInfo, err error) {
 
 	info, err = s.getAccount(identity, s.meta)
 	if errors.Is(err, errAccountNotFound) {
@@ -151,15 +147,44 @@ func (s *Substrate) EnsureAccount(sk ed25519.PrivateKey) (info types.AccountInfo
 
 }
 
-// Identity derive the correct substrate identity from ed25519 key
-func Identity(sk ed25519.PrivateKey) (signature.KeyringPair, error) {
+// Identity is a user identity
+type Identity signature.KeyringPair
+
+// SecureKey returns the ed25519 key from identity
+func (i *Identity) SecureKey() (ed25519.PrivateKey, error) {
+	scheme := subkeyEd25519.Scheme{}
+	kyr, err := subkey.DeriveKeyPair(scheme, i.URI)
+	if err != nil {
+		return nil, err
+	}
+
+	return ed25519.NewKeyFromSeed(kyr.Seed()), nil
+}
+
+// IdentityFromSecureKey derive the correct substrate identity from ed25519 key
+func IdentityFromSecureKey(sk ed25519.PrivateKey) (Identity, error) {
 	str := types.HexEncodeToString(sk.Seed())
-	return keyringPairFromSecret(str, 42)
+	krp, err := keyringPairFromSecret(str, network)
+	if err != nil {
+		return Identity{}, err
+	}
+
+	return Identity(krp), nil
 	// because 42 is the answer to life the universe and everything
 	// no, seriously, don't change it, it has to be 42.
 }
 
-func (s *Substrate) getAccount(identity signature.KeyringPair, meta *types.Metadata) (info types.AccountInfo, err error) {
+//IdentityFromPhrase gets identity from hex seed or mnemonics
+func IdentityFromPhrase(seedOrPhrase string) (Identity, error) {
+	krp, err := keyringPairFromSecret(seedOrPhrase, network)
+	if err != nil {
+		return Identity{}, err
+	}
+
+	return Identity(krp), nil
+}
+
+func (s *Substrate) getAccount(identity *Identity, meta *types.Metadata) (info types.AccountInfo, err error) {
 	key, err := types.CreateStorageKey(meta, "System", "Account", identity.PublicKey, nil)
 	if err != nil {
 		err = errors.Wrap(err, "failed to create storage key")
@@ -179,11 +204,7 @@ func (s *Substrate) getAccount(identity signature.KeyringPair, meta *types.Metad
 }
 
 // GetAccount gets account info with secure key
-func (s *Substrate) GetAccount(sk ed25519.PrivateKey) (info types.AccountInfo, err error) {
-	identity, err := Identity(sk)
-	if err != nil {
-		return
-	}
+func (s *Substrate) GetAccount(identity *Identity) (info types.AccountInfo, err error) {
 	meta, err := s.cl.RPC.State.GetMetadataLatest()
 	if err != nil {
 		return info, err

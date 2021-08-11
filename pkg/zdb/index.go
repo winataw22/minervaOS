@@ -1,4 +1,4 @@
-package zdbpool
+package zdb
 
 import (
 	"encoding/binary"

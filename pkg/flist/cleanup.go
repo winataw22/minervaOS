@@ -80,7 +80,7 @@ func (f *flistModule) cleanupMount(ctx context.Context, name string) error {
 		log.Warn().Err(err).Str("path", path).Msg("fail to unmount flist")
 	}
 
-	fs, err := f.storage.Path(ctx, name)
+	fs, err := f.storage.VolumeLookup(ctx, name)
 	if err != nil {
 		log.Warn().Err(err).Str("subvolume", name).Msg("subvolume does not exist")
 		return nil

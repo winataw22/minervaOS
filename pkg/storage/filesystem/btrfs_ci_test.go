@@ -21,13 +21,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/threefoldtech/zos/pkg"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 var (
@@ -36,13 +36,23 @@ var (
 
 type TestDevices map[string]string
 
-func (d TestDevices) Loops() DeviceCache {
-	var loops DeviceCache
+func (d TestDevices) Loops() Devices {
+	mgr := lsblkDeviceManager{
+		executer: executerFunc(run),
+	}
 	for _, loop := range d {
-		loops = append(loops, Device{Path: loop})
+		mgr.cache = append(mgr.cache, minDevice{
+			IPath:    loop,
+			IName:    filepath.Base(loop),
+			DiskType: zos.SSDDevice,
+		})
 	}
 
-	return loops
+	devices, err := mgr.Devices(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	return devices
 }
 
 func (d TestDevices) Destroy() {
@@ -99,6 +109,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		// we can't create devices. we need to skip
 		// CI test
+		fmt.Println("skipping ci tests")
 		SkipCITests = true
 	} else {
 		devices.Destroy()
@@ -114,8 +125,8 @@ func TestMain(m *testing.M) {
 
 func basePoolTest(t *testing.T, pool Pool) {
 	t.Run("test mounted", func(t *testing.T) {
-		_, mounted := pool.Mounted()
-		assert.False(t, mounted)
+		_, err := pool.Mounted()
+		assert.ErrorIs(t, err, ErrDeviceNotMounted)
 	})
 
 	t.Run("test path", func(t *testing.T) {
@@ -201,98 +212,11 @@ func TestBtrfsSingleCI(t *testing.T) {
 	defer devices.Destroy()
 	loops := devices.Loops()
 
-	fs := NewBtrfs(&TestDeviceManager{loops})
-	pool, err := fs.Create(context.Background(), "test-single", pkg.Single, &loops[0])
-	require.NoError(t, err)
-
-	basePoolTest(t, pool)
-}
-
-func TestBtrfsRaid1CI(t *testing.T) {
-	if SkipCITests {
-		t.Skip("test requires ability to create loop devices")
-	}
-	devices, err := SetupDevices(3)
-	require.NoError(t, err, "failed to initialize devices")
-
-	defer devices.Destroy()
-
-	loops := devices.Loops()
-	fs := NewBtrfs(&TestDeviceManager{loops})
-
-	pool, err := fs.Create(context.Background(), "test-raid1", pkg.Raid1, &loops[0], &loops[1]) //use the first 2 disks
-
-	require.NoError(t, err)
-
-	basePoolTest(t, pool)
-
-	//make sure pool is mounted
-	_, err = pool.Mount()
-	require.NoError(t, err)
-
-	defer pool.UnMount()
-
-	// raid  specific tests
-
-	t.Run("add device", func(t *testing.T) {
-		// add a device to array
-		err = pool.AddDevice(&loops[2])
+	for _, dev := range loops {
+		pool, err := NewBtrfsPool(dev)
 		require.NoError(t, err)
-	})
-
-	t.Run("remove device", func(t *testing.T) {
-		// remove device from array
-		err = pool.RemoveDevice(&loops[0])
-		require.NoError(t, err)
-	})
-
-	t.Run("remove second device", func(t *testing.T) {
-		// remove a 2nd device should fail because raid1 should
-		// have at least 2 devices
-		err = pool.RemoveDevice(&loops[1])
-		require.Error(t, err)
-	})
-}
-
-func TestBtrfsListCI(t *testing.T) {
-	if SkipCITests {
-		t.Skip("test requires ability to create loop devices")
+		basePoolTest(t, pool)
 	}
-
-	devices, err := SetupDevices(2)
-	require.NoError(t, err, "failed to initialize devices")
-
-	defer devices.Destroy()
-	loops := devices.Loops()
-	fs := NewBtrfs(&TestDeviceManager{loops})
-
-	names := make(map[string]struct{})
-	for idx := range loops {
-		loop := &loops[idx]
-		name := fmt.Sprintf("test-list-%d", idx)
-		names[name] = struct{}{}
-		_, err := fs.Create(context.Background(), name, pkg.Single, loop)
-		require.NoError(t, err)
-	}
-	pools, err := fs.List(context.Background(), func(p Pool) bool {
-		return strings.HasPrefix(p.Name(), "test-")
-	})
-
-	require.NoError(t, err)
-
-	for _, pool := range pools {
-		if !strings.HasPrefix(pool.Name(), "test-list") {
-			continue
-		}
-
-		_, exist := names[pool.Name()]
-		require.True(t, exist, "pool %s is not listed", pool)
-
-		delete(names, pool.Name())
-	}
-
-	ok := assert.Len(t, names, 0)
-	assert.True(t, ok, "not all pools were listed")
 }
 
 func TestCLeanUpQgroupsCI(t *testing.T) {
@@ -305,21 +229,8 @@ func TestCLeanUpQgroupsCI(t *testing.T) {
 	defer devices.Destroy()
 
 	loops := devices.Loops()
-	fs := NewBtrfs(&TestDeviceManager{loops})
-
-	names := make(map[string]struct{})
-	for idx := range loops {
-		loop := &loops[idx]
-		name := fmt.Sprintf("test-list-%d", idx)
-		names[name] = struct{}{}
-		_, err := fs.Create(context.Background(), name, pkg.Single, loop)
-		require.NoError(t, err)
-	}
-	pools, err := fs.List(context.Background(), func(p Pool) bool {
-		return strings.HasPrefix(p.Name(), "test-")
-	})
+	pool, err := NewBtrfsPool(loops[0])
 	require.NoError(t, err)
-	pool := pools[0]
 
 	_, err = pool.Mount()
 	require.NoError(t, err)
@@ -337,7 +248,7 @@ func TestCLeanUpQgroupsCI(t *testing.T) {
 
 	qgroups, err := btrfsVol.utils.QGroupList(context.TODO(), pool.Path())
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(qgroups))
+	assert.Equal(t, 1, len(qgroups))
 	t.Logf("qgroups before delete: %v", qgroups)
 
 	_, ok = qgroups[fmt.Sprintf("0/%d", btrfsVol.id)]
@@ -350,5 +261,5 @@ func TestCLeanUpQgroupsCI(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("remaining qgroups: %+v", qgroups)
-	assert.Equal(t, 1, len(qgroups), "qgroups should have been deleted with the subvolume")
+	assert.Equal(t, 0, len(qgroups), "qgroups should have been deleted with the subvolume")
 }
