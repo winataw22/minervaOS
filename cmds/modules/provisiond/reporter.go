@@ -358,7 +358,7 @@ func (r *Reporter) computeNU(m pkg.MachineMetric) gridtypes.Unit {
 	const (
 		// weights knobs for nu calculations
 		public  float64 = 1.0
-		private float64 = 0.5
+		private float64 = 0
 	)
 
 	nu := m.Public.Nu()*public + m.Private.Nu()*private

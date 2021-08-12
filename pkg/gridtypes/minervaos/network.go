@@ -131,6 +131,9 @@ type Peer struct {
 	Subnet gridtypes.IPNet `json:"subnet"`
 	// WGPublicKey of the peer (driven from its private key)
 	WGPublicKey string `json:"wireguard_public_key"`
+	// Allowed Ips is related to his subnet.
+	// todo: remove and derive from subnet
+	AllowedIPs []gridtypes.IPNet `json:"allowed_ips"`
 	// Entrypoint of the peer
 	Endpoint string `json:"endpoint"`
 }
@@ -139,6 +142,10 @@ type Peer struct {
 func (p *Peer) Valid() error {
 	if p.Subnet.Nil() {
 		return fmt.Errorf("peer wireguard subnet cannot empty")
+	}
+
+	if len(p.AllowedIPs) <= 0 {
+		return fmt.Errorf("peer wireguard allowedIPs cannot empty")
 	}
 
 	if p.WGPublicKey == "" {
@@ -159,6 +166,10 @@ func (p Peer) Challenge(w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "%s", p.Subnet.String()); err != nil {
 		return err
 	}
-
+	for _, ip := range p.AllowedIPs {
+		if _, err := fmt.Fprintf(w, "%s", ip.String()); err != nil {
+			return err
+		}
+	}
 	return nil
 }
