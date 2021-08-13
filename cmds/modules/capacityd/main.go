@@ -73,10 +73,21 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	twin, err := registration(ctx, redis)
+	node, twin, err := registration(ctx, redis)
 	if err != nil {
 		return errors.Wrap(err, "failed during node registration")
 	}
+
+	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
+
+	go func() {
+		for {
+			if err := uptime(ctx, redis); err != nil {
+				log.Error().Err(err).Msg("sending uptime failed")
+				<-time.After(10 * time.Second)
+			}
+		}
+	}()
 
 	log.Info().Uint32("twin", twin).Msg("node has been registered")
 	log.Debug().Msg("start message bus")

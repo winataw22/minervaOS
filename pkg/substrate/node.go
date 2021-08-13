@@ -90,17 +90,38 @@ func (m OptionPublicConfig) Encode(encoder scale.Encoder) (err error) {
 	return
 }
 
+// Decode implementation
+func (m *OptionPublicConfig) Decode(decoder scale.Decoder) (err error) {
+	var i byte
+	if err := decoder.Decode(&i); err != nil {
+		return err
+	}
+
+	switch i {
+	case 0:
+		return nil
+	case 1:
+		m.HasValue = true
+		return decoder.Decode(&m.AsValue)
+	default:
+		return fmt.Errorf("unknown value for Option")
+	}
+}
+
 // Node type
 type Node struct {
 	Versioned
-	ID           types.U32
-	FarmID       types.U32
-	TwinID       types.U32
-	Resources    Resources
-	Location     Location
-	CountryID    types.U32
-	CityID       types.U32
-	PublicConfig OptionPublicConfig
+	ID            types.U32
+	FarmID        types.U32
+	TwinID        types.U32
+	Resources     Resources
+	Location      Location
+	CountryID     types.U32
+	CityID        types.U32
+	PublicConfig  OptionPublicConfig
+	Uptime        types.U64
+	Created       types.U64
+	FarmingPolicy types.U32
 }
 
 //GetNodeByTwinID gets a node by twin id
@@ -213,4 +234,19 @@ func (s *Substrate) UpdateNode(identity *Identity, node Node) (uint32, error) {
 	}
 
 	return s.GetNodeByTwinID(uint32(node.TwinID))
+}
+
+// UpdateNodeUptime updates the node uptime to given value
+func (s *Substrate) UpdateNodeUptime(identity *Identity, uptime uint64) error {
+	c, err := types.NewCall(s.meta, "TfgridModule.report_uptime", uptime)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to create call")
+	}
+
+	if _, err := s.call(identity, c); err != nil {
+		return errors.Wrap(err, "failed to update node uptime")
+	}
+
+	return nil
 }
