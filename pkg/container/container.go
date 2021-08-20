@@ -171,7 +171,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 	}
 
 	if err := applyStartup(&data, filepath.Join(data.RootFS, ".startup.toml")); err != nil {
-		errors.Wrap(err, "error updating environment variable from startup file")
+		return id, errors.Wrap(err, "error updating environment variable from startup file")
 	}
 
 	opts := []oci.SpecOpts{
@@ -246,7 +246,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		// we delete the container.
 		// (preparing, creating, and starting a task)
 		if err != nil {
-			container.Delete(ctx, containerd.WithSnapshotCleanup)
+			_ = container.Delete(ctx, containerd.WithSnapshotCleanup)
 		}
 	}()
 
@@ -277,7 +277,11 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 				continue
 			}
 
-			go stats.Monitor(c.containerd, ns, data.Name, s)
+			go func() {
+				if err := stats.Monitor(c.containerd, ns, data.Name, s); err != nil {
+					log.Error().Err(err).Str("name", data.Name).Msg("container monitor exited with error")
+				}
+			}()
 
 		default:
 			log.Error().Str("type", l.Type).Msg("invalid stats type requested")
@@ -518,27 +522,32 @@ func (c *Module) ensureNamespace(ctx context.Context, client *containerd.Client,
 
 func applyStartup(data *pkg.Container, path string) error {
 	f, err := os.Open(path)
-	if err == nil {
-		defer f.Close()
-		log.Info().Msg("startup file found")
-
-		startup := startup{}
-		if _, err := toml.DecodeReader(f, &startup); err != nil {
-			return err
-		}
-
-		entry, ok := startup.Entries["entry"]
-		if !ok {
-			return nil
-		}
-
-		data.Env = mergeEnvs(data.Env, entry.Envs())
-		if data.Entrypoint == "" && entry.Entrypoint() != "" {
-			data.Entrypoint = entry.Entrypoint()
-		}
-		if data.WorkingDir == "" && entry.WorkingDir() != "" {
-			data.WorkingDir = entry.WorkingDir()
-		}
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to open .startup.toml file")
 	}
+	defer f.Close()
+
+	log.Info().Msg("startup file found")
+
+	startup := startup{}
+	if _, err := toml.DecodeReader(f, &startup); err != nil {
+		return err
+	}
+
+	entry, ok := startup.Entries["entry"]
+	if !ok {
+		return nil
+	}
+
+	data.Env = mergeEnvs(data.Env, entry.Envs())
+	if data.Entrypoint == "" && entry.Entrypoint() != "" {
+		data.Entrypoint = entry.Entrypoint()
+	}
+	if data.WorkingDir == "" && entry.WorkingDir() != "" {
+		data.WorkingDir = entry.WorkingDir()
+	}
+
 	return nil
 }

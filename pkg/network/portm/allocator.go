@@ -35,8 +35,12 @@ func NewAllocator(pRange PortRange, store backend.Store) *Allocator {
 
 // Reserve implements PortAllocator interface
 func (a *Allocator) Reserve(ns string) (int, error) {
-	a.store.Lock()
-	defer a.store.Unlock()
+	if err := a.store.Lock(); err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = a.store.Unlock()
+	}()
 
 	allocatedPorts, err := a.store.GetByNS(ns)
 	if err != nil {
@@ -74,8 +78,12 @@ func (a *Allocator) Reserve(ns string) (int, error) {
 
 // Release implements PortAllocator interface
 func (a *Allocator) Release(ns string, port int) error {
-	a.store.Lock()
-	defer a.store.Unlock()
+	if err := a.store.Lock(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = a.store.Unlock()
+	}()
 
 	return a.store.Release(ns, port)
 }

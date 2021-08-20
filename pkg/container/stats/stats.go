@@ -68,7 +68,9 @@ func Monitor(addr string, ns string, id string, backend io.WriteCloser) error {
 		}
 
 		// sending metric to the backend
-		backend.Write(b)
+		if _, err := backend.Write(b); err != nil {
+			log.Error().Err(err).Msg("failed to send metrics to backend")
+		}
 
 		time.Sleep(StatsPushInterval)
 	}

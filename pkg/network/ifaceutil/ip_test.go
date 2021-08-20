@@ -3,6 +3,8 @@ package ifaceutil
 import (
 	"crypto/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIPv6SuffixFromInputBytesAsHex_7_Simple_Nil(t *testing.T) {
@@ -59,7 +61,8 @@ func TestIPv6SuffixFromInputBytesAsHex_1_Range(t *testing.T) {
 	for n := 0; n < 1024; n++ {
 		for s := 0; s < 32; s++ {
 			b := make([]byte, s)
-			rand.Read(b[:])
+			_, err := rand.Read(b[:])
+			require.NoError(t, err)
 			IPv6SuffixFromInputBytesAsHex(b, 1)
 		}
 	}
@@ -69,7 +72,8 @@ func TestIPv6SuffixFromInputBytesAsHex_7_Range(t *testing.T) {
 	for n := 0; n < 1024; n++ {
 		for s := 0; s < 32; s++ {
 			b := make([]byte, s)
-			rand.Read(b[:])
+			_, err := rand.Read(b[:])
+			require.NoError(t, err)
 			IPv6SuffixFromInputBytesAsHex(b, 7)
 		}
 	}
@@ -79,7 +83,8 @@ func TestIPv6SuffixFromInputBytesAsHex_8_Range(t *testing.T) {
 	for n := 0; n < 1024; n++ {
 		for s := 0; s < 32; s++ {
 			b := make([]byte, s)
-			rand.Read(b[:])
+			_, err := rand.Read(b[:])
+			require.NoError(t, err)
 			IPv6SuffixFromInputBytesAsHex(b, 8)
 		}
 	}
@@ -87,7 +92,7 @@ func TestIPv6SuffixFromInputBytesAsHex_8_Range(t *testing.T) {
 
 func BenchmarkIPv6SuffixFromInputBytesAsHex_7_Range(b *testing.B) {
 	var bs [33]byte
-	rand.Read(bs[:])
+	_, _ = rand.Read(bs[:])
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		IPv6SuffixFromInputBytesAsHex(bs[:], 7)
@@ -96,7 +101,7 @@ func BenchmarkIPv6SuffixFromInputBytesAsHex_7_Range(b *testing.B) {
 
 func BenchmarkIPv6SuffixFromInputBytesAsHex_8_Range(b *testing.B) {
 	var bs [33]byte
-	rand.Read(bs[:])
+	_, _ = rand.Read(bs[:])
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		IPv6SuffixFromInputBytesAsHex(bs[:], 8)
@@ -105,7 +110,7 @@ func BenchmarkIPv6SuffixFromInputBytesAsHex_8_Range(b *testing.B) {
 
 func BenchmarkIPv6SuffixFromInputBytesAsHex_12_Range(b *testing.B) {
 	var bs [33]byte
-	rand.Read(bs[:])
+	_, _ = rand.Read(bs[:])
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		IPv6SuffixFromInputBytesAsHex(bs[:], 12)

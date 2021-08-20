@@ -217,7 +217,9 @@ func (s *Module) expandFs(disk string) error {
 		return errors.Wrap(err, "couldn't mount the btrfs fs to resize it")
 	}
 
-	defer syscall.Unmount(dname, 0)
+	defer func() {
+		_ = syscall.Unmount(dname, 0)
+	}()
 	cmd = exec.Command("btrfs", "filesystem", "resize", "max", dname)
 
 	if err := cmd.Run(); err != nil {

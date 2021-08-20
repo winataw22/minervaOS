@@ -51,7 +51,7 @@ func (nr *NetResource) Join(cfg ContainerConfig) (join pkg.Member, err error) {
 
 	defer func() {
 		if err != nil {
-			namespace.Delete(netspace)
+			_ = namespace.Delete(netspace)
 		}
 	}()
 

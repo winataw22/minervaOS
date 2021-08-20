@@ -10,7 +10,6 @@ import (
 
 const (
 	nsFlagsPublic   = 1
-	nsFlagsWorm     = 2
 	nsFlagsExtended = 4
 )
 

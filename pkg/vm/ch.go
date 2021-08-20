@@ -38,7 +38,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	defer func() {
 		if err != nil {
 			for _, pid := range pids {
-				syscall.Kill(pid, syscall.SIGKILL)
+				_ = syscall.Kill(pid, syscall.SIGKILL)
 			}
 		}
 	}()
@@ -206,7 +206,9 @@ func (m *Machine) appendEnv(root string) error {
 	}
 
 	defer file.Close()
-	file.WriteString("\n")
+	if _, err := file.WriteString("\n"); err != nil {
+		return err
+	}
 	for k, v := range m.Environment {
 		//TODO: need some string escaping here
 		if _, err := fmt.Fprintf(file, "%s=%s\n", k, v); err != nil {
@@ -238,7 +240,7 @@ func (m *Machine) release(ps *os.Process) error {
 			return
 		}
 
-		ps.Wait()
+		_, _ = ps.Wait()
 	}()
 
 	if err := ps.Release(); err != nil {

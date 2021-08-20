@@ -58,7 +58,7 @@ func (d TestDevices) Loops() Devices {
 func (d TestDevices) Destroy() {
 	for file, loop := range d {
 		if loop != "" {
-			run(context.Background(), "losetup", "-d", loop)
+			_, _ = run(context.Background(), "losetup", "-d", loop)
 		}
 
 		if err := os.Remove(file); err != nil {
@@ -117,7 +117,7 @@ func TestMain(m *testing.M) {
 
 	defer func() {
 		//make sure to try to detach all remaining loop devices from testing
-		run(context.Background(), "losetup", "-D")
+		_, _ = run(context.Background(), "losetup", "-D")
 	}()
 
 	os.Exit(m.Run())
@@ -141,7 +141,9 @@ func basePoolTest(t *testing.T, pool Pool) {
 		assert.Equal(t, target, pool.Path())
 	})
 
-	defer pool.UnMount()
+	defer func() {
+		_ = pool.UnMount()
+	}()
 
 	t.Run("test no subvolumes", func(t *testing.T) {
 		// no volumes
@@ -234,7 +236,9 @@ func TestCLeanUpQgroupsCI(t *testing.T) {
 
 	_, err = pool.Mount()
 	require.NoError(t, err)
-	defer pool.UnMount()
+	defer func() {
+		_ = pool.UnMount()
+	}()
 
 	volume, err := pool.AddVolume("vol1")
 	require.NoError(t, err)

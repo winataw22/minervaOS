@@ -41,8 +41,6 @@ type Farm struct {
 	TwinID            types.U32
 	PricingPolicyID   types.U32
 	CertificationType CertificationType
-	CountryID         types.U32
-	CityID            types.U32
 	PublicIPs         []PublicIP
 }
 

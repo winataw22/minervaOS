@@ -61,7 +61,9 @@ func LoadSeed(path string) ([]byte, error) {
 	if versioned.IsNotVersioned(err) {
 		// this is a compatibility code for seed files
 		// in case it does not have any version information
-		versioned.WriteFile(path, SeedVersionLatest, seed, 0400)
+		if err := versioned.WriteFile(path, SeedVersionLatest, seed, 0400); err != nil {
+			return nil, err
+		}
 		version = SeedVersion1
 	} else if err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+//nolint
 const (
 	colorBlack = iota + 30
 	colorRed

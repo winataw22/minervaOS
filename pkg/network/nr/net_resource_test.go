@@ -122,7 +122,7 @@ func TestCreateBridge(t *testing.T) {
 	assert.True(t, ok)
 
 	// cleanup
-	netlink.LinkDel(l)
+	_ = netlink.LinkDel(l)
 }
 
 func Test_wgIP(t *testing.T) {

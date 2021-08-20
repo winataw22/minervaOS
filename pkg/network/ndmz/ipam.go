@@ -39,9 +39,11 @@ func allocateIPv4(networkID, leaseDir string) (*net.IPNet, error) {
 	// the same IP.
 	// So we have to check the store ourselves to see if there is already an IP allocated
 	// to this container, and if one found, we return it.
-	store.Lock()
+	if err := store.Lock(); err != nil {
+		return nil, err
+	}
 	ips := store.GetByID(networkID, "eth0")
-	store.Unlock()
+	_ = store.Unlock()
 	if len(ips) > 0 {
 		ip := ips[0]
 		rng, err := set.RangeFor(ip)

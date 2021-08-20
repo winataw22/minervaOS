@@ -172,8 +172,8 @@ func registerNode(
 		TwinID:       types.U32(twinID),
 		Resources:    resources,
 		Location:     location,
-		CountryID:    0,
-		CityID:       0,
+		Country:      loc.CountryCode,
+		City:         loc.City,
 		PublicConfig: pubCfg,
 	})
 

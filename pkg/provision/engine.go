@@ -359,7 +359,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 				if err := e.storage.Set(job.Target); err != nil {
 					log.Error().Err(err).Msg("failed to set deployment global error")
 				}
-				e.queue.Dequeue()
+				_, _ = e.queue.Dequeue()
 
 				continue
 			}
@@ -407,7 +407,10 @@ func (e *NativeEngine) Run(root context.Context) error {
 			}
 		}
 
-		e.queue.Dequeue()
+		_, err = e.queue.Dequeue()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to dequeue job")
+		}
 	}
 }
 

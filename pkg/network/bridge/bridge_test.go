@@ -14,7 +14,7 @@ func TestCreateBridge(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		netlink.LinkDel(br)
+		_ = netlink.LinkDel(br)
 	}()
 
 	bridges, err := List()

@@ -169,8 +169,8 @@ func TestReuseReleased(t *testing.T) {
 
 func TestRelease(t *testing.T) {
 	store := newTestStore()
-	store.Reserve("ns", 1000)
-	store.Reserve("ns", 1001)
+	_, _ = store.Reserve("ns", 1000)
+	_, _ = store.Reserve("ns", 1001)
 
 	pRange := PortRange{
 		Start: 1000,

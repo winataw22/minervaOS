@@ -59,7 +59,9 @@ func (h *HubClient) Info(flist string) (info FullFListInfo, err error) {
 	}
 
 	defer response.Body.Close()
-	defer ioutil.ReadAll(response.Body)
+	defer func() {
+		_, _ = ioutil.ReadAll(response.Body)
+	}()
 
 	if response.StatusCode != http.StatusOK {
 		return info, fmt.Errorf("failed to get flist (%s) info: %s", flist, response.Status)
@@ -86,7 +88,9 @@ func (h *HubClient) List(repo string) ([]FListInfo, error) {
 	}
 
 	defer response.Body.Close()
-	defer ioutil.ReadAll(response.Body)
+	defer func() {
+		_, _ = ioutil.ReadAll(response.Body)
+	}()
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get repository listing: %s", response.Status)
@@ -259,7 +263,9 @@ func (b *FListInfo) Files() ([]FileInfo, error) {
 	}
 
 	defer response.Body.Close()
-	defer ioutil.ReadAll(response.Body)
+	defer func() {
+		_, _ = ioutil.ReadAll(response.Body)
+	}()
 
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get flist info: %s", response.Status)

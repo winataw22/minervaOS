@@ -456,7 +456,7 @@ func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.Workload
 
 	for id, container := range containers {
 		con := zdbConnection(id)
-		if con.Connect(); err == nil {
+		if err := con.Connect(); err == nil {
 			if ok, _ := con.Exist(wl.ID.String()); ok {
 				if err := con.DeleteNamespace(wl.ID.String()); err != nil {
 					return errors.Wrap(err, "failed to delete namespace")

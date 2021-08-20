@@ -27,7 +27,7 @@ func WithSignal(ctx context.Context, sig ...os.Signal) (context.Context, context
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 3)
 
 	signal.Notify(ch, sig...)
 

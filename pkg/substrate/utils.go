@@ -5,10 +5,62 @@ import (
 
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/vedhavyas/go-subkey"
 	subkeyEd25519 "github.com/vedhavyas/go-subkey/ed25519"
 	"golang.org/x/crypto/blake2b"
 )
+
+// https://github.com/threefoldtech/tfchain_pallets/blob/bc9c5d322463aaf735212e428da4ea32b117dc24/pallet-smart-contract/src/lib.rs#L58
+var smartContractModuleErrors = []string{
+	"TwinNotExists",
+	"NodeNotExists",
+	"FarmNotExists",
+	"FarmHasNotEnoughPublicIPs",
+	"FarmHasNotEnoughPublicIPsFree",
+	"FailedToReserveIP",
+	"FailedToFreeIPs",
+	"ContractNotExists",
+	"TwinNotAuthorizedToUpdateContract",
+	"TwinNotAuthorizedToCancelContract",
+	"NodeNotAuthorizedToDeployContract",
+	"NodeNotAuthorizedToComputeReport",
+	"PricingPolicyNotExists",
+	"ContractIsNotUnique",
+	"NameExists",
+	"NameNotValid",
+}
+
+// TODO: add all events from SmartContractModule and TfgridModule
+
+// ContractCreated is the contract created event
+type ContractCreated struct {
+	Phase    types.Phase
+	Contract Contract
+	Topics   []types.Hash
+}
+
+// ContractUpdated is the contract updated event
+type ContractUpdated struct {
+	Phase    types.Phase
+	Contract Contract
+	Topics   []types.Hash
+}
+
+// ContractCanceled is the contract canceled event
+type ContractCanceled struct {
+	Phase      types.Phase
+	ContractID types.U64
+	Topics     []types.Hash
+}
+
+// EventRecords is a struct that extends the default events with our events
+type EventRecords struct {
+	types.EventRecords
+	SmartContractModule_ContractCreated  []ContractCreated  //nolint:stylecheck,golint
+	SmartContractModule_ContractUpdated  []ContractUpdated  //nolint:stylecheck,golint
+	SmartContractModule_ContractCanceled []ContractCanceled //nolint:stylecheck,golint
+}
 
 // Sign signs data with the private key under the given derivation path, returning the signature. Requires the subkey
 // command to be in path
@@ -144,4 +196,44 @@ func (s *Substrate) call(identity *Identity, call types.Call) (hash types.Hash, 
 	}
 
 	return hash, nil
+}
+
+func (s *Substrate) checkForError(blockHash types.Hash, signer types.AccountID) error {
+	meta, err := s.cl.RPC.State.GetMetadataLatest()
+	if err != nil {
+		return err
+	}
+
+	key, err := types.CreateStorageKey(meta, "System", "Events", nil, nil)
+	if err != nil {
+		return err
+	}
+
+	raw, err := s.cl.RPC.State.GetStorageRaw(key, blockHash)
+	if err != nil {
+		return err
+	}
+
+	block, err := s.cl.RPC.Chain.GetBlock(blockHash)
+	if err != nil {
+		return err
+	}
+
+	events := EventRecords{}
+	err = types.EventRecordsRaw(*raw).DecodeEventRecords(meta, &events)
+	if err != nil {
+		log.Debug().Msgf("Failed to decode event %+v", err)
+		return nil
+	}
+
+	if len(events.System_ExtrinsicFailed) > 0 {
+		for _, e := range events.System_ExtrinsicFailed {
+			who := block.Block.Extrinsics[e.Phase.AsApplyExtrinsic].Signature.Signer.AsID
+			if signer == who {
+				return fmt.Errorf(smartContractModuleErrors[e.DispatchError.Error])
+			}
+		}
+	}
+
+	return nil
 }

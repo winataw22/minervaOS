@@ -305,54 +305,57 @@ func TestWaitPIDFileExists(t *testing.T) {
 		out <- waitPidFile(2*time.Second, testFile, true)
 	}(out)
 
-	os.Create(testFile)
-	err := <-out
+	f, err := os.Create(testFile)
+	require.NoError(err)
+	defer f.Close()
+	err = <-out
 	require.NoError(err)
 }
 
 func TestWaitPIDFileDeleted(t *testing.T) {
 	require := require.New(t)
 	const testFile = "/tmp/wait.deleted.test"
-	os.Create(testFile)
+	f, err := os.Create(testFile)
+	require.NoError(err)
+	defer f.Close()
 
 	out := make(chan error)
 	go func(out chan<- error) {
 		out <- waitPidFile(2*time.Second, testFile, false)
 	}(out)
 
-	os.Remove(testFile)
-	err := <-out
+	err = os.Remove(testFile)
+	require.NoError(err)
+	err = <-out
 	require.NoError(err)
 }
 
 func TestWaitPIDFileTimeout(t *testing.T) {
 	require := require.New(t)
 	const testFile = "/tmp/wait.deleted.test"
-	os.Create(testFile)
+	f, err := os.Create(testFile)
+	require.NoError(err)
+	defer f.Close()
 
 	out := make(chan error)
 	go func(out chan<- error) {
 		out <- waitPidFile(1*time.Second, testFile, false)
 	}(out)
 
-	err := <-out
+	err = <-out
 	require.Equal(context.DeadlineExceeded, err)
 }
 
 func Test_forceStop(t *testing.T) {
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sleep", "50")
 	err := cmd.Start()
 	require.NoError(t, err)
 
 	go func() {
-		cmd.Wait()
-	}()
-
-	go func() {
-		<-ctx.Done()
-		t.Error("didn't stop the process in time")
+		_ = cmd.Wait()
 	}()
 
 	err = forceStop(cmd.Process.Pid)

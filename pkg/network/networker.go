@@ -51,7 +51,6 @@ const (
 	// ZDBYggIface is ygg interface name of the interface used in the 0-db network namespace
 	ZDBYggIface = "ygg0"
 
-	wgPortDir          = "wireguard_ports"
 	networkDir         = "networks"
 	ipamLeaseDir       = "ndmz-lease"
 	zdbNamespacePrefix = "zdb-ns-"
@@ -1036,7 +1035,7 @@ func createNetNS(name string) (ns.NetNS, error) {
 	})
 
 	if err != nil {
-		namespace.Delete(netNs)
+		_ = namespace.Delete(netNs)
 		return nil, fmt.Errorf("failed to bring lo interface up in namespace %s: %w", name, err)
 	}
 

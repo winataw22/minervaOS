@@ -13,6 +13,7 @@ import (
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
 	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/vedhavyas/go-subkey"
 	subkeyEd25519 "github.com/vedhavyas/go-subkey/ed25519"
 )
@@ -98,9 +99,11 @@ func (s *Substrate) activateAccount(identity *Identity) error {
 	const activationDefaultURL = "https://explorer.devnet.grid.tf/activation/activate"
 
 	var buf bytes.Buffer
-	json.NewEncoder(&buf).Encode(map[string]string{
+	if err := json.NewEncoder(&buf).Encode(map[string]string{
 		"substrateAccountID": identity.Address,
-	})
+	}); err != nil {
+		return errors.Wrap(err, "failed to build required body")
+	}
 
 	response, err := http.Post(activationDefaultURL, "application/json", &buf)
 	if err != nil {
@@ -124,6 +127,7 @@ func (s *Substrate) EnsureAccount(identity *Identity) (info types.AccountInfo, e
 	info, err = s.getAccount(identity, s.meta)
 	if errors.Is(err, errAccountNotFound) {
 		// account activation
+		log.Debug().Msg("account not found ... activating")
 		if err = s.activateAccount(identity); err != nil {
 			return
 		}

@@ -46,8 +46,7 @@ func DeleteFlag(key string) error {
 	}
 
 	if err := os.RemoveAll(filepath.Join(flagsDir, key)); err != nil {
-		errors.Wrap(err, "failed to remove the flag file")
-		return err
+		return errors.Wrap(err, "failed to remove the flag file")
 	}
 	return nil
 }

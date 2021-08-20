@@ -144,8 +144,10 @@ func AnalyseLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 		if err := netlink.LinkSetUp(link); err != nil {
 			return errors.Wrap(err, "failed to bring interface up")
 		}
-		defer netlink.LinkSetDown(link)
-		defer netlink.LinkSetNsFd(link, int(host.Fd()))
+		defer func() {
+			_ = netlink.LinkSetNsFd(link, int(host.Fd()))
+			_ = netlink.LinkSetDown(link)
+		}()
 
 		name := link.Attrs().Name
 

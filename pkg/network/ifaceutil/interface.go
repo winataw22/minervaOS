@@ -96,7 +96,7 @@ func HasDefaultGW(link netlink.Link, family int) (bool, net.IP, error) {
 	for i, route := range routes {
 		log.Info().
 			Str("interface", link.Attrs().Name).
-			Str(string(i), route.String())
+			Str(fmt.Sprint(i), route.String())
 	}
 
 	for _, route := range routes {
@@ -157,7 +157,7 @@ func MakeVethPair(name, master string, mtu int) (netlink.Link, error) {
 
 	defer func() {
 		if err != nil {
-			netlink.LinkDel(veth)
+			_ = netlink.LinkDel(veth)
 		}
 	}()
 
@@ -201,11 +201,11 @@ func VethByName(name string) (netlink.Link, error) {
 func Exists(name string, netNS ns.NetNS) bool {
 	exist := false
 	if netNS != nil {
-		netNS.Do(func(_ ns.NetNS) error {
+		err := netNS.Do(func(_ ns.NetNS) error {
 			_, err := netlink.LinkByName(name)
-			exist = err == nil
-			return nil
+			return err
 		})
+		exist = err == nil
 	} else {
 		_, err := netlink.LinkByName(name)
 		exist = err == nil
@@ -216,9 +216,9 @@ func Exists(name string, netNS ns.NetNS) bool {
 // Get link by name from optional namespace
 func Get(name string, netNS ns.NetNS) (link netlink.Link, err error) {
 	if netNS != nil {
-		netNS.Do(func(_ ns.NetNS) error {
+		err = netNS.Do(func(_ ns.NetNS) error {
 			link, err = netlink.LinkByName(name)
-			return nil
+			return err
 		})
 
 		return
@@ -268,7 +268,9 @@ func SetMAC(name string, mac net.HardwareAddr, netNS ns.NetNS) error {
 		if err := netlink.LinkSetDown(link); err != nil {
 			return err
 		}
-		defer netlink.LinkSetUp(link)
+		defer func() {
+			_ = netlink.LinkSetUp(link)
+		}()
 
 		return netlink.LinkSetHardwareAddr(link, mac)
 	}

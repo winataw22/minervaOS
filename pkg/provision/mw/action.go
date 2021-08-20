@@ -27,8 +27,8 @@ type Action func(r *http.Request) (interface{}, Response)
 func AsHandlerFunc(a Action) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
-			ioutil.ReadAll(r.Body)
-			r.Body.Close()
+			_, _ = ioutil.ReadAll(r.Body)
+			_ = r.Body.Close()
 		}()
 
 		object, result := a(r)

@@ -163,7 +163,7 @@ func (m *LegacyMonitor) monitor(ctx context.Context) error {
 	items, err := ioutil.ReadDir(root)
 	if os.IsNotExist(err) || len(items) == 0 {
 		for _, pid := range running {
-			syscall.Kill(pid, syscall.SIGKILL)
+			_ = syscall.Kill(pid, syscall.SIGKILL)
 		}
 		return errNoMoreFirecracker
 	} else if err != nil {

@@ -46,6 +46,13 @@ func NewClient(address string) (Client, error) {
 	}, nil
 }
 
+// Close closes the rmb client
+func (c *redisClient) Close() error {
+	return c.pool.Close()
+}
+
+// Call calls the twin with given function and message. if result is not nil the response body is json
+// decoded into this value
 func (c *redisClient) Call(ctx context.Context, twin uint32, fn string, data interface{}, result interface{}) error {
 	bytes, err := json.Marshal(data)
 	if err != nil {

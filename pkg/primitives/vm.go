@@ -118,9 +118,9 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err != nil {
 			for _, nic := range networkInfo.Ifaces {
 				if nic.Public {
-					network.DisconnectPubTap(ctx, nic.Tap)
+					_ = network.DisconnectPubTap(ctx, nic.Tap)
 				} else {
-					network.RemoveTap(ctx, nic.Tap)
+					_ = network.RemoveTap(ctx, nic.Tap)
 				}
 			}
 		}
@@ -265,7 +265,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	err = p.vmRun(ctx, wl.ID.String(), &config, boot, disks, imageInfo, cmd, networkInfo)
 	if err != nil {
 		// attempt to delete the vm, should the process still be lingering
-		vm.Delete(ctx, wl.ID.String())
+		_ = vm.Delete(ctx, wl.ID.String())
 	}
 
 	return result, err

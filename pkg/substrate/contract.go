@@ -72,8 +72,13 @@ func (s *Substrate) CreateContract(identity *Identity, node uint32, body []byte,
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(identity, c); err != nil {
-		return 0, errors.Wrap(err, "failed to create node")
+	blockHash, err := s.call(identity, c)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create contract")
+	}
+
+	if err := s.checkForError(blockHash, types.NewAccountID(identity.PublicKey)); err != nil {
+		return 0, err
 	}
 
 	return s.GetContractWithHash(node, hash)
@@ -89,8 +94,13 @@ func (s *Substrate) UpdateContract(identity *Identity, contract uint64, body []b
 		return 0, errors.Wrap(err, "failed to create call")
 	}
 
-	if _, err := s.call(identity, c); err != nil {
-		return 0, errors.Wrap(err, "failed to create node")
+	blockHash, err := s.call(identity, c)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to update contract")
+	}
+
+	if err := s.checkForError(blockHash, types.NewAccountID(identity.PublicKey)); err != nil {
+		return 0, err
 	}
 
 	return contract, nil
@@ -104,8 +114,13 @@ func (s *Substrate) CancelContract(identity *Identity, contract uint64) error {
 		return errors.Wrap(err, "failed to cancel call")
 	}
 
-	if _, err := s.call(identity, c); err != nil {
+	blockHash, err := s.call(identity, c)
+	if err != nil {
 		return errors.Wrap(err, "failed to cancel contract")
+	}
+
+	if err := s.checkForError(blockHash, types.NewAccountID(identity.PublicKey)); err != nil {
+		return err
 	}
 
 	return nil

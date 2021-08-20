@@ -4,7 +4,7 @@ GOPATH := $(shell go env GOPATH)
 all: build
 
 getdeps:
-	@echo "Installing golint" && go install golang.org/x/lint/golint@latest
+	@echo "Installing golint" && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
 	@echo "Installing gocyclo" && go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
 	@echo "Installing deadcode" && go install github.com/remyoudompheng/go-misc/deadcode@latest
 	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell@latest
@@ -23,7 +23,7 @@ fmt:
 
 lint:
 	@echo "Running $@"
-	@${GOPATH}/bin/golint -set_exit_status $(shell go list ./... | grep -v stubs)
+	@${GOPATH}/bin/golangci-lint run
 
 ineffassign:
 	@echo "Running $@"

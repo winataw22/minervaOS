@@ -96,7 +96,9 @@ func Create(name string) (ns.NetNS, error) {
 		}
 
 		// Put this thread back to the orig ns, since it might get reused (pre go1.10)
-		defer origNS.Set()
+		defer func() {
+			_ = origNS.Set()
+		}()
 
 		// bind mount the netns from the current thread (from /proc) onto the
 		// mount point. This causes the namespace to persist, even when there

@@ -138,7 +138,9 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 		return err
 	}
 	dhcpMon := NewDHCPMon(dmzPub4, dmzNamespace, z)
-	go dhcpMon.Start(ctx)
+	go func() {
+		_ = dhcpMon.Start(ctx)
+	}()
 
 	return nil
 }
@@ -443,7 +445,9 @@ func waitIP4() error {
 	if err := probe.Start(dmzPub4); err != nil {
 		return err
 	}
-	defer probe.Stop()
+	defer func() {
+		_ = probe.Stop()
+	}()
 
 	link, err := netlink.LinkByName(dmzPub4)
 	if err != nil {

@@ -281,7 +281,7 @@ func (f *flistModule) mountBind(ctx context.Context, name, ro string) error {
 	}
 	defer func() {
 		if err != nil {
-			f.system.Unmount(mountpoint, 0)
+			_ = f.system.Unmount(mountpoint, 0)
 		}
 	}()
 
@@ -321,7 +321,7 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 		// we need to deallocate the filesystem
 
 		if newAllocation && err != nil {
-			f.storage.VolumeDelete(ctx, name)
+			_ = f.storage.VolumeDelete(ctx, name)
 		}
 	}()
 

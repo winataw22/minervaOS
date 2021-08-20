@@ -44,7 +44,9 @@ func TestNamespaceIsolation(t *testing.T) {
 	nsName := "testns"
 	netns, err := Create(nsName)
 	require.NoError(t, err)
-	defer Delete(netns)
+	defer func() {
+		_ = Delete(netns)
+	}()
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		ifaces, err = netlink.LinkList()

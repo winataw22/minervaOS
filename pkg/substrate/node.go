@@ -116,8 +116,8 @@ type Node struct {
 	TwinID        types.U32
 	Resources     Resources
 	Location      Location
-	CountryID     types.U32
-	CityID        types.U32
+	Country       string
+	City          string
 	PublicConfig  OptionPublicConfig
 	Uptime        types.U64
 	Created       types.U64
@@ -200,7 +200,7 @@ func (s *Substrate) CreateNode(identity *Identity, node Node) (uint32, error) {
 
 	c, err := types.NewCall(s.meta, "TfgridModule.create_node",
 		node.FarmID, node.Resources, node.Location,
-		node.CountryID, node.CityID, node.PublicConfig,
+		node.Country, node.City, node.PublicConfig,
 	)
 
 	if err != nil {
@@ -222,7 +222,7 @@ func (s *Substrate) UpdateNode(identity *Identity, node Node) (uint32, error) {
 	}
 
 	c, err := types.NewCall(s.meta, "TfgridModule.update_node", node.ID, node.FarmID, node.Resources, node.Location,
-		node.CountryID, node.CityID, node.PublicConfig,
+		node.Country, node.City, node.PublicConfig,
 	)
 
 	if err != nil {

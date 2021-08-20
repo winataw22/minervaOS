@@ -8,11 +8,12 @@ import (
 
 // Location holds the result of a geoip request
 type Location struct {
-	Longitute float64 `json:"longitude,omitempty"`
-	Latitude  float64 `json:"latitude,omitempty"`
-	Continent string  `json:"continent,omitempty"`
-	Country   string  `json:"country_name,omitempty"`
-	City      string  `json:"city,omitempty"`
+	Longitute   float64 `json:"longitude"`
+	Latitude    float64 `json:"latitude"`
+	Continent   string  `json:"continent"`
+	Country     string  `json:"country_name"`
+	CountryCode string  `json:"country_code"`
+	City        string  `json:"city_name"`
 }
 
 // Fetch retrieves the location of the system calling this function

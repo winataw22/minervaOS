@@ -36,7 +36,7 @@ func TestHardwareAddrFromInputBytes_Range(t *testing.T) {
 	for n := 0; n < 1024; n++ {
 		for s := 0; s < 32; s++ {
 			b := make([]byte, s)
-			rand.Read(b[:])
+			_, _ = rand.Read(b[:])
 			HardwareAddrFromInputBytes(b)
 		}
 	}
@@ -44,7 +44,7 @@ func TestHardwareAddrFromInputBytes_Range(t *testing.T) {
 
 func BenchmarkHardwareAddrFromInputBytes_Range(b *testing.B) {
 	var bs [33]byte
-	rand.Read(bs[:])
+	_, _ = rand.Read(bs[:])
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		HardwareAddrFromInputBytes(bs[:])

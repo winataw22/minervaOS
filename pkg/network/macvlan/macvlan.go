@@ -83,7 +83,7 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 	if netns != nil {
 		err = netns.Do(f)
 	} else {
-		f(nil)
+		err = f(nil)
 	}
 
 	return mv, err
