@@ -24,6 +24,14 @@ func (t *testIdentityManager) NodeID() pkg.StrIdentifier {
 	return pkg.StrIdentifier(t.id)
 }
 
+func (t *testIdentityManager) NodeIDNumeric() (uint32, error) {
+	return 1, nil
+}
+
+func (t *testIdentityManager) Farm() (string, error) {
+	return "test-farm", nil
+}
+
 func (t *testIdentityManager) FarmSecret() (string, error) {
 	return "", nil
 }

@@ -23,9 +23,15 @@ type IdentityManager interface {
 	// NodeID returns the node id (public key)
 	NodeID() StrIdentifier
 
+	// NodeIDNumeric returns the node registered ID.
+	NodeIDNumeric() (uint32, error)
+
 	// FarmID return the farm id this node is part of. this is usually a configuration
 	// that the node is booted with. An error is returned if the farmer id is not configured
 	FarmID() (FarmID, error)
+
+	// Farm returns name of the farm. Or error
+	Farm() (string, error)
 
 	//FarmSecret get the farm secret as defined in the boot params
 	FarmSecret() (string, error)

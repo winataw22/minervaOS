@@ -126,7 +126,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create identity manager")
 	}
 
-	monitor := newVersionMonitor(2 * time.Second)
+	monitor := newVersionMonitor(10 * time.Second)
 	// 3. start zbus server to serve identity interface
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {

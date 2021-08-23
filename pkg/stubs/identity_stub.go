@@ -87,6 +87,22 @@ func (s *IdentityManagerStub) EncryptECDH(ctx context.Context, arg0 []uint8, arg
 	return
 }
 
+func (s *IdentityManagerStub) Farm(ctx context.Context) (ret0 string, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Farm", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *IdentityManagerStub) FarmID(ctx context.Context) (ret0 pkg.FarmID, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "FarmID", args...)
@@ -126,6 +142,22 @@ func (s *IdentityManagerStub) NodeID(ctx context.Context) (ret0 pkg.StrIdentifie
 		panic(err)
 	}
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *IdentityManagerStub) NodeIDNumeric(ctx context.Context) (ret0 uint32, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "NodeIDNumeric", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return

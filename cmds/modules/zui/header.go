@@ -11,6 +11,14 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
+func green(s string) string {
+	return fmt.Sprintf("[%s](fg:green)", s)
+}
+
+func red(s string) string {
+	return fmt.Sprintf("[%s](fg:red)", s)
+}
+
 // func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
 func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r *signalFlag) error {
 	env, err := environment.Get()
@@ -19,20 +27,13 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 	}
 
 	identity := stubs.NewIdentityManagerStub(c)
-	nodeID := identity.NodeID(ctx)
-	var farm string
-	farmID, err := identity.FarmID(ctx)
-	if err != nil {
-		farm = "not set"
-	} else {
-		farm = fmt.Sprintf("%d", farmID)
-	}
+	farmID, _ := identity.FarmID(ctx)
 
 	h.Text = "\n    Fetching realtime node information... please wait."
 
 	s := "          Welcome to [Zero-OS](fg:yellow), [ThreeFold](fg:blue) Autonomous Operating System\n" +
 		"\n" +
-		" This is node [%s](fg:green) (farmer [%s](fg:green))\n" +
+		" This is node %s (farmer %s)\n" +
 		" running Zero-OS version [%s](fg:blue) (mode [%s](fg:cyan))"
 
 	host := stubs.NewVersionMonitorStub(c)
@@ -43,6 +44,21 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 
 	go func() {
 		for version := range ch {
+			var name string
+			var nodeID string
+			var farm string
+			if name, err = identity.Farm(ctx); err != nil {
+				farm = red(fmt.Sprintf("%d: %s", farmID, err.Error()))
+			} else {
+				farm = green(fmt.Sprintf("%d: %s", farmID, name))
+			}
+
+			if node, err := identity.NodeIDNumeric(ctx); err != nil {
+				nodeID = red(err.Error())
+			} else {
+				nodeID = green(fmt.Sprint(node))
+			}
+
 			h.Text = fmt.Sprintf(s, nodeID, farm, version.String(), env.RunningMode.String())
 			r.Signal()
 		}
