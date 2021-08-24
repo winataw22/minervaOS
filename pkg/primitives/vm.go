@@ -312,10 +312,10 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 	if len(cfg.Network.PublicIP) > 0 {
 		deployment := provision.GetDeployment(ctx)
 		ipWl, err := deployment.Get(cfg.Network.PublicIP)
-		ifName := ipWl.ID.String()
 		if err != nil {
 			return err
 		}
+		ifName := ipWl.ID.String()
 		if err := network.RemovePubTap(ctx, ifName); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}
