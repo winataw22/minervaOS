@@ -69,6 +69,7 @@ import (
 	"net"
 
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/rmb"
 )
@@ -192,6 +193,16 @@ func (n *NodeClient) NetworkGetPublicConfig(ctx context.Context) (cfg pkg.Public
 	const cmd = "zos.network.public_config_get"
 
 	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &cfg); err != nil {
+		return
+	}
+
+	return
+}
+
+func (n *NodeClient) SystemDMI(ctx context.Context) (result dmi.DMI, err error) {
+	const cmd = "zos.system.dmi"
+
+	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
 		return
 	}
 

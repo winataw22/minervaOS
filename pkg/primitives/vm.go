@@ -114,14 +114,16 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
 	}
 
+	var ifs []string
+	var pubIf string
+
 	defer func() {
 		if err != nil {
-			for _, nic := range networkInfo.Ifaces {
-				if nic.Public {
-					_ = network.DisconnectPubTap(ctx, nic.Tap)
-				} else {
-					_ = network.RemoveTap(ctx, nic.Tap)
-				}
+			for _, nic := range ifs {
+				_ = network.RemoveTap(ctx, nic)
+			}
+			if pubIf != "" {
+				_ = network.DisconnectPubTap(ctx, pubIf)
 			}
 		}
 	}()
@@ -131,6 +133,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err != nil {
 			return result, err
 		}
+		ifs = append(ifs, tapNameFromName(wl.ID, string(nic.Network)))
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 	}
 
@@ -139,6 +142,9 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err != nil {
 			return result, err
 		}
+
+		ipWl, _ := deployment.Get(config.Network.PublicIP)
+		pubIf = tapNameFromName(ipWl.ID, "pub")
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 	}
 
@@ -149,6 +155,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		}
 
 		log.Debug().Msgf("Planetary: %+v", inf)
+		ifs = append(ifs, tapNameFromName(wl.ID, "ygg"))
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 	}
 	// - mount flist RO
@@ -315,7 +322,7 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 		if err != nil {
 			return err
 		}
-		ifName := ipWl.ID.String()
+		ifName := tapNameFromName(ipWl.ID, "pub")
 		if err := network.RemovePubTap(ctx, ifName); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}

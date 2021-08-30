@@ -90,8 +90,9 @@ func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.Work
 }
 
 func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
+	tapName := tapNameFromName(wl.ID, "pub")
 	network := stubs.NewNetworkerStub(p.zbus)
-	fName := filterName(wl.ID.String())
+	fName := filterName(tapName)
 
 	if network.PubIPFilterExists(ctx, fName) {
 		return result, provision.ErrDidNotChange
@@ -101,9 +102,8 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	if err != nil {
 		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
 	}
-
-	tapName := fmt.Sprintf("p-%s", wl.ID.String()) // TODO: clean this up, needs to come form networkd
-	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(wl.ID.String()))
+	ifName := fmt.Sprintf("p-%s", tapName) // TODO: clean this up, needs to come form networkd
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
 
 	predictedIPv6, err := predictedSlaac(pubIP6Base.IP, mac.String())
 	if err != nil {
@@ -115,18 +115,19 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 		return zos.PublicIPResult{}, err
 	}
 
-	err = network.SetupPubIPFilter(ctx, fName, tapName, result.IP.IP.String(), predictedIPv6, mac.String())
+	err = network.SetupPubIPFilter(ctx, fName, ifName, result.IP.IP.String(), predictedIPv6, mac.String())
 	return
 }
 
 func (p *Primitives) publicIPDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	// Disconnect the public interface from the network if one exists
 	network := stubs.NewNetworkerStub(p.zbus)
-	fName := filterName(wl.ID.String())
+	tapName := tapNameFromName(wl.ID, "pub")
+	fName := filterName(tapName)
 	if err := network.RemovePubIPFilter(ctx, fName); err != nil {
 		log.Error().Err(err).Msg("could not remove filter rules")
 	}
-	return network.DisconnectPubTap(ctx, wl.ID.String())
+	return network.DisconnectPubTap(ctx, tapName)
 }
 
 func filterName(reservationID string) string {

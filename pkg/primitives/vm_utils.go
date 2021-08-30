@@ -120,21 +120,20 @@ func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment grid
 	if err != nil {
 		return pkg.VMIface{}, err
 	}
-	name := ipWl.ID.String()
+	tapName := tapNameFromName(ipWl.ID, "pub")
 
 	pubIP, pubGw, err := p.getPubIPConfig(ipWl)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not get public ip config")
 	}
-
-	pubIface, err := network.SetupPubTap(ctx, name)
+	pubIface, err := network.SetupPubTap(ctx, tapName)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device for public network")
 	}
 
 	// the mac address uses the global workload id
 	// this needs to be the same as how we get it in the actual IP reservation
-	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(ipWl.ID.String()))
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
 
 	return pkg.VMIface{
 		Tap: pubIface,

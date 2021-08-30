@@ -7,7 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 
+	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/monitord"
+	"github.com/threefoldtech/zos/pkg/rmb"
+	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 
 	"github.com/rs/zerolog/log"
@@ -73,13 +76,41 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	node, twin, err := registration(ctx, redis)
+	oracle := capacity.NewResourceOracle(stubs.NewStorageModuleStub(redis))
+	cap, err := oracle.Total()
+	if err != nil {
+		return errors.Wrap(err, "failed to get node capacity")
+	}
+
+	bus, err := rmb.New(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize message bus server")
+	}
+
+	dmi, err := oracle.DMI()
+	if err != nil {
+		return errors.Wrap(err, "failed to get dmi information")
+	}
+
+	bus.WithHandler("zos.system.dmi", func(ctx context.Context, payload []byte) (interface{}, error) {
+		return dmi, nil
+	})
+
+	// answer calls for dmi
+	go func() {
+		if err := bus.Run(ctx); err != nil {
+			log.Fatal().Err(err).Msg("message bus handler failure")
+		}
+	}()
+
+	node, twin, err := registration(ctx, redis, cap)
 	if err != nil {
 		return errors.Wrap(err, "failed during node registration")
 	}
 
 	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
 
+	// uptime update
 	go func() {
 		for {
 			if err := uptime(ctx, redis); err != nil {

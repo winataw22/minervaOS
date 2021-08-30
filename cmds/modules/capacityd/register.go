@@ -14,7 +14,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -27,22 +26,15 @@ const (
 	reportUptimeEvery = 8 * time.Hour
 )
 
-func registration(ctx context.Context, cl zbus.Client) (nodeID, twinID uint32, err error) {
+func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (nodeID, twinID uint32, err error) {
 	env, err := environment.Get()
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to get runtime environment for zos")
 	}
 
-	storage := stubs.NewStorageModuleStub(cl)
-
 	loc, err := geoip.Fetch()
 	if err != nil {
 		log.Fatal().Err(err).Msg("fetch location")
-	}
-	oracle := capacity.NewResourceOracle(storage)
-	cap, err := oracle.Total()
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get node capacity")
 	}
 
 	log.Debug().

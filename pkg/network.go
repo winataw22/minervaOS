@@ -87,13 +87,13 @@ type Networker interface {
 	// SetupPubTap sets up a tap device in the host namespace for the public ip
 	// reservation id. It is hooked to the public bridge. The name of the tap
 	// interface is returned
-	SetupPubTap(PubIPReservationID string) (string, error)
+	SetupPubTap(name string) (string, error)
 
 	// PubTapExists checks if the tap device for the public network exists already
-	PubTapExists(PubIPReservationID string) (bool, error)
+	PubTapExists(name string) (bool, error)
 
 	// RemovePubTap removes the public tap device from the host namespace
-	RemovePubTap(PubIPReservationID string) error
+	RemovePubTap(name string) error
 
 	// SetupPubIPFilter sets up filter for this public ip
 	SetupPubIPFilter(filterName string, iface string, ip string, ipv6 string, mac string) error
@@ -105,7 +105,7 @@ type Networker interface {
 	PubIPFilterExists(filterName string) bool
 	// DisconnectPubTap disconnects the public tap from the network. The interface
 	// itself is not removed and will need to be cleaned up later
-	DisconnectPubTap(PubIPReservationID string) error
+	DisconnectPubTap(name string) error
 
 	// GetSubnet of the network with the given ID on the local node
 	GetSubnet(networkID NetID) (net.IPNet, error)
