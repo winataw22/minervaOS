@@ -410,12 +410,15 @@ func (f *flistModule) flistMountpath(hash string) (string, error) {
 // ErrAlreadyMounted is returned when checking if a path has already
 // something mounted on it
 var ErrAlreadyMounted = errors.New("path is already mounted")
+var ErrTransportEndpointIsNotConencted = errors.New("transport endpoint is not connected")
 
 // valid checks that this mount path is free, and can be used
 func (f *flistModule) valid(path string) error {
 	stat, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return nil
+	} else if err != nil && strings.Contains(err.Error(), ErrTransportEndpointIsNotConencted.Error()) {
+		return f.system.Unmount(path, 0)
 	} else if err != nil {
 		return errors.Wrapf(err, "failed to check mountpoint: %s", path)
 	}
