@@ -92,8 +92,17 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get dmi information")
 	}
 
+	hypervisor, err := oracle.GetHypervisor()
+	if err != nil {
+		return errors.Wrap(err, "failed to get hypervisors")
+	}
+
 	bus.WithHandler("zos.system.dmi", func(ctx context.Context, payload []byte) (interface{}, error) {
 		return dmi, nil
+	})
+
+	bus.WithHandler("zos.system.hypervisor", func(ctx context.Context, payload []byte) (interface{}, error) {
+		return hypervisor, nil
 	})
 
 	// answer calls for dmi

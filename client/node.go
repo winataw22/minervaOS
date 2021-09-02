@@ -208,3 +208,13 @@ func (n *NodeClient) SystemDMI(ctx context.Context) (result dmi.DMI, err error) 
 
 	return
 }
+
+func (n *NodeClient) SystemHypervisor(ctx context.Context) (result string, err error) {
+	const cmd = "zos.system.hypervisor"
+
+	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
+		return
+	}
+
+	return
+}

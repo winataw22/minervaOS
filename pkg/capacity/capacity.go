@@ -112,18 +112,22 @@ func (r *ResourceOracle) Disks() (d Disks, err error) {
 }
 
 //GetHypervisor gets the name of the hypervisor used on the node
-func (r *ResourceOracle) GetHypervisor() ([]string, error) {
+func (r *ResourceOracle) GetHypervisor() (string, error) {
 	out, err := exec.Command("virt-what").CombinedOutput()
 
 	if err != nil {
-		return nil, errors.Wrap(err, "could not detect if VM or not")
+		return "", errors.Wrap(err, "could not detect if VM or not")
 	}
 
 	str := strings.TrimSpace(string(out))
 	if len(str) == 0 {
-		return nil, nil
+		return "", nil
 	}
 
-	lines := strings.Split(str, "\n")
-	return lines, nil
+	lines := strings.Fields(str)
+	if len(lines) > 0 {
+		return lines[0], nil
+	}
+
+	return "", nil
 }
