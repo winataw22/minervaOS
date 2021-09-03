@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -27,14 +28,40 @@ const (
 )
 
 func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (nodeID, twinID uint32, err error) {
+	var (
+		netMgr = stubs.NewNetworkerStub(cl)
+	)
+
 	env, err := environment.Get()
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to get runtime environment for zos")
 	}
 
+	// we need to collect all node information here
+	// - we already have capacity
+	// - we get the location (will not change after initial registration)
 	loc, err := geoip.Fetch()
 	if err != nil {
 		log.Fatal().Err(err).Msg("fetch location")
+	}
+
+	// - node public config
+
+	var pub *pkg.PublicConfig
+	if pubCfg, err := netMgr.GetPublicConfig(ctx); err == nil {
+		pub = &pubCfg
+	}
+
+	// - yggdrasil
+	// node always register with ndmz address
+	var ygg net.IP
+	if ips, err := netMgr.Addrs(ctx, yggdrasil.YggNSInf, "ndmz"); err == nil {
+		if len(ips) == 0 {
+			return 0, 0, errors.Wrap(err, "failed to get yggdrasil ip")
+		}
+		if len(ips) == 1 {
+			ygg = net.IP(ips[0])
+		}
 	}
 
 	log.Debug().
@@ -53,7 +80,7 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	exp.MaxInterval = 2 * time.Minute
 	bo := backoff.WithContext(exp, ctx)
 	err = backoff.RetryNotify(func() error {
-		nodeID, twinID, err = registerNode(ctx, env, cl, sub, cap, loc)
+		nodeID, twinID, err = registerNode(ctx, env, cl, sub, cap, loc, pub, ygg)
 		return err
 	}, bo, retryNotify)
 
@@ -61,7 +88,90 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 		return 0, 0, errors.Wrap(err, "failed to register node")
 	}
 
+	// well the node is registed. but now we need to monitor changes to networking
+	// to update the node
+	go func() {
+		for {
+			err := watch(ctx, env, cl, sub, cap, loc, pub, ygg)
+			if errors.Is(err, context.Canceled) {
+				return
+			} else if err != nil {
+				log.Error().Err(err).Msg("watching network changes failed")
+				<-time.After(3 * time.Second)
+			}
+		}
+	}()
+
 	return nodeID, twinID, nil
+}
+
+func watch(
+	ctx context.Context,
+	env environment.Environment,
+	cl zbus.Client,
+	sub *substrate.Substrate,
+	cap gridtypes.Capacity,
+	loc geoip.Location,
+	pub *pkg.PublicConfig,
+	ygg net.IP,
+) error {
+	var (
+		netMgr = stubs.NewNetworkerStub(cl)
+	)
+
+	pubCh, err := netMgr.PublicAddresses(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to register on public config changes")
+	}
+
+	yggCh, err := netMgr.YggAddresses(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to register on ygg ips changes")
+	}
+
+	log.Info().Msg("start watching node network changes")
+	for {
+		update := false
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case pubInput := <-pubCh:
+			var pubNew *pkg.PublicConfig
+			if pubInput.HasPublicConfig {
+				pubNew = &pubInput.PublicConfig
+			}
+			if !reflect.DeepEqual(pub, pubNew) {
+				pub = pubNew
+				update = true
+			}
+		case yggInput := <-yggCh:
+			var yggNew net.IP
+			if len(yggInput) > 0 {
+				yggNew = yggInput[0].IP
+			}
+			if !yggNew.Equal(ygg) {
+				ygg = yggNew
+				update = true
+			}
+		}
+
+		if !update {
+			continue
+		}
+		// some of the node config has changed. we need to try register it again
+		log.Debug().Msg("node setup seems to have been changed. re-register")
+		exp := backoff.NewExponentialBackOff()
+		exp.MaxInterval = 2 * time.Minute
+		bo := backoff.WithContext(exp, ctx)
+		err = backoff.RetryNotify(func() error {
+			_, _, err := registerNode(ctx, env, cl, sub, cap, loc, pub, ygg)
+			return err
+		}, bo, retryNotify)
+
+		if err != nil {
+			return errors.Wrap(err, "failed to register node")
+		}
+	}
 }
 
 func retryNotify(err error, d time.Duration) {
@@ -75,14 +185,15 @@ func registerNode(
 	sub *substrate.Substrate,
 	cap gridtypes.Capacity,
 	loc geoip.Location,
+	pub *pkg.PublicConfig,
+	ygg net.IP,
 ) (nodeID, twinID uint32, err error) {
 	var (
-		mgr    = stubs.NewIdentityManagerStub(cl)
-		netMgr = stubs.NewNetworkerStub(cl)
+		mgr = stubs.NewIdentityManagerStub(cl)
 	)
 
 	var pubCfg substrate.OptionPublicConfig
-	if pub, err := netMgr.GetPublicConfig(ctx); err == nil {
+	if pub != nil {
 		pubCfg.HasValue = true
 		pubCfg.AsValue = substrate.PublicConfig{
 			IPv4: pub.IPv4.String(),
@@ -116,14 +227,7 @@ func registerNode(
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 
-	// make sure the node twin exists
-	cfg := yggdrasil.GenerateConfig(sk)
-	address, err := cfg.Address()
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get yggdrasil address")
-	}
-
-	twinID, err = ensureTwin(sub, sk, address)
+	twinID, err = ensureTwin(sub, sk, ygg)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure twin")
 	}

@@ -8,13 +8,30 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 )
 
+var (
+	// persistencePath is path to config file.
+	persistencePath = ""
+)
+
+func SetPersistence(path string) {
+	persistencePath = path
+}
+
+func getPersistencePath() string {
+	if persistencePath == "" {
+		panic("public config persistence path is not set")
+	}
+	return persistencePath
+}
+
 // ErrNoPublicConfig is the error returns by ReadPubIface when no public
 // interface is configured
-var ErrNoPublicConfig = errors.New("no public interface configured for this node")
+var ErrNoPublicConfig = errors.New("no public configuration")
 
 // LoadPublicConfig loads public config from file
-func LoadPublicConfig(path string) (*pkg.PublicConfig, error) {
-	file, err := os.Open(path)
+func LoadPublicConfig() (*pkg.PublicConfig, error) {
+
+	file, err := os.Open(getPersistencePath())
 	if os.IsNotExist(err) {
 		// it's not an error to not have config
 		// but we return a nil config
@@ -33,14 +50,8 @@ func LoadPublicConfig(path string) (*pkg.PublicConfig, error) {
 }
 
 // SavePublicConfig stores public config in a file
-func SavePublicConfig(path string, cfg *pkg.PublicConfig) error {
-	if cfg == nil {
-		if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-			return errors.Wrap(err, "couldn't delete config file")
-		}
-	}
-
-	file, err := os.Create(path)
+func SavePublicConfig(cfg pkg.PublicConfig) error {
+	file, err := os.Create(getPersistencePath())
 	if err != nil {
 		return errors.Wrap(err, "failed to create configuration file")
 	}

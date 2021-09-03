@@ -35,6 +35,10 @@ func New(socket string) (*Client, error) {
 	return &Client{conn: conn, scan: scan}, nil
 }
 
+func Default() (*Client, error) {
+	return New(defaultSocketPath)
+}
+
 // Close closes the socket connection
 func (c *Client) Close() error {
 	if c.conn != nil {

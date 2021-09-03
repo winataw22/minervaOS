@@ -2,7 +2,6 @@ package networkd
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,9 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/network/latency"
 	"github.com/threefoldtech/zos/pkg/network/public"
-	"github.com/threefoldtech/zos/pkg/zinit"
 	"github.com/urfave/cli/v2"
 
 	"github.com/cenkalti/backoff/v3"
@@ -81,7 +78,8 @@ func action(cli *cli.Context) error {
 	})
 
 	publicCfgPath := filepath.Join(root, publicConfigFile)
-	pub, err := public.LoadPublicConfig(publicCfgPath)
+	public.SetPersistence(publicCfgPath)
+	pub, err := public.LoadPublicConfig()
 	log.Debug().Err(err).Msgf("public interface configred: %+v", pub)
 	if err != nil && err != public.ErrNoPublicConfig {
 		return errors.Wrap(err, "failed to get node public_config")
@@ -102,18 +100,43 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to host firewall rules")
 	}
 	log.Debug().Msg("starting yggdrasil")
-	ygg, err := startYggdrasil(ctx, identity.PrivateKey(cli.Context), dmz)
+	yggNamespace := dmz.Namespace()
+	if public.HasPublicSetup() {
+		yggNamespace = public.PublicNamespace
+	}
+
+	yggNs, err := yggdrasil.NewYggdrasilNamespace(yggNamespace)
+	if err != nil {
+		return errors.Wrap(err, "failed to create yggdrasil namespace")
+	}
+
+	ygg, err := yggdrasil.EnsureYggdrasil(ctx, identity.PrivateKey(cli.Context), yggNs)
 	if err != nil {
 		return errors.Wrap(err, "fail to start yggdrasil")
 	}
 
-	gw, err := ygg.Gateway()
-	if err != nil {
-		return errors.Wrap(err, "fail read yggdrasil subnet")
-	}
+	if public.HasPublicSetup() {
+		// if yggdrasil is living inside public namespace
+		// we still need to setup ndmz to also have yggdrasil but we set the yggdrasil interface
+		// a different Ip that lives inside the yggdrasil range.
+		dmzYgg, err := yggdrasil.NewYggdrasilNamespace(dmz.Namespace())
+		if err != nil {
+			return errors.Wrap(err, "failed to setup ygg for dmz namespace")
+		}
 
-	if err := dmz.SetIP(gw); err != nil {
-		return errors.Wrap(err, "fail to configure yggdrasil subnet gateway IP")
+		ip, err := ygg.SubnetFor([]byte(fmt.Sprintf("ygg:%s", dmz.Namespace())))
+		if err != nil {
+			return errors.Wrap(err, "failed to calculate ip for ygg inside dmz")
+		}
+
+		gw, err := ygg.Gateway()
+		if err != nil {
+			return err
+		}
+
+		if err := dmzYgg.SetYggIP(ip, gw.IP); err != nil {
+			return errors.Wrap(err, "failed to set yggdrasil ip for dmz")
+		}
 	}
 
 	log.Info().Msg("start zbus server")
@@ -121,7 +144,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "fail to create module root")
 	}
 
-	networker, err := network.NewNetworker(identity, publicCfgPath, dmz, ygg)
+	networker, err := network.NewNetworker(identity, dmz, ygg)
 	if err != nil {
 		return errors.Wrap(err, "error creating network manager")
 	}
@@ -164,110 +187,4 @@ func waitYggdrasilBin() {
 	}, bo, func(err error, d time.Duration) {
 		log.Warn().Err(err).Msgf("yggdrasil binary not found, retying in %s", d.String())
 	})
-}
-
-func fetchPeerList() yggdrasil.Peers {
-	// Try to fetch public peer
-	// If we failed to do so, use the fallback hardcoded peer list
-	var pl yggdrasil.Peers
-
-	// Do not retry more than 4 times
-	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 4)
-
-	fetchPeerList := func() error {
-		p, err := yggdrasil.FetchPeerList()
-		if err != nil {
-			log.Debug().Err(err).Msg("failed to fetch yggdrasil peers")
-			return err
-		}
-		pl = p
-		return nil
-	}
-
-	err := backoff.Retry(fetchPeerList, bo)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to read yggdrasil public peer list online, using fallback")
-		pl = yggdrasil.PeerListFallback
-	}
-
-	return pl
-}
-
-func startYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, dmz ndmz.DMZ) (*network.YggServer, error) {
-	pl := fetchPeerList()
-	peersUp := pl.Ups()
-	endpoints := make([]string, len(peersUp))
-	for i, p := range peersUp {
-		endpoints[i] = p.Endpoint
-	}
-
-	// filter out the possible yggdrasil public node
-	var filter latency.IPFilter
-	ipv4Only, err := dmz.IsIPv4Only()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check ipv6 support for dmz")
-	}
-
-	if ipv4Only {
-		// if we are a hidden node,only keep ipv4 public nodes
-		filter = latency.IPV4Only
-	} else {
-		// if we are a dual stack node, filter out all the nodes from the same
-		// segment so we do not just connect locally
-		ips, err := dmz.GetIP(ndmz.FamilyV6)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get ndmz public ipv6")
-		}
-
-		for _, ip := range ips {
-			if ip.IP.IsGlobalUnicast() {
-				filter = latency.ExcludePrefix(ip.IP[:8])
-				break
-			}
-		}
-	}
-
-	ls := latency.NewSorter(endpoints, 5, filter)
-	results := ls.Run(ctx)
-	if len(results) == 0 {
-		return nil, fmt.Errorf("cannot find public yggdrasil peer to connect to")
-	}
-
-	// select the best 3 public peers
-	peers := make([]string, 3)
-	for i := 0; i < 3; i++ {
-		if len(results) > i {
-			peers[i] = results[i].Endpoint
-			log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
-		}
-	}
-
-	z, err := zinit.New("")
-	if err != nil {
-		return nil, err
-	}
-
-	cfg := yggdrasil.GenerateConfig(privateKey)
-	cfg.Peers = peers
-
-	server := network.NewYggServer(z, &cfg)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			if err := server.Stop(); err != nil {
-				log.Error().Err(err).Msg("error while stopping yggdrasil")
-			}
-			if err := z.Close(); err != nil {
-				log.Error().Err(err).Msg("error while closing zinit client")
-			}
-			log.Info().Msg("yggdrasil stopped")
-		}
-	}()
-
-	if err := server.Start(); err != nil {
-		return nil, err
-	}
-
-	return server, nil
 }

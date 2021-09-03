@@ -225,7 +225,12 @@ func (s *StorageModuleStub) Monitor(ctx context.Context) (<-chan pkg.PoolsStats,
 			if err := event.Unmarshal(&obj); err != nil {
 				panic(err)
 			}
-			ch <- obj
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- obj:
+			default:
+			}
 		}
 	}()
 	return ch, nil

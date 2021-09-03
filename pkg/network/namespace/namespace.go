@@ -17,6 +17,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var (
+	ErrNotNamedNamespace = fmt.Errorf("name space is not named")
+)
+
 const (
 	netNSPath = "/var/run/netns"
 )
@@ -145,6 +149,19 @@ func Delete(ns ns.NetNS) error {
 	}
 
 	return nil
+}
+
+// Name gets the name of the namespace if it was created with Create
+// otherwise return ErrNotNamedNamespace
+func Name(ns ns.NetNS) (string, error) {
+	path := ns.Path()
+
+	dir, name := filepath.Split(path)
+	if dir != netNSPath {
+		return "", ErrNotNamedNamespace
+	}
+
+	return name, nil
 }
 
 // Exists checks if a network namespace exists or not

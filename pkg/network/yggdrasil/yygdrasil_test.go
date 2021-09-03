@@ -1,4 +1,4 @@
-package network
+package yggdrasil
 
 import (
 	"net"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg/identity"
-	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"gotest.tools/assert"
 )
 
@@ -14,8 +13,8 @@ func TestAddresses(t *testing.T) {
 	kp, err := identity.FromSeed([]byte("00000000000000000000000000000000"))
 	require.NoError(t, err)
 
-	cfg := yggdrasil.GenerateConfig(kp.PrivateKey)
-	s := NewYggServer(nil, &cfg)
+	cfg := GenerateConfig(kp.PrivateKey)
+	s := NewYggServer(&cfg)
 
 	ip, err := s.Address()
 	require.NoError(t, err)

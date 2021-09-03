@@ -36,8 +36,7 @@ import (
 const (
 
 	//ndmzBridge is the name of the ipv4 routing bridge in the ndmz namespace
-	ndmzBridge    = "br-ndmz"
-	ndmzYggBridge = types.YggBridge
+	ndmzBridge = "br-ndmz"
 
 	//dmzNamespace name of the dmz namespace
 	dmzNamespace = "ndmz"
@@ -49,8 +48,6 @@ const (
 	dmzPub4 = "npub4"
 	// dmzPub6 ipv6 public interface
 	dmzPub6 = "npub6"
-
-	dmzYgg = "nygg6"
 
 	//nrPubIface is the name of the public interface in a network resource
 	nrPubIface = "public"
@@ -70,6 +67,10 @@ func New(nodeID string, public *netlink.Bridge) DMZ {
 		nodeID: nodeID,
 		public: public,
 	}
+}
+
+func (d *dmzImpl) Namespace() string {
+	return dmzNamespace
 }
 
 // Create create the NDMZ network namespace and configure its default routes and addresses
@@ -97,10 +98,6 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 
 	if err := createRoutingBridge(ndmzBridge, netNS); err != nil {
 		return errors.Wrapf(err, "ndmz: createRoutingBridge error")
-	}
-
-	if err := createYggBridge(ndmzYggBridge, netNS); err != nil {
-		return errors.Wrapf(err, "ndmz: createYggBridge error")
 	}
 
 	if err := createPubIface6(dmzPub6, d.public, d.nodeID, netNS); err != nil {
@@ -231,40 +228,6 @@ func (d *dmzImpl) AttachNR(networkID string, nr *nr.NetResource, ipamLeaseDir st
 	})
 }
 
-// IsIPv4Only means dmz only supports ipv4 addresses
-func (d *dmzImpl) IsIPv4Only() (bool, error) {
-	// this is true if DMZPub6 only has local not routable ipv6 addresses
-	//DMZPub6
-	netNS, err := namespace.GetByName(dmzNamespace)
-	if err != nil {
-		return false, errors.Wrap(err, "failed to get ndmz namespace")
-	}
-	defer netNS.Close()
-
-	var ipv4Only bool
-	err = netNS.Do(func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(dmzPub6)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get interface '%s'", dmzPub6)
-		}
-		ips, err := netlink.AddrList(link, netlink.FAMILY_V6)
-		if err != nil {
-			return errors.Wrapf(err, "failed to list '%s' ips", dmzPub6)
-		}
-
-		for _, ip := range ips {
-			if ip.IP.IsGlobalUnicast() && !ifaceutil.IsULA(ip.IP) {
-				return nil
-			}
-		}
-
-		ipv4Only = true
-		return nil
-	})
-
-	return ipv4Only, err
-}
-
 func (d *dmzImpl) GetIPFor(inf string) ([]net.IPNet, error) {
 
 	netns, err := namespace.GetByName(dmzNamespace)
@@ -338,46 +301,6 @@ func (d *dmzImpl) GetIP(family int) ([]net.IPNet, error) {
 	})
 
 	return results, err
-}
-
-// SetIP sets an ip inside dmz
-func (d *dmzImpl) SetIP(subnet net.IPNet) error {
-	netns, err := namespace.GetByName(dmzNamespace)
-	if err != nil {
-		return err
-	}
-	defer netns.Close()
-
-	err = netns.Do(func(_ ns.NetNS) error {
-		inf := dmzPub4
-		if ip6 := subnet.IP.To16(); ip6 != nil {
-			// this still can be an ygg address
-			// so ..
-			_, ygg, err := net.ParseCIDR("200::/7")
-			if err != nil {
-				panic(err)
-			}
-
-			if ygg.Contains(ip6) {
-				inf = dmzYgg
-			} else {
-				inf = dmzPub6
-			}
-		}
-
-		link, err := netlink.LinkByName(inf)
-		if err != nil {
-			return err
-		}
-
-		if err := netlink.AddrAdd(link, &netlink.Addr{
-			IPNet: &subnet,
-		}); err != nil && !os.IsExist(err) {
-			return err
-		}
-		return nil
-	})
-	return err
 }
 
 // SupportsPubIPv4 implements DMZ interface
@@ -538,29 +461,6 @@ func createPubIface4(name, nodeID string, netNS ns.NetNS) error {
 			Msg("set mac on ipv4 ndmz public iface")
 
 		return ifaceutil.SetMAC(name, mac, nil)
-	})
-}
-
-func createYggBridge(name string, netNS ns.NetNS) error {
-	if !bridge.Exists(name) {
-		if _, err := bridge.New(name); err != nil {
-			return errors.Wrapf(err, "couldn't create bridge %s", name)
-		}
-	}
-
-	if !ifaceutil.Exists(dmzYgg, netNS) {
-		if _, err := macvlan.Create(dmzYgg, name, netNS); err != nil {
-			return errors.Wrapf(err, "ndmz: couldn't create %s", dmzYgg)
-		}
-	}
-
-	return netNS.Do(func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(dmzYgg)
-		if err != nil {
-			return err
-		}
-
-		return netlink.LinkSetUp(link)
 	})
 }
 

@@ -117,6 +117,8 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed during node registration")
 	}
 
+	// TODO: monitor change to yggdrasil Ip and update the twin according
+
 	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
 
 	// uptime update

@@ -3,6 +3,7 @@ package zui
 import (
 	"context"
 	_ "fmt"
+	"net"
 	"strings"
 
 	ui "github.com/gizak/termui/v3"
@@ -49,6 +50,10 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 	toString := func(al pkg.NetlinkAddresses) string {
 		var buf strings.Builder
 		for _, a := range al {
+			if a.IP == nil || len(a.IP) == 0 {
+				continue
+			}
+
 			if buf.Len() > 0 {
 				buf.WriteString(", ")
 			}
@@ -70,7 +75,11 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 			case a := <-ygg:
 				table.Rows[2][1] = toString(a)
 			case a := <-pub:
-				table.Rows[3][1] = toString(a)
+				str := "no public config"
+				if a.HasPublicConfig {
+					str = toString([]net.IPNet{a.IPv4.IPNet, a.IPv6.IPNet})
+				}
+				table.Rows[3][1] = str
 			}
 
 			render.Signal()

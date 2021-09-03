@@ -1,4 +1,4 @@
-package latency
+package latency_test
 
 import (
 	"context"
@@ -8,17 +8,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/threefoldtech/zos/pkg/network/latency"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 )
 
 func TestLatency(t *testing.T) {
-	l, err := Latency("explorer.grid.tf:80")
+	l, err := latency.Latency("explorer.grid.tf:80")
 	require.NoError(t, err)
 	t.Log(l)
 }
 
 func TestLatencySorter(t *testing.T) {
-	ls := NewSorter([]string{
+	ls := latency.NewSorter([]string{
 		"explorer.grid.tf:80",
 		"google.com:80",
 	}, 2)
@@ -30,14 +31,14 @@ func TestLatencySorter(t *testing.T) {
 	for _, r := range results {
 		fmt.Printf("%s %v\n", r.Endpoint, r.Latency)
 	}
-	assert.Equal(t, len(ls.endpoints), len(results))
+	assert.Equal(t, 2, len(results))
 }
 
 func TestLatencySorterIPV4Only(t *testing.T) {
-	ls := NewSorter([]string{
+	ls := latency.NewSorter([]string{
 		"tcp://[2a00:1450:400e:806::200e]:443",
 		"tcp://172.217.17.78:443",
-	}, 1, IPV4Only)
+	}, 1, latency.IPV4Only)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -56,7 +57,7 @@ func TestYggPeering(t *testing.T) {
 		endpoints[i] = p.Endpoint
 	}
 
-	ls := NewSorter(endpoints, 2)
+	ls := latency.NewSorter(endpoints, 2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -82,7 +83,7 @@ func TestIPV4Only(t *testing.T) {
 		},
 	} {
 		t.Run(tc.ip.String(), func(t *testing.T) {
-			assert.Equal(t, tc.ipv4, IPV4Only(tc.ip))
+			assert.Equal(t, tc.ipv4, latency.IPV4Only(tc.ip))
 		})
 	}
 }
@@ -105,7 +106,7 @@ func TestExcludePrefix(t *testing.T) {
 		},
 	} {
 		t.Run(tc.ip.String(), func(t *testing.T) {
-			assert.Equal(t, tc.expect, ExcludePrefix(tc.prefix[:8])(tc.ip))
+			assert.Equal(t, tc.expect, latency.ExcludePrefix(tc.prefix[:8])(tc.ip))
 		})
 	}
 

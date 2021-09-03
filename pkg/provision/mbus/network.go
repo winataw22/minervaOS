@@ -104,16 +104,17 @@ func (n *Network) listInterfaces(ctx context.Context) (interface{}, mw.Response)
 	mgr := stubs.NewNetworkerStub(n.cl)
 	results := make(map[string][]net.IP)
 	type q struct {
-		inf string
-		ns  string
+		inf    string
+		ns     string
+		rename string
 	}
-	for _, i := range []q{{"zos", ""}, {"ygg0", "ndmz"}} {
+	for _, i := range []q{{"zos", "", "zos"}, {"nygg6", "ndmz", "ygg"}} {
 		ips, err := mgr.Addrs(ctx, i.inf, i.ns)
 		if err != nil {
 			return nil, mw.Error(errors.Wrapf(err, "failed to get ips for '%s' interface", i))
 		}
 
-		results[i.inf] = func() []net.IP {
+		results[i.rename] = func() []net.IP {
 			list := make([]net.IP, 0, len(ips))
 			for _, item := range ips {
 				ip := net.IP(item)

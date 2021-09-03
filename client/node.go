@@ -199,6 +199,18 @@ func (n *NodeClient) NetworkGetPublicConfig(ctx context.Context) (cfg pkg.Public
 	return
 }
 
+// NetworkGetPublicConfig returns the current public node network configuration. A node with a
+// public config can be used as an access node for wireguard.
+func (n *NodeClient) NetworkSetPublicConfig(ctx context.Context, cfg pkg.PublicConfig) error {
+	const cmd = "zos.network.public_config_set"
+
+	if err := n.bus.Call(ctx, n.nodeTwin, cmd, cfg, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (n *NodeClient) SystemDMI(ctx context.Context) (result dmi.DMI, err error) {
 	const cmd = "zos.system.dmi"
 

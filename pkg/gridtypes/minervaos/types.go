@@ -15,9 +15,10 @@ const (
 	ZDBType gridtypes.WorkloadType = "zdb"
 	// ZMachineType type
 	ZMachineType gridtypes.WorkloadType = "zmachine"
-
-	//PublicIPType reservation
+	//PublicIPType type
 	PublicIPType gridtypes.WorkloadType = "ipv4"
+	// GatewayNameProxyType type
+	GatewayNameProxyType gridtypes.WorkloadType = "gateway-proxy"
 )
 
 func init() {
@@ -26,6 +27,7 @@ func init() {
 	gridtypes.RegisterType(ZDBType, ZDB{})
 	gridtypes.RegisterType(ZMachineType, ZMachine{})
 	gridtypes.RegisterType(PublicIPType, PublicIP{})
+	gridtypes.RegisterType(GatewayNameProxyType, GatewayNameProxy{})
 }
 
 // DeviceType is the actual type of hardware that the storage device runs on,

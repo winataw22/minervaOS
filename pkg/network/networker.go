@@ -2,20 +2,19 @@ package network
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
-	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/macvtap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
@@ -23,7 +22,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
-	"github.com/threefoldtech/zos/pkg/substrate"
 
 	"github.com/vishvananda/netlink"
 
@@ -71,15 +69,14 @@ type networker struct {
 	ipamLeaseDir string
 	portSet      *set.UIntSet
 
-	publicConfig string
-	ndmz         ndmz.DMZ
-	ygg          *YggServer
+	ndmz ndmz.DMZ
+	ygg  *yggdrasil.YggServer
 }
 
 var _ pkg.Networker = (*networker)(nil)
 
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity *stubs.IdentityManagerStub, publicCfgPath string, ndmz ndmz.DMZ, ygg *YggServer) (pkg.Networker, error) {
+func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdrasil.YggServer) (pkg.Networker, error) {
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
@@ -100,9 +97,8 @@ func NewNetworker(identity *stubs.IdentityManagerStub, publicCfgPath string, ndm
 		ipamLeaseDir: ipamLease,
 		portSet:      set.NewInt(),
 
-		publicConfig: publicCfgPath,
-		ygg:          ygg,
-		ndmz:         ndmz,
+		ygg:  ygg,
+		ndmz: ndmz,
 	}
 
 	// always add the reserved yggdrasil port to the port set so we make sure they are never
@@ -161,10 +157,7 @@ func (n networker) ZDBPrepare(id string) (string, error) {
 	}
 
 	ips := []*net.IPNet{
-		{
-			IP:   ip,
-			Mask: net.CIDRMask(64, 128),
-		},
+		&ip,
 	}
 
 	gw, err := n.ygg.Gateway()
@@ -338,10 +331,7 @@ func (n *networker) SetupYggTap(name string) (tap pkg.YggdrasilTap, err error) {
 		return tap, err
 	}
 
-	tap.IP = net.IPNet{
-		IP:   ip,
-		Mask: net.CIDRMask(64, 128),
-	}
+	tap.IP = ip
 
 	gw, err := n.ygg.Gateway()
 	if err != nil {
@@ -737,60 +727,45 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 		return errors.Wrap(err, "failed to apply public config")
 	}
 
-	if err := public.SavePublicConfig(n.publicConfig, &cfg); err != nil {
+	if err := public.SavePublicConfig(cfg); err != nil {
 		return errors.Wrap(err, "failed to store public config")
 	}
 
-	// this is kinda dirty, but we need to update the node public config
-	// on the block-chain. so ...
-	env := environment.MustGet()
-	sub, err := env.GetSubstrate()
+	// when public setup is updated. it can take a while but the capacityd
+	// will detect this change and take necessary actions to update the node
+	ctx := context.Background()
+	sk := ed25519.PrivateKey(n.identity.PrivateKey(ctx))
+	ns, err := yggdrasil.NewYggdrasilNamespace(public.PublicNamespace)
 	if err != nil {
-		return errors.Wrap(err, "failed to connect to substrate")
+		return errors.Wrap(err, "failed to setup public namespace for yggdrasil")
 	}
-	sk := n.identity.PrivateKey(context.Background())
-	identity, err := substrate.IdentityFromSecureKey(sk)
+	ygg, err := yggdrasil.EnsureYggdrasil(context.Background(), sk, ns)
 	if err != nil {
 		return err
 	}
-	twin, err := sub.GetTwinByPubKey(identity.PublicKey)
+	// if yggdrasil is living inside public namespace
+	// we still need to setup ndmz to also have yggdrasil but we set the yggdrasil interface
+	// a different Ip that lives inside the yggdrasil range.
+	dmzYgg, err := yggdrasil.NewYggdrasilNamespace(n.ndmz.Namespace())
 	if err != nil {
-		return errors.Wrap(err, "failed to get node twin by public key")
+		return errors.Wrap(err, "failed to setup ygg for dmz namespace")
 	}
 
-	nodeID, err := sub.GetNodeByTwinID(twin)
+	ip, err := ygg.SubnetFor([]byte(fmt.Sprintf("ygg:%s", n.ndmz.Namespace())))
 	if err != nil {
-		return errors.Wrap(err, "failed to get node by twin id")
+		return errors.Wrap(err, "failed to calculate ip for ygg inside dmz")
 	}
 
-	node, err := sub.GetNode(nodeID)
+	gw, err := ygg.Gateway()
 	if err != nil {
-		return errors.Wrapf(err, "failed to get node with id: %d", nodeID)
+		return err
 	}
 
-	cfg, err = public.GetPublicSetup()
-	if err != nil {
-		return errors.Wrap(err, "failed to get public setup")
+	if err := dmzYgg.SetYggIP(ip, gw.IP); err != nil {
+		return errors.Wrap(err, "failed to set yggdrasil ip for dmz")
 	}
 
-	subCfg := substrate.OptionPublicConfig{
-		HasValue: true,
-		AsValue: substrate.PublicConfig{
-			IPv4: cfg.IPv4.String(),
-			IPv6: cfg.IPv6.String(),
-			GWv4: cfg.GW4.String(),
-			GWv6: cfg.GW6.String(),
-		},
-	}
-
-	if reflect.DeepEqual(node.PublicConfig, subCfg) {
-		//nothing to do
-		return nil
-	}
-	// update the node
-	node.PublicConfig = subCfg
-	_, err = sub.UpdateNode(&identity, *node)
-	return err
+	return nil
 }
 
 // Get node public namespace config
@@ -886,11 +861,17 @@ func (n *networker) YggAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 			case <-ctx.Done():
 				return
 			case <-time.After(30 * time.Second):
-				ips, err := n.ndmz.GetIPFor(yggdrasil.YggIface)
+				ips, err := n.ndmz.GetIPFor(yggdrasil.YggNSInf)
 				if err != nil {
 					log.Error().Err(err).Str("inf", yggdrasil.YggIface).Msg("failed to get public IPs")
 				}
-				ch <- ips
+				filtered := ips[:0]
+				for _, ip := range ips {
+					if yggdrasil.YggRange.Contains(ip.IP) {
+						filtered = append(filtered, ip)
+					}
+				}
+				ch <- filtered
 			}
 		}
 	}()
@@ -898,19 +879,19 @@ func (n *networker) YggAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 	return ch
 }
 
-func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	ch := make(chan pkg.NetlinkAddresses)
+func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.OptionPublicConfig {
+	ch := make(chan pkg.OptionPublicConfig)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(30 * time.Second):
-				ips, err := public.IPs()
-				if err != nil {
-					log.Error().Err(err).Msg("failed to get public IPs")
+				cfg, err := n.GetPublicConfig()
+				ch <- pkg.OptionPublicConfig{
+					PublicConfig:    cfg,
+					HasPublicConfig: err == nil,
 				}
-				ch <- ips
 			}
 		}
 	}()

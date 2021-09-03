@@ -36,7 +36,12 @@ func (s *ProvisionStub) Counters(ctx context.Context) (<-chan pkg.ProvisionCount
 			if err := event.Unmarshal(&obj); err != nil {
 				panic(err)
 			}
-			ch <- obj
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- obj:
+			default:
+			}
 		}
 	}()
 	return ch, nil

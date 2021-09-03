@@ -36,7 +36,12 @@ func (s *HostMonitorStub) Uptime(ctx context.Context) (<-chan time.Duration, err
 			if err := event.Unmarshal(&obj); err != nil {
 				panic(err)
 			}
-			ch <- obj
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- obj:
+			default:
+			}
 		}
 	}()
 	return ch, nil
