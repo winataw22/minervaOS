@@ -103,6 +103,7 @@ func (c *Client) readResponse() (string, error) {
 		if content.Len() > 0 {
 			content.WriteByte('\n')
 		}
+
 		content.WriteString(scanner.Text())
 	}
 

@@ -1,18 +1,23 @@
 entryPoints:
   web:
     address: ":80"
-
+    http:
+      redirections:
+        entryPoint:
+          to: web-secure
+          scheme: https
   web-secure:
     address: ":443"
 providers:
   file:
-    directory: "%s/proxy"
+    directory: "%[1]s/proxy"
     watch: true
 certificatesResolvers:
   resolver:
     acme:
-      # email: your-email@example.com
-      storage: acme.json
+      # is there a farmer mail we can use?
+      email: "%[2]s"
+      storage: "%[1]s/traefik/acme.json"
       httpChallenge:
         # used during the challenge
         entryPoint: web
