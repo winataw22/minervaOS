@@ -19,14 +19,15 @@ var (
 	// the module name declared by the server. Hence, we collect them here for
 	// validation
 	PossibleModules = map[string]struct{}{
-		"storage":   struct{}{},
-		"monitor":   struct{}{},
-		"identityd": struct{}{},
-		"vmd":       struct{}{},
-		"flist":     struct{}{},
-		"network":   struct{}{},
-		"container": struct{}{},
-		"provision": struct{}{},
+		"storage":   {},
+		"monitor":   {},
+		"identityd": {},
+		"vmd":       {},
+		"flist":     {},
+		"network":   {},
+		"container": {},
+		"provision": {},
+		"gateway":   {},
 	}
 
 	//Module entry point

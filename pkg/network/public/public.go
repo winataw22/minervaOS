@@ -353,6 +353,15 @@ func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	}
 
 	err = pubNS.Do(func(_ ns.NetNS) error {
+		lo, err := netlink.LinkByName("lo")
+		if err != nil {
+			return errors.Wrap(err, "failed to get lo interface")
+		}
+
+		if err := netlink.LinkSetUp(lo); err != nil {
+			return errors.Wrap(err, "failed to set lo interface up")
+		}
+
 		if err := options.SetIPv6AcceptRA(options.RAAcceptIfForwardingIsEnabled); err != nil {
 			return errors.Wrap(err, "failed to accept_ra=2 in public namespace")
 		}

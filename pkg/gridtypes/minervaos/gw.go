@@ -3,6 +3,7 @@ package zos
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"regexp"
 
@@ -26,6 +27,10 @@ func (b Backend) Valid() error {
 		return fmt.Errorf("invalid scheme expected http, or https")
 	}
 
+	ip := net.ParseIP(u.Hostname())
+	if ip == nil || len(ip) == 0 || ip.IsLoopback() {
+		return fmt.Errorf("invalid ip address in backend: %s", u.Hostname())
+	}
 	return nil
 }
 

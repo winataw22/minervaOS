@@ -23,6 +23,22 @@ func NewFlisterStub(client zbus.Client) *FlisterStub {
 	}
 }
 
+func (s *FlisterStub) Exists(ctx context.Context, arg0 string) (ret0 bool, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Exists", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *FlisterStub) FlistHash(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "FlistHash", args...)

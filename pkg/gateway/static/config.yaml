@@ -8,6 +8,12 @@ entryPoints:
           scheme: https
   web-secure:
     address: ":443"
+  metrics:
+    # only listen on lo for metrics
+    address: "127.0.0.1:8082"
+metrics:
+  prometheus:
+    entryPoint: metrics
 providers:
   file:
     directory: "%[1]s/proxy"

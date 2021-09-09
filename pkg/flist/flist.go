@@ -353,6 +353,22 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 	return nil
 }
 
+func (f *flistModule) Exists(name string) (bool, error) {
+	// mount overlay
+	mountpoint, err := f.mountpath(name)
+	if err != nil {
+		return false, errors.Wrap(err, "invalid mountpoint")
+	}
+
+	if err := f.valid(mountpoint); err == ErrAlreadyMounted {
+		return true, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "validating of mount point failed")
+	}
+
+	return false, nil
+}
+
 func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, error) {
 	sublog := log.With().Str("name", name).Str("url", url).Str("storage", opt.Storage).Logger()
 	sublog.Info().Msgf("request to mount flist: %+v", opt)

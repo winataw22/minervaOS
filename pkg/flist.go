@@ -48,4 +48,6 @@ type Flister interface {
 
 	// FlistHash returns md5 of flist if available (requesting the hub)
 	FlistHash(url string) (string, error)
+
+	Exists(name string) (bool, error)
 }

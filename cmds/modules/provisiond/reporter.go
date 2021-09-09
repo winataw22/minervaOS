@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
@@ -261,14 +262,19 @@ func (r *Reporter) collect(ctx context.Context, since time.Time) (rep Report, er
 		return rep, err
 	}
 
-	// to optimize we get ALL vms metrics in one call.
-	metrics, err := stubs.NewVMModuleStub(r.cl).Metrics(ctx)
+	// to optimize we get ALL vms vmMetrics in one call.
+	vmMetrics, err := stubs.NewVMModuleStub(r.cl).Metrics(ctx)
 	if err != nil {
 		return Report{}, errors.Wrap(err, "failed to get VMs network metrics")
 	}
 
+	gwMetrics, err := stubs.NewGatewayStub(r.cl).Metrics(ctx)
+	if err != nil && !strings.Contains(err.Error(), "metrics not available") {
+		return Report{}, errors.Wrap(err, "failed to get gateway metrics")
+	}
+
 	for _, user := range users {
-		cap, err := r.user(since, user, metrics)
+		cap, err := r.user(since, user, vmMetrics, gwMetrics)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to collect all user capacity")
 			// NOTE: we intentionally not doing a 'continue' or 'return'
@@ -286,7 +292,7 @@ func (r *Reporter) push(report Report) error {
 	return r.queue.Enqueue(&report)
 }
 
-func (r *Reporter) user(since time.Time, user uint32, metrics pkg.MachineMetrics) ([]Consumption, error) {
+func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetrics, gwMetrics pkg.GatewayMetrics) ([]Consumption, error) {
 	var m many
 
 	var consumptions []Consumption
@@ -324,26 +330,31 @@ func (r *Reporter) user(since time.Time, user uint32, metrics pkg.MachineMetrics
 				continue
 			}
 
-			if r.shouldCount(since, &wl.Result) {
-				cap, err := wl.Capacity()
-				if err != nil {
-					m = m.append(errors.Wrapf(err, "failed to get reservation '%s' capacity", id))
-					continue
-				}
-
-				consumption.CRU += types.U64(cap.CRU)
-				consumption.MRU += types.U64(cap.MRU)
-				consumption.HRU += types.U64(cap.HRU)
-				consumption.SRU += types.U64(cap.SRU)
-
-				// special handling for ZMachine types. if they exist
-				// we also need to get network usage.
-				metric, ok := metrics[wlID.String()]
-				if ok {
-					// add metric to consumption
-					consumption.NRU += types.U64(r.computeNU(metric))
-				}
+			if !r.shouldCount(since, &wl.Result) {
+				continue
 			}
+
+			cap, err := wl.Capacity()
+			if err != nil {
+				m = m.append(errors.Wrapf(err, "failed to get reservation '%s' capacity", id))
+				continue
+			}
+
+			consumption.CRU += types.U64(cap.CRU)
+			consumption.MRU += types.U64(cap.MRU)
+			consumption.HRU += types.U64(cap.HRU)
+			consumption.SRU += types.U64(cap.SRU)
+
+			// special handling for ZMachine types. if they exist
+			// we also need to get network usage.
+			metric, ok := vmMetrics[wlID.String()]
+			if ok {
+				// add metric to consumption
+				consumption.NRU += types.U64(r.computeNU(metric))
+			}
+
+			// special handling for gw types.
+			consumption.NRU += types.U64(gwMetrics.Nu(wlID.String()))
 		}
 
 		if !consumption.IsEmpty() {

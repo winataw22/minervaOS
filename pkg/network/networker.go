@@ -103,7 +103,8 @@ func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdr
 
 	// always add the reserved yggdrasil port to the port set so we make sure they are never
 	// picked for wireguard endpoints
-	for _, port := range []int{yggdrasil.YggListenTCP, yggdrasil.YggListenTLS, yggdrasil.YggListenLinkLocal} {
+	// we also add http, https, and traefik metrics ports 8082 to the list.
+	for _, port := range []int{yggdrasil.YggListenTCP, yggdrasil.YggListenTLS, yggdrasil.YggListenLinkLocal, 80, 443, 8082} {
 		if err := nw.portSet.Add(uint(port)); err != nil && errors.Is(err, set.ErrConflict{}) {
 			return nil, err
 		}
