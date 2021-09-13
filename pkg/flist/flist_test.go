@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"testing"
 	"text/template"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -22,7 +21,6 @@ import (
 
 var (
 	templ = template.Must(template.New("script").Parse(`
-echo $PPID > {{.pid}}
 echo "mount ready" > {{.log}}
 `))
 )
@@ -96,7 +94,6 @@ func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
 	m, _ := t.args(args...)
 	var script bytes.Buffer
 	err := templ.Execute(&script, map[string]string{
-		"pid": m["pid"],
 		"log": m["log"],
 	})
 
@@ -122,11 +119,10 @@ func (t *testSystem) Unmount(target string, flags int) error {
 func TestCommander(t *testing.T) {
 	cmder := testCommander{T: t}
 
-	m, r := cmder.args("-pid", "pid-file", "-log", "log-file", "remaining")
+	m, r := cmder.args("-log", "log-file", "remaining")
 
 	require.Equal(t, []string{"remaining"}, r)
 	require.Equal(t, map[string]string{
-		"pid": "pid-file",
 		"log": "log-file",
 	}, m)
 }
@@ -262,10 +258,8 @@ func TestDownloadFlist(t *testing.T) {
 
 	sys := &testSystem{}
 
-	x := newFlister(root, strg, cmder, sys)
+	f := newFlister(root, strg, cmder, sys)
 
-	f, ok := x.(*flistModule)
-	require.True(ok)
 	path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
 	require.NoError(err)
 
@@ -293,71 +287,4 @@ func TestDownloadFlist(t *testing.T) {
 	info3, err := os.Stat(path3)
 	require.NoError(err)
 	assert.NotEqual(info2.ModTime(), info3.ModTime())
-}
-
-func TestWaitPIDFileExists(t *testing.T) {
-	require := require.New(t)
-	const testFile = "/tmp/wait.exists.test"
-	os.Remove(testFile)
-
-	out := make(chan error)
-	go func(out chan<- error) {
-		out <- waitPidFile(2*time.Second, testFile, true)
-	}(out)
-
-	f, err := os.Create(testFile)
-	require.NoError(err)
-	defer f.Close()
-	err = <-out
-	require.NoError(err)
-}
-
-func TestWaitPIDFileDeleted(t *testing.T) {
-	require := require.New(t)
-	const testFile = "/tmp/wait.deleted.test"
-	f, err := os.Create(testFile)
-	require.NoError(err)
-	defer f.Close()
-
-	out := make(chan error)
-	go func(out chan<- error) {
-		out <- waitPidFile(2*time.Second, testFile, false)
-	}(out)
-
-	err = os.Remove(testFile)
-	require.NoError(err)
-	err = <-out
-	require.NoError(err)
-}
-
-func TestWaitPIDFileTimeout(t *testing.T) {
-	require := require.New(t)
-	const testFile = "/tmp/wait.deleted.test"
-	f, err := os.Create(testFile)
-	require.NoError(err)
-	defer f.Close()
-
-	out := make(chan error)
-	go func(out chan<- error) {
-		out <- waitPidFile(1*time.Second, testFile, false)
-	}(out)
-
-	err = <-out
-	require.Equal(context.DeadlineExceeded, err)
-}
-
-func Test_forceStop(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "sleep", "50")
-	err := cmd.Start()
-	require.NoError(t, err)
-
-	go func() {
-		_ = cmd.Wait()
-	}()
-
-	err = forceStop(cmd.Process.Pid)
-	assert.NoError(t, err)
 }

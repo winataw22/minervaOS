@@ -278,9 +278,8 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 			}
 
 			go func() {
-				if err := stats.Monitor(c.containerd, ns, data.Name, s); err != nil {
-					log.Error().Err(err).Str("name", data.Name).Msg("container monitor exited with error")
-				}
+				err := stats.Monitor(c.containerd, ns, data.Name, s)
+				log.Error().Err(err).Str("name", data.Name).Msg("container monitor exited with error")
 			}()
 
 		default:

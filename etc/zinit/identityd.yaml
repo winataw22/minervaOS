@@ -1,3 +1,4 @@
 exec: identityd
+test: zbusdebug --module identityd
 after:
   - boot

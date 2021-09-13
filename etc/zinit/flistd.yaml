@@ -1,3 +1,5 @@
 exec: flistd --broker unix://var/run/redis.sock --root /var/cache/modules/flistd
 after:
   - boot
+  # identityd is added to make sure all binaries are up to date
+  - identityd

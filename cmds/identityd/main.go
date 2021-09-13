@@ -140,18 +140,18 @@ func main() {
 	// register the cancel function with defer if the process stops because of a update
 	defer cancel()
 
-	go func() {
-		if err := server.Run(ctx); err != nil && err != context.Canceled {
-			log.Error().Err(err).Msg("unexpected error")
-		}
-	}()
-
 	upgrader, err := upgrade.NewUpgrader(root, upgrade.NoSelfUpgrade(debug))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize upgrader")
 	}
 
 	installBinaries(&boot, upgrader)
+
+	go func() {
+		if err := server.Run(ctx); err != nil && err != context.Canceled {
+			log.Error().Err(err).Msg("unexpected error")
+		}
+	}()
 
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("received a termination signal")

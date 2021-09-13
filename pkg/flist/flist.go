@@ -1,7 +1,6 @@
 package flist
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/md5"
@@ -13,7 +12,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -28,9 +26,17 @@ import (
 
 const (
 	defaultRoot = "/var/cache/modules/flist"
+	mib         = 1024 * 1024
 )
 
-const mib = 1024 * 1024
+var (
+	// ErrAlreadyMounted is returned when checking if a path has already
+	// something mounted on it
+	ErrAlreadyMounted                  = errors.New("path is already mounted")
+	ErrNotMountPoint                   = errors.New("path is not a mountpoint")
+	ErrTransportEndpointIsNotConencted = errors.New("transport endpoint is not connected")
+	ErrZFSProcessNotFound              = errors.New("0-fs process not found")
+)
 
 type commander interface {
 	Command(name string, arg ...string) *exec.Cmd
@@ -89,14 +95,13 @@ type flistModule struct {
 	ro         string
 	pid        string
 	log        string
-	run        string
 
 	storage   volumeAllocator
 	commander commander
 	system    system
 }
 
-func newFlister(root string, storage volumeAllocator, commander commander, system system) pkg.Flister {
+func newFlister(root string, storage volumeAllocator, commander commander, system system) *flistModule {
 	if root == "" {
 		root = defaultRoot
 	}
@@ -111,7 +116,7 @@ func newFlister(root string, storage volumeAllocator, commander commander, syste
 	}
 
 	// prepare directory layout for the module
-	for _, path := range []string{"flist", "cache", "mountpoint", "ro", "pid", "log", "run"} {
+	for _, path := range []string{"flist", "cache", "mountpoint", "ro", "pid", "log"} {
 		p := filepath.Join(root, path)
 		if err := os.MkdirAll(p, 0755); err != nil {
 			panic(err)
@@ -130,7 +135,6 @@ func newFlister(root string, storage volumeAllocator, commander commander, syste
 		ro:         filepath.Join(root, "ro"),
 		pid:        filepath.Join(root, "pid"),
 		log:        filepath.Join(root, "log"),
-		run:        filepath.Join(root, "run"),
 
 		storage:   storage,
 		commander: commander,
@@ -200,7 +204,6 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 		return "", err
 	}
 
-	pidPath := filepath.Join(f.pid, hash) + ".pid"
 	logPath := filepath.Join(f.log, hash) + ".log"
 	var args []string
 
@@ -209,7 +212,6 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 		"-meta", flistPath,
 		"-storage-url", storage,
 		"-daemon",
-		"-pid", pidPath,
 		"-log", logPath,
 		// this is always read-only
 		"-ro",
@@ -223,35 +225,6 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 	if out, err = cmd.CombinedOutput(); err != nil {
 		sublog.Err(err).Str("out", string(out)).Msg("fail to start 0-fs daemon")
 		return "", err
-	}
-
-	// wait for the daemon to be ready
-	// we check the pid file is created
-	if err := waitPidFile(time.Second*5, pidPath, true); err != nil {
-		sublog.Error().Err(err).Msg("pid file of 0-fs daemon not created")
-		return "", err
-	}
-
-	// and scan the logs after "mount ready"
-	if err := waitMountedLog(time.Second*5, logPath); err != nil {
-		sublog.Error().Err(err).Msg("0-fs daemon did not start properly")
-		return "", err
-	}
-
-	syscall.Sync()
-
-	// the track file is a symlink to the process pid
-	// if the link is broken, then the fs has exited gracefully
-	// otherwise we can get the fs pid from the track path
-	// if the pid does not exist of the target does not exist
-	// we can clean up the named mount
-	trackPath := filepath.Join(f.run, hash)
-	if err = os.Remove(trackPath); err != nil && !os.IsNotExist(err) {
-		return "", errors.Wrap(err, "failed to clean up pid file")
-	}
-
-	if err = os.Symlink(pidPath, trackPath); err != nil {
-		sublog.Error().Err(err).Msg("failed track fs pid")
 	}
 
 	syscall.Sync()
@@ -423,11 +396,6 @@ func (f *flistModule) flistMountpath(hash string) (string, error) {
 	return mountpath, nil
 }
 
-// ErrAlreadyMounted is returned when checking if a path has already
-// something mounted on it
-var ErrAlreadyMounted = errors.New("path is already mounted")
-var ErrTransportEndpointIsNotConencted = errors.New("transport endpoint is not connected")
-
 // valid checks that this mount path is free, and can be used
 func (f *flistModule) valid(path string) error {
 	stat, err := os.Stat(path)
@@ -460,38 +428,16 @@ func (f *flistModule) waitMountpoint(path string, seconds int) error {
 
 	return fmt.Errorf("was not mounted in time")
 }
-
 func (f *flistModule) isMountpoint(path string) error {
 	log.Debug().Str("mnt", path).Msg("testing mountpoint")
 	return f.commander.Command("mountpoint", path).Run()
 }
 
-func (f *flistModule) getPid(pidPath string) (int64, error) {
-	pid, err := ioutil.ReadFile(pidPath)
-	if err != nil {
-		return 0, err
-	}
-
-	value, err := strconv.ParseInt(string(pid), 10, 64)
-	if err != nil {
-		return 0, errors.Wrap(err, "invalid pid value in file, expected int")
-	}
-
-	return value, nil
-}
-
-func (f *flistModule) getMountOptions(pidPath string) (options, error) {
-	pid, err := f.getPid(pidPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get pid from file: %s", pidPath)
-	}
-
-	return f.getMountOptionsForPID(pid)
-}
-
 func (f *flistModule) getMountOptionsForPID(pid int64) (options, error) {
 	cmdline, err := ioutil.ReadFile(path.Join("/proc", fmt.Sprint(pid), "cmdline"))
-	if err != nil {
+	if os.IsNotExist(err) {
+		return nil, ErrZFSProcessNotFound
+	} else if err != nil {
 		return nil, errors.Wrapf(err, "failed to read mount (%d) cmdline", pid)
 	}
 
@@ -506,10 +452,18 @@ func (f *flistModule) getMountOptionsForPID(pid int64) (options, error) {
 }
 
 func (f *flistModule) HashFromRootPath(name string) (string, error) {
-	base := filepath.Base(name)
-	pidPath := filepath.Join(f.pid, base) + ".pid"
+	path, err := f.mountpath(filepath.Base(name))
+	if err != nil {
+		return "", err
+	}
 
-	opts, err := f.getMountOptions(pidPath)
+	info, err := f.resolve(path)
+	if err != nil {
+		return "", err
+	}
+
+	// this can either be an overlay mount.
+	opts, err := f.getMountOptionsForPID(info.Pid)
 	if err != nil {
 		return "", err
 	}
@@ -663,110 +617,6 @@ func md5Compare(hash string, r io.Reader) (bool, error) {
 		return false, err
 	}
 	return strings.Compare(fmt.Sprintf("%x", h.Sum(nil)), hash) == 0, nil
-}
-
-// waitPidFile wait for a file pointed by path to be created or deleted
-// for at most timeout duration
-// is exists is true, it waits for the file to exists
-// else it waits for the file to be deleted
-func waitPidFile(timeout time.Duration, path string, exists bool) error {
-	const delay = time.Millisecond * 100
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			_, err := os.Stat(path)
-			// check exist but the file is not there yet,
-			// or check NOT exist but it is still there
-			// we try again
-			if (exists && os.IsNotExist(err)) || (!exists && err == nil) {
-				time.Sleep(delay)
-			} else if err != nil && !os.IsNotExist(err) {
-				//another error that is NOT IsNotExist.
-				return err
-			} else {
-				return nil
-			}
-		}
-	}
-}
-
-func waitMountedLog(timeout time.Duration, logfile string) error {
-	const target = "mount ready"
-	const delay = time.Millisecond * 500
-
-	f, err := os.Open(logfile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	br := bufio.NewReader(f)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	// this goroutine looks for "mount ready"
-	// in the logs of the 0-fs
-	cErr := make(chan error)
-	go func(ctx context.Context, r io.Reader, cErr chan<- error) {
-		for {
-			select {
-			case <-ctx.Done():
-				// ensure we don't leak the goroutine
-				cErr <- ctx.Err()
-			default:
-				line, err := br.ReadString('\n')
-				if err != nil {
-					time.Sleep(delay)
-					continue
-				}
-
-				if !strings.Contains(line, target) {
-					time.Sleep(delay)
-					continue
-				}
-				// found
-				cErr <- nil
-				return
-			}
-		}
-	}(ctx, br, cErr)
-
-	return <-cErr
-}
-
-func forceStop(pid int) error {
-	slog := log.With().Int("pid", pid).Logger()
-	slog.Info().Msg("trying to force stop by killing the process")
-
-	p, err := os.FindProcess(int(pid))
-	if err != nil {
-		return err
-	}
-
-	if err := p.Signal(syscall.SIGTERM); err != nil {
-		slog.Error().Err(err).Msg("failed to send SIGTERM to process")
-	}
-
-	time.Sleep(time.Second)
-	if pidExist(p) {
-		slog.Info().Msgf("process didn't stop gracefully, lets kill it")
-		if err := p.Signal(syscall.SIGKILL); err != nil {
-			slog.Error().Err(err).Msg("failed to send SIGKILL to process")
-		}
-	}
-
-	return nil
-}
-
-func pidExist(p *os.Process) bool {
-	// https://github.com/golang/go/issues/14146#issuecomment-176888204
-	return p.Signal(syscall.Signal(0)) == nil
 }
 
 var _ pkg.Flister = (*flistModule)(nil)
