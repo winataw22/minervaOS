@@ -171,10 +171,8 @@ func (g *gatewayModule) Metrics() (result pkg.GatewayMetrics, err error) {
 	// all the checks, we can try to directly get the metrics and see if we
 	// can get it. we need to do these operations anyway.
 	pubNS, err := namespace.GetByName(publicNS)
-	if errors.Is(err, ns.NSPathNotExistErr{}) {
+	if err != nil {
 		return result, ErrMetricsNotAvailable
-	} else if err != nil {
-		return result, errors.Wrap(err, "failed to get public namespace")
 	}
 
 	defer pubNS.Close()

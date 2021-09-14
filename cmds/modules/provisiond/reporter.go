@@ -285,7 +285,7 @@ func (r *Reporter) collect(ctx context.Context, since time.Time) (rep Report, er
 		rep.Consumption = append(rep.Consumption, cap...)
 	}
 
-	return
+	return rep, nil
 }
 
 func (r *Reporter) push(report Report) error {
