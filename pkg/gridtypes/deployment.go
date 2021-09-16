@@ -316,7 +316,6 @@ func (d *Deployment) Verify(getter KeyGetter) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to get public key for twin '%d'", request.TwinID)
 		}
-
 		bytes, err := hex.DecodeString(signature.Signature)
 		if err != nil {
 			return errors.Wrap(err, "invalid signature")

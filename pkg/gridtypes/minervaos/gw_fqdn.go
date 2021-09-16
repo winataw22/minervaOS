@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	gwNameRegex = regexp.MustCompile(`^\w+$`)
+	gwNameRegex = regexp.MustCompile(`^[a-zA-Z0-9-.]+$`)
 )
 
 type Backend string
@@ -34,18 +34,24 @@ func (b Backend) Valid() error {
 	return nil
 }
 
-// GatewayNameProxy definition. this will proxy name.<zos.domain> to backends
-type GatewayNameProxy struct {
-	// Name of the domain prefix. this must be a valid dns name (with no dots)
-	Name string `json:"name"`
+// GatewayFQDNProxy definition. this will proxy name.<zos.domain> to backends
+type GatewayFQDNProxy struct {
+	// FQDN the fully qualified domain name to use (cannot be present with Name)
+	FQDN string `json:"fqdn"`
+
+	// Passthroug whether to pass tls traffic or not
+	TLSPassthrough bool `json:"tls_passthrough"`
 
 	// Backends are list of backend ips
 	Backends []Backend `json:"backends"`
 }
 
-func (g GatewayNameProxy) Valid(getter gridtypes.WorkloadGetter) error {
-	if !gwNameRegex.MatchString(g.Name) {
+func (g GatewayFQDNProxy) Valid(getter gridtypes.WorkloadGetter) error {
+	if !gwNameRegex.MatchString(g.FQDN) {
 		return fmt.Errorf("invalid name")
+	}
+	if g.FQDN[len(g.FQDN)-1] == '.' {
+		return fmt.Errorf("fqdn can't end with a dot")
 	}
 	if len(g.Backends) == 0 {
 		return fmt.Errorf("backends list can not be empty")
@@ -59,8 +65,12 @@ func (g GatewayNameProxy) Valid(getter gridtypes.WorkloadGetter) error {
 	return nil
 }
 
-func (g GatewayNameProxy) Challenge(w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s", g.Name); err != nil {
+func (g GatewayFQDNProxy) Challenge(w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "%s", g.FQDN); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "%t", g.TLSPassthrough); err != nil {
 		return err
 	}
 
@@ -73,7 +83,7 @@ func (g GatewayNameProxy) Challenge(w io.Writer) error {
 	return nil
 }
 
-func (g GatewayNameProxy) Capacity() (gridtypes.Capacity, error) {
+func (g GatewayFQDNProxy) Capacity() (gridtypes.Capacity, error) {
 	// this has to be calculated per bytes served over the gw. so
 	// a special handler in reporting that need to calculate and report
 	// this.
