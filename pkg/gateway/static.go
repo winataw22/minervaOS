@@ -12,6 +12,12 @@ import (
 //go:embed static/config.yaml
 var config string
 
+//go:embed static/dnsmasq.conf
+var dConfig string
+
+//go:embed static/cert.sh
+var certScript string
+
 // staticConfig write static config to file
 func staticConfig(p, root, email string) (bool, error) {
 	config := fmt.Sprintf(config, root, email)
@@ -27,4 +33,13 @@ func staticConfig(p, root, email string) (bool, error) {
 	}
 
 	return update, os.WriteFile(p, []byte(config), 0644)
+}
+
+func updateCertScript(p, root string) error {
+	certScript := fmt.Sprintf(certScript, root)
+	return os.WriteFile(p, []byte(certScript), 0744)
+}
+
+func dnsmasqConfig(p string) error {
+	return os.WriteFile(p, []byte(dConfig), 0644)
 }

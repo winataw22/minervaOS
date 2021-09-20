@@ -30,7 +30,8 @@ const (
 	// letsencrypt email need to customizable by he farmer.
 	letsencryptEmail = "letsencrypt@threefold.tech"
 	// certResolver must match the one defined in static config
-	certResolver = "resolver"
+	httpCertResolver = "resolver"
+	dnsCertResolver  = "dnsresolver"
 )
 
 type gatewayModule struct {
@@ -41,6 +42,7 @@ type gatewayModule struct {
 	proxyConfigPath  string
 	staticConfigPath string
 	binPath          string
+	certScriptPath   string
 }
 
 type ProxyConfig struct {
@@ -59,8 +61,14 @@ type Router struct {
 	Tls     *TlsConfig `yaml:"tls,omitempty"`
 }
 type TlsConfig struct {
-	CertResolver string `yaml:"certResolver,omitempty"`
-	Passthrough  string `yaml:"passthrough,omitempty"`
+	CertResolver string   `yaml:"certResolver,omitempty"`
+	Domains      []Domain `yaml:"domains,omitempty"`
+	Passthrough  string   `yaml:"passthrough,omitempty"`
+}
+
+type Domain struct {
+	Sans []string `yaml:"sans,omitempty"`
+	Main string   `yaml:"main,omitempty"`
 }
 
 type Service struct {
@@ -155,6 +163,16 @@ func New(ctx context.Context, cl zbus.Client, root string) (pkg.Gateway, error) 
 		return nil, errors.Wrap(err, "failed to ensure traefik binary")
 	}
 
+	dnsmasqCfgPath := filepath.Join(root, "dnsmasq.conf")
+	err = dnsmasqConfig(dnsmasqCfgPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create dnsmasq config")
+	}
+	certScriptPath := filepath.Join(root, "cert.sh")
+	err = updateCertScript(certScriptPath, root)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create cert script")
+	}
 	staticCfgPath := filepath.Join(root, "traefik.yaml")
 	updated, err := staticConfig(staticCfgPath, root, letsencryptEmail)
 	if err != nil {
@@ -177,6 +195,7 @@ func New(ctx context.Context, cl zbus.Client, root string) (pkg.Gateway, error) 
 		cl:               cl,
 		proxyConfigPath:  configPath,
 		staticConfigPath: staticCfgPath,
+		certScriptPath:   certScriptPath,
 		binPath:          bin,
 		resolver:         r,
 		reservedDomains:  domains,
@@ -253,6 +272,7 @@ func (g *gatewayModule) verifyDomainDestination(ctx context.Context, cfg pkg.Pub
 }
 
 func (g *gatewayModule) startTraefik(z *zinit.Client) error {
+
 	cmd := fmt.Sprintf(
 		"ip netns exec public %s --configfile %s",
 		g.binPath,
@@ -261,6 +281,9 @@ func (g *gatewayModule) startTraefik(z *zinit.Client) error {
 
 	if err := zinit.AddService(traefikService, zinit.InitService{
 		Exec: cmd,
+		Env: map[string]string{
+			"EXEC_PATH": g.certScriptPath,
+		},
 	}); err != nil {
 		return errors.Wrap(err, "failed to add traefik to zinit")
 	}
@@ -292,7 +315,16 @@ func (g *gatewayModule) SetNamedProxy(wlID string, prefix string, backends []str
 		return "", errors.New("node doesn't support name proxy (doesn't have a domain)")
 	}
 	fqdn := fmt.Sprintf("%s.%s", prefix, cfg.Domain)
-	if err := g.setupRouting(wlID, fqdn, backends, TLSPassthrough); err != nil {
+
+	gatewayTLSConfig := TlsConfig{
+		CertResolver: dnsCertResolver,
+		Domains: []Domain{
+			{
+				Sans: []string{fmt.Sprintf("*.%s", cfg.Domain)},
+			},
+		},
+	}
+	if err := g.setupRouting(wlID, fqdn, backends, gatewayTLSConfig, TLSPassthrough); err != nil {
 		return "", err
 	} else {
 		return fqdn, nil
@@ -314,24 +346,28 @@ func (g *gatewayModule) SetFQDNProxy(wlID string, fqdn string, backends []string
 	if err := g.verifyDomainDestination(ctx, cfg, fqdn); err != nil {
 		return errors.Wrap(err, "failed to verify domain dns record")
 	}
-	return g.setupRouting(wlID, fqdn, backends, TLSPassthrough)
+	gatewayTLSConfig := TlsConfig{
+		CertResolver: httpCertResolver,
+		Domains: []Domain{
+			{
+				Main: fqdn,
+			},
+		},
+	}
+	return g.setupRouting(wlID, fqdn, backends, gatewayTLSConfig, TLSPassthrough)
 }
-func (g *gatewayModule) setupRouting(wlID string, fqdn string, backends []string, TLSPassthrough bool) error {
+func (g *gatewayModule) setupRouting(wlID string, fqdn string, backends []string, tlsConfig TlsConfig, TLSPassthrough bool) error {
 	if _, ok := g.reservedDomains[fqdn]; ok {
 		return errors.New("domain already registered")
 	}
 	var rule string
-	var tlsConfig *TlsConfig
 	if TLSPassthrough {
 		rule = fmt.Sprintf("HostSNI(`%s`)", fqdn)
-		tlsConfig = &TlsConfig{
+		tlsConfig = TlsConfig{
 			Passthrough: "true",
 		}
 	} else {
 		rule = fmt.Sprintf("Host(`%s`)", fqdn)
-		tlsConfig = &TlsConfig{
-			CertResolver: certResolver,
-		}
 	}
 	servers := make([]Server, len(backends))
 	for idx, backend := range backends {
@@ -361,7 +397,7 @@ func (g *gatewayModule) setupRouting(wlID string, fqdn string, backends []string
 			route: {
 				Rule:    rule,
 				Service: wlID,
-				Tls:     tlsConfig,
+				Tls:     &tlsConfig,
 			},
 		},
 		Services: map[string]Service{

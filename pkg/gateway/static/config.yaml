@@ -21,9 +21,14 @@ providers:
 certificatesResolvers:
   resolver:
     acme:
-      # is there a farmer mail we can use?
       email: "%[2]s"
       storage: "%[1]s/traefik/acme.json"
       httpChallenge:
         # used during the challenge
         entryPoint: web
+  dnsresolver:
+    acme:
+      email: "%[2]s"
+      storage: "%[1]s/traefik/acme2.json"
+      dnsChallenge:
+        provider: exec
