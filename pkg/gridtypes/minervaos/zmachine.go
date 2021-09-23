@@ -230,6 +230,7 @@ func (v ZMachine) Challenge(b io.Writer) error {
 
 // ZMachineResult result returned by VM reservation
 type ZMachineResult struct {
-	ID string `json:"id"`
-	IP string `json:"ip"`
+	ID    string `json:"id"`
+	IP    string `json:"ip"`
+	YggIP string `json:"ygg_ip"`
 }

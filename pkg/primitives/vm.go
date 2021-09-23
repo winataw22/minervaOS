@@ -157,6 +157,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		log.Debug().Msgf("Planetary: %+v", inf)
 		ifs = append(ifs, tapNameFromName(wl.ID, "ygg"))
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
+		result.YggIP = inf.IPs[0].IP.String()
 	}
 	// - mount flist RO
 	mnt, err := flist.Mount(ctx, wl.ID.String(), config.FList, pkg.ReadOnlyMountOptions)
