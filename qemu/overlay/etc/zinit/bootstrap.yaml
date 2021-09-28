@@ -1,6 +1,6 @@
 # Override the default bootstrap procedure
 # embedded in the image if using overlay
-exec: "true"
+exec: /sbin/bootstrap -d 
 oneshot: true
 after:
   - internet

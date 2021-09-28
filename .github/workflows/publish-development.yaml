@@ -56,7 +56,7 @@ jobs:
           target: ${{ steps.setname.outputs.build }}
 
       - name: Crosslink flist (development)
-        if: success() && github.ref == 'refs/heads/master-3'
+        if: success() && github.ref == 'refs/heads/main'
         uses: threefoldtech/publish-flist@master
         with:
           token: ${{ secrets.HUB_JWT }}

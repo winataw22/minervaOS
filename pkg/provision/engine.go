@@ -203,11 +203,11 @@ func withDeployment(ctx context.Context, dl *gridtypes.Deployment) context.Conte
 }
 
 // GetContract of deployment. panics if engine has no substrate set.
-func GetContract(ctx context.Context) *substrate.Contract {
-	return ctx.Value(contractKey{}).(*substrate.Contract)
+func GetContract(ctx context.Context) *substrate.NodeContract {
+	return ctx.Value(contractKey{}).(*substrate.NodeContract)
 }
 
-func withContract(ctx context.Context, contract *substrate.Contract) context.Context {
+func withContract(ctx context.Context, contract *substrate.NodeContract) context.Context {
 	return context.WithValue(ctx, contractKey{}, contract)
 }
 
@@ -428,9 +428,12 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 		return nil, errors.Wrap(err, "failed to get deployment contract")
 	}
 
-	ctx = withContract(ctx, contract)
+	if !contract.ContractType.IsNodeContract {
+		return nil, fmt.Errorf("invalid contract type, expecting node contract")
+	}
+	ctx = withContract(ctx, &contract.ContractType.NodeContract)
 
-	if uint32(contract.Node) != e.nodeID {
+	if uint32(contract.ContractType.NodeContract.Node) != e.nodeID {
 		return nil, fmt.Errorf("invalid node address in contract")
 	}
 
@@ -439,7 +442,7 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 		return nil, errors.Wrap(err, "failed to compute deployment hash")
 	}
 
-	if contract.DeploymentHash != hex.EncodeToString(hash) {
+	if contract.ContractType.NodeContract.DeploymentHash != hex.EncodeToString(hash) {
 		return nil, fmt.Errorf("contract hash does not match deployment hash")
 	}
 

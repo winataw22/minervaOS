@@ -196,10 +196,11 @@ func registerNode(
 	if pub != nil {
 		pubCfg.HasValue = true
 		pubCfg.AsValue = substrate.PublicConfig{
-			IPv4: pub.IPv4.String(),
-			GWv4: pub.GW4.String(),
-			IPv6: pub.IPv6.String(),
-			GWv6: pub.GW6.String(),
+			IPv4:   pub.IPv4.String(),
+			GWv4:   pub.GW4.String(),
+			IPv6:   pub.IPv6.String(),
+			GWv6:   pub.GW6.String(),
+			Domain: pub.Domain,
 		}
 	}
 

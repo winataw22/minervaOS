@@ -49,22 +49,84 @@ func (r ContractState) Encode(encoder scale.Encoder) (err error) {
 	return
 }
 
-// Contract structure
-type Contract struct {
-	Versioned
-	ContractID     types.U64
-	TwinID         types.U32
+type NodeContract struct {
 	Node           types.U32
 	DeploymentData []byte
 	DeploymentHash string
 	PublicIPsCount types.U32
-	State          ContractState
 	PublicIPs      []PublicIP
 }
 
-// CreateContract creates a contract for deployment
-func (s *Substrate) CreateContract(identity *Identity, node uint32, body []byte, hash string, publicIPs uint32) (uint64, error) {
-	c, err := types.NewCall(s.meta, "SmartContractModule.create_contract",
+type NameContract struct {
+	Name string
+}
+
+type ContractType struct {
+	IsNodeContract bool
+	NodeContract   NodeContract
+	IsNameContract bool
+	NameContract   NameContract
+}
+
+// Decode implementation for the enum type
+func (r *ContractType) Decode(decoder scale.Decoder) error {
+	b, err := decoder.ReadOneByte()
+	if err != nil {
+		return err
+	}
+
+	switch b {
+	case 0:
+		r.IsNodeContract = true
+		if err := decoder.Decode(&r.NodeContract); err != nil {
+			return err
+		}
+	case 1:
+		r.IsNameContract = true
+		if err := decoder.Decode(&r.NameContract); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown contract type value")
+	}
+
+	return nil
+}
+
+// Encode implementation
+func (r ContractType) Encode(encoder scale.Encoder) (err error) {
+	if r.IsNodeContract {
+		if err = encoder.PushByte(0); err != nil {
+			return err
+		}
+		if err = encoder.Encode(r.NodeContract); err != nil {
+			return err
+		}
+	} else if r.IsNameContract {
+		if err = encoder.PushByte(1); err != nil {
+			return err
+		}
+
+		if err = encoder.Encode(r.NameContract); err != nil {
+			return err
+		}
+	}
+
+	return
+}
+
+// Contract structure
+type Contract struct {
+	Versioned
+	State        ContractState
+	ContractID   types.U64
+	TwinID       types.U32
+	ContractType ContractType
+}
+
+// CreateNodeContract creates a contract for deployment
+func (s *Substrate) CreateNodeContract(identity *Identity, node uint32, body []byte, hash string, publicIPs uint32) (uint64, error) {
+	c, err := types.NewCall(s.meta, "SmartContractModule.create_node_contract",
 		node, body, hash, publicIPs,
 	)
 
@@ -84,9 +146,9 @@ func (s *Substrate) CreateContract(identity *Identity, node uint32, body []byte,
 	return s.GetContractWithHash(node, hash)
 }
 
-// UpdateContract updates existing contract
-func (s *Substrate) UpdateContract(identity *Identity, contract uint64, body []byte, hash string) (uint64, error) {
-	c, err := types.NewCall(s.meta, "SmartContractModule.update_contract",
+// UpdateNodeContract updates existing contract
+func (s *Substrate) UpdateNodeContract(identity *Identity, contract uint64, body []byte, hash string) (uint64, error) {
+	c, err := types.NewCall(s.meta, "SmartContractModule.update_node_contract",
 		contract, body, hash,
 	)
 

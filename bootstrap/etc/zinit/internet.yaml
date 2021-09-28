@@ -1,4 +1,5 @@
 exec: internet
 oneshot: true
+log: stdout
 after:
   - udev-trigger

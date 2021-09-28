@@ -67,7 +67,7 @@ var (
 		RunningMode:  RunningDev,
 		SubstrateURL: SubstrateDefaultURL,
 		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-bins.dev",
+		BinRepo:      "tf-zos-v3-bins.dev",
 	}
 
 	envTest = Environment{
@@ -75,7 +75,7 @@ var (
 		// TODO: this should become a different substrate ?
 		SubstrateURL: SubstrateDefaultURL,
 		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-bins.test",
+		BinRepo:      "tf-zos-v3-bins.test",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
@@ -83,7 +83,7 @@ var (
 		RunningMode:  RunningMain,
 		SubstrateURL: SubstrateDefaultURL,
 		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-bins",
+		BinRepo:      "tf-zos-v3-bins",
 	}
 )
 

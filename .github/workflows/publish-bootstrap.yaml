@@ -2,8 +2,8 @@ name: Publish Bootstrap
 on:
   push:
     paths:
-      - 'bootstrap/bootstrap/**'
-      - '.github/workflows/publish-bootstrap.yaml'
+      - "bootstrap/bootstrap/**"
+      - ".github/workflows/publish-bootstrap.yaml"
 
 jobs:
   bootstrap:
@@ -53,7 +53,7 @@ jobs:
           name: ${{ steps.setname.outputs.build }}
           target: bootstrap:development.flist
       - name: Symlink flist (release)
-        if: success() && github.ref == 'refs/heads/master'
+        if: success() && github.ref == 'refs/heads/main'
         uses: threefoldtech/publish-flist@master
         with:
           action: symlink

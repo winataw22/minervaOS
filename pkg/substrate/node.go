@@ -60,10 +60,11 @@ func (r Role) Encode(encoder scale.Encoder) (err error) {
 
 // PublicConfig type
 type PublicConfig struct {
-	IPv4 string
-	IPv6 string
-	GWv4 string
-	GWv6 string
+	IPv4   string
+	IPv6   string
+	GWv4   string
+	GWv6   string
+	Domain string
 }
 
 // OptionPublicConfig type

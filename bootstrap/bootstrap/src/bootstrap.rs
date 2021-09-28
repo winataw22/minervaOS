@@ -8,7 +8,9 @@ use config::{RunMode, Version};
 use retry;
 
 const FLIST_REPO: &str = "tf-zos";
-const BIN_REPO: &str = "tf-zos-bins";
+const BIN_REPO_V2: &str = "tf-zos-bins";
+const BIN_REPO_V3: &str = "tf-zos-v3-bins";
+
 const FLIST_INFO_FILE: &str = "/tmp/flist.info";
 const FLIST_NAME_FILE: &str = "/tmp/flist.name";
 const WORKDIR: &str = "/tmp/bootstrap";
@@ -128,21 +130,26 @@ pub fn install(cfg: &config::Config) -> Result<()> {
 }
 
 fn install_packages(cfg: &config::Config) -> Result<()> {
+    let name = match cfg.version {
+        Version::V2 => BIN_REPO_V2,
+        Version::V3 => BIN_REPO_V3,
+    };
+
     let repo = match cfg.runmode {
-        config::RunMode::Prod => BIN_REPO.to_owned(),
-        config::RunMode::Dev => format!("{}.dev", BIN_REPO),
-        config::RunMode::Test => format!("{}.test", BIN_REPO),
+        config::RunMode::Prod => name.into(),
+        config::RunMode::Dev => format!("{}.dev", name),
+        config::RunMode::Test => format!("{}.test", name),
     };
 
     let client = hub::Repo::new(&repo);
     let packages = retry::retry(retry::delay::Exponential::from_millis(200), || {
-        info!("list packages in: {}", BIN_REPO);
+        info!("list packages in: {}", BIN_REPO_V2);
         //the full point of this match is the logging.
         let packages = match client.list() {
             Ok(info) => info,
             Err(err) => {
-                error!("failed to list repo '{}': {}", BIN_REPO, err);
-                bail!("failed to list repo '{}': {}", BIN_REPO, err);
+                error!("failed to list repo '{}': {}", BIN_REPO_V2, err);
+                bail!("failed to list repo '{}': {}", BIN_REPO_V2, err);
             }
         };
 
@@ -151,7 +158,7 @@ fn install_packages(cfg: &config::Config) -> Result<()> {
 
     let packages = match packages {
         Ok(packages) => packages,
-        Err(err) => bail!("failed to list '{}': {:?}", BIN_REPO, err),
+        Err(err) => bail!("failed to list '{}': {:?}", BIN_REPO_V2, err),
     };
 
     let mut map = std::collections::HashMap::new();
