@@ -89,10 +89,7 @@ func EnsureYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, ns Yggd
 		}
 	}
 
-	z, err := zinit.New("")
-	if err != nil {
-		return nil, err
-	}
+	z := zinit.Default()
 
 	cfg := GenerateConfig(privateKey)
 	cfg.Peers = peers

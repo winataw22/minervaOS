@@ -130,10 +130,7 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 		return err
 	}
 
-	z, err := zinit.New("")
-	if err != nil {
-		return err
-	}
+	z := zinit.Default()
 	dhcpMon := NewDHCPMon(dmzPub4, dmzNamespace, z)
 	go func() {
 		_ = dhcpMon.Start(ctx)

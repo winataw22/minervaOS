@@ -233,11 +233,7 @@ func (g *gatewayModule) ensureGateway(ctx context.Context, forceResstart bool) (
 		return pkg.PublicConfig{}, errors.Wrap(err, "gateway is not supported on this node")
 	}
 
-	z, err := zinit.Default()
-	if err != nil {
-		return pkg.PublicConfig{}, errors.Wrap(err, "failed to connect to zinit")
-	}
-	defer z.Close()
+	z := zinit.Default()
 	running, err := g.isTraefikStarted(z)
 	if err != nil {
 		return pkg.PublicConfig{}, errors.Wrap(err, "failed to check traefik status")

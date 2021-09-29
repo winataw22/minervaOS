@@ -72,11 +72,7 @@ func check() error {
 
 func configureZOS() error {
 	f := func() error {
-		z, err := zinit.New("")
-		if err != nil {
-			log.Error().Err(err).Msg("failed to connect to zinit")
-			return err
-		}
+		z := zinit.Default()
 
 		log.Info().Msg("Start network bootstrap")
 

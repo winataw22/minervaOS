@@ -105,7 +105,6 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		Exec: fmt.Sprintf("ip netns exec %s %s -useconffile %s -loglevel trace", ns, bin, confPath),
 		After: []string{
 			"node-ready",
-			"networkd",
 		},
 		Test: "yggdrasilctl getself | grep -i coords",
 	})
@@ -113,7 +112,7 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		return err
 	}
 
-	if err := z.Monitor(zinitService); err != nil {
+	if err := z.Monitor(zinitService); err != nil && !errors.Is(err, zinit.ErrAlreadyMonitored) {
 		return err
 	}
 
