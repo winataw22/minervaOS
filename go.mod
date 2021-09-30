@@ -30,7 +30,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
 	github.com/gorilla/mux v1.8.0
 	github.com/hanwen/go-fuse/v2 v2.1.0 // indirect
@@ -48,7 +48,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0 // indirect
 	github.com/prometheus/common v0.20.0 // indirect
-	github.com/rs/zerolog v1.21.0
+	github.com/rs/zerolog v1.25.0
 	github.com/rusart/muxprom v0.0.0-20200609120753-9173fa27435a
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.0.0-20201023143004-874930cb3ce0 // indirect
@@ -57,6 +57,8 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
+	github.com/threefoldtech/go-rmb v0.1.3 // indirect
+	github.com/threefoldtech/substrate-client v0.0.0-20210930125201-9bd88e80762d // indirect
 	github.com/threefoldtech/zbus v0.1.5
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli v1.22.5
@@ -69,7 +71,7 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.4.0
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273
+	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	google.golang.org/appengine v1.6.7 // indirect

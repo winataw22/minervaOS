@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zos/pkg/capacity"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/monitord"
 	"github.com/threefoldtech/zos/pkg/rmb"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -52,6 +53,8 @@ func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 	)
+
+	env := environment.MustGet()
 
 	redis, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
@@ -134,5 +137,5 @@ func action(cli *cli.Context) error {
 	log.Info().Uint32("twin", twin).Msg("node has been registered")
 	log.Debug().Msg("start message bus")
 
-	return runMsgBus(ctx, twin)
+	return runMsgBus(ctx, twin, env.SubstrateURL)
 }

@@ -1,5 +1,5 @@
-MSGBUSD_VERSION="0.1.1"
-MSGBUSD_CHECKSUM="9cbd3290798b3b56c5c9f3f5889fa8e6"
+MSGBUSD_VERSION="0.1.2"
+MSGBUSD_CHECKSUM="bd4ddd29658147efeed4d5cbac8bfdd9"
 MSGBUSD_LINK="https://github.com/threefoldtech/rmb-go/releases/download/v${MSGBUSD_VERSION}/msgbusd"
 
 download_msgbusd() {

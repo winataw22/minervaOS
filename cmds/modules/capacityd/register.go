@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/host"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -20,7 +21,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
-	"github.com/threefoldtech/zos/pkg/substrate"
 )
 
 const (
@@ -224,7 +224,7 @@ func registerNode(
 	if err != nil {
 		return 0, 0, err
 	}
-	if _, err := sub.EnsureAccount(&id); err != nil {
+	if _, err := sub.EnsureAccount(&id, env.ActivationURL); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 
@@ -258,7 +258,7 @@ func registerNode(
 		node.Resources = resources
 		node.Location = location
 
-		log.Debug().Msg("node data have changing, issuing an update node")
+		log.Debug().Msgf("node data have changing, issuing an update node: %+v", node)
 		_, err = sub.UpdateNode(&id, *node)
 		return uint32(node.ID), uint32(node.TwinID), err
 	}

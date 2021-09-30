@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg/crypto"
-	"github.com/threefoldtech/zos/pkg/substrate"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"

@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rusart/muxprom"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
@@ -21,7 +22,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
 	"github.com/threefoldtech/zos/pkg/rmb"
-	"github.com/threefoldtech/zos/pkg/substrate"
 	"github.com/urfave/cli/v2"
 
 	"github.com/threefoldtech/zos/pkg/stubs"

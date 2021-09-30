@@ -2,42 +2,25 @@ package capacityd
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/go-rmb"
 )
 
-func runMsgBus(ctx context.Context, twin uint32) error {
+func runMsgBus(ctx context.Context, twin uint32, substrate string) error {
 	// todo: make it argument or parse from broker
 	const redis = "/var/run/redis.sock"
-	for {
-		cmd := exec.CommandContext(ctx,
-			"msgbusd",
-			"--twin", fmt.Sprint(twin),
-			"--redis", redis)
-
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		err := cmd.Run()
-
-		if err == context.Canceled {
-			return nil
-		} else if err != nil {
-			log.Error().Err(err).Msg("msgbusd exited unexpectedly, retrying")
-			<-time.After(2 * time.Second)
-		}
-
-		// hmm, so msgbusd exited with no error.
-		// see if context is canceled
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			//try again then
-		}
+	app, err := rmb.NewServer(substrate, redis, int(twin))
+	if err != nil {
+		return err
 	}
+
+	log.Info().Uint32("twin", twin).Msg("starting twin")
+
+	if err := app.Serve(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	return nil
 }

@@ -5,15 +5,16 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg"
 
 	"github.com/threefoldtech/zos/pkg/kernel"
-	"github.com/threefoldtech/zos/pkg/substrate"
 )
 
 const (
 	// SubstrateDefaultURL default substrate url
-	SubstrateDefaultURL = "wss://explorer.devnet.grid.tf/ws"
+	SubstrateDefaultURL = "wss://tfchain.dev.threefold.io"
+	ActivationURL       = "https://tfchain.dev.threefold.io/activation/activate"
 )
 
 // Environment holds information about running environment of a node
@@ -27,8 +28,9 @@ type Environment struct {
 	FarmerID pkg.FarmID
 	Orphan   bool
 
-	FarmSecret   string
-	SubstrateURL string
+	FarmSecret    string
+	SubstrateURL  string
+	ActivationURL string
 }
 
 // RunningMode type
@@ -64,26 +66,29 @@ const (
 
 var (
 	envDev = Environment{
-		RunningMode:  RunningDev,
-		SubstrateURL: SubstrateDefaultURL,
-		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-v3-bins.dev",
+		RunningMode:   RunningDev,
+		SubstrateURL:  SubstrateDefaultURL,
+		ActivationURL: ActivationURL,
+		FlistURL:      "zdb://hub.grid.tf:9900",
+		BinRepo:       "tf-zos-v3-bins.dev",
 	}
 
 	envTest = Environment{
 		RunningMode: RunningTest,
 		// TODO: this should become a different substrate ?
-		SubstrateURL: SubstrateDefaultURL,
-		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-v3-bins.test",
+		SubstrateURL:  SubstrateDefaultURL,
+		ActivationURL: ActivationURL,
+		FlistURL:      "zdb://hub.grid.tf:9900",
+		BinRepo:       "tf-zos-v3-bins.test",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
-		RunningMode:  RunningMain,
-		SubstrateURL: SubstrateDefaultURL,
-		FlistURL:     "zdb://hub.grid.tf:9900",
-		BinRepo:      "tf-zos-v3-bins",
+		RunningMode:   RunningMain,
+		SubstrateURL:  SubstrateDefaultURL,
+		ActivationURL: ActivationURL,
+		FlistURL:      "zdb://hub.grid.tf:9900",
+		BinRepo:       "tf-zos-v3-bins",
 	}
 )
 

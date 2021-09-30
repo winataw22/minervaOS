@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/substrate"
+	"github.com/threefoldtech/substrate-client"
 )
 
 func main() {

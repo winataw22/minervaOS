@@ -321,8 +321,9 @@ func upgradeLoop(
 				//TODO: crash or continue!
 				log.Error().Err(err).Msg("upgrade failed")
 				continue
+			} else {
+				log.Info().Msg("update completed")
 			}
-
 			if err := boot.Set(*event); err != nil {
 				log.Error().Err(err).Msg("failed to update boot information")
 			}

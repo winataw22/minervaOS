@@ -6,7 +6,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg/substrate"
+	"github.com/threefoldtech/substrate-client"
 )
 
 type substrateTwins struct {

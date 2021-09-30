@@ -11,9 +11,9 @@ import (
 
 	"github.com/joncrlsn/dque"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/substrate"
 
 	"github.com/rs/zerolog/log"
 )

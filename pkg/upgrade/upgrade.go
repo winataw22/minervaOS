@@ -204,7 +204,7 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 			log.Warn().Err(err).Str("service", name).Msg("could not forget service")
 		}
 
-		if err := u.zinit.Monitor(name); err != nil {
+		if err := u.zinit.Monitor(name); err != nil && err != zinit.ErrAlreadyMonitored {
 			log.Error().Err(err).Str("service", name).Msg("could not monitor service")
 		}
 	}
@@ -431,7 +431,7 @@ func (u *Upgrader) applyUpgrade(from, to FListEvent) error {
 	log.Debug().Msg("copying files complete")
 	// start all services in the flist
 	for _, service := range services {
-		if err := u.zinit.Monitor(service); err != nil {
+		if err := u.zinit.Monitor(service); err != nil && err != zinit.ErrAlreadyMonitored {
 			log.Error().Err(err).Str("service", service).Msg("error on zinit monitor")
 		}
 
