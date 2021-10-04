@@ -1,0 +1,2 @@
+exec: sh -c 'zinit log > /dev/tty2'
+log: stdout
