@@ -254,9 +254,14 @@ func registerNode(
 		}
 
 		// we need to update the node
-		node.PublicConfig = pubCfg
+		node.FarmID = types.U32(env.FarmerID)
+		node.ID = types.U32(nodeID)
+		node.TwinID = types.U32(twinID)
 		node.Resources = resources
 		node.Location = location
+		node.Country = loc.Country
+		node.City = loc.City
+		node.PublicConfig = pubCfg
 
 		log.Debug().Msgf("node data have changing, issuing an update node: %+v", node)
 		_, err = sub.UpdateNode(&id, *node)
