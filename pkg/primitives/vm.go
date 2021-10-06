@@ -198,8 +198,16 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 			return result, errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
 		}
 
+		hash, err := flist.FlistHash(ctx, cloudContainerFlist)
+		if err != nil {
+			return zos.ZMachineResult{}, errors.Wrap(err, "failed to get cloud-container flist hash")
+		}
+
+		// if the name changes (because flist changed, a new mount will be created)
+		name := fmt.Sprintf("%s:%s", cloudContainerName, hash)
+
 		// now mount cloud image also
-		cloudImage, err := flist.Mount(ctx, cloudContainerName, cloudContainerFlist, pkg.ReadOnlyMountOptions)
+		cloudImage, err := flist.Mount(ctx, name, cloudContainerFlist, pkg.ReadOnlyMountOptions)
 		if err != nil {
 			return result, errors.Wrap(err, "failed to mount cloud container base image")
 		}
