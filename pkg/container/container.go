@@ -185,7 +185,9 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		WithMemoryLimit(uint64(data.Memory)),
 		WithCPUCount(data.CPU),
 	}
-
+	if data.RootFsPropagation != "" {
+		opts = append(opts, WithRootfsPropagation(data.RootFsPropagation))
+	}
 	if data.Elevated {
 		log.Warn().Msg("elevated container requested")
 

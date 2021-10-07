@@ -58,6 +58,7 @@ func withCoreX() oci.SpecOpts {
 
 func withMounts(mounts []pkg.MountInfo) oci.SpecOpts {
 	mnts := make([]specs.Mount, len(mounts))
+
 	for i, mount := range mounts {
 		mnts[i] = specs.Mount{
 			Destination: mount.Target,
@@ -66,7 +67,15 @@ func withMounts(mounts []pkg.MountInfo) oci.SpecOpts {
 			Options:     []string{"rbind"},
 		}
 	}
-	return oci.Compose(oci.WithMounts(mnts))
+	return oci.WithMounts(mnts)
+}
+
+// WithRootfsPropagation makes the
+func WithRootfsPropagation(rootfsPropagation pkg.RootFSPropagation) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+		s.Linux.RootfsPropagation = string(rootfsPropagation)
+		return nil
+	}
 }
 
 // WithMemoryLimit sets the `Linux.LinuxResources.Memory.Limit` section to the

@@ -112,7 +112,16 @@ func (s *Module) dump() {
 			log.Debug().Msgf("pool %s is mounted at: %s", pool.Name(), path)
 		}
 		device := pool.Device()
-		log.Debug().Str("path", device.Path()).Str("label", pool.Name()).Str("type", string(device.Type())).Send()
+		log.Debug().Str("path", device.Path()).Str("label", pool.Name()).Str("type", string(zos.SSDDevice)).Send()
+	}
+
+	for _, pool := range s.hdds {
+		path, err := pool.Mounted()
+		if err == nil {
+			log.Debug().Msgf("pool %s is mounted at: %s", pool.Name(), path)
+		}
+		device := pool.Device()
+		log.Debug().Str("path", device.Path()).Str("label", pool.Name()).Str("type", string(zos.HDDDevice)).Send()
 	}
 
 }
@@ -131,12 +140,12 @@ func (s *Module) initialize() error {
 	defer s.mu.Unlock()
 	log.Info().Msgf("Initializing storage module")
 
-	vm := true
+	//vm := true
 	hyperVisor, err := capacity.NewResourceOracle(nil).GetHypervisor()
-	if err == nil {
-		// Disable disk shutdown when running in a VM
-		vm = len(hyperVisor) > 0
-	}
+	vm := err == nil && len(hyperVisor) > 0
+
+	log.Debug().Bool("is-vm", vm).Msg("virtualization detection")
+
 	// Make sure we finish in 1 minute
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 	defer cancel()
@@ -168,6 +177,10 @@ func (s *Module) initialize() error {
 		if vm {
 			// force ssd device for vms
 			typ = zos.SSDDevice
+
+			if device.Name() == "/dev/vdd" || device.Name() == "/dev/vde" {
+				typ = zos.HDDDevice
+			}
 		}
 
 		switch typ {

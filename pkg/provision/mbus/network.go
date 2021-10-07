@@ -109,7 +109,7 @@ func (n *Network) listInterfaces(ctx context.Context) (interface{}, mw.Response)
 		rename string
 	}
 	for _, i := range []q{{"zos", "", "zos"}, {"nygg6", "ndmz", "ygg"}} {
-		ips, err := mgr.Addrs(ctx, i.inf, i.ns)
+		ips, _, err := mgr.Addrs(ctx, i.inf, i.ns)
 		if err != nil {
 			return nil, mw.Error(errors.Wrapf(err, "failed to get ips for '%s' interface", i))
 		}

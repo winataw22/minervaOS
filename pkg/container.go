@@ -10,6 +10,18 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
+const (
+	RootFSPropagationSlave    = "slave"
+	RootFSPropagationRslave   = "rslave"
+	RootFSPropagationShared   = "shared"
+	RootFSPropagationRshared  = "rshared"
+	RootFSPropagationPrivate  = "private"
+	RootFSPropagationRprivate = "rprivate"
+)
+
+// RootFSPropagation defines how the submounts are propagated to its mountpoint peers
+type RootFSPropagation string
+
 // ContainerID type
 type ContainerID string
 
@@ -67,6 +79,8 @@ type Container struct {
 	Elevated bool
 	// CreatedAt time
 	CreatedAt time.Time
+	// RootfsPropagation root fs propagation mode (rshared,shared,slave,...)
+	RootFsPropagation RootFSPropagation
 }
 
 // ContainerModule defines rpc interface to containerd

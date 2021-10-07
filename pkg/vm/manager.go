@@ -116,6 +116,19 @@ func (m *Module) makeDevices(vm *pkg.VM) ([]Disk, error) {
 	return drives, nil
 }
 
+func (m *Module) makeVirtioFilesystems(vm *pkg.VM) ([]VirtioFS, error) {
+	var result []VirtioFS
+	for _, shared := range vm.Shared {
+
+		result = append(result, VirtioFS{
+			Tag:  shared.ID,
+			Path: shared.Path,
+		})
+	}
+
+	return result, nil
+}
+
 func (m *Module) socketPath(name string) string {
 	return filepath.Join(socketDir, name)
 }
@@ -320,14 +333,16 @@ func (m *Module) Run(vm pkg.VM) error {
 	if err != nil {
 		return err
 	}
+	fs, err := m.makeVirtioFilesystems(&vm)
+	if err != nil {
+		return errors.Wrap(err, "failed while constructing qsfs filesystems")
+	}
 
 	cmdline := vm.KernelArgs
 	if cmdline == nil {
 		cmdline = pkg.KernelArgs{}
 		cmdline.Extend(defaultKernelArgs)
 	}
-
-	var fs []VirtioFS
 	var env map[string]string
 	if vm.Boot.Type == pkg.BootVirtioFS {
 		// booting from a virtiofs. the vm is basically
@@ -337,15 +352,20 @@ func (m *Module) Run(vm pkg.VM) error {
 		cmdline["rootfstype"] = "virtiofs"
 
 		// we add the fs for booting.
-		fs = []VirtioFS{
-			{Tag: virtioRootFsTag, Path: vm.Boot.Path},
-		}
+		fs = append(fs, VirtioFS{
+			Tag:  virtioRootFsTag,
+			Path: vm.Boot.Path,
+		})
 		// we set the environment
 		env = vm.Environment
 		// add we also add disk mounts
 		for i, mnt := range vm.Disks {
 			name := fmt.Sprintf("vd%c", 'a'+i)
 			cmdline[name] = mnt.Target
+		}
+		for _, q := range vm.Shared {
+			key := fmt.Sprintf("qsfs_%s", q.ID)
+			cmdline[key] = q.Target
 		}
 	} else {
 		// if with no virtio fs we can only

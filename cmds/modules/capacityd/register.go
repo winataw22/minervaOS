@@ -55,7 +55,7 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	// - yggdrasil
 	// node always register with ndmz address
 	var ygg net.IP
-	if ips, err := netMgr.Addrs(ctx, yggdrasil.YggNSInf, "ndmz"); err == nil {
+	if ips, _, err := netMgr.Addrs(ctx, yggdrasil.YggNSInf, "ndmz"); err == nil {
 		if len(ips) == 0 {
 			return 0, 0, errors.Wrap(err, "failed to get yggdrasil ip")
 		}
@@ -189,8 +189,29 @@ func registerNode(
 	ygg net.IP,
 ) (nodeID, twinID uint32, err error) {
 	var (
-		mgr = stubs.NewIdentityManagerStub(cl)
+		mgr    = stubs.NewIdentityManagerStub(cl)
+		netMgr = stubs.NewNetworkerStub(cl)
 	)
+
+	zosIps, zosMac, err := netMgr.Addrs(ctx, "zos", "")
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to get zos bridge information")
+	}
+
+	interfaces := []substrate.Interface{
+		{
+			Name: "zos",
+			Mac:  zosMac,
+			IPs: func() []string {
+				var ips []string
+				for _, ip := range zosIps {
+					ipV := net.IP(ip)
+					ips = append(ips, ipV.String())
+				}
+				return ips
+			}(),
+		},
+	}
 
 	var pubCfg substrate.OptionPublicConfig
 	if pub != nil {
@@ -247,21 +268,23 @@ func registerNode(
 
 		if reflect.DeepEqual(node.PublicConfig, pubCfg) &&
 			reflect.DeepEqual(node.Resources, resources) &&
-			reflect.DeepEqual(node.Location, location) {
+			reflect.DeepEqual(node.Location, location) &&
+			reflect.DeepEqual(node.Interfaces, interfaces) {
 			// so node exists AND pub config, nor resources hasn't changed
 			log.Debug().Msg("node information has not changed")
 			return uint32(node.ID), uint32(node.TwinID), nil
 		}
 
 		// we need to update the node
-		node.FarmID = types.U32(env.FarmerID)
 		node.ID = types.U32(nodeID)
+		node.FarmID = types.U32(env.FarmerID)
 		node.TwinID = types.U32(twinID)
 		node.Resources = resources
 		node.Location = location
 		node.Country = loc.Country
 		node.City = loc.City
 		node.PublicConfig = pubCfg
+		node.Interfaces = interfaces
 
 		log.Debug().Msgf("node data have changing, issuing an update node: %+v", node)
 		_, err = sub.UpdateNode(&id, *node)
@@ -277,6 +300,7 @@ func registerNode(
 		Country:      loc.CountryCode,
 		City:         loc.City,
 		PublicConfig: pubCfg,
+		Interfaces:   interfaces,
 	})
 
 	if err != nil {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net"
 
-	"github.com/threefoldtech/zos/pkg/network/nr"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/vishvananda/netlink"
 )
@@ -26,7 +25,9 @@ type DMZ interface {
 	// delete the ndmz network namespace and clean up all network interfaces
 	Delete() error
 	// link a network resource from a user network to ndmz
-	AttachNR(networkID string, nr *nr.NetResource, ipamLeaseDir string) error
+	AttachNR(networkID, nr, ipamLeaseDir string) error
+
+	DetachNR(networkID, ipamLeaseDir string) error
 	// GetIP gets ndmz public ips from ndmz
 	GetIP(family int) ([]net.IPNet, error)
 

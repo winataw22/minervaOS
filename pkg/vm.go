@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"path/filepath"
 
 	"github.com/google/shlex"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -47,6 +48,16 @@ type VMNetworkInfo struct {
 
 // VMDisk specifies vm disk params
 type VMDisk struct {
+	// Path raw disk path
+	Path string
+	// Target is mount point. Only in container mode
+	Target string
+}
+
+// SharedDir specifies virtio shared dir params
+type SharedDir struct {
+	// ID unique qsfs identifier
+	ID string
 	// Path raw disk path
 	Path string
 	// Target is mount point. Only in container mode
@@ -136,6 +147,8 @@ type VM struct {
 	// Disks are a list of disks that are going to
 	// be auto allocated on the provided storage path
 	Disks []VMDisk
+	// Shared are a list of qsfs that are going to
+	Shared []SharedDir
 	// Boot options
 	Boot Boot
 	// Environment is injected to the VM via container mechanism (virtiofs)
@@ -170,6 +183,17 @@ func (vm *VM) Validate() error {
 		return fmt.Errorf("invalid cpu must be between 1 and 32")
 	}
 
+	for _, shared := range vm.Shared {
+		if filepath.Clean(shared.Target) == "/" {
+			return fmt.Errorf("validating virtiofs %s: mount target can't be /", shared.Target)
+		}
+	}
+
+	for _, disk := range vm.Disks {
+		if filepath.Clean(disk.Target) == "/" {
+			return fmt.Errorf("validating disk %s: mount target can't be /", disk.Target)
+		}
+	}
 	return nil
 }
 

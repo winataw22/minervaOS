@@ -25,7 +25,7 @@ func NewNetworkerStub(client zbus.Client) *NetworkerStub {
 	}
 }
 
-func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (ret0 [][]uint8, ret1 error) {
+func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (ret0 [][]uint8, ret1 string, ret2 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Addrs", args...)
 	if err != nil {
@@ -34,8 +34,11 @@ func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (re
 	if err := result.Unmarshal(0, &ret0); err != nil {
 		panic(err)
 	}
-	ret1 = new(zbus.RemoteError)
 	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
 		panic(err)
 	}
 	return
@@ -265,6 +268,47 @@ func (s *NetworkerStub) PublicIPv4Support(ctx context.Context) (ret0 bool) {
 		panic(err)
 	}
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) QSFSDestroy(ctx context.Context, arg0 string) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "QSFSDestroy", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) QSFSNamespace(ctx context.Context, arg0 string) (ret0 string) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "QSFSNamespace", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "QSFSPrepare", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return

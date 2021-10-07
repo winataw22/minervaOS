@@ -21,8 +21,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/zinit"
 
-	"github.com/threefoldtech/zos/pkg/network/nr"
-
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
 
 	"github.com/rs/zerolog/log"
@@ -35,8 +33,8 @@ import (
 
 const (
 
-	//ndmzBridge is the name of the ipv4 routing bridge in the ndmz namespace
-	ndmzBridge = "br-ndmz"
+	//NdmzBridge is the name of the ipv4 routing bridge in the host namespace
+	NdmzBridge = "br-ndmz"
 
 	//dmzNamespace name of the dmz namespace
 	dmzNamespace = "ndmz"
@@ -96,7 +94,7 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 
 	defer netNS.Close()
 
-	if err := createRoutingBridge(ndmzBridge, netNS); err != nil {
+	if err := createRoutingBridge(NdmzBridge, netNS); err != nil {
 		return errors.Wrapf(err, "ndmz: createRoutingBridge error")
 	}
 
@@ -151,20 +149,20 @@ func (d *dmzImpl) Delete() error {
 	return nil
 }
 
-// AttachNR links a network resource to the NDMZ
-func (d *dmzImpl) AttachNR(networkID string, nr *nr.NetResource, ipamLeaseDir string) error {
-	nrNSName, err := nr.Namespace()
-	if err != nil {
-		return err
-	}
+func (d *dmzImpl) DetachNR(networkID, ipamLeaseDir string) error {
+	// so far this is only used to deallocate reserved IP
+	return deAllocateIPv4(networkID, ipamLeaseDir)
+}
 
+// AttachNR links a network resource to the NDMZ
+func (d *dmzImpl) AttachNR(networkID, nrNSName string, ipamLeaseDir string) error {
 	nrNS, err := namespace.GetByName(nrNSName)
 	if err != nil {
 		return err
 	}
 
 	if !ifaceutil.Exists(nrPubIface, nrNS) {
-		if _, err = macvlan.Create(nrPubIface, ndmzBridge, nrNS); err != nil {
+		if _, err = macvlan.Create(nrPubIface, NdmzBridge, nrNS); err != nil {
 			return err
 		}
 	}

@@ -68,6 +68,18 @@ type Networker interface {
 	// for zdb is rewind. ns param is the namespace return by the ZDBPrepare
 	ZDBDestroy(ns string) error
 
+	// QSFSNamespace returns the namespace of the qsfs workload
+	QSFSNamespace(id string) string
+
+	// QSFSPrepare creates a network namespace with a macvlan interface into it
+	// to allow qsfs container to reach the internet but not be reachable itself
+	// it return the name of the network namespace created.
+	// the id should be unique.
+	QSFSPrepare(id string) (string, error)
+
+	// QSFSDestroy rewind setup by QSFSPrepare
+	QSFSDestroy(id string) error
+
 	// SetupPrivTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
 	SetupPrivTap(networkID NetID, name string) (string, error)
@@ -126,7 +138,7 @@ type Networker interface {
 
 	// Addrs return the IP addresses of interface
 	// if the interface is in a network namespace netns needs to be not empty
-	Addrs(iface string, netns string) ([]net.IP, error)
+	Addrs(iface string, netns string) (ips []net.IP, mac string, err error)
 
 	WireguardPorts() ([]uint, error)
 

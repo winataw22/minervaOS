@@ -273,8 +273,13 @@ func (r *Reporter) collect(ctx context.Context, since time.Time) (rep Report, er
 		return Report{}, errors.Wrap(err, "failed to get gateway metrics")
 	}
 
+	qsfsMetrics, err := stubs.NewQSFSDStub(r.cl).Metrics(ctx)
+	if err != nil {
+		return Report{}, errors.Wrap(err, "failed to get qsfs metrics")
+	}
+
 	for _, user := range users {
-		cap, err := r.user(since, user, vmMetrics, gwMetrics)
+		cap, err := r.user(since, user, vmMetrics, gwMetrics, qsfsMetrics)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to collect all user capacity")
 			// NOTE: we intentionally not doing a 'continue' or 'return'
@@ -292,7 +297,7 @@ func (r *Reporter) push(report Report) error {
 	return r.queue.Enqueue(&report)
 }
 
-func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetrics, gwMetrics pkg.GatewayMetrics) ([]Consumption, error) {
+func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetrics, gwMetrics pkg.GatewayMetrics, qsfsMetrics pkg.QSFSMetrics) ([]Consumption, error) {
 	var m many
 
 	var consumptions []Consumption
@@ -304,7 +309,7 @@ func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetri
 	for _, id := range ids {
 		dl, err := r.engine.Storage().Get(user, id)
 		if err != nil {
-			m = m.append(errors.Wrapf(err, "failed to get reservation '%s'", id))
+			m = m.append(errors.Wrapf(err, "failed to get reservation '%d'", id))
 			continue
 		}
 
@@ -352,7 +357,7 @@ func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetri
 				// add metric to consumption
 				consumption.NRU += types.U64(r.computeNU(metric))
 			}
-
+			consumption.NRU += types.U64(qsfsMetrics.Nu(wlID.String()))
 			// special handling for gw types.
 			consumption.NRU += types.U64(gwMetrics.Nu(wlID.String()))
 		}

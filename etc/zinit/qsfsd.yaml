@@ -1,0 +1,3 @@
+exec: qsfsd --broker unix://var/run/redis.sock --root /var/cache/modules/qsfsd
+after:
+  - boot

@@ -6,6 +6,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/plugins/plugins/ipam/host-local/backend/allocator"
 	"github.com/containernetworking/plugins/plugins/ipam/host-local/backend/disk"
+	"github.com/rs/zerolog/log"
 )
 
 // allocateIPv4 allocates a unique IPv4 for the entity defines by the given id (for example container id, or a vm).
@@ -61,4 +62,31 @@ func allocateIPv4(networkID, leaseDir string) (*net.IPNet, error) {
 		return nil, err
 	}
 	return &ipConfig.Address, nil
+}
+
+// allocateIPv4 allocates a unique IPv4 for the entity defines by the given id (for example container id, or a vm).
+// in the network with netID, and NetResource.
+func deAllocateIPv4(networkID, leaseDir string) error {
+	store, err := disk.New("ndmz", leaseDir)
+	if err != nil {
+		return err
+	}
+
+	defer store.Close()
+
+	// unfortunately, calling the allocator Get() directly will try to allocate
+	// a new IP. if the ID/nic already has an ip allocated it will just fail instead of returning
+	// the same IP.
+	// So we have to check the store ourselves to see if there is already an IP allocated
+	// to this container, and if one found, we return it.
+	if err := store.Lock(); err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := store.Unlock(); err != nil {
+			log.Error().Err(err).Msg("failed to unlock store while deallocating ipv4")
+		}
+	}()
+	return store.ReleaseByID(networkID, "eth0")
 }

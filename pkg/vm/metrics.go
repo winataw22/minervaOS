@@ -92,6 +92,7 @@ func (m *Module) metrics(ps Process) (pkg.MachineMetric, error) {
 					Int("pid", ps.Pid).
 					Str("net", nic).
 					Msg("failed to get macvtap for public ip")
+				continue
 			}
 
 			pub = append(pub, tap)
