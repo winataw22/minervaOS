@@ -33,7 +33,7 @@ func init() {
 	gridtypes.RegisterType(PublicIPType, PublicIP{})
 	gridtypes.RegisterType(GatewayNameProxyType, GatewayNameProxy{})
 	gridtypes.RegisterType(GatewayFQDNProxyType, GatewayFQDNProxy{})
-	gridtypes.RegisterType(QuantumSafeFSType, QuatumSafeFS{})
+	gridtypes.RegisterType(QuantumSafeFSType, QuantumSafeFS{})
 }
 
 // DeviceType is the actual type of hardware that the storage device runs on,

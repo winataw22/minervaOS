@@ -298,7 +298,7 @@ func (s *NetworkerStub) QSFSNamespace(ctx context.Context, arg0 string) (ret0 st
 	return
 }
 
-func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
+func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 string, ret2 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "QSFSPrepare", args...)
 	if err != nil {
@@ -307,8 +307,11 @@ func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 stri
 	if err := result.Unmarshal(0, &ret0); err != nil {
 		panic(err)
 	}
-	ret1 = new(zbus.RemoteError)
 	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
 		panic(err)
 	}
 	return

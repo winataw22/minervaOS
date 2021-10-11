@@ -19,6 +19,7 @@ func validateNameContract(twinID uint32, name string) error {
 }
 
 func (p *Primitives) gwProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+
 	result := zos.GatewayProxyResult{}
 	var proxy zos.GatewayNameProxy
 	if err := json.Unmarshal(wl.Data, &proxy); err != nil {
@@ -44,7 +45,7 @@ func (p *Primitives) gwProvision(ctx context.Context, wl *gridtypes.WorkloadWith
 	// gateway := stubs.NewGatewayStub(p.zbus)
 	// gateway.SetNamedProxy(ctx context.Context, arg0 string, arg1 []string)
 	gateway := stubs.NewGatewayStub(p.zbus)
-	fqdn, err := gateway.SetNamedProxy(ctx, wl.ID.String(), proxy.Name, backends, proxy.TLSPassthrough)
+	fqdn, err := gateway.SetNamedProxy(ctx, wl.ID.String(), proxy.Name, backends, proxy.TLSPassthrough, twinID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup name proxy")
 	}

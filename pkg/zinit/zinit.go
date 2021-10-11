@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 
 	"github.com/pkg/errors"
 )
 
 const defaultSocketPath = "/var/run/zinit.sock"
+
+var unknownServiceRegex = regexp.MustCompile("^service name \".*\" unknown$")
 
 // Client is a client for zinit action
 // it talks to zinit directly over its unis socket
@@ -59,6 +62,10 @@ func (c *Client) cmd(cmd string, out interface{}) error {
 		var msg string
 		if err := json.Unmarshal(result.Body, &msg); err != nil {
 			return errors.Wrapf(err, "failed to parse response error (%v) ", result.Body)
+		}
+
+		if unknownServiceRegex.Match([]byte(msg)) {
+			return ErrUnknownService
 		}
 		return errors.New(msg)
 	}

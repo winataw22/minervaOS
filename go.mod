@@ -5,7 +5,6 @@ go 1.16
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Microsoft/go-winio v0.4.18 // indirect
-	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/alexflint/go-filemutex v1.1.0
 	github.com/blang/semver v3.5.1+incompatible
@@ -23,7 +22,6 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
 	github.com/gizak/termui/v3 v3.1.0
-	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gofrs/flock v0.8.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
@@ -57,13 +55,12 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/go-rmb v0.1.3 // indirect
-	github.com/threefoldtech/substrate-client v0.0.0-20211007134519-74137b8f68ec // indirect
+	github.com/threefoldtech/go-rmb v0.1.4
+	github.com/threefoldtech/substrate-client v0.0.0-20211007134519-74137b8f68ec
 	github.com/threefoldtech/zbus v0.1.5
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli v1.22.5
 	github.com/urfave/cli/v2 v2.3.0
-	github.com/vedhavyas/go-subkey v1.0.2
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect

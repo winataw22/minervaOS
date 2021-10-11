@@ -73,9 +73,9 @@ type Networker interface {
 
 	// QSFSPrepare creates a network namespace with a macvlan interface into it
 	// to allow qsfs container to reach the internet but not be reachable itself
-	// it return the name of the network namespace created.
+	// it return the name of the network namespace created, and the ygg ip.
 	// the id should be unique.
-	QSFSPrepare(id string) (string, error)
+	QSFSPrepare(id string) (string, string, error)
 
 	// QSFSDestroy rewind setup by QSFSPrepare
 	QSFSDestroy(id string) error

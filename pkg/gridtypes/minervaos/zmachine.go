@@ -101,8 +101,8 @@ type ZMachine struct {
 	FList string `json:"flist"`
 	// Network configuration for machine network
 	Network MachineNetwork `json:"network"`
-	// Size of zmachine (deprecated)
-	Size uint8 `json:"size"` // deprecated, use compute_capacity instead
+	// Size of zmachine disk
+	Size gridtypes.Unit `json:"size"`
 	// ComputeCapacity configuration for machine cpu+memory
 	ComputeCapacity MachineCapacity `json:"compute_capacity"`
 	// Mounts configure mounts/disks attachments to this machine
@@ -129,16 +129,14 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 			return fmt.Errorf("invalid IP")
 		}
 	}
-
-	if v.Size == 0 {
-		if v.ComputeCapacity.CPU == 0 {
-			return fmt.Errorf("cpu capcity can't be 0")
-		}
-		if v.ComputeCapacity.Memory < 250*gridtypes.Megabyte {
-			return fmt.Errorf("mem capacity can't be less that 250M")
-		}
-	} else if v.Size < 1 || v.Size > 18 {
-		return fmt.Errorf("unsupported vm size %d, only size 1 to 18 are supported", v.Size)
+	if v.ComputeCapacity.CPU == 0 {
+		return fmt.Errorf("cpu capcity can't be 0")
+	}
+	if v.ComputeCapacity.Memory < 250*gridtypes.Megabyte {
+		return fmt.Errorf("mem capacity can't be less that 250M")
+	}
+	if v.Size != 0 && v.Size < 250*gridtypes.Megabyte {
+		return fmt.Errorf("disk size can't be less that 250M")
 	}
 	if !v.Network.PublicIP.IsEmpty() {
 		wl, err := getter.Get(v.Network.PublicIP)
@@ -162,18 +160,14 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 
 // Capacity implementation
 func (v ZMachine) Capacity() (gridtypes.Capacity, error) {
-	if v.Size > 0 {
-		rsu, ok := vmSize[v.Size]
-		if !ok {
-			return gridtypes.Capacity{}, fmt.Errorf("VM size %d is not supported", v.Size)
-		}
-		return rsu, nil
+	var sru uint64
+	if v.Size > 250*gridtypes.Megabyte {
+		sru += uint64(v.Size) - 250*uint64(gridtypes.Megabyte)
 	}
-
-	// otherwise
 	return gridtypes.Capacity{
 		CRU: uint64(v.ComputeCapacity.CPU),
 		MRU: v.ComputeCapacity.Memory,
+		SRU: gridtypes.Unit(sru),
 	}, nil
 }
 

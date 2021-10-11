@@ -65,8 +65,8 @@ func (s *GatewayStub) SetFQDNProxy(ctx context.Context, arg0 string, arg1 string
 	return
 }
 
-func (s *GatewayStub) SetNamedProxy(ctx context.Context, arg0 string, arg1 string, arg2 []string, arg3 bool) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2, arg3}
+func (s *GatewayStub) SetNamedProxy(ctx context.Context, arg0 string, arg1 string, arg2 []string, arg3 bool, arg4 uint32) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetNamedProxy", args...)
 	if err != nil {
 		panic(err)

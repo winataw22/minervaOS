@@ -137,23 +137,23 @@ func (c *QuantumCompression) Challenge(w io.Writer) error {
 }
 
 type QuantumSafeFSConfig struct {
-	DataShards      uint32             `json:"data_shards" toml:"data_shards"`
-	ParityShards    uint32             `json:"parity_shards" toml:"parity_shards"`
-	RedundantGroups uint32             `json:"redundant_groups" toml:"redundant_groups"`
-	RedundantNodes  uint32             `json:"redundant_nodes" toml:"redundant_nodes"`
-	Socket          string             `json:"socket" toml:"socket"`
-	Encryption      Encryption         `json:"encryption" toml:"encryption"`
-	Meta            QuantumSafeMeta    `json:"meta" toml:"meta"`
-	Groups          []ZdbGroup         `json:"groups" toml:"groups"`
-	Compression     QuantumCompression `json:"compression" toml:"compression"`
+	MinimalShards     uint32             `json:"minimal_shards" toml:"minimal_shards"`
+	ExpectedShards    uint32             `json:"expected_shards" toml:"expected_shards"`
+	RedundantGroups   uint32             `json:"redundant_groups" toml:"redundant_groups"`
+	RedundantNodes    uint32             `json:"redundant_nodes" toml:"redundant_nodes"`
+	MaxZDBDataDirSize uint32             `json:"max_zdb_data_dir_size" toml:"max_zdb_data_dir_size"`
+	Encryption        Encryption         `json:"encryption" toml:"encryption"`
+	Meta              QuantumSafeMeta    `json:"meta" toml:"meta"`
+	Groups            []ZdbGroup         `json:"groups" toml:"groups"`
+	Compression       QuantumCompression `json:"compression" toml:"compression"`
 }
 
 func (c *QuantumSafeFSConfig) Challenge(w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%d", c.DataShards); err != nil {
+	if _, err := fmt.Fprintf(w, "%d", c.MinimalShards); err != nil {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "%d", c.ParityShards); err != nil {
+	if _, err := fmt.Fprintf(w, "%d", c.ExpectedShards); err != nil {
 		return err
 	}
 
@@ -165,7 +165,7 @@ func (c *QuantumSafeFSConfig) Challenge(w io.Writer) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "%s", c.Socket); err != nil {
+	if _, err := fmt.Fprintf(w, "%d", c.MaxZDBDataDirSize); err != nil {
 		return err
 	}
 
@@ -190,16 +190,19 @@ func (c *QuantumSafeFSConfig) Challenge(w io.Writer) error {
 	return nil
 }
 
-type QuatumSafeFS struct {
+type QuantumSafeFS struct {
 	Cache  gridtypes.Unit      `json:"cache"`
 	Config QuantumSafeFSConfig `json:"config"`
 }
 
-func (q QuatumSafeFS) Valid(getter gridtypes.WorkloadGetter) error {
+func (q QuantumSafeFS) Valid(getter gridtypes.WorkloadGetter) error {
+	if q.Config.MinimalShards > q.Config.ExpectedShards {
+		return fmt.Errorf("minimal shards can't be greater than expected shards")
+	}
 	return nil
 }
 
-func (q QuatumSafeFS) Challenge(w io.Writer) error {
+func (q QuantumSafeFS) Challenge(w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "%d", q.Cache); err != nil {
 		return err
 	}
@@ -211,7 +214,7 @@ func (q QuatumSafeFS) Challenge(w io.Writer) error {
 	return nil
 }
 
-func (q QuatumSafeFS) Capacity() (gridtypes.Capacity, error) {
+func (q QuantumSafeFS) Capacity() (gridtypes.Capacity, error) {
 	return gridtypes.Capacity{
 		CRU: 1,
 		MRU: 256 * gridtypes.Megabyte,
@@ -220,5 +223,6 @@ func (q QuatumSafeFS) Capacity() (gridtypes.Capacity, error) {
 }
 
 type QuatumSafeFSResult struct {
-	Path string `json:"string"`
+	Path            string `json:"path"`
+	MetricsEndpoint string `json:"metrics_endpoint"`
 }

@@ -45,7 +45,6 @@ func (p *Primitives) virtualMachineProvision(ctx context.Context, wl *gridtypes.
 
 func (p *Primitives) vmMounts(ctx context.Context, deployment gridtypes.Deployment, mounts []zos.MachineMount, format bool, vm *pkg.VM) error {
 	for _, mount := range mounts {
-		log.Debug().Str("mount", string(mount.Name)).Msg("why this")
 		wl, err := deployment.Get(mount.Name)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get mount '%s' workload", mount.Name)
@@ -221,8 +220,15 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err := flist.Unmount(ctx, wl.ID.String()); err != nil {
 			return result, errors.Wrapf(err, "failed to unmount flist: %s", wl.ID.String())
 		}
+		rootfsSize := config.Size
+		if rootfsSize < 250*gridtypes.Megabyte {
+			rootfsSize = 250 * gridtypes.Megabyte
+		}
 		// remounting in RW mode
-		mnt, err = flist.Mount(ctx, wl.ID.String(), config.FList, pkg.DefaultMountOptions)
+		mnt, err = flist.Mount(ctx, wl.ID.String(), config.FList, pkg.MountOptions{
+			ReadOnly: false,
+			Limit:    rootfsSize,
+		})
 		if err != nil {
 			return result, errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
 		}

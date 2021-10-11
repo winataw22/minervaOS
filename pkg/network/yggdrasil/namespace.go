@@ -7,6 +7,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
@@ -46,6 +47,10 @@ func ensureYggPlumbing(netNS ns.NetNS) error {
 		}
 	}
 
+	if err := dumdumHack(); err != nil {
+		log.Error().Err(err).Msg("failed to create the dummy hack for ygg-bridge")
+	}
+
 	if !ifaceutil.Exists(YggNSInf, netNS) {
 		if _, err := macvlan.Create(YggNSInf, yggBridge, netNS); err != nil {
 			return errors.Wrapf(err, "couldn't create %s inside", YggNSInf)
@@ -60,6 +65,46 @@ func ensureYggPlumbing(netNS ns.NetNS) error {
 
 		return netlink.LinkSetUp(link)
 	})
+}
+
+func dumdumHack() error {
+	// dumdum hack. this hack to fix a weird issue with linux kernel
+	// 5.10.version 55
+	// it seems that the macvlan on a bridge does not bring the bridge
+	// up. So we have to plug in a dummy device into yggBridge and set
+	// the device up to keep the bridge state UP.
+	br, err := bridge.Get(yggBridge)
+	if err != nil {
+		return errors.Wrap(err, "failed to get br-ygg")
+	}
+
+	const name = "dumdum"
+	link, err := netlink.LinkByName(name)
+	if _, ok := err.(netlink.LinkNotFoundError); ok {
+		if err := netlink.LinkAdd(&netlink.Dummy{
+			LinkAttrs: netlink.LinkAttrs{
+				NetNsID: -1,
+				TxQLen:  -1,
+				Name:    name,
+			},
+		}); err != nil {
+			return err
+		}
+
+		link, err = netlink.LinkByName(name)
+		if err != nil {
+			return errors.Wrap(err, "failed to get dumdum device")
+		}
+	} else if err != nil {
+		return err
+	}
+
+	if err := netlink.LinkSetMaster(link, br); err != nil {
+		return err
+	}
+
+	return netlink.LinkSetUp(link)
+
 }
 
 func NewYggdrasilNamespace(ns string) (YggdrasilNamespace, error) {

@@ -22,7 +22,7 @@ func (m *GatewayMetrics) Nu(service string) (result uint64) {
 }
 
 type Gateway interface {
-	SetNamedProxy(wlID string, prefix string, backends []string, TLSPassthrough bool) (string, error)
+	SetNamedProxy(wlID string, prefix string, backends []string, TLSPassthrough bool, twinID uint32) (string, error)
 	SetFQDNProxy(wlID string, fqdn string, backends []string, TLSPassthrough bool) error
 	DeleteNamedProxy(wlID string) error
 	Metrics() (GatewayMetrics, error)

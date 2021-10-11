@@ -39,6 +39,11 @@ type Message struct {
 	Schema     string   `json:"shm"`
 	Epoch      int64    `json:"now"`
 	Err        string   `json:"err"`
+	// Proxy flag is only used to keep the value sent by
+	// msgbusd. because it need to be send back as is to
+	// the daemon. While it's not used in the client side
+	// it need to stay
+	Proxy bool `json:"pxy"`
 }
 
 type messageBusSubrouter struct {

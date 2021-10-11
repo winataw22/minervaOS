@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	every = 5 * 60 // 5 minutes
+	every = 60 * 60 // 1 hour
 )
 
 type many []error
