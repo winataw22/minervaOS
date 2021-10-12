@@ -16,9 +16,11 @@ impl Zfs {
     {
         // mount the flist
         let target = target.into();
+        std::fs::create_dir_all(&target)?;
+
         let mut child = Command::new("g8ufs")
             .arg("--ro")
-            .arg("--backend")
+            .arg("--cache")
             .arg(backend.as_ref())
             .arg("--meta")
             .arg(meta.as_ref())

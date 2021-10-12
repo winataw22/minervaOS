@@ -208,13 +208,13 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 	var args []string
 
 	args = append(args,
-		"-cache", f.cache,
-		"-meta", flistPath,
-		"-storage-url", storage,
-		"-daemon",
-		"-log", logPath,
+		"--cache", f.cache,
+		"--meta", flistPath,
+		"--storage-url", storage,
+		"--daemon",
+		"--log", logPath,
 		// this is always read-only
-		"-ro",
+		"--ro",
 		mountpoint,
 	)
 

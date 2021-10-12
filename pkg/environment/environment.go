@@ -69,7 +69,7 @@ var (
 		RunningMode:   RunningDev,
 		SubstrateURL:  SubstrateDefaultURL,
 		ActivationURL: ActivationURL,
-		FlistURL:      "zdb://hub.grid.tf:9900",
+		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.dev",
 	}
 
@@ -78,7 +78,7 @@ var (
 		// TODO: this should become a different substrate ?
 		SubstrateURL:  SubstrateDefaultURL,
 		ActivationURL: ActivationURL,
-		FlistURL:      "zdb://hub.grid.tf:9900",
+		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
 	}
 
@@ -87,7 +87,7 @@ var (
 		RunningMode:   RunningMain,
 		SubstrateURL:  SubstrateDefaultURL,
 		ActivationURL: ActivationURL,
-		FlistURL:      "zdb://hub.grid.tf:9900",
+		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
 	}
 )

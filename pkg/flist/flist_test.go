@@ -62,8 +62,8 @@ func (t *testCommander) args(args ...string) (map[string]string, []string) {
 	v := make(map[string]string)
 	var r []string
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			lk = strings.TrimPrefix(arg, "-")
+		if strings.HasPrefix(arg, "--") {
+			lk = strings.TrimPrefix(arg, "--")
 			v[lk] = ""
 			continue
 		}
@@ -119,7 +119,7 @@ func (t *testSystem) Unmount(target string, flags int) error {
 func TestCommander(t *testing.T) {
 	cmder := testCommander{T: t}
 
-	m, r := cmder.args("-log", "log-file", "remaining")
+	m, r := cmder.args("--log", "log-file", "remaining")
 
 	require.Equal(t, []string{"remaining"}, r)
 	require.Equal(t, map[string]string{
