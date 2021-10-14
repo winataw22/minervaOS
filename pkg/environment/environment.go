@@ -12,9 +12,13 @@ import (
 )
 
 const (
-	// SubstrateDefaultURL default substrate url
-	SubstrateDefaultURL = "wss://tfchain.dev.threefold.io"
-	ActivationURL       = "https://tfchain.dev.threefold.io/activation/activate"
+	// SubstrateDevURL default substrate url
+	SubstrateDevURL  = "wss://tfchain.dev.threefold.io"
+	ActivationDevURL = "https://tfchain.dev.threefold.io/activation/activate"
+
+	// SubstrateDevURL default substrate url
+	SubstrateTestURL  = "wss://tfchain.test.threefold.io"
+	ActivationTestURL = "https://tfchain.test.threefold.io/activation/activate"
 )
 
 // Environment holds information about running environment of a node
@@ -67,8 +71,8 @@ const (
 var (
 	envDev = Environment{
 		RunningMode:   RunningDev,
-		SubstrateURL:  SubstrateDefaultURL,
-		ActivationURL: ActivationURL,
+		SubstrateURL:  SubstrateDevURL,
+		ActivationURL: ActivationDevURL,
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.dev",
 	}
@@ -76,8 +80,8 @@ var (
 	envTest = Environment{
 		RunningMode: RunningTest,
 		// TODO: this should become a different substrate ?
-		SubstrateURL:  SubstrateDefaultURL,
-		ActivationURL: ActivationURL,
+		SubstrateURL:  SubstrateTestURL,
+		ActivationURL: ActivationTestURL,
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
 	}
@@ -85,8 +89,8 @@ var (
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode:   RunningMain,
-		SubstrateURL:  SubstrateDefaultURL,
-		ActivationURL: ActivationURL,
+		SubstrateURL:  SubstrateDevURL,
+		ActivationURL: ActivationDevURL,
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
 	}

@@ -399,7 +399,7 @@ func (d *Deployment) ByType(typ WorkloadType) []*WorkloadWithID {
 // Upgrade validates n as an updated version of d, and return an Upgrade description
 // for the steps that the node needs to take to move from d to n. unchanged workloads results
 // will be set on n as is
-func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
+func (d *Deployment) Upgrade(n *Deployment) ([]UpgradeOp, error) {
 	if err := n.Valid(); err != nil {
 		return nil, errors.Wrap(err, "new deployment is invalid")
 	}
@@ -420,10 +420,7 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 		current[wl.Name] = wl
 	}
 
-	update := make([]*WorkloadWithID, 0)
-	add := make([]*WorkloadWithID, 0)
-	remove := make([]*WorkloadWithID, 0)
-
+	ops := make([]UpgradeOp, 0)
 	for i := range n.Workloads {
 		l := &n.Workloads[i]
 		id, err := NewWorkloadID(n.TwinID, n.ContractID, l.Name)
@@ -439,7 +436,10 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 		if !ok {
 			if wl.Version == expected {
 				// newly added workload
-				add = append(add, wl)
+				ops = append(ops, UpgradeOp{
+					wl,
+					OpAdd,
+				})
 			} else {
 				return nil, fmt.Errorf("invalid version number for workload '%s' expected '%d'", wl.Name, expected)
 			}
@@ -454,7 +454,11 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 			// so
 			if wl.Version == expected {
 				// should added to 'update' pile
-				update = append(update, wl)
+				ops = append(ops, UpgradeOp{
+					wl,
+					OpUpdate,
+				})
+
 			}
 			// other wise. we leave it untouched
 		}
@@ -466,18 +470,26 @@ func (d *Deployment) Upgrade(n *Deployment) (*Upgrade, error) {
 	for _, wl := range current {
 		id, _ := NewWorkloadID(d.TwinID, d.ContractID, wl.Name)
 
-		remove = append(remove, &WorkloadWithID{
-			Workload: wl,
-			ID:       id,
+		ops = append(ops, UpgradeOp{
+			&WorkloadWithID{
+				Workload: wl,
+				ID:       id,
+			},
+			OpRemove,
 		})
 	}
-
-	return &Upgrade{ToAdd: add, ToUpdate: update, ToRemove: remove}, nil
+	return ops, nil
 }
 
-// Upgrade procedure structure
-type Upgrade struct {
-	ToAdd    []*WorkloadWithID
-	ToUpdate []*WorkloadWithID
-	ToRemove []*WorkloadWithID
+type UpgradeOp struct {
+	WlID *WorkloadWithID
+	Op   jobOperation
 }
+
+type jobOperation int
+
+const (
+	OpRemove jobOperation = iota
+	OpAdd
+	OpUpdate
+)
