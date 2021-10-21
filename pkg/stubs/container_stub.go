@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	"time"
 )
 
 type ContainerModuleStub struct {
@@ -26,6 +27,22 @@ func NewContainerModuleStub(client zbus.Client) *ContainerModuleStub {
 func (s *ContainerModuleStub) Delete(ctx context.Context, arg0 string, arg1 pkg.ContainerID) (ret0 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Delete", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *ContainerModuleStub) Exec(ctx context.Context, arg0 string, arg1 string, arg2 time.Duration, arg3 ...string) (ret0 error) {
+	args := []interface{}{arg0, arg1, arg2}
+	for _, argv := range arg3 {
+		args = append(args, argv)
+	}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Exec", args...)
 	if err != nil {
 		panic(err)
 	}

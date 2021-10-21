@@ -181,6 +181,37 @@ func (f *QSFS) isMounted(path string) (bool, error) {
 	return false, nil
 }
 
+func (q *QSFS) UpdateMount(wlID string, cfg zos.QuantumSafeFS) (pkg.QSFSInfo, error) {
+	var info pkg.QSFSInfo
+	zstorConfig := setQSFSDefaults(&cfg)
+	networkd := stubs.NewNetworkerStub(q.cl)
+	flistd := stubs.NewFlisterStub(q.cl)
+	contd := stubs.NewContainerModuleStub(q.cl)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	yggIP, err := networkd.QSFSYggIP(ctx, wlID)
+	if err != nil {
+		return info, errors.Wrap(err, "failed to get ygg ip")
+	}
+	flistPath, err := flistd.UpdateMountSize(ctx, wlID, cfg.Cache)
+	if err != nil {
+		return info, errors.Wrap(err, "failed to get qsfs flist mountpoint")
+	}
+	if err := q.writeQSFSConfig(flistPath, zstorConfig); err != nil {
+		return info, errors.Wrap(err, "couldn't write qsfs config")
+	}
+	mountPath := q.mountPath(wlID)
+
+	if err := contd.Exec(ctx, qsfsContainerNS, wlID, 10*time.Second, "/sbin/zinit", "kill", "zstor", "SIGINT"); err != nil {
+		return info, errors.Wrap(err, "failed to restart zstor process")
+	}
+	info.Path = mountPath
+	info.MetricsEndpoint = fmt.Sprintf("http://[%s]:%d/metrics", yggIP, zstorMetricsPort)
+	return info, nil
+}
+
 func (q *QSFS) Unmount(wlID string) error {
 	networkd := stubs.NewNetworkerStub(q.cl)
 	flistd := stubs.NewFlisterStub(q.cl)

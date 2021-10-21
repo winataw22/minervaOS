@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -54,7 +55,15 @@ func (n networker) QSFSNamespace(id string) string {
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte(netId))
 	return qsfsNamespacePrefix + strings.Replace(hw.String(), ":", "", -1)
 }
+func (n networker) QSFSYggIP(id string) (string, error) {
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + id))
 
+	ip, err := n.ygg.SubnetFor(hw)
+	if err != nil {
+		return "", fmt.Errorf("failed to get ygg subnet IP: %w", err)
+	}
+	return ip.IP.String(), nil
+}
 func (n networker) QSFSPrepare(id string) (string, string, error) {
 	netId := "qsfs:" + id
 	netNSName := n.QSFSNamespace(id)
@@ -72,7 +81,7 @@ func (n networker) QSFSPrepare(id string) (string, string, error) {
 	}
 
 	if n.ygg == nil {
-		return netNSName, "", nil
+		return "", "", errors.New("no ygg server found")
 	}
 	ip, err := n.attachYgg(id, netNs)
 	if err != nil {

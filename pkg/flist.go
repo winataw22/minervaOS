@@ -39,6 +39,9 @@ type Flister interface {
 	// mount is not needed anymore and clean it up
 	Mount(name, url string, opt MountOptions) (path string, err error)
 
+	// UpdateMountSize change the mount size
+	UpdateMountSize(name string, limit gridtypes.Unit) (path string, err error)
+
 	// Umount a RW mount. this only unmounts the RW layer and remove the assigned
 	// volume.
 	Unmount(name string) error

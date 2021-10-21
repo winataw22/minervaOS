@@ -45,7 +45,8 @@ func NewPrimitivesProvisioner(zbus zbus.Client) *Primitives {
 
 	// only network support update atm
 	updaters := map[gridtypes.WorkloadType]provision.DeployFunction{
-		zos.NetworkType: p.networkProvision,
+		zos.NetworkType:       p.networkProvision,
+		zos.QuantumSafeFSType: p.qsfsUpdate,
 	}
 
 	p.Provisioner = provision.NewMapProvisioner(provisioners, decommissioners, updaters)

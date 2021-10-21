@@ -68,3 +68,19 @@ func (s *QSFSDStub) Unmount(ctx context.Context, arg0 string) (ret0 error) {
 	}
 	return
 }
+
+func (s *QSFSDStub) UpdateMount(ctx context.Context, arg0 string, arg1 zos.QuantumSafeFS) (ret0 pkg.QSFSInfo, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "UpdateMount", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}

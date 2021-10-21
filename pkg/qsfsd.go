@@ -27,6 +27,7 @@ func (q *QSFSMetrics) Nu(wlID string) (result uint64) {
 
 type QSFSD interface {
 	Mount(wlID string, cfg zos.QuantumSafeFS) (QSFSInfo, error)
+	UpdateMount(wlID string, cfg zos.QuantumSafeFS) (QSFSInfo, error)
 	Unmount(wlID string) error
 	Metrics() (QSFSMetrics, error)
 }

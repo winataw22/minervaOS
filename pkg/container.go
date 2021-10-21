@@ -91,6 +91,9 @@ type ContainerModule interface {
 	// data: Container info
 	Run(ns string, data Container) (ContainerID, error)
 
+	// Exec executes a command in the container
+	// stdout and stderr is ignored
+	Exec(ns string, containerID string, timeout time.Duration, args ...string) error
 	// ListNS list the name of all the container namespaces
 	ListNS() ([]string, error)
 

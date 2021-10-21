@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	gridtypes "github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
 type FlisterStub struct {
@@ -95,6 +96,22 @@ func (s *FlisterStub) Unmount(ctx context.Context, arg0 string) (ret0 error) {
 	}
 	ret0 = new(zbus.RemoteError)
 	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *FlisterStub) UpdateMountSize(ctx context.Context, arg0 string, arg1 gridtypes.Unit) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "UpdateMountSize", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
 		panic(err)
 	}
 	return

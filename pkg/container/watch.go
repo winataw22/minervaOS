@@ -20,6 +20,11 @@ func (c *Module) handlerEventTaskExit(ctx context.Context, ns string, event *eve
 
 	log.Debug().Msg("task exited")
 
+	if event.ID != event.ContainerID {
+		// something other than the main container task, ignore it
+		return
+	}
+
 	marker, ok := c.failures.Get(event.ContainerID)
 	if !ok {
 		// no previous value. so this is the first failure

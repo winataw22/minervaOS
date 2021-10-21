@@ -71,6 +71,9 @@ type volumeAllocator interface {
 	// to try again on a different devicetype
 	VolumeCreate(ctx context.Context, name string, size gridtypes.Unit) (pkg.Volume, error)
 
+	// VolumeUpdate changes the size of an already existing volume
+	VolumeUpdate(ctx context.Context, name string, size gridtypes.Unit) error
+
 	// ReleaseFilesystem signals that the named filesystem is no longer needed.
 	// The filesystem will be unmounted and subsequently removed.
 	// All data contained in the filesystem will be lost, and the
@@ -376,6 +379,22 @@ func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, err
 	// otherwise
 	sublog.Debug().Msg("mount overlay")
 	return mountpoint, f.mountOverlay(ctx, name, ro, opt.Limit)
+}
+
+func (f *flistModule) UpdateMountSize(name string, limit gridtypes.Unit) (string, error) {
+	// mount overlay
+	mountpoint, err := f.mountpath(name)
+	if err != nil {
+		return "", errors.Wrap(err, "invalid mountpoint")
+	}
+
+	if err := f.isMountpoint(mountpoint); err != nil {
+		return "", errors.Wrap(err, "flist not mounted")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = f.storage.VolumeUpdate(ctx, name, limit)
+	return mountpoint, err
 }
 
 func (f *flistModule) mountpath(name string) (string, error) {

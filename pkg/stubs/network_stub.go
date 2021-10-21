@@ -317,6 +317,22 @@ func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 stri
 	return
 }
 
+func (s *NetworkerStub) QSFSYggIP(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "QSFSYggIP", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) Ready(ctx context.Context) (ret0 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Ready", args...)

@@ -38,6 +38,12 @@ func (s *StorageMock) VolumeCreate(ctx context.Context, name string, size gridty
 	}, args.Error(1)
 }
 
+// UpdateFilesystem update filesystem mock
+func (s *StorageMock) VolumeUpdate(ctx context.Context, name string, size gridtypes.Unit) error {
+	args := s.Called(ctx, name)
+	return args.Error(0)
+}
+
 // ReleaseFilesystem releases filesystem mock
 func (s *StorageMock) VolumeDelete(ctx context.Context, name string) error {
 	args := s.Called(ctx, name)
