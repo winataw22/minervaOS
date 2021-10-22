@@ -2,13 +2,10 @@ package mbus
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
@@ -66,20 +63,6 @@ func (n *Network) getPublicConfigHandler(ctx context.Context, payload []byte) (i
 	return data, nil
 }
 
-func (n *Network) setPublicConfigHandler(ctx context.Context, payload []byte) (interface{}, error) {
-	twinID := rmb.GetTwinID(ctx)
-
-	if _, err := n.engine.Admins().GetKey(twinID); err != nil {
-		return nil, fmt.Errorf("not authorized")
-	}
-
-	data, err := n.setPublicConfig(ctx, payload)
-	if err != nil {
-		return nil, err.Err()
-	}
-	return data, nil
-}
-
 func (n *Network) setup(router rmb.Router) {
 
 	// network handlers
@@ -87,7 +70,6 @@ func (n *Network) setup(router rmb.Router) {
 	sub.WithHandler("list_wg_ports", n.listPortsHandler)
 	sub.WithHandler("list_public_ips", n.listPublicIPsHandler)
 	sub.WithHandler("public_config_get", n.getPublicConfigHandler)
-	sub.WithHandler("public_config_set", n.setPublicConfigHandler)
 	sub.WithHandler("interfaces", n.interfacesHandler)
 }
 
@@ -179,19 +161,4 @@ func (n *Network) getPublicConfig(ctx context.Context) (interface{}, mw.Response
 	}
 
 	return cfg, nil
-}
-
-func (n *Network) setPublicConfig(ctx context.Context, payload []byte) (interface{}, mw.Response) {
-	var cfg pkg.PublicConfig
-
-	if err := json.Unmarshal(payload, &cfg); err != nil {
-		return nil, mw.BadRequest(err)
-	}
-
-	err := stubs.NewNetworkerStub(n.cl).SetPublicConfig(ctx, cfg)
-	if err != nil {
-		return nil, mw.Error(err)
-	}
-
-	return nil, mw.Created()
 }

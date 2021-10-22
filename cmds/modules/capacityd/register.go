@@ -15,7 +15,6 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -43,13 +42,6 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	loc, err := geoip.Fetch()
 	if err != nil {
 		log.Fatal().Err(err).Msg("fetch location")
-	}
-
-	// - node public config
-
-	var pub *pkg.PublicConfig
-	if pubCfg, err := netMgr.GetPublicConfig(ctx); err == nil {
-		pub = &pubCfg
 	}
 
 	// - yggdrasil
@@ -80,7 +72,7 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	exp.MaxInterval = 2 * time.Minute
 	bo := backoff.WithContext(exp, ctx)
 	err = backoff.RetryNotify(func() error {
-		nodeID, twinID, err = registerNode(ctx, env, cl, sub, cap, loc, pub, ygg)
+		nodeID, twinID, err = registerNode(ctx, env, cl, sub, cap, loc, ygg)
 		return err
 	}, bo, retryNotify)
 
@@ -92,7 +84,7 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	// to update the node
 	go func() {
 		for {
-			err := watch(ctx, env, cl, sub, cap, loc, pub, ygg)
+			err := watch(ctx, env, cl, sub, cap, loc, ygg)
 			if errors.Is(err, context.Canceled) {
 				return
 			} else if err != nil {
@@ -112,17 +104,11 @@ func watch(
 	sub *substrate.Substrate,
 	cap gridtypes.Capacity,
 	loc geoip.Location,
-	pub *pkg.PublicConfig,
 	ygg net.IP,
 ) error {
 	var (
 		netMgr = stubs.NewNetworkerStub(cl)
 	)
-
-	pubCh, err := netMgr.PublicAddresses(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to register on public config changes")
-	}
 
 	yggCh, err := netMgr.YggAddresses(ctx)
 	if err != nil {
@@ -135,15 +121,6 @@ func watch(
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case pubInput := <-pubCh:
-			var pubNew *pkg.PublicConfig
-			if pubInput.HasPublicConfig {
-				pubNew = &pubInput.PublicConfig
-			}
-			if !reflect.DeepEqual(pub, pubNew) {
-				pub = pubNew
-				update = true
-			}
 		case yggInput := <-yggCh:
 			var yggNew net.IP
 			if len(yggInput) > 0 {
@@ -164,7 +141,7 @@ func watch(
 		exp.MaxInterval = 2 * time.Minute
 		bo := backoff.WithContext(exp, ctx)
 		err = backoff.RetryNotify(func() error {
-			_, _, err := registerNode(ctx, env, cl, sub, cap, loc, pub, ygg)
+			_, _, err := registerNode(ctx, env, cl, sub, cap, loc, ygg)
 			return err
 		}, bo, retryNotify)
 
@@ -185,7 +162,6 @@ func registerNode(
 	sub *substrate.Substrate,
 	cap gridtypes.Capacity,
 	loc geoip.Location,
-	pub *pkg.PublicConfig,
 	ygg net.IP,
 ) (nodeID, twinID uint32, err error) {
 	var (
@@ -211,18 +187,6 @@ func registerNode(
 				return ips
 			}(),
 		},
-	}
-
-	var pubCfg substrate.OptionPublicConfig
-	if pub != nil {
-		pubCfg.HasValue = true
-		pubCfg.AsValue = substrate.PublicConfig{
-			IPv4:   pub.IPv4.String(),
-			GWv4:   pub.GW4.String(),
-			IPv6:   pub.IPv6.String(),
-			GWv6:   pub.GW6.String(),
-			Domain: pub.Domain,
-		}
 	}
 
 	resources := substrate.Resources{
@@ -266,8 +230,7 @@ func registerNode(
 			return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 		}
 
-		if reflect.DeepEqual(node.PublicConfig, pubCfg) &&
-			reflect.DeepEqual(node.Resources, resources) &&
+		if reflect.DeepEqual(node.Resources, resources) &&
 			reflect.DeepEqual(node.Location, location) &&
 			reflect.DeepEqual(node.Interfaces, interfaces) {
 			// so node exists AND pub config, nor resources hasn't changed
@@ -283,7 +246,6 @@ func registerNode(
 		node.Location = location
 		node.Country = loc.Country
 		node.City = loc.City
-		node.PublicConfig = pubCfg
 		node.Interfaces = interfaces
 
 		log.Debug().Msgf("node data have changing, issuing an update node: %+v", node)
@@ -293,14 +255,13 @@ func registerNode(
 
 	// create node
 	nodeID, err = sub.CreateNode(&id, substrate.Node{
-		FarmID:       types.U32(env.FarmerID),
-		TwinID:       types.U32(twinID),
-		Resources:    resources,
-		Location:     location,
-		Country:      loc.CountryCode,
-		City:         loc.City,
-		PublicConfig: pubCfg,
-		Interfaces:   interfaces,
+		FarmID:     types.U32(env.FarmerID),
+		TwinID:     types.U32(twinID),
+		Resources:  resources,
+		Location:   location,
+		Country:    loc.CountryCode,
+		City:       loc.City,
+		Interfaces: interfaces,
 	})
 
 	if err != nil {
