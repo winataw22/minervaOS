@@ -1,4 +1,4 @@
-package capacityd
+package noded
 
 import (
 	"context"
@@ -23,7 +23,7 @@ const module = "monitor"
 
 // Module is entry point for module
 var Module cli.Command = cli.Command{
-	Name:  "capacityd",
+	Name:  "noded",
 	Usage: "reports the node total resources",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -121,8 +121,16 @@ func action(cli *cli.Context) error {
 	}
 
 	// TODO: monitor change to yggdrasil Ip and update the twin according
-
 	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
+
+	go func() {
+		for {
+			if err := public(ctx, node, redis); err != nil {
+				log.Error().Err(err).Msg("setting public config failed")
+				<-time.After(10 * time.Second)
+			}
+		}
+	}()
 
 	// uptime update
 	go func() {

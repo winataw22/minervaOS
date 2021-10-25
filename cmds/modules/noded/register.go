@@ -1,4 +1,4 @@
-package capacityd
+package noded
 
 import (
 	"context"
@@ -81,7 +81,8 @@ func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (
 	}
 
 	// well the node is registed. but now we need to monitor changes to networking
-	// to update the node
+	// to update the node (currently only yggdrasil ip) which will require changes
+	// to twin ip.
 	go func() {
 		for {
 			err := watch(ctx, env, cl, sub, cap, loc, ygg)

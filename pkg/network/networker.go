@@ -760,8 +760,22 @@ func (n *networker) DeleteNR(netNR pkg.Network) error {
 
 // Set node public namespace config
 func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
+	if cfg.Equal(pkg.PublicConfig{}) {
+		return fmt.Errorf("public config cannot be unset, only modified")
+	}
+
+	current, err := public.LoadPublicConfig()
+	if err != nil && err != public.ErrNoPublicConfig {
+		return errors.Wrapf(err, "failed to load current public configuration")
+	}
+
+	if current != nil && current.Equal(cfg) {
+		//nothing to do
+		return nil
+	}
+
 	id := n.identity.NodeID(context.Background())
-	_, err := public.EnsurePublicSetup(id, &cfg)
+	_, err = public.EnsurePublicSetup(id, &cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply public config")
 	}

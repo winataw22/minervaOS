@@ -3,7 +3,9 @@ package pkg
 import (
 	"context"
 	"net"
+	"reflect"
 
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -204,6 +206,27 @@ type PublicConfig struct {
 	// Domain is the node domain name like gent01.devnet.grid.tf
 	// or similar
 	Domain string `json:"domain"`
+}
+
+func PublicConfigFrom(cfg substrate.PublicConfig) (pub PublicConfig, err error) {
+	pub.Type = MacVlanIface
+	pub.IPv4, err = gridtypes.ParseIPNet(cfg.IPv4)
+	if err != nil {
+		return pub, err
+	}
+	pub.IPv6, err = gridtypes.ParseIPNet(cfg.IPv6)
+	if err != nil {
+		return pub, err
+	}
+	pub.GW4 = net.ParseIP(cfg.GWv4)
+	pub.GW6 = net.ParseIP(cfg.GWv6)
+	pub.Domain = cfg.Domain
+
+	return
+}
+
+func (p PublicConfig) Equal(cfg PublicConfig) bool {
+	return reflect.DeepEqual(p, cfg)
 }
 
 type OptionPublicConfig struct {

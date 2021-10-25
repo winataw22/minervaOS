@@ -101,7 +101,41 @@ func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, route
 		}
 
 		name := link.Attrs().Name
-		// TODO: check if we need to remove an IP from the nic
+		ipsMap := make(map[string]struct{})
+		routesMap := make(map[string]struct{})
+		for _, ip := range ips {
+			ipsMap[ip.String()] = struct{}{}
+		}
+
+		for _, route := range routes {
+			routesMap[route.String()] = struct{}{}
+		}
+		if current, err := netlink.AddrList(link, netlink.FAMILY_ALL); err == nil {
+			for _, addr := range current {
+				if _, ok := ipsMap[addr.IPNet.String()]; ok {
+					// only delete ips that are not to be installed
+					continue
+				}
+				if err := netlink.AddrDel(link, &addr); err != nil {
+					log.Error().Err(err).Str("ip", addr.IP.String()).Msg("failed to delete address")
+				}
+			}
+		}
+
+		// NOTE: this is dangerous because it also deletes default network routes. this then must
+		// be rewritten.
+		// if current, err := netlink.RouteList(link, netlink.FAMILY_ALL); err == nil {
+		// 	for _, route := range current {
+		// 		if _, ok := routesMap[route.String()]; ok {
+		// 			// only delete routes that are not to be installed
+		// 			continue
+		// 		}
+		// 		if err := netlink.RouteDel(&route); err != nil {
+		// 			log.Error().Err(err).Str("route", route.String()).Msg("failed to delete route")
+		// 		}
+		// 	}
+		// }
+
 		for _, ip := range ips {
 			if err := netlink.AddrAdd(link, &netlink.Addr{
 				IPNet: ip,
