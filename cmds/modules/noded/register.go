@@ -316,16 +316,8 @@ func uptime(ctx context.Context, cl zbus.Client) error {
 	if err != nil {
 		return err
 	}
-	first := make(chan struct{}, 1)
-	first <- struct{}{}
 
 	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-first:
-		case <-time.After(reportUptimeEvery):
-		}
 		uptime, err := host.Uptime()
 		if err != nil {
 			return errors.Wrap(err, "failed to get uptime")
@@ -333,6 +325,13 @@ func uptime(ctx context.Context, cl zbus.Client) error {
 		log.Debug().Msg("updating node uptime")
 		if err := sub.UpdateNodeUptime(&id, uptime); err != nil {
 			log.Error().Err(err).Msg("failed to report uptime")
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(reportUptimeEvery):
+			continue
 		}
 	}
 }

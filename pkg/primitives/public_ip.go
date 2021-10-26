@@ -75,11 +75,11 @@ func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.Work
 			// free ip. we can just take it
 			ipNet, err := gridtypes.ParseIPNet(ip.IP)
 			if err != nil {
-				return result, fmt.Errorf("found a mullformed ip address in contract object '%s'", ip.IP)
+				return result, fmt.Errorf("found a malformed ip address in contract object '%s'", ip.IP)
 			}
 			gw := net.ParseIP(ip.Gateway)
 			if gw == nil {
-				return result, fmt.Errorf("found a mullformed gateway address in farm object '%s'", ip.Gateway)
+				return result, fmt.Errorf("found a malformed gateway address in farm object '%s'", ip.Gateway)
 			}
 
 			return zos.PublicIPResult{IP: ipNet, Gateway: gw}, nil
