@@ -46,7 +46,7 @@ table inet filter {
   chain input {
     type filter hook input priority 0; policy accept;
     jump base_checks
-    ip6 daddr ff02::/64 accept
+    ip6 daddr {ff02::/64,fe80::/64} accept
     tcp dport { {{.YggPorts}} } accept
     # port for provisiond
     tcp dport 8051 accept

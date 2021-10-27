@@ -2,8 +2,6 @@ package storaged
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -34,11 +32,6 @@ var Module cli.Command = cli.Command{
 			Usage: "number of workers `N`",
 			Value: 1,
 		},
-		&cli.UintFlag{
-			Name:  "expvar-port",
-			Usage: "port to host expvar variables on `N`",
-			Value: 28682,
-		},
 	},
 	Action: action,
 }
@@ -47,7 +40,6 @@ func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 		workerNr     uint   = cli.Uint("workers")
-		expvarPort   uint   = cli.Uint("expvar-port")
 	)
 
 	storageModule, err := storage.New()
@@ -71,12 +63,6 @@ func action(cli *cli.Context) error {
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
-
-	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux); err != nil {
-			log.Error().Err(err).Msg("Error starting http server")
-		}
-	}()
 
 	if err := server.Run(ctx); err != nil && err != context.Canceled {
 		return errors.Wrap(err, "unexpected error")
