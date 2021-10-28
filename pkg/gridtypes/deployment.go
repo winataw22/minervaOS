@@ -483,13 +483,13 @@ func (d *Deployment) Upgrade(n *Deployment) ([]UpgradeOp, error) {
 
 type UpgradeOp struct {
 	WlID *WorkloadWithID
-	Op   jobOperation
+	Op   JobOperation
 }
 
-type jobOperation int
+type JobOperation int
 
 const (
-	OpRemove jobOperation = iota
+	OpRemove JobOperation = iota
 	OpAdd
 	OpUpdate
 )

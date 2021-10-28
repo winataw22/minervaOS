@@ -102,7 +102,7 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 	}
 
 	err = zinit.AddService(zinitService, zinit.InitService{
-		Exec: fmt.Sprintf("ip netns exec %s %s -useconffile %s -loglevel trace", ns, bin, confPath),
+		Exec: fmt.Sprintf("ip netns exec %s %s -useconffile %s", ns, bin, confPath),
 		After: []string{
 			"node-ready",
 		},

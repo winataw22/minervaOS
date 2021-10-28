@@ -314,9 +314,20 @@ func (e *NativeEngine) Update(ctx context.Context, update gridtypes.Deployment) 
 	// this will just calculate the update
 	// steps we run it here as a sort of validation
 	// that this update is acceptable.
-	_, err = deployment.Upgrade(&update)
+	upgrades, err := deployment.Upgrade(&update)
 	if err != nil {
 		return errors.Wrap(ErrDeploymentUpgradeValidationError, err.Error())
+	}
+
+	for _, op := range upgrades {
+		if op.Op == gridtypes.OpUpdate {
+			if !e.provisioner.CanUpdate(ctx, op.WlID.Type) {
+				return errors.Wrapf(
+					ErrDeploymentUpgradeValidationError,
+					"workload '%s' does not support upgrade",
+					op.WlID.Type.String())
+			}
+		}
 	}
 
 	// all is okay we can push the job
@@ -575,11 +586,10 @@ func (e *NativeEngine) updateWorkload(ctx context.Context, wl *gridtypes.Workloa
 	if e.provisioner.CanUpdate(ctx, wl.Type) {
 		result, err = e.provisioner.Update(ctx, wl)
 	} else {
-		if err := e.provisioner.Decommission(ctx, wl); err != nil {
-			log.Error().Err(err).Msg("failed to decomission workload")
-		}
-
-		result, err = e.provisioner.Provision(ctx, wl)
+		// deprecated. We should never update resources by decomission and then provsion
+		// the check in Update method should prevent this
+		// #unreachable
+		err = fmt.Errorf("can not update this workload type")
 	}
 
 	if err != nil {
