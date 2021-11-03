@@ -20,7 +20,7 @@ var (
 	// validation
 	PossibleModules = map[string]struct{}{
 		"storage":   {},
-		"monitor":   {},
+		"node":      {},
 		"identityd": {},
 		"vmd":       {},
 		"flist":     {},
@@ -28,6 +28,7 @@ var (
 		"container": {},
 		"provision": {},
 		"gateway":   {},
+		"qsfsd":     {},
 	}
 
 	//Module entry point

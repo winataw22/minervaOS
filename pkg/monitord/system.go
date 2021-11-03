@@ -19,15 +19,20 @@ var (
 // systemMonitor stream
 type systemMonitor struct {
 	duration time.Duration
+	node     uint32
 }
 
 // NewSystemMonitor creates new system of system monitor
-func NewSystemMonitor(duration time.Duration) (pkg.SystemMonitor, error) {
+func NewSystemMonitor(node uint32, duration time.Duration) (pkg.SystemMonitor, error) {
 	if duration == 0 {
 		duration = 2 * time.Second
 	}
 
-	return &systemMonitor{duration: duration}, nil
+	return &systemMonitor{duration: duration, node: node}, nil
+}
+
+func (m *systemMonitor) NodeID() uint32 {
+	return m.node
 }
 
 // Memory starts memory monitor stream

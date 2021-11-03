@@ -15,7 +15,7 @@ type HostMonitorStub struct {
 func NewHostMonitorStub(client zbus.Client) *HostMonitorStub {
 	return &HostMonitorStub{
 		client: client,
-		module: "monitor",
+		module: "node",
 		object: zbus.ObjectID{
 			Name:    "host",
 			Version: "0.0.1",

@@ -145,6 +145,12 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		}
 	}
 
+	if activation, ok := params.Get("activation"); ok {
+		if len(activation) > 0 {
+			env.ActivationURL = activation[len(activation)-1]
+		}
+	}
+
 	if farmSecret, ok := params.Get("secret"); ok {
 		if len(farmSecret) > 0 {
 			env.FarmSecret = farmSecret[len(farmSecret)-1]

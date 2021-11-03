@@ -26,15 +26,10 @@ const (
 	reportUptimeEvery = 8 * time.Hour
 )
 
-func registration(ctx context.Context, cl zbus.Client, cap gridtypes.Capacity) (nodeID, twinID uint32, err error) {
+func registration(ctx context.Context, cl zbus.Client, env environment.Environment, cap gridtypes.Capacity) (nodeID, twinID uint32, err error) {
 	var (
 		netMgr = stubs.NewNetworkerStub(cl)
 	)
-
-	env, err := environment.Get()
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get runtime environment for zos")
-	}
 
 	// we need to collect all node information here
 	// - we already have capacity

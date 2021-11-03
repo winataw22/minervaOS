@@ -1,8 +1,8 @@
 package pkg
 
 //go:generate mkdir -p stubs
-//go:generate zbusc -module monitor -version 0.0.1 -name system -package stubs github.com/threefoldtech/zos/pkg+SystemMonitor stubs/system_monitor_stub.go
-//go:generate zbusc -module monitor -version 0.0.1 -name host -package stubs github.com/threefoldtech/zos/pkg+HostMonitor stubs/host_monitor_stub.go
+//go:generate zbusc -module node -version 0.0.1 -name system -package stubs github.com/threefoldtech/zos/pkg+SystemMonitor stubs/system_monitor_stub.go
+//go:generate zbusc -module node -version 0.0.1 -name host -package stubs github.com/threefoldtech/zos/pkg+HostMonitor stubs/host_monitor_stub.go
 //go:generate zbusc -module identityd -version 0.0.1 -name monitor -package stubs github.com/threefoldtech/zos/pkg+VersionMonitor stubs/version_monitor_stub.go
 
 import (
@@ -78,15 +78,16 @@ type PoolStats struct {
 // PoolsStats alias for map[string]PoolStats
 type PoolsStats map[string]PoolStats
 
-//SystemMonitor interface (provided by monitord)
+//SystemMonitor interface (provided by noded)
 type SystemMonitor interface {
+	NodeID() uint32
 	Memory(ctx context.Context) <-chan VirtualMemoryStat
 	CPU(ctx context.Context) <-chan TimesStat
 	Disks(ctx context.Context) <-chan DisksIOCountersStat
 	Nics(ctx context.Context) <-chan NicsIOCounterStat
 }
 
-// HostMonitor interface (provided by monitord)
+// HostMonitor interface (provided by noded)
 type HostMonitor interface {
 	Uptime(ctx context.Context) <-chan time.Duration
 }

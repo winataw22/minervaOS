@@ -58,7 +58,6 @@ func (d *DHCPMon) Start(ctx context.Context) error {
 			return nil
 
 		case <-t.C:
-			log.Info().Msg("check if ndmz default route is still in place")
 			has, err := hasDefaultRoute(d.iface, d.namespace)
 			if err != nil {
 				log.Error().Str("iface", d.iface).Err(err).Msg("error checking default gateway")

@@ -177,6 +177,7 @@ func action(cli *cli.Context) error {
 		}
 	}
 
+	log.Debug().Msgf("current used capacity: %+v", current)
 	// statistics collects information about workload statistics
 	// also does some checks on capacity
 	statistics := primitives.NewStatistics(

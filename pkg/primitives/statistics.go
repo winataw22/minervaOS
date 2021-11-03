@@ -133,7 +133,7 @@ func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) error {
 		return errors.Wrap(err, "failed to get available memory")
 	}
 	if required.MRU > usable {
-		return fmt.Errorf("cannot fulfil required memory size")
+		return fmt.Errorf("cannot fulfil required memory size %d bytes out of usable %d bytes", required.MRU, usable)
 	}
 
 	//check other resources as well?

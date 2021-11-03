@@ -22,6 +22,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
 	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"github.com/vishvananda/netlink"
 
@@ -796,6 +797,13 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	if err != nil {
 		return err
 	}
+
+	// since the public ip might have changed, it seems sometimes ygg needs to be
+	// restart to use new public ip
+	if err := ygg.Restart(zinit.Default()); err != nil {
+		log.Error().Err(err).Msg("failed to restart yggdrasil service")
+	}
+
 	// if yggdrasil is living inside public namespace
 	// we still need to setup ndmz to also have yggdrasil but we set the yggdrasil interface
 	// a different Ip that lives inside the yggdrasil range.

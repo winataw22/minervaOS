@@ -734,12 +734,11 @@ func (s *Module) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 }
 
 func (s *Module) periodicallyCheckDiskShutdown(vm bool) {
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Hour)
 
 	go func() {
 		for {
 			<-ticker.C
-			log.Info().Msg("Checking pools for disks that should be shutdown...")
 			s.shutdownDisks(vm)
 		}
 	}()

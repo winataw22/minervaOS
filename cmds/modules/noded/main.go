@@ -9,6 +9,7 @@ import (
 
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/monitord"
 	"github.com/threefoldtech/zos/pkg/rmb"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -19,7 +20,7 @@ import (
 	"github.com/threefoldtech/zbus"
 )
 
-const module = "monitor"
+const module = "node"
 
 // Module is entry point for module
 var Module cli.Command = cli.Command{
@@ -33,20 +34,6 @@ var Module cli.Command = cli.Command{
 		},
 	},
 	Action: action,
-}
-
-func mon(ctx context.Context, server zbus.Server) {
-	system, err := monitord.NewSystemMonitor(2 * time.Second)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize system monitor")
-	}
-	host, err := monitord.NewHostMonitor(2 * time.Second)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize host monitor")
-	}
-
-	server.Register(zbus.ObjectID{Name: "host", Version: "0.0.1"}, host)
-	server.Register(zbus.ObjectID{Name: "system", Version: "0.0.1"}, system)
 }
 
 func action(cli *cli.Context) error {
@@ -70,14 +57,6 @@ func action(cli *cli.Context) error {
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
-
-	mon(ctx, server)
-
-	go func() {
-		if err := server.Run(ctx); err != nil && err != context.Canceled {
-			log.Error().Err(err).Msg("unexpected error")
-		}
-	}()
 
 	oracle := capacity.NewResourceOracle(stubs.NewStorageModuleStub(redis))
 	cap, err := oracle.Total()
@@ -115,17 +94,42 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	node, twin, err := registration(ctx, redis, cap)
+	node, twin, err := registration(ctx, redis, env, cap)
 	if err != nil {
 		return errors.Wrap(err, "failed during node registration")
 	}
 
-	// TODO: monitor change to yggdrasil Ip and update the twin according
+	sub, err := env.GetSubstrate()
+	if err != nil {
+		return errors.Wrap(err, "failed to get connection to tfchain")
+	}
+	events := events.New(sub, node)
+
+	system, err := monitord.NewSystemMonitor(node, 2*time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize system monitor")
+	}
+
+	host, err := monitord.NewHostMonitor(2 * time.Second)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize host monitor")
+	}
+
+	server.Register(zbus.ObjectID{Name: "host", Version: "0.0.1"}, host)
+	server.Register(zbus.ObjectID{Name: "system", Version: "0.0.1"}, system)
+	server.Register(zbus.ObjectID{Name: "events", Version: "0.0.1"}, events)
+
+	go func() {
+		if err := server.Run(ctx); err != nil && err != context.Canceled {
+			log.Fatal().Err(err).Msg("unexpected error")
+		}
+	}()
+
 	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
 
 	go func() {
 		for {
-			if err := public(ctx, node, redis); err != nil {
+			if err := public(ctx, node, env, redis); err != nil {
 				log.Error().Err(err).Msg("setting public config failed")
 				<-time.After(10 * time.Second)
 			}

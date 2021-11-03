@@ -15,7 +15,7 @@ type SystemMonitorStub struct {
 func NewSystemMonitorStub(client zbus.Client) *SystemMonitorStub {
 	return &SystemMonitorStub{
 		client: client,
-		module: "monitor",
+		module: "node",
 		object: zbus.ObjectID{
 			Name:    "system",
 			Version: "0.0.1",
@@ -117,4 +117,16 @@ func (s *SystemMonitorStub) Nics(ctx context.Context) (<-chan pkg.NicsIOCounterS
 		}
 	}()
 	return ch, nil
+}
+
+func (s *SystemMonitorStub) NodeID(ctx context.Context) (ret0 uint32) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "NodeID", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
 }
