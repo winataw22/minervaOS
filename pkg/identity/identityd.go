@@ -72,11 +72,11 @@ func (d *identityManager) NodeIDNumeric() (uint32, error) {
 	if d.node != 0 {
 		return d.node, nil
 	}
-	id, err := substrate.IdentityFromSecureKey(d.key.PrivateKey)
+	id, err := substrate.NewIdentityFromEd25519Key(d.key.PrivateKey)
 	if err != nil {
 		return 0, err
 	}
-	twin, err := d.sub.GetTwinByPubKey(id.PublicKey)
+	twin, err := d.sub.GetTwinByPubKey(id.PublicKey())
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get node twin")
 	}

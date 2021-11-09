@@ -53,7 +53,7 @@ func (u UserMap) AddKeyFromHex(id uint32, key string) error {
 }
 
 // GetKey implements interface
-func (u UserMap) GetKey(id uint32) (ed25519.PublicKey, error) {
+func (u UserMap) GetKey(id uint32) ([]byte, error) {
 	key, ok := u[id]
 	if !ok {
 		return nil, fmt.Errorf("unknown user id '%d' in key map", id)

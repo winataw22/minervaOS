@@ -28,9 +28,9 @@ func NewSubstrateTwins(sub *substrate.Substrate) (Twins, error) {
 }
 
 // GetKey gets twins public key
-func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
+func (s *substrateTwins) GetKey(id uint32) ([]byte, error) {
 	if value, ok := s.mem.Get(id); ok {
-		return value.(ed25519.PublicKey), nil
+		return value.([]byte), nil
 	}
 
 	user, err := s.sub.GetTwin(id)
@@ -40,7 +40,7 @@ func (s *substrateTwins) GetKey(id uint32) (ed25519.PublicKey, error) {
 
 	key := user.Account.PublicKey()
 	s.mem.Add(id, key)
-	return key, nil
+	return []byte(key), nil
 }
 
 type substrateAdmins struct {
@@ -69,10 +69,10 @@ func NewSubstrateAdmins(sub *substrate.Substrate, farmID uint32) (Twins, error) 
 }
 
 // GetKey gets twin public key if twin is valid admin
-func (s *substrateAdmins) GetKey(id uint32) (ed25519.PublicKey, error) {
+func (s *substrateAdmins) GetKey(id uint32) ([]byte, error) {
 	if id != s.twin {
 		return nil, fmt.Errorf("twin with id '%d' is not an admin", id)
 	}
 
-	return s.pk, nil
+	return []byte(s.pk), nil
 }

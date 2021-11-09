@@ -2,7 +2,6 @@ package provision
 
 import (
 	"context"
-	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -178,7 +177,7 @@ func (w *withRerunAll) apply(e *NativeEngine) {
 
 type nullKeyGetter struct{}
 
-func (n *nullKeyGetter) GetKey(id uint32) (ed25519.PublicKey, error) {
+func (n *nullKeyGetter) GetKey(id uint32) ([]byte, error) {
 	return nil, fmt.Errorf("null user key getter")
 }
 

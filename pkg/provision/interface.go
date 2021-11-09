@@ -2,7 +2,6 @@ package provision
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
 
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -10,7 +9,7 @@ import (
 
 // Twins is used to get twin public key
 type Twins interface {
-	GetKey(id uint32) (ed25519.PublicKey, error)
+	GetKey(id uint32) ([]byte, error)
 }
 
 // Engine is engine interface

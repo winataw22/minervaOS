@@ -112,7 +112,7 @@ func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root st
 
 	idMgr := stubs.NewIdentityManagerStub(cl)
 	sk := ed25519.PrivateKey(idMgr.PrivateKey(context.TODO()))
-	id, err := substrate.IdentityFromSecureKey(sk)
+	id, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (r *Reporter) pushOne() ([]Consumption, error) {
 		log.Debug().Uint64("contract", uint64(cmp.ContractID)).Msg("has consumption to report")
 		consumptions = append(consumptions, cmp.Consumption)
 	}
-	if err := r.substrate.Report(&r.identity, consumptions); err != nil {
+	if err := r.substrate.Report(r.identity, consumptions); err != nil {
 		return nil, errors.Wrap(err, "failed to publish consumption report")
 	}
 

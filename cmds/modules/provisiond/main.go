@@ -209,12 +209,12 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
 
-	kp, err := substrate.IdentityFromSecureKey(sk)
+	kp, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return errors.Wrap(err, "failed to get substrate keypair from secure key")
 	}
 
-	twin, err := sub.GetTwinByPubKey(kp.PublicKey)
+	twin, err := sub.GetTwinByPubKey(kp.PublicKey())
 	if err != nil {
 		return errors.Wrap(err, "failed to get node twin id")
 	}
