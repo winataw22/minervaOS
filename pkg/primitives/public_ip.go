@@ -98,17 +98,20 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 		return result, provision.ErrDidNotChange
 	}
 
-	pubIP6Base, err := network.GetPublicIPv6Subnet(ctx)
-	if err != nil {
-		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
-	}
-	ifName := fmt.Sprintf("p-%s", tapName) // TODO: clean this up, needs to come form networkd
-	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
+	var predictedIPv6 string
 
-	predictedIPv6, err := predictedSlaac(pubIP6Base.IP, mac.String())
-	if err != nil {
-		return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
+	pubIP6Base, err := network.GetPublicIPv6Subnet(ctx)
+	if err == nil {
+		predictedIPv6, err = predictedSlaac(pubIP6Base.IP, mac.String())
+		if err != nil {
+			return zos.PublicIPResult{}, errors.Wrap(err, "could not look up ipv6 prefix")
+		}
+	} else {
+		log.Warn().Err(err).Msg("could not look up ipv6 prefix")
 	}
+
+	ifName := fmt.Sprintf("p-%s", tapName) // TODO: clean this up, needs to come form networkd
 
 	result, err = p.getAssignedPublicIP(ctx, wl)
 	if err != nil {

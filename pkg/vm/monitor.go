@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -47,10 +46,8 @@ func (m *Module) monitor(ctx context.Context) error {
 	// monitoring trying to restart a machine that is not running yet.
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
 	// list all machines available under `{root}/firecracker`
-	root := filepath.Join(m.root, configDir)
-	items, err := ioutil.ReadDir(root)
+	items, err := ioutil.ReadDir(m.cfg)
 	if os.IsNotExist(err) {
 		return nil
 	} else if err != nil {

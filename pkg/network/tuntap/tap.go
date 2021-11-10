@@ -35,7 +35,7 @@ func CreateTap(name string, master string) (*netlink.Tuntap, error) {
 
 	// Setting the master iface on the link attrs at creation time seems to not work
 	// (at least not always), so explicitly set the master again once the iface is added.
-	if err = netlink.LinkSetMasterByIndex(tap, masterIface.Attrs().Index); err != nil {
+	if err = netlink.LinkSetMaster(tap, masterIface); err != nil {
 		return nil, errors.Wrap(err, "could not set tap master")
 	}
 
@@ -65,6 +65,10 @@ func CreateTap(name string, master string) (*netlink.Tuntap, error) {
 		if tap.Mode != netlink.TUNTAP_MODE_TAP {
 			return nil, errors.New("tuntap iface does not have the expected 'tap' mode")
 		}
+	}
+
+	if err = netlink.SetPromiscOn(tap); err != nil {
+		return nil, errors.Wrap(err, "could not bring set promsic on iface")
 	}
 
 	if err = netlink.LinkSetUp(tap); err != nil {

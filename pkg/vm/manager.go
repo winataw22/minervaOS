@@ -25,8 +25,11 @@ import (
 const (
 	// socketDir where vm firecracker sockets are kept
 	socketDir = "/var/run/cloud-hypervisor"
-	configDir = "config"
-	logsDir   = "logs"
+
+	// ConfigDir [deprecated] is config directory name
+	ConfigDir = "config"
+	// logsDir is logs directory name
+	logsDir = "logs"
 )
 
 var (
@@ -55,6 +58,7 @@ var (
 // Module implements the VMModule interface
 type Module struct {
 	root     string
+	cfg      string
 	client   zbus.Client
 	lock     sync.Mutex
 	failures *cache.Cache
@@ -67,10 +71,9 @@ var (
 )
 
 // NewVMModule creates a new instance of vm manager
-func NewVMModule(cl zbus.Client, root string) (*Module, error) {
+func NewVMModule(cl zbus.Client, root, config string) (*Module, error) {
 	for _, dir := range []string{
 		socketDir,
-		filepath.Join(root, configDir),
 		filepath.Join(root, logsDir),
 	} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -80,6 +83,7 @@ func NewVMModule(cl zbus.Client, root string) (*Module, error) {
 
 	mod := &Module{
 		root:   root,
+		cfg:    config,
 		client: cl,
 		// values are cached only for 1 minute. purge cache every 20 second
 		failures: cache.New(2*time.Minute, 20*time.Second),
@@ -134,7 +138,7 @@ func (m *Module) socketPath(name string) string {
 }
 
 func (m *Module) configPath(name string) string {
-	return filepath.Join(m.root, configDir, name)
+	return filepath.Join(m.cfg, name)
 }
 
 func (m *Module) logsPath(name string) string {
@@ -417,6 +421,7 @@ func (m *Module) Run(vm pkg.VM) error {
 
 	defer func() {
 		if err != nil {
+			log.Error().Err(err).Msg("decomission duo to failure to create the VM")
 			_ = m.Delete(machine.ID)
 		}
 	}()

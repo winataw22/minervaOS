@@ -77,6 +77,10 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("shutting down")
 	})
 
+	if err := ensureHostFw(ctx); err != nil {
+		return errors.Wrap(err, "failed to host firewall rules")
+	}
+
 	publicCfgPath := filepath.Join(root, publicConfigFile)
 	public.SetPersistence(publicCfgPath)
 	pub, err := public.LoadPublicConfig()
@@ -94,10 +98,6 @@ func action(cli *cli.Context) error {
 
 	if err := dmz.Create(ctx); err != nil {
 		return errors.Wrap(err, "failed to create ndmz")
-	}
-
-	if err := ensureHostFw(ctx); err != nil {
-		return errors.Wrap(err, "failed to host firewall rules")
 	}
 	log.Debug().Msg("starting yggdrasil")
 	yggNamespace := dmz.Namespace()

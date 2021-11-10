@@ -314,8 +314,9 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	machine.KernelArgs = cmd
 	machine.Boot = boot
 
-	if err := vm.Run(ctx, machine); err != nil {
+	if err = vm.Run(ctx, machine); err != nil {
 		// attempt to delete the vm, should the process still be lingering
+		log.Error().Err(err).Msg("cleaning up vm deployment duo to an error")
 		_ = vm.Delete(ctx, wl.ID.String())
 	}
 
