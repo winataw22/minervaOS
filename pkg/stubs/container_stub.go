@@ -101,6 +101,22 @@ func (s *ContainerModuleStub) ListNS(ctx context.Context) (ret0 []string, ret1 e
 	return
 }
 
+func (s *ContainerModuleStub) Logs(ctx context.Context, arg0 string, arg1 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Logs", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *ContainerModuleStub) Run(ctx context.Context, arg0 string, arg1 pkg.Container) (ret0 pkg.ContainerID, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Run", args...)

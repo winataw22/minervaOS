@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"os/exec"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -295,6 +296,18 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 	}
 
 	return pkg.ContainerID(container.ID()), nil
+}
+
+// Get logs of the container
+func (c *Module) Logs(ns string, containerID string) (logs string, err error) {
+	logFile := fmt.Sprintf("%s.log", containerID)
+	filePath := filepath.Join(c.root, "logs", ns, logFile)
+	tailCmd := exec.Command("tail", "-n", "100", filePath)
+	tailOut, err := tailCmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(tailOut), nil
 }
 
 // Exec executes a command inside the container

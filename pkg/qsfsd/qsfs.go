@@ -129,7 +129,11 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 		cont,
 	)
 	if lerr := q.waitUntilMounted(ctx, mountPath); lerr != nil {
-		err = lerr
+		logs, containerErr := contd.Logs(ctx, qsfsContainerNS, wlID)
+		if containerErr != nil {
+			log.Error().Err(containerErr).Msg("Failed to read container logs")
+		}
+		err = errors.Wrapf(lerr, fmt.Sprintf("Container Logs:\n%s", logs))
 		return
 	}
 	info.Path = mountPath
