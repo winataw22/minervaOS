@@ -13,12 +13,12 @@ import (
 
 const (
 	// SubstrateDevURL default substrate url
-	SubstrateDevURL  = "wss://tfchain.dev.threefold.io"
-	ActivationDevURL = "https://tfchain.dev.threefold.io/activation/activate"
+	SubstrateDevURL  = "wss://tfchain.dev.grid.tf/"
+	ActivationDevURL = "https://activation.dev.grid.tf/activation/activate"
 
 	// SubstrateDevURL default substrate url
-	SubstrateTestURL  = "wss://tfchain.test.threefold.io"
-	ActivationTestURL = "https://tfchain.test.threefold.io/activation/activate"
+	SubstrateTestURL  = "wss://tfchain.test.grid.tf/"
+	ActivationTestURL = "https://activation.test.grid.tf/activation/activate"
 )
 
 // Environment holds information about running environment of a node
