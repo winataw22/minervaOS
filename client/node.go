@@ -80,6 +80,11 @@ type NodeClient struct {
 	bus      rmb.Client
 }
 
+type Version struct {
+	ZOS   string `json:"zos"`
+	ZInit string `json:"zinit"`
+}
+
 type args map[string]interface{}
 
 // NewNodeClient creates a new node RMB client. This client then can be used to
@@ -209,6 +214,16 @@ func (n *NodeClient) NetworkSetPublicConfig(ctx context.Context, cfg pkg.PublicC
 	}
 
 	return nil
+}
+
+func (n *NodeClient) SystemVersion(ctx context.Context) (ver Version, err error) {
+	const cmd = "zos.system.version"
+
+	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &ver); err != nil {
+		return
+	}
+
+	return
 }
 
 func (n *NodeClient) SystemDMI(ctx context.Context) (result dmi.DMI, err error) {

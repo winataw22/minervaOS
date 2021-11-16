@@ -2,6 +2,8 @@ package noded
 
 import (
 	"context"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -78,6 +80,27 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get hypervisors")
 	}
+
+	bus.WithHandler("zos.system.version", func(ctx context.Context, payload []byte) (interface{}, error) {
+		ver := stubs.NewVersionMonitorStub(redis)
+		output, err := exec.CommandContext(ctx, "zinit", "-V").CombinedOutput()
+		var zInitVer string
+		if err != nil {
+			zInitVer = err.Error()
+		} else {
+			zInitVer = strings.TrimSpace(strings.TrimPrefix(string(output), "zinit"))
+		}
+
+		version := struct {
+			ZOS   string `json:"zos"`
+			ZInit string `json:"zinit"`
+		}{
+			ZOS:   ver.GetVersion(ctx).String(),
+			ZInit: zInitVer,
+		}
+
+		return version, nil
+	})
 
 	bus.WithHandler("zos.system.dmi", func(ctx context.Context, payload []byte) (interface{}, error) {
 		return dmi, nil

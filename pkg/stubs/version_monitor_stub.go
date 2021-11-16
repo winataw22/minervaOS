@@ -23,6 +23,18 @@ func NewVersionMonitorStub(client zbus.Client) *VersionMonitorStub {
 	}
 }
 
+func (s *VersionMonitorStub) GetVersion(ctx context.Context) (ret0 semver.Version) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetVersion", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *VersionMonitorStub) Version(ctx context.Context) (<-chan semver.Version, error) {
 	ch := make(chan semver.Version)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Version")

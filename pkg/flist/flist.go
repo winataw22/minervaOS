@@ -349,6 +349,11 @@ func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, err
 	sublog := log.With().Str("name", name).Str("url", url).Str("storage", opt.Storage).Logger()
 	sublog.Info().Msgf("request to mount flist: %+v", opt)
 
+	defer func() {
+		if err := f.cleanUnusedMounts(); err != nil {
+			log.Error().Err(err).Msg("failed to run clean up")
+		}
+	}()
 	// mount overlay
 	mountpoint, err := f.mountpath(name)
 	if err != nil {
@@ -499,6 +504,11 @@ func (f *flistModule) HashFromRootPath(name string) (string, error) {
 }
 
 func (f *flistModule) Unmount(name string) error {
+	defer func() {
+		if err := f.cleanUnusedMounts(); err != nil {
+			log.Error().Err(err).Msg("failed to run clean up")
+		}
+	}()
 	// this will
 	// - unmount the overlay mount
 	mountpoint, err := f.mountpath(name)

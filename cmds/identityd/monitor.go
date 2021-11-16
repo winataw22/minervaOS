@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"time"
+
 	"github.com/blang/semver"
 	"github.com/threefoldtech/zos/pkg"
-	"time"
 )
 
 type monitorStream struct {
@@ -21,6 +22,10 @@ func newVersionMonitor(d time.Duration) *monitorStream {
 		C:        make(chan semver.Version),
 		duration: d,
 	}
+}
+
+func (m *monitorStream) GetVersion() semver.Version {
+	return m.version
 }
 
 func (m *monitorStream) Version(ctx context.Context) <-chan semver.Version {

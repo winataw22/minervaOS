@@ -91,10 +91,10 @@ func (t *testCommander) args(args ...string) (map[string]string, []string) {
 func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
 	if name == "mountpoint" {
 		return exec.Command("true")
-	}
-
-	if name != "g8ufs" {
-		t.Fatal("invalid command name, expected 'g8ufs'")
+	} else if name == "findmnt" {
+		return exec.Command("echo", "{}")
+	} else if name != "g8ufs" {
+		t.Fatalf("invalid command name, expected 'g8ufs' got '%s'", name)
 	}
 
 	m, _ := t.args(args...)

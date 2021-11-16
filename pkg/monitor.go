@@ -94,5 +94,6 @@ type HostMonitor interface {
 
 // VersionMonitor interface (provided by identityd)
 type VersionMonitor interface {
+	GetVersion() semver.Version
 	Version(ctx context.Context) <-chan semver.Version
 }

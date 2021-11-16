@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,17 +16,31 @@ const (
 	fsTypeOverlay = "overlay"
 )
 
-// //nolint
-// type filter func(i *mountInfo) bool
+//nolint
+type filter func(i *mountInfo) bool
 
-// //nolint
-// func withParentDir(path string) filter {
-// 	path = filepath.Clean(path)
-// 	return func(mnt *mountInfo) bool {
-// 		base := filepath.Base(mnt.Target)
-// 		return path == base
-// 	}
-// }
+func withUnderPath(path string) filter {
+	path = filepath.Clean(path) + string(filepath.Separator)
+	return func(mnt *mountInfo) bool {
+		return strings.HasPrefix(mnt.Target, path)
+	}
+}
+
+//nolint
+func withParentDir(path string) filter {
+	path = filepath.Clean(path)
+	return func(mnt *mountInfo) bool {
+		dir := filepath.Dir(mnt.Target)
+		return path == dir
+	}
+}
+
+func withTarget(path string) filter {
+	path = filepath.Clean(path)
+	return func(mnt *mountInfo) bool {
+		return path == mnt.Target
+	}
+}
 
 type mountInfo struct {
 	Target  string `json:"target"`
@@ -111,35 +126,51 @@ func (f *flistModule) resolve(path string) (g8ufsInfo, error) {
 	}
 }
 
-// //nolint
-// func (f *flistModule) mounts(filter ...filter) ([]mountInfo, error) {
-// 	output, err := f.commander.Command("findmnt", "-J", "-l").Output()
-// 	if err != nil {
-// 		return nil, errors.Wrap(err, "failed to list system mounts")
-// 	}
+type mounts []mountInfo
 
-// 	var result struct {
-// 		Filesystems []mountInfo `json:"filesystems"`
-// 	}
+func (m mounts) filter(filter ...filter) mounts {
+	var filtered mounts
+next:
+	for i := range m {
+		for _, f := range filter {
+			if !f(&m[i]) {
+				continue next
+			}
+		}
+		filtered = append(filtered, m[i])
+	}
 
-// 	if err := json.Unmarshal(output, &result); err != nil {
-// 		return nil, errors.Wrap(err, "failed to parse findmnt output")
-// 	}
+	return filtered
+}
 
-// 	if len(filter) == 0 {
-// 		return result.Filesystems, nil
-// 	}
+func (f *flistModule) mounts(filter ...filter) (mounts, error) {
+	output, err := f.commander.Command("findmnt", "-J", "-l").Output()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list system mounts")
+	}
 
-// 	mounts := result.Filesystems[:0]
-// next:
-// 	for _, mnt := range result.Filesystems {
-// 		for _, f := range filter {
-// 			if !f(&mnt) {
-// 				continue next
-// 			}
-// 		}
-// 		mounts = append(mounts, mnt)
-// 	}
+	var result struct {
+		Filesystems []mountInfo `json:"filesystems"`
+	}
 
-// 	return mounts, nil
-// }
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, errors.Wrap(err, "failed to parse findmnt output")
+	}
+
+	if len(filter) == 0 {
+		return result.Filesystems, nil
+	}
+
+	mounts := result.Filesystems[:0]
+next:
+	for _, mnt := range result.Filesystems {
+		for _, f := range filter {
+			if !f(&mnt) {
+				continue next
+			}
+		}
+		mounts = append(mounts, mnt)
+	}
+
+	return mounts, nil
+}

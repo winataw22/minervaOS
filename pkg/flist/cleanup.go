@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/app"
 )
@@ -69,4 +70,61 @@ func (f *flistModule) cleanCache(now time.Time, age time.Duration) error {
 
 		return nil
 	})
+}
+
+// cleanUnusedMounts need to be called ONLY inside the daemon worker
+// calling it in a timer can cause an issue if it decide to clean
+// ro mount that are still half through a mount operation.
+func (f *flistModule) cleanUnusedMounts() error {
+	// we list all mounts maintained by flist daemon
+	all, err := f.mounts(withUnderPath(f.root))
+	if err != nil {
+		return errors.Wrap(err, "failed to list flist mounts")
+	}
+
+	roTargets := make(map[int64]mountInfo)
+	for _, mount := range all.filter(withParentDir(f.ro)) {
+		if mount.FSType != fsTypeG8ufs {
+			// this mount type should not be under ro
+			// where all mounts are g8ufs.
+			continue
+		}
+		g8ufs := mount.AsG8ufs()
+		roTargets[g8ufs.Pid] = mount
+	}
+
+	for _, mount := range all.filter(withParentDir(f.mountpoint)) {
+		var info g8ufsInfo
+		switch mount.FSType {
+		case fsTypeG8ufs:
+			// this is a bind mount
+			info = mount.AsG8ufs()
+		case fsTypeOverlay:
+			// this is an overly mount, so g8ufs lives as a lower layer
+			// we get this from the list of mounts.
+			lower := all.filter(withTarget(mount.AsOverlay().LowerDir))
+			if len(lower) > 0 {
+				info = lower[0].AsG8ufs()
+			}
+		}
+
+		delete(roTargets, info.Pid)
+	}
+	if len(roTargets) == 0 {
+		log.Debug().Msg("no unused mounts detected")
+	}
+	// cleaning up remaining un-used mounts
+	for pid, mount := range roTargets {
+		log.Debug().Int64("source", pid).Msgf("cleaning up mount: %+v", mount)
+		if err := f.system.Unmount(mount.Target, 0); err != nil {
+			log.Error().Err(err).Str("target", mount.Target).Msg("failed to clean up mount")
+			continue
+		}
+
+		if err := os.RemoveAll(mount.Target); err != nil {
+			log.Error().Err(err).Str("target", mount.Target).Msg("failed to delete mountpoint")
+		}
+	}
+
+	return nil
 }
