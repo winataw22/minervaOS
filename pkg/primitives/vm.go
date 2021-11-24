@@ -21,7 +21,7 @@ import (
 
 const (
 	// this probably need a way to update. for now just hard code it
-	cloudContainerFlist = "https://hub.grid.tf/azmy.3bot/cloud-container.flist"
+	cloudContainerFlist = "https://hub.grid.tf/omar0.3bot/cloud-container.flist"
 	cloudContainerName  = "cloud-container"
 )
 
@@ -213,7 +213,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		"panic":   "1",
 		"root":    "/dev/vda",
 	}
-
+	var entrypoint string
 	if imageInfo.Container {
 		// - if Container, remount RW
 		// prepare for container
@@ -260,8 +260,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		}
 
 		cmd["host"] = string(wl.Name)
-		// change the root boot to use the right virtiofs tag
-		cmd["init"] = config.Entrypoint
+		entrypoint = config.Entrypoint
 		if err := p.vmMounts(ctx, deployment, config.Mounts, true, &machine); err != nil {
 			return result, err
 		}
@@ -313,6 +312,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	machine.InitrdImage = imageInfo.Initrd
 	machine.KernelArgs = cmd
 	machine.Boot = boot
+	machine.Entrypoint = entrypoint
 
 	if err = vm.Run(ctx, machine); err != nil {
 		// attempt to delete the vm, should the process still be lingering

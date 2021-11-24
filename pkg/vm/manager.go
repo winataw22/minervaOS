@@ -407,6 +407,7 @@ func (m *Module) Run(vm pkg.VM) error {
 			Mem:       MemMib(vm.Memory / gridtypes.Megabyte),
 			HTEnabled: false,
 		},
+		Entrypoint:  vm.Entrypoint,
 		FS:          fs,
 		Interfaces:  nics,
 		Disks:       devices,

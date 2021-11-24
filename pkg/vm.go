@@ -6,7 +6,6 @@ import (
 	"net"
 	"path/filepath"
 
-	"github.com/google/shlex"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
@@ -102,22 +101,6 @@ func (s KernelArgs) String() string {
 			buf.WriteString(v)
 		}
 	}
-	init, ok := s["init"]
-	if ok {
-		if buf.Len() > 0 {
-			buf.WriteRune(' ')
-		}
-		parts, _ := shlex.Split(init)
-		if len(parts) > 0 {
-			buf.WriteString("init=")
-			buf.WriteString(parts[0])
-			for _, part := range parts[1:] {
-				buf.WriteRune(' ')
-				buf.WriteString(fmt.Sprintf("\"%s\"", part))
-			}
-		}
-	}
-
 	return buf.String()
 }
 
@@ -144,6 +127,8 @@ type VM struct {
 	InitrdImage string
 	// KernelArgs to override the default kernel arguments. (default: "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules")
 	KernelArgs KernelArgs
+	// Entrypoint a shell-compatible command to execute as the init process
+	Entrypoint string
 	// Disks are a list of disks that are going to
 	// be auto allocated on the provided storage path
 	Disks []VMDisk
