@@ -180,10 +180,11 @@ func (m *Machine) findVirtioFsMount() (*VirtioFS, error) {
 }
 
 func (m *Machine) buildZosRC() error {
-	if len(m.Environment) == 0 || m.Entrypoint == "" {
+	if len(m.Environment) == 0 && m.Entrypoint == "" {
 		// nothing to add in .zosrc
 		return nil
 	}
+
 	fs, err := m.findVirtioFsMount()
 	if err != nil {
 		return err
@@ -216,7 +217,7 @@ func (m *Machine) buildZosRC() error {
 	return nil
 }
 
-func (m *Machine) appendEnv(file *os.File) error {
+func (m *Machine) appendEnv(file io.Writer) error {
 	for k, v := range m.Environment {
 		if _, err := fmt.Fprintf(file, "export %s=%s\n", k, quote(v)); err != nil {
 			return err
@@ -225,7 +226,7 @@ func (m *Machine) appendEnv(file *os.File) error {
 	return nil
 }
 
-func (m *Machine) appendEntrypoint(file *os.File) error {
+func (m *Machine) appendEntrypoint(file io.Writer) error {
 	parts, err := shlex.Split(m.Entrypoint)
 	if err != nil {
 		return errors.Wrap(err, "invalid entrypoint")
