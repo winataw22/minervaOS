@@ -67,15 +67,15 @@ func action(ctx *cli.Context) error {
 
 	header := widgets.NewParagraph()
 	header.Border = true
-	header.SetRect(0, 0, width, 6)
+	header.SetRect(0, 0, width, 7)
 
 	netgrid := ui.NewGrid()
 	netgrid.Title = "Network"
-	netgrid.SetRect(0, 6, width, 12)
+	netgrid.SetRect(0, 7, width, 13)
 
 	provision := ui.NewGrid()
 	provision.Title = "Provision"
-	provision.SetRect(0, 12, width, 18)
+	provision.SetRect(0, 13, width, 19)
 	provision.Border = false
 
 	var flag signalFlag

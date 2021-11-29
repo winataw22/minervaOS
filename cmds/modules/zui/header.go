@@ -7,6 +7,7 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -34,7 +35,8 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 	s := "          Welcome to [Zero-OS](fg:yellow), [ThreeFold](fg:blue) Autonomous Operating System\n" +
 		"\n" +
 		" This is node %s (farmer %s)\n" +
-		" running Zero-OS version [%s](fg:blue) (mode [%s](fg:cyan))"
+		" running Zero-OS version [%s](fg:blue) (mode [%s](fg:cyan))\n" +
+		" cache disk: %s"
 
 	host := stubs.NewVersionMonitorStub(c)
 	ch, err := host.Version(ctx)
@@ -59,7 +61,12 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 				nodeID = green(fmt.Sprint(node))
 			}
 
-			h.Text = fmt.Sprintf(s, nodeID, farm, version.String(), env.RunningMode.String())
+			cache := green("OK")
+			if app.CheckFlag(app.LimitedCache) {
+				cache = red("LIMITED CACHE")
+			}
+
+			h.Text = fmt.Sprintf(s, nodeID, farm, version.String(), env.RunningMode.String(), cache)
 			r.Signal()
 		}
 	}()

@@ -498,7 +498,7 @@ func (s *Module) ensureCache() error {
 		log.Warn().Msg("failed to create persisted cache disk. Running on limited cache")
 
 		// set limited cache flag
-		if err := app.SetFlag("limited-cache"); err != nil {
+		if err := app.SetFlag(app.LimitedCache); err != nil {
 			return err
 		}
 

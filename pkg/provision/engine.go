@@ -667,7 +667,7 @@ func (e *NativeEngine) updateDeployment(ctx context.Context, ops []gridtypes.Upg
 // Counters implements the zbus interface
 func (e *NativeEngine) Counters(ctx context.Context) <-chan pkg.ProvisionCounters {
 	//TODO: implement counters
-	// this is probably need to be moved to
+	// this is probably need to be moved to statistics
 	ch := make(chan pkg.ProvisionCounters)
 	go func() {
 		select {
