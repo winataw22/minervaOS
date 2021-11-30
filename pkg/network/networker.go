@@ -415,17 +415,13 @@ nft 'add rule bridge filter prerouting iifname "{{.Iface}}" jump {{.Name}}-pre'
 nft 'add rule bridge filter postrouting oifname "{{.Iface}}" jump {{.Name}}-post'
 
 nft 'add rule bridge filter {{.Name}}-pre ip saddr . ether saddr != { {{.IPv4}} . {{.Mac}} } counter drop'
-{{if .IPv6}}
 nft 'add rule bridge filter {{.Name}}-pre ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
-{{end}}
 
 nft 'add rule bridge filter {{.Name}}-pre arp operation reply arp saddr ip != {{.IPv4}} counter drop'
 nft 'add rule bridge filter {{.Name}}-pre arp operation request arp saddr ip != {{.IPv4}} counter drop'
 
 nft 'add rule bridge filter {{.Name}}-post ip daddr . ether daddr != { {{.IPv4}} . {{.Mac}} } counter drop'
-{{if .IPv6}}
 nft 'add rule bridge filter {{.Name}}-post ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
-{{end}}
 `))
 
 	pubIpTemplateDestroy = template.Must(template.New("filter-destroy").Parse(
@@ -474,9 +470,22 @@ fi
 )
 
 // SetupPubIPFilter sets up filter for this public ip
-func (n *networker) SetupPubIPFilter(filterName string, iface string, ip string, ipv6 string, mac string) error {
+func (n *networker) SetupPubIPFilter(filterName string, iface string, ipv4 net.IP, ipv6 net.IP, mac string) error {
 	if n.PubIPFilterExists(filterName) {
 		return nil
+	}
+
+	ipv4 = ipv4.To4()
+	ipv6 = ipv6.To16()
+	// if no ipv4 or ipv6 provided, we make sure
+	// to use zero ip so the user can't just assign
+	// an ip to his vm to use.
+	if len(ipv4) == 0 {
+		ipv4 = net.IPv4zero
+	}
+
+	if len(ipv6) == 0 {
+		ipv6 = net.IPv6zero
 	}
 
 	data := struct {
@@ -489,8 +498,8 @@ func (n *networker) SetupPubIPFilter(filterName string, iface string, ip string,
 		Name:  filterName,
 		Iface: iface,
 		Mac:   mac,
-		IPv4:  ip,
-		IPv6:  ipv6,
+		IPv4:  ipv4.String(),
+		IPv6:  ipv6.String(),
 	}
 
 	var buffer bytes.Buffer

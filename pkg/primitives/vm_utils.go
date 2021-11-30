@@ -120,12 +120,14 @@ func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment grid
 	if err != nil {
 		return pkg.VMIface{}, err
 	}
+
 	tapName := tapNameFromName(ipWl.ID, "pub")
 
-	pubIP, pubGw, err := p.getPubIPConfig(ipWl)
+	config, err := p.getPubIPConfig(ipWl)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not get public ip config")
 	}
+
 	pubIface, err := network.SetupPubTap(ctx, tapName)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device for public network")
@@ -135,51 +137,49 @@ func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment grid
 	// this needs to be the same as how we get it in the actual IP reservation
 	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
 
+	// pubic ip config can has
+	// - reserved public ipv4
+	// - public ipv6
+	// - both
+	// in all cases we have ipv6 it's handed out via slaac, so we don't need
+	// to set the IP on the interface. We need to configure it ONLY for ipv4
+	// hence:
+	var ips []net.IPNet
+	var gw net.IP
+	if !config.IP.Nil() {
+		ips = []net.IPNet{
+			config.IP.IPNet,
+		}
+		gw = config.Gateway
+	}
 	return pkg.VMIface{
-		Tap: pubIface,
-		MAC: mac.String(), // mac so we always get the same IPv6 from slaac
-		IPs: []net.IPNet{
-			pubIP,
-		},
-		IP4DefaultGateway: pubGw,
+		Tap:               pubIface,
+		MAC:               mac.String(), // mac so we always get the same IPv6 from slaac
+		IPs:               ips,
+		IP4DefaultGateway: gw,
 		// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
 		Public: true,
 	}, nil
 }
 
 // Get the public ip, and the gateway from the reservation ID
-func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID) (ip net.IPNet, gw net.IP, err error) {
-	if wl.Type != zos.PublicIPType {
-		return ip, gw, fmt.Errorf("workload for public IP is of wrong type")
+func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
+	if wl.Type != zos.PublicIPv4Type && wl.Type != zos.PublicIPType {
+		return result, fmt.Errorf("workload for public IP is of wrong type")
 	}
 
 	if wl.Result.State != gridtypes.StateOk {
-		return ip, gw, fmt.Errorf("public ip workload is not okay")
+		return result, fmt.Errorf("public ip workload is not okay")
 	}
 
-	var result zos.PublicIPResult
 	if err := wl.Result.Unmarshal(&result); err != nil {
-		return ip, gw, errors.Wrap(err, "failed to load ip config")
+		return result, errors.Wrap(err, "failed to load ip result")
 	}
 
-	return result.IP.IPNet, result.Gateway, nil
+	return result, nil
 }
 
 func getFlistInfo(imagePath string) (FListInfo, error) {
-	// entities, err := ioutil.ReadDir(imagePath)
-	// if err != nil {
-	// 	return FListInfo{}, err
-	// }
-	// out, err := exec.Command("mountpoint", imagePath).CombinedOutput()
-	// if err != nil {
-	// 	return FListInfo{}, err
-	// }
-	// log.Debug().Msgf("mountpoint: %s", string(out))
-	// log.Debug().Str("mnt", imagePath).Msg("listing files in")
-	// for _, ent := range entities {
-	// 	log.Debug().Str("file", ent.Name()).Msg("file found")
-	// }
-
 	kernel := filepath.Join(imagePath, "kernel")
 	log.Debug().Str("file", kernel).Msg("checking kernel")
 	if _, err := os.Stat(kernel); os.IsNotExist(err) {

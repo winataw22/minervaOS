@@ -11,16 +11,20 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
+const (
+	gig = 1024 * 1024 * 1024.0
+)
+
 func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) error {
 	prov := widgets.NewTable()
-	prov.Title = "System Load"
+	prov.Title = "System Used Capacity"
 	prov.RowSeparator = false
 
 	prov.Rows = [][]string{
 		{"CPU Usage", "", "Memory Usage", ""},
-		{"Containers", "", "Volumes", ""},
-		{"Networks", "", "VMs", ""},
-		{"ZDB NS", "", "Debug", ""},
+		{"CRU Reserved", "", "MRU Reserved", ""},
+		{"SSD Reserved", "", "HDD Reserved", ""},
+		{"IPv4 Reserved", ""},
 	}
 
 	grid.Set(
@@ -31,8 +35,8 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) erro
 
 	ctx := context.Background()
 
-	monitor := stubs.NewProvisionStub(client)
-	counters, err := monitor.Counters(ctx)
+	monitor := stubs.NewStatisticsStub(client)
+	counters, err := monitor.Reserved(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to start net monitor stream")
 	}
@@ -40,12 +44,11 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) erro
 	go func() {
 		for counter := range counters {
 			rows := prov.Rows
-			rows[1][1] = fmt.Sprint(counter.Container)
-			rows[1][3] = fmt.Sprint(counter.Volume)
-			rows[2][1] = fmt.Sprint(counter.Network)
-			rows[2][3] = fmt.Sprint(counter.VM)
-			rows[3][1] = fmt.Sprint(counter.ZDB)
-			rows[3][3] = fmt.Sprint(counter.Debug)
+			rows[1][1] = fmt.Sprint(counter.CRU)
+			rows[1][3] = fmt.Sprintf("%0.00f GB", float64(counter.MRU)/gig)
+			rows[2][1] = fmt.Sprintf("%0.00f GB", float64(counter.SRU)/gig)
+			rows[2][3] = fmt.Sprintf("%0.00f GB", float64(counter.HRU)/gig)
+			rows[3][1] = fmt.Sprint(counter.IPV4U)
 
 			render.Signal()
 		}

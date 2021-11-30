@@ -15,8 +15,11 @@ const (
 	ZDBType gridtypes.WorkloadType = "zdb"
 	// ZMachineType type
 	ZMachineType gridtypes.WorkloadType = "zmachine"
-	//PublicIPType type
-	PublicIPType gridtypes.WorkloadType = "ipv4"
+	//PublicIPv4Type type [deprecated]
+	PublicIPv4Type gridtypes.WorkloadType = "ipv4"
+	//PublicIPType type is the new way to assign public ips
+	// to a VM. this has flags (V4, and V6) that has to be set.
+	PublicIPType gridtypes.WorkloadType = "ip"
 	// GatewayNameProxyType type
 	GatewayNameProxyType gridtypes.WorkloadType = "gateway-name-proxy"
 	// GatewayFQDNProxyType type
@@ -30,6 +33,7 @@ func init() {
 	gridtypes.RegisterType(NetworkType, Network{})
 	gridtypes.RegisterType(ZDBType, ZDB{})
 	gridtypes.RegisterType(ZMachineType, ZMachine{})
+	gridtypes.RegisterType(PublicIPv4Type, PublicIP4{})
 	gridtypes.RegisterType(PublicIPType, PublicIP{})
 	gridtypes.RegisterType(GatewayNameProxyType, GatewayNameProxy{})
 	gridtypes.RegisterType(GatewayFQDNProxyType, GatewayFQDNProxy{})

@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net/http"
+	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
-	"github.com/threefoldtech/zos/pkg/provision/mw"
 	"github.com/threefoldtech/zos/pkg/rmb"
 )
 
@@ -198,32 +197,7 @@ func (s *Statistics) CanUpdate(ctx context.Context, typ gridtypes.WorkloadType) 
 	return s.inner.CanUpdate(ctx, typ)
 }
 
-type statisticsAPI struct {
-	stats *Statistics
-}
-
-// NewStatisticsAPI sets up a new statistics API and set it up on the given
-// router
-func NewStatisticsAPI(router *mux.Router, stats *Statistics) error {
-	api := statisticsAPI{stats}
-	return api.setup(router)
-}
-
-func (s *statisticsAPI) setup(router *mux.Router) error {
-	router.Path("/counters").HandlerFunc(mw.AsHandlerFunc(s.getCounters)).Methods(http.MethodGet).Name("statistics-counters")
-	return nil
-}
-
-func (s *statisticsAPI) getCounters(r *http.Request) (interface{}, mw.Response) {
-	return struct {
-		Total gridtypes.Capacity `json:"total"`
-		Used  gridtypes.Capacity `json:"used"`
-	}{
-		Total: s.stats.Total(),
-		Used:  s.stats.Current(),
-	}, nil
-}
-
+// statistics api handlers for msgbus
 type statisticsMessageBus struct {
 	stats *Statistics
 }
@@ -248,4 +222,28 @@ func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) 
 		Total: s.stats.Total(),
 		Used:  s.stats.Current(),
 	}, nil
+}
+
+type statsStream struct {
+	stats *Statistics
+}
+
+func NewStatisticsStream(s *Statistics) pkg.Statistics {
+	return &statsStream{s}
+}
+
+func (s *statsStream) Reserved(ctx context.Context) <-chan gridtypes.Capacity {
+	ch := make(chan gridtypes.Capacity)
+	go func(ctx context.Context) {
+		defer close(ch)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second):
+				ch <- s.stats.Current()
+			}
+		}
+	}(ctx)
+	return ch
 }

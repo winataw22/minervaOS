@@ -3,7 +3,6 @@ package vm
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,11 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
-	"github.com/vishvananda/netlink"
-)
-
-var (
-	errMacVTapNotFound = errors.New("macvtap not found")
 )
 
 // Metrics gets running machines network metrics
@@ -68,39 +62,21 @@ func (m *Module) metrics(ps Process) (pkg.MachineMetric, error) {
 	for _, nic := range nics {
 		params := parse(nic)
 
-		if tap, ok := params["tap"]; ok {
-			priv = append(priv, tap)
-		} else if fd, ok := params["fd"]; ok {
-			// fd is an open file descriptor
-			// so first, we readlink of the open fd
-			// then parse the index and get the device
-			// then get the name
-			fdInt, err := strconv.Atoi(fd)
-			if err != nil {
-				log.Error().Err(err).
-					Int("pid", ps.Pid).
-					Str("net", nic).
-					Msg("failed to parse fd")
-				continue
-			}
-
-			tap, err := readMacVTap(ps.Pid, fdInt)
-			if errors.Is(err, errMacVTapNotFound) {
-				continue
-			} else if err != nil {
-				log.Error().Err(err).
-					Int("pid", ps.Pid).
-					Str("net", nic).
-					Msg("failed to get macvtap for public ip")
-				continue
-			}
-
-			pub = append(pub, tap)
-		} else {
+		tap, ok := params["tap"]
+		if !ok {
 			log.Warn().
 				Int("pid", ps.Pid).
 				Str("net", nic).
 				Msg("failed to parse net config for process")
+			continue
+		}
+
+		if strings.HasPrefix("t-", tap) {
+			priv = append(priv, tap)
+		} else if strings.HasPrefix("p-", tap) {
+			pub = append(pub, tap)
+		} else {
+			log.Error().Str("name", tap).Msg("tap device with wrong name")
 		}
 	}
 
@@ -152,30 +128,4 @@ func metricsForNics(nics []string) (m pkg.NetMetric, err error) {
 	}
 
 	return
-}
-
-func readMacVTap(pid, fd int) (string, error) {
-	const template = "/proc/%d/fd/%d"
-
-	path := fmt.Sprintf(template, pid, fd)
-
-	target, err := os.Readlink(path)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to read link of '%s'", path)
-	}
-
-	// the target should be in this format /dev/tap544
-	var index int
-	if _, err := fmt.Sscanf(target, "/dev/tap%d", &index); err != nil {
-		return "", errors.Wrap(err, "failed to parse tap index")
-	}
-
-	link, err := netlink.LinkByIndex(index)
-	if _, ok := err.(netlink.LinkNotFoundError); ok {
-		return "", errMacVTapNotFound
-	} else if err != nil {
-		return "", errors.Wrap(err, "failed to get the error")
-	}
-
-	return link.Attrs().Name, nil
 }

@@ -414,7 +414,7 @@ func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 s
 	return
 }
 
-func (s *NetworkerStub) SetupPubIPFilter(ctx context.Context, arg0 string, arg1 string, arg2 string, arg3 string, arg4 string) (ret0 error) {
+func (s *NetworkerStub) SetupPubIPFilter(ctx context.Context, arg0 string, arg1 string, arg2 []uint8, arg3 []uint8, arg4 string) (ret0 error) {
 	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPubIPFilter", args...)
 	if err != nil {

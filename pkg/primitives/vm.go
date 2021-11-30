@@ -167,6 +167,8 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	}
 
 	if !config.Network.PublicIP.IsEmpty() {
+		// some public access is required, we need to add a public
+		// interface to the machine with the right config.
 		inf, err := p.newPubNetworkInterface(ctx, deployment, config)
 		if err != nil {
 			return result, err

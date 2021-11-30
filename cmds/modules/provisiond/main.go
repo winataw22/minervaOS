@@ -34,8 +34,10 @@ import (
 )
 
 const (
-	module = "provision"
-	gib    = 1024 * 1024 * 1024
+	serverName       = "provision"
+	provisionModule  = "provision"
+	statisticsModule = "statistics"
+	gib              = 1024 * 1024 * 1024
 )
 
 // Module entry point
@@ -95,7 +97,7 @@ func action(cli *cli.Context) error {
 		select {}
 	}
 
-	server, err := zbus.NewRedisServer(module, msgBrokerCon, 1)
+	server, err := zbus.NewRedisServer(serverName, msgBrokerCon, 1)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to message broker")
 	}
@@ -163,7 +165,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get node reserved capacity")
 	}
 	var current gridtypes.Capacity
-	if !app.IsFirstBoot(module) {
+	if !app.IsFirstBoot(serverName) {
 		// if this is the first boot of this module.
 		// it means the provision engine will still
 		// rerun all deployments, which means we don't need
@@ -190,10 +192,6 @@ func action(cli *cli.Context) error {
 	if err := primitives.NewStatisticsMessageBus(zosRouter, statistics); err != nil {
 		return errors.Wrap(err, "failed to create statistics api")
 	}
-
-	// TODO: that is a test user map for development, do not commit
-	// users := mw.NewUserMap()
-	// users.AddKeyFromHex(1, "95d1ba20e9f5cb6cfc6182fecfa904664fb1953eba520db454d5d5afaa82d791")
 
 	sub, err := env.GetSubstrate()
 	if err != nil {
@@ -243,18 +241,27 @@ func action(cli *cli.Context) error {
 			zos.ZMountType,
 			zos.QuantumSafeFSType,
 			zos.NetworkType,
+			zos.PublicIPv4Type,
 			zos.PublicIPType,
 		),
 		// if this is a node reboot, the node needs to
 		// recreate all reservations. so we set rerun = true
-		provision.WithRerunAll(app.IsFirstBoot(module)),
+		provision.WithRerunAll(app.IsFirstBoot(serverName)),
 	)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to instantiate provision engine")
 	}
 
-	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, pkg.Provision(engine))
+	server.Register(
+		zbus.ObjectID{Name: provisionModule, Version: "0.0.1"},
+		pkg.Provision(engine),
+	)
+
+	server.Register(
+		zbus.ObjectID{Name: statisticsModule, Version: "0.0.1"},
+		pkg.Statistics(primitives.NewStatisticsStream(statistics)),
+	)
 
 	log.Info().
 		Str("broker", msgBrokerCon).
@@ -270,7 +277,7 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	if err := app.MarkBooted(module); err != nil {
+	if err := app.MarkBooted(provisionModule); err != nil {
 		log.Error().Err(err).Msg("failed to mark module as booted")
 	}
 
@@ -286,7 +293,7 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("capacity reported stopped")
 	}()
 
-	// and start the zbus server in the back ground
+	// and start the zbus server in the background
 	go func() {
 		if err := server.Run(ctx); err != nil && err != context.Canceled {
 			log.Fatal().Err(err).Msg("zbus provision engine api exited unexpectedely")
@@ -294,6 +301,7 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("zbus server stopped")
 	}()
 
+	// register message bug api
 	setupMessageBusses(zosRouter, cl, engine)
 
 	log.Info().Msg("running messagebus")

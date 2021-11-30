@@ -113,7 +113,7 @@ type Networker interface {
 	RemovePubTap(name string) error
 
 	// SetupPubIPFilter sets up filter for this public ip
-	SetupPubIPFilter(filterName string, iface string, ip string, ipv6 string, mac string) error
+	SetupPubIPFilter(filterName string, iface string, ipv4 net.IP, ipv6 net.IP, mac string) error
 
 	// RemovePubIPFilter removes the filter setted up by SetupPubIPFilter
 	RemovePubIPFilter(filterName string) error

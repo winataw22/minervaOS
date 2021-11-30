@@ -1,6 +1,7 @@
 package zos
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -144,8 +145,29 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 			return fmt.Errorf("public ip is not found")
 		}
 
-		if wl.Type != PublicIPType {
+		if wl.Type != PublicIPv4Type && wl.Type != PublicIPType {
 			return errors.Wrapf(err, "workload of name '%s' is not a public ip", v.Network.PublicIP)
+		}
+
+		// also we need to make sure this public ip is not used by other vms in the same
+		// deployment.
+		allVMs := getter.ByType(ZMachineType)
+		count := 0
+		for _, vm := range allVMs {
+			var data ZMachine
+			if err := json.Unmarshal(vm.Data, &data); err != nil {
+				return err
+			}
+			// we can only check the name because unfortunately we don't know
+			// `this` workload ID at this level. may be can b added later.
+			// for now, we can just count the number of this public ip workload
+			// name was referenced in all VMs and fail if it's more than one.
+			if data.Network.PublicIP == v.Network.PublicIP {
+				count += 1
+			}
+		}
+		if count > 1 {
+			return fmt.Errorf("public ip is assigned to multiple vms")
 		}
 	}
 

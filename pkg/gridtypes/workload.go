@@ -46,7 +46,7 @@ func Types() []WorkloadType {
 // Valid checks if this is a known reservation type
 func (t WorkloadType) Valid() error {
 	if _, ok := workloadTypes[t]; !ok {
-		return fmt.Errorf("invalid reservation type")
+		return fmt.Errorf("invalid reservation type '%s'", t.String())
 	}
 
 	return nil
