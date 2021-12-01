@@ -338,7 +338,14 @@ func (m *Message) GetPayload() ([]byte, error) {
 	return base64.StdEncoding.DecodeString(m.Data)
 }
 
-func newRedisPool(address string) (*redis.Pool, error) {
+func newRedisPool(address string, size ...uint32) (*redis.Pool, error) {
+	var poolSize uint32 = 20
+	if len(size) == 1 {
+		poolSize = size[0]
+	} else if len(size) > 1 {
+		panic("invalid pool size")
+	}
+
 	u, err := url.Parse(address)
 	if err != nil {
 		return nil, err
@@ -374,7 +381,7 @@ func newRedisPool(address string) (*redis.Pool, error) {
 
 			return nil
 		},
-		MaxActive:   5,
+		MaxActive:   int(poolSize),
 		MaxIdle:     3,
 		IdleTimeout: 1 * time.Minute,
 		Wait:        true,

@@ -31,12 +31,14 @@ func Default() (Client, error) {
 // NewClient creates a new rmb client. the given address should
 // be to the local redis. If not provided, default redis address
 // is used
-func NewClient(address string) (Client, error) {
+// poolSize is optional parameter to define redis pool size (Default: 20)
+func NewClient(address string, poolSize ...uint32) (Client, error) {
+
 	if len(address) == 0 {
 		address = DefaultAddress
 	}
 
-	pool, err := newRedisPool(address)
+	pool, err := newRedisPool(address, poolSize...)
 	if err != nil {
 		return nil, err
 	}
