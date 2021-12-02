@@ -1027,6 +1027,8 @@ github.com/threefoldtech/go-rmb v0.1.4 h1:z7GRnuL3Xe/4wRjCOdUFX3Za5VCK2oUGVmWF+3
 github.com/threefoldtech/go-rmb v0.1.4/go.mod h1:+9ql1bqMqmBpudtafk5HG4WO0E7Y5AX9Q2njM8SAvnU=
 github.com/threefoldtech/go-rmb v0.1.6 h1:RcYyiz2ge0pqJ7vgRNTuZ4hUr3KQVGAxofXkhwKT/Xg=
 github.com/threefoldtech/go-rmb v0.1.6/go.mod h1:+9ql1bqMqmBpudtafk5HG4WO0E7Y5AX9Q2njM8SAvnU=
+github.com/threefoldtech/go-rmb v0.1.7 h1:3xpGgPx/nxDSkEFm1chaXZ4iKkwkYdplgsqQHicg83c=
+github.com/threefoldtech/go-rmb v0.1.7/go.mod h1:+9ql1bqMqmBpudtafk5HG4WO0E7Y5AX9Q2njM8SAvnU=
 github.com/threefoldtech/substrate-client v0.0.0-20210930125201-9bd88e80762d/go.mod h1:t/85gAaltVbJmUnCVwu5lpNKn0HLn9Z9vu/NFJlJcrk=
 github.com/threefoldtech/substrate-client v0.0.0-20211029140440-1426b1f1a195 h1:xWQ+jsLHnRmbsXMdkjVcxxfIMs1DsJQaY/+N0ltAhv0=
 github.com/threefoldtech/substrate-client v0.0.0-20211029140440-1426b1f1a195/go.mod h1:t/85gAaltVbJmUnCVwu5lpNKn0HLn9Z9vu/NFJlJcrk=

@@ -280,12 +280,15 @@ func (g *gatewayModule) validateNameContracts() error {
 	networker := stubs.NewNetworkerStub(g.cl)
 	cfg, err := networker.GetPublicConfig(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "gateway is not supported on this node, why are names are getting validated?")
+		return nil
 	}
 
 	baseDomain := cfg.Domain
 	if baseDomain == "" {
-		return errors.New("why is domain is empty while validating name contracts?")
+		// domain doesn't exist so no name workloads exist
+		// or the domain was unset and name wokrloads will never be deleted
+		// should iterate over workloads instead?
+		return nil
 	}
 	reservedDomains := g.copyReservedDomain()
 	for domain, id := range reservedDomains {
