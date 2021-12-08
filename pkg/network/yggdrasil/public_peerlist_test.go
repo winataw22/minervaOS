@@ -10,8 +10,9 @@ import (
 func TestFetchPeerList(t *testing.T) {
 	pl, err := FetchPeerList()
 	require.NoError(t, err)
-
-	for _, peer := range pl.Ups() {
+	peers, err := pl.Ups()
+	require.NoError(t, err)
+	for _, peer := range peers {
 		assert.True(t, peer.Up)
 	}
 }
@@ -20,7 +21,10 @@ func TestUps(t *testing.T) {
 	pl, err := FetchPeerList()
 	require.NoError(t, err)
 
-	for _, peer := range pl.Ups() {
+	peers, err := pl.Ups()
+	require.NoError(t, err)
+
+	for _, peer := range peers {
 		assert.True(t, peer.Up)
 	}
 }

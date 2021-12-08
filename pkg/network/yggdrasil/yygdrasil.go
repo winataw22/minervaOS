@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/zinit"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
@@ -66,6 +67,11 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 
 	status, err := z.Status(zinitService)
 
+	//TODO: what if it runs in the correct namespace but wrong config ?
+	if err := writeConfig(confPath, s.cfg); err != nil {
+		return err
+	}
+
 	if err == nil && status.State.Is(zinit.ServiceStateRunning) {
 		pids, err := s.pidsOf(ns)
 		if err != nil {
@@ -83,6 +89,9 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		}
 
 		if in(uint32(status.Pid)) {
+			if err := z.Kill(zinitService, zinit.SIGHUP); err != nil {
+				log.Error().Err(err).Msg("failed to reload config")
+			}
 			return nil
 		}
 
@@ -93,11 +102,6 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		if err := z.Forget(zinitService); err != nil {
 			return errors.Wrap(err, "failed to forget yggdrasil service")
 		}
-	}
-
-	//TODO: what if it runs in the correct namespace but wrong config ?
-	if err := writeConfig(confPath, s.cfg); err != nil {
-		return err
 	}
 
 	bin, err := exec.LookPath("yggdrasil")

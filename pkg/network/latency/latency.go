@@ -1,7 +1,6 @@
 package latency
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"sort"
@@ -17,7 +16,6 @@ import (
 type Sorter struct {
 	endpoints []string
 	worker    int
-	filters   []IPFilter
 }
 
 // Result is the struct return by the LatencySorter
@@ -26,28 +24,12 @@ type Result struct {
 	Latency  time.Duration
 }
 
-// IPFilter is function used by Sorted to filters out IP address during the latency test
-type IPFilter func(net.IP) bool
-
-// IPV4Only is an IPFilter function that filters out non IPv4 address
-func IPV4Only(ip net.IP) bool {
-	return ip.To4() != nil
-}
-
-// ExcludePrefix is a IPFilter function that filters IPs that start with prefix
-func ExcludePrefix(prefix []byte) IPFilter {
-	return func(ip net.IP) bool {
-		return !bytes.HasPrefix(ip, prefix)
-	}
-}
-
 // NewSorter create a new LatencySorter that will sort endpoints by latency
 // you can controle the concurrency by tuning the worker value
-func NewSorter(endpoints []string, worker int, filters ...IPFilter) *Sorter {
+func NewSorter(endpoints []string, worker int) *Sorter {
 	return &Sorter{
 		endpoints: endpoints,
 		worker:    worker,
-		filters:   filters,
 	}
 }
 
@@ -63,23 +45,6 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 			)
 
 			addr = cleanupEndpoint(endpoint)
-			host, _, err := net.SplitHostPort(addr)
-			if err != nil {
-				continue
-			}
-
-			skip := false
-			for _, filter := range l.filters {
-				ip := net.ParseIP(host)
-				skip = !filter(ip)
-				if skip {
-					break
-				}
-			}
-			if skip {
-				continue
-			}
-
 			t, err := Latency(addr)
 			if err != nil {
 				log.Warn().Err(err).Str("address", addr).Msg("cannot connect to peer. skipping")
