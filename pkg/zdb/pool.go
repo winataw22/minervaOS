@@ -1,9 +1,11 @@
 package zdb
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 
@@ -13,7 +15,9 @@ import (
 
 // Prefix is a string used as prefix in the filesystem volume used
 // to storge 0-db namespaces
-const Prefix = "zdb"
+const (
+	Prefix = "zdb"
+)
 
 var (
 	nRegex = regexp.MustCompile(`^[\w-]+$`)
@@ -21,13 +25,13 @@ var (
 
 // Index represent a part of a disk that is reserved to store 0-db data
 type Index struct {
-	path string
+	root string
 }
 
-// NewIndex creates a ZDBPool with path. the path should point
-// where both 'index' and 'data' folders exists.
-func NewIndex(path string) Index {
-	return Index{path}
+// NewIndex creates an Index with root. the root is a directory
+// which has both 'index' and 'data' folders under.
+func NewIndex(root string) Index {
+	return Index{root}
 }
 
 // NSInfo is a struct containing information about a 0-db namespace
@@ -37,11 +41,11 @@ type NSInfo struct {
 }
 
 func (p *Index) index() string {
-	return filepath.Join(p.path, "index")
+	return filepath.Join(p.root, "index")
 }
 
 func (p *Index) data() string {
-	return filepath.Join(p.path, "data")
+	return filepath.Join(p.root, "data")
 }
 
 func (p *Index) valid(n string) error {
@@ -72,32 +76,6 @@ func (p *Index) Reserved() (uint64, error) {
 	return total, nil
 }
 
-// Create a namespace. Note that this create only reserve the name
-// space size (and create namespace descriptor) this must be followed
-// by an actual zdb NSNEW call to create the database files.
-func (p *Index) Create(name, password string, size gridtypes.Unit) error {
-	if err := p.valid(name); err != nil {
-		return err
-	}
-
-	dir := filepath.Join(p.index(), name)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return errors.Wrapf(err, "namespace '%s' directory creation failed", dir)
-	}
-	path := filepath.Join(dir, "zdb-namespace")
-	writer, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-
-	return WriteHeader(writer, Header{
-		Name:     name,
-		Password: password,
-		MaxSize:  size,
-	})
-}
-
 // Namespace gets a namespace info from pool
 func (p *Index) Namespace(name string) (info NSInfo, err error) {
 	if err := p.valid(name); err != nil {
@@ -111,7 +89,8 @@ func (p *Index) Namespace(name string) (info NSInfo, err error) {
 	}
 
 	defer f.Close()
-	header, err := ReadHeader(f)
+
+	header, err := ReadHeaderV2(f)
 	if err != nil {
 		return info, errors.Wrapf(err, "failed to read namespace header at %s", path)
 	}
@@ -170,7 +149,7 @@ func (p *Index) IndexMode(name string) (mode IndexMode, err error) {
 		return IndexMode(0), err
 	}
 
-	path := filepath.Join(p.index(), name, "zdb-index-00000")
+	path := filepath.Join(p.index(), name, "i0")
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -201,4 +180,32 @@ func (p *Index) Delete(name string) error {
 	}
 
 	return nil
+}
+
+func IsZDBVersion1(ctx context.Context, root string) (bool, error) {
+	// detect if we have files created by v1
+	searchPath := filepath.Join(root, "index")
+	_, err := os.Stat(searchPath)
+	if os.IsNotExist(err) {
+		// empty root, so this can be anything
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "failed to check index directory")
+	}
+
+	found, err := exec.CommandContext(ctx,
+		"find", searchPath,
+		"-name", "zdb-index-*",
+		"-print",
+		"-quit",
+	).CombinedOutput()
+	if err != nil {
+		return false, errors.Wrap(err, "failed to detect version")
+	}
+	// nothing was found
+	if len(found) == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }

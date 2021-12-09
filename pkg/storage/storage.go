@@ -16,9 +16,9 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
-	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/kernel"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
 
@@ -140,10 +140,7 @@ func (s *Module) initialize() error {
 	defer s.mu.Unlock()
 	log.Info().Msgf("Initializing storage module")
 
-	//vm := true
-	hyperVisor, err := capacity.NewResourceOracle(nil).GetHypervisor()
-	vm := err == nil && len(hyperVisor) > 0
-
+	vm := kernel.GetParams().Exists("zos-debug")
 	log.Debug().Bool("is-vm", vm).Msg("virtualization detection")
 
 	// Make sure we finish in 1 minute
@@ -461,7 +458,9 @@ func (s *Module) ensureCache() error {
 
 	// check if cache volume available
 	for _, pool := range s.ssds {
+		log.Debug().Str("pool", pool.Name()).Msg("checking pool for cache volume")
 		if _, err := pool.Mounted(); err != nil {
+			log.Debug().Str("pool", pool.Name()).Msg("pool is not mounted")
 			continue
 		}
 
@@ -469,6 +468,7 @@ func (s *Module) ensureCache() error {
 		if err != nil {
 			return err
 		}
+
 		for _, fs := range filesystems {
 			if fs.Name() == cacheLabel {
 				log.Debug().Msgf("Found existing cache at %v", fs.Path())

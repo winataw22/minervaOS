@@ -25,7 +25,9 @@ import (
 const (
 	// https://hub.grid.tf/api/flist/tf-autobuilder/threefoldtech-0-db-development.flist/light
 	// To get the latest symlink pointer
-	zdbFlistURL         = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-release-development-c81c68391d.flist"
+
+	// this is v2 of zdb, it's not backward compatible with previous version and we decided to wipe out data
+	zdbFlistURL         = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development-v2-d28bf23dba.flist"
 	zdbContainerNS      = "zdb"
 	zdbContainerDataMnt = "/zdb"
 	zdbPort             = 9900
@@ -315,8 +317,31 @@ func (p *Primitives) createZdbContainer(ctx context.Context, device pkg.Device) 
 	return nil
 }
 
+// dataMigration will make sure that we delete any data files from v1. This is
+// hardly a data migration but at this early stage it's fine since there is still
+// no real data loads live on the grid. All v2 zdbs, will be safe.
+func (p *Primitives) dataMigration(ctx context.Context, volume string) {
+	v1, _ := zdb.IsZDBVersion1(ctx, volume)
+	// TODO: what if there is an error?
+	if !v1 {
+		// it's eather a new volume, or already on version 2
+		// so nothing to do.
+		return
+	}
+
+	for _, sub := range []string{"data", "index"} {
+		if err := os.RemoveAll(filepath.Join(volume, sub)); err != nil {
+			log.Error().Err(err).Msg("failed to delete obsolete data directories")
+		}
+	}
+}
+
 func (p *Primitives) zdbRun(ctx context.Context, name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
 	var cont = stubs.NewContainerModuleStub(p.zbus)
+
+	// we do data migration here because this is called
+	// on new zdb starts, or updating the runtime.
+	p.dataMigration(ctx, volumepath)
 
 	conf := pkg.Container{
 		Name:        name,
