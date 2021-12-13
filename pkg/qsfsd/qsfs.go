@@ -15,18 +15,25 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
-	qsfsFlist             = "https://hub.grid.tf/azmy.3bot/qsfs.flist"
+	qsfsFlist             = "https://hub.grid.tf/omar0.3bot/qsfs.flist"
 	qsfsContainerNS       = "qsfs"
 	qsfsRootFsPropagation = pkg.RootFSPropagationSlave
 	zstorSocket           = "/var/run/zstor.sock"
 	zstorZDBFSMountPoint  = "/mnt" // hardcoded in the container
 	zstorMetricsPort      = 9100
-	zstorZDBDataDirPath   = "/data"
+	zstorZDBDataDirPath   = "/data/data"
+	zstorZDBIndexDirPath  = "/data/index"
+	// 30 * two significant uploads at close (zstor configured timeout)
+	// it's a lot and shouldn't be reached at all
+	// zdb doesn't wait for jump-* hooks to finish
+	// so we might need to wait more, but how much?
+	qsfsShutdownTimeout = 3 * time.Minute
 )
 
 type QSFS struct {
@@ -38,10 +45,10 @@ type QSFS struct {
 type zstorConfig struct {
 	zos.QuantumSafeFSConfig
 	ZDBDataDirPath  string `toml:"zdb_data_dir_path"`
+	ZDBIndexDirPath string `toml:"zdb_index_dir_path"`
 	Socket          string `toml:"socket"`
 	MetricsPort     uint32 `toml:"prometheus_port"`
 	ZDBFSMountpoint string `toml:"zdbfs_mountpoint"`
-	Root            string `toml:"root"`
 }
 
 func New(ctx context.Context, cl zbus.Client, root string) (pkg.QSFSD, error) {
@@ -65,7 +72,7 @@ func setQSFSDefaults(cfg *zos.QuantumSafeFS) zstorConfig {
 		MetricsPort:         zstorMetricsPort,
 		ZDBFSMountpoint:     zstorZDBFSMountPoint,
 		ZDBDataDirPath:      zstorZDBDataDirPath,
-		Root:                zstorZDBFSMountPoint,
+		ZDBIndexDirPath:     zstorZDBIndexDirPath,
 	}
 }
 
@@ -109,9 +116,10 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 	cont := pkg.Container{
 		Name:        wlID,
 		RootFS:      flistPath,
-		Entrypoint:  "/sbin/zinit init",
+		Entrypoint:  "/sbin/zinit init --container",
 		Interactive: false,
 		Network:     pkg.NetworkInfo{Namespace: netns},
+		Memory:      gridtypes.Gigabyte,
 		Mounts: []pkg.MountInfo{
 			{
 				Source: mountPath,
@@ -122,6 +130,7 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 		// the default is rslave which recursively sets all mountpoints to slave
 		// we don't care about the rootfs propagation, it just has to be non-recursive
 		RootFsPropagation: qsfsRootFsPropagation,
+		ShutdownTimeout:   qsfsShutdownTimeout,
 	}
 	_, err = contd.Run(
 		ctx,

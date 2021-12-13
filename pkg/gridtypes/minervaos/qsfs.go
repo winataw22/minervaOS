@@ -217,7 +217,7 @@ func (q QuantumSafeFS) Challenge(w io.Writer) error {
 func (q QuantumSafeFS) Capacity() (gridtypes.Capacity, error) {
 	return gridtypes.Capacity{
 		CRU: 1,
-		MRU: 256 * gridtypes.Megabyte,
+		MRU: 1 * gridtypes.Gigabyte,
 		SRU: q.Cache, // is it HRU or SRU?
 	}, nil
 }

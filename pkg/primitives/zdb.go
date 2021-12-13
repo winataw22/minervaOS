@@ -25,9 +25,7 @@ import (
 const (
 	// https://hub.grid.tf/api/flist/tf-autobuilder/threefoldtech-0-db-development.flist/light
 	// To get the latest symlink pointer
-
-	// this is v2 of zdb, it's not backward compatible with previous version and we decided to wipe out data
-	zdbFlistURL         = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development-v2-d28bf23dba.flist"
+	zdbFlistURL         = "https://hub.grid.tf/tf-autobuilder/threefoldtech-0-db-development-v2-1241d6a804.flist"
 	zdbContainerNS      = "zdb"
 	zdbContainerDataMnt = "/zdb"
 	zdbPort             = 9900

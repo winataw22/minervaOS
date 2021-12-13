@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"os/exec"
+	"strconv"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -37,8 +38,9 @@ import (
 )
 
 const (
-	containerdSock = "/run/containerd/containerd.sock"
-	binaryLogsShim = "/bin/shim-logs"
+	containerdSock         = "/run/containerd/containerd.sock"
+	binaryLogsShim         = "/bin/shim-logs"
+	defaultShutdownTimeout = 3 * time.Second
 )
 
 const (
@@ -167,6 +169,10 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		data.Logs = []logger.Logs{}
 	}
 
+	if data.ShutdownTimeout == 0 {
+		data.ShutdownTimeout = defaultShutdownTimeout
+	}
+
 	// we never allow any container to boot without a network namespace
 	if data.Network.Namespace == "" {
 		return "", fmt.Errorf("cannot create container without network namespace")
@@ -181,6 +187,9 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		oci.WithRootFSPath(data.RootFS),
 		oci.WithEnv(data.Env),
 		oci.WithHostResolvconf,
+		oci.WithAnnotations(map[string]string{
+			"shutdown_timeout": fmt.Sprintf("%d", data.ShutdownTimeout),
+		}),
 		removeRunMount(),
 		withNetworkNamespace(data.Network.Namespace),
 		withMounts(data.Mounts),
@@ -537,7 +546,20 @@ func (c *Module) Delete(ns string, id pkg.ContainerID) error {
 	if err != nil {
 		return err
 	}
-
+	spec, err := container.Spec(ctx)
+	if err != nil {
+		return errors.Wrap(err, "couldn't load container spec")
+	}
+	shutdownTimeout := defaultShutdownTimeout
+	shutdownTimeoutStr, ok := spec.Annotations["shutdown_timeout"]
+	if ok {
+		shutdownTimeoutUint64, err := strconv.ParseUint(shutdownTimeoutStr, 10, 64)
+		if err != nil {
+			log.Error().Err(err).Str("shutdown_timeout", shutdownTimeoutStr).Err(err).Msg("couldn't parse shutdown timeout")
+		} else {
+			shutdownTimeout = time.Duration(shutdownTimeoutUint64)
+		}
+	}
 	// mark this container as perminant down. so the watcher
 	// does not try to restart it again
 	c.failures.Set(string(id), permanent, cache.DefaultExpiration)
@@ -549,28 +571,17 @@ func (c *Module) Delete(ns string, id pkg.ContainerID) error {
 		if err != nil {
 			return err
 		}
-		trials := 3
-	loop:
-		for {
-			signal := syscall.SIGTERM
-			if trials <= 0 {
-				signal = syscall.SIGKILL
-			}
-
-			log.Debug().Str("id", string(id)).Int("signal", int(signal)).Msg("sending signal")
-			_ = task.Kill(ctx, signal)
-			trials--
-
+		log.Debug().Str("id", string(id)).Int("signal", int(syscall.SIGTERM)).Msg("sending signal")
+		_ = task.Kill(ctx, syscall.SIGTERM)
+		select {
+		case <-exitC:
+		case <-time.After(time.Duration(shutdownTimeout)):
+			log.Debug().Str("id", string(id)).Int("signal", int(syscall.SIGKILL)).Msg("sending signal")
+			_ = task.Kill(ctx, syscall.SIGKILL)
 			select {
 			case <-exitC:
-				break loop
-			case <-time.After(1 * time.Second):
-			}
-
-			if trials < -5 {
-				msg := fmt.Errorf("cannot stop container, SIGTERM and SIGKILL ignored")
-				log.Error().Err(msg).Msg("stopping container failed")
-				break loop
+			case <-time.After(time.Second):
+				log.Warn().Str("id", string(id)).Msg("didn't receive container exit signal after SIGKILLing")
 			}
 		}
 

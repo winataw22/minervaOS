@@ -81,6 +81,8 @@ type Container struct {
 	CreatedAt time.Time
 	// RootfsPropagation root fs propagation mode (rshared,shared,slave,...)
 	RootFsPropagation RootFSPropagation
+	// How much time to wait for the container to gracefully shutdown before sending a SIGKILL (default: 5)
+	ShutdownTimeout time.Duration
 }
 
 // ContainerModule defines rpc interface to containerd
