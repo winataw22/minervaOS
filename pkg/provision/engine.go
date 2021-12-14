@@ -485,7 +485,7 @@ func (e *NativeEngine) uninstallWorkload(ctx context.Context, wl *gridtypes.Work
 	log := log.With().
 		Uint32("twin", twin).
 		Uint64("deployment", deployment).
-		Str("name", name).
+		Stringer("name", name).
 		Str("type", wl.Type.String()).
 		Logger()
 
@@ -525,7 +525,7 @@ func (e *NativeEngine) installWorkload(ctx context.Context, wl *gridtypes.Worklo
 	log := log.With().
 		Uint32("twin", twin).
 		Uint64("deployment", deployment).
-		Str("name", name).
+		Stringer("name", name).
 		Str("type", wl.Type.String()).
 		Logger()
 
@@ -558,7 +558,7 @@ func (e *NativeEngine) updateWorkload(ctx context.Context, wl *gridtypes.Workloa
 	log := log.With().
 		Uint32("twin", twin).
 		Uint64("deployment", deployment).
-		Str("name", name).
+		Stringer("name", name).
 		Str("type", wl.Type.String()).
 		Logger()
 

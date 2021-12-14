@@ -36,8 +36,11 @@ type Provisioner interface {
 // Filter is filtering function for Purge method
 
 var (
-	//ErrDeploymentExists returned if object exist
+	// ErrDeploymentExists returned if object exist
 	ErrDeploymentExists = fmt.Errorf("exists")
+	// ErrDeploymentConflict returned if deployment cannot be stored because
+	// it conflicts with another deployment
+	ErrDeploymentConflict = fmt.Errorf("conflict")
 	//ErrDeploymentNotExists returned if object not exists
 	ErrDeploymentNotExists = fmt.Errorf("not exists")
 	// ErrDidNotChange special error that can be returned by the provisioner
@@ -57,6 +60,10 @@ type Storage interface {
 	Get(twin uint32, deployment uint64) (gridtypes.Deployment, error)
 	Twins() ([]uint32, error)
 	ByTwin(twin uint32) ([]uint64, error)
+
+	// manage of shared workloads
+	GetShared(twinID uint32, name gridtypes.Name) (gridtypes.WorkloadID, error)
+	SharedByTwin(twinID uint32) ([]gridtypes.WorkloadID, error)
 }
 
 // Janitor interface

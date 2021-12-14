@@ -48,7 +48,7 @@ func (i WorkloadID) String() string {
 }
 
 // Parts split id into building parts
-func (i WorkloadID) Parts() (twin uint32, deployment uint64, name string, err error) {
+func (i WorkloadID) Parts() (twin uint32, deployment uint64, name Name, err error) {
 	_, err = fmt.Sscanf(string(i), "%d-%d-%s", &twin, &deployment, &name)
 	return
 }
@@ -76,4 +76,8 @@ func NewWorkloadID(twin uint32, deployment uint64, name Name) (WorkloadID, error
 	}
 
 	return WorkloadID(fmt.Sprintf("%d-%d-%s", twin, deployment, name)), nil
+}
+
+func NewUncheckedWorkloadID(twin uint32, deployment uint64, name Name) WorkloadID {
+	return WorkloadID(fmt.Sprintf("%d-%d-%s", twin, deployment, name))
 }

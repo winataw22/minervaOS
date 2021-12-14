@@ -198,14 +198,14 @@ func (r *Reporter) synchronize(ctx context.Context, reported []Consumption) erro
 
 	// the idea here is that we bring ALL active node contracts from chain.
 	// then compare it with what we have atm (the one we just reported)
-	contracts, err := r.substrate.GetNodeContracts(r.nodeID, substrate.ContractState{IsCreated: true})
+	contracts, err := r.substrate.GetNodeContracts(r.nodeID)
 	if err != nil {
 		return err
 	}
 
 	for _, contract := range contracts {
 		// is there a consumption report for a contract
-		delete(local, contract.ContractID)
+		delete(local, contract)
 	}
 	// any LOCAL contract that is not in the map must be decommissioned
 	for _, local := range local {

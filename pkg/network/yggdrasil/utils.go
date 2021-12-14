@@ -9,7 +9,6 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/network/latency"
 	"github.com/threefoldtech/zos/pkg/zinit"
 )
 
@@ -41,8 +40,6 @@ func fetchPeerList() Peers {
 }
 
 func EnsureYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, ns YggdrasilNamespace) (*YggServer, error) {
-	pl := fetchPeerList()
-
 	// Filter out all the nodes from the same
 	// segment so we do not just connect locally
 	ips, err := ns.GetIPs() // returns ipv6 only
@@ -58,36 +55,12 @@ func EnsureYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, ns Yggd
 	}
 
 	filter := Exclude(ranges)
-
-	peersUp, err := pl.Ups(filter)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get peers list")
-	}
-
-	endpoints := make([]string, len(peersUp))
-	for i, p := range peersUp {
-		endpoints[i] = p.Endpoint
-	}
-
-	ls := latency.NewSorter(endpoints, 5)
-	results := ls.Run(ctx)
-	if len(results) == 0 {
-		return nil, fmt.Errorf("cannot find public yggdrasil peer to connect to")
-	}
-
-	// select the best 3 public peers
-	peers := make([]string, 3)
-	for i := 0; i < 3; i++ {
-		if len(results) > i {
-			peers[i] = results[i].Endpoint
-			log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
-		}
-	}
-
 	z := zinit.Default()
 
 	cfg := GenerateConfig(privateKey)
-	cfg.Peers = peers
+	if err := cfg.FindPeers(ctx, filter); err != nil {
+		return nil, fmt.Errorf("cannot find public yggdrasil peer to connect to")
+	}
 
 	server := NewYggServer(&cfg)
 	if err := server.Ensure(z, ns.Name()); err != nil {

@@ -3,11 +3,12 @@ package latency
 import (
 	"context"
 	"net"
+	"net/url"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +45,12 @@ func (l *Sorter) Run(ctx context.Context) []Result {
 				err  error
 			)
 
-			addr = cleanupEndpoint(endpoint)
+			addr, err = cleanupEndpoint(endpoint)
+			if err != nil {
+				log.Warn().Err(err).Str("endpoint", endpoint).Msg("cannot parse peer url")
+				continue
+			}
+
 			t, err := Latency(addr)
 			if err != nil {
 				log.Warn().Err(err).Str("address", addr).Msg("cannot connect to peer. skipping")
@@ -109,9 +115,10 @@ func Latency(host string) (time.Duration, error) {
 	return duration / (3 / 2), nil
 }
 
-func cleanupEndpoint(endpoint string) string {
-	if strings.HasPrefix(endpoint, "tcp://") || strings.HasPrefix(endpoint, "tls://") {
-		return endpoint[6:]
+func cleanupEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse peer url")
 	}
-	return endpoint
+	return u.Host, nil
 }

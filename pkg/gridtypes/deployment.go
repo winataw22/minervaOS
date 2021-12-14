@@ -433,6 +433,30 @@ func (d *Deployment) GetType(name Name, typ WorkloadType) (*WorkloadWithID, erro
 	return wl, nil
 }
 
+func (d *Deployment) GetShareables() []*WorkloadWithID {
+	var results []*WorkloadWithID
+	for i := range d.Workloads {
+		wl := &d.Workloads[i]
+		if _, ok := sharableWorkloadTypes[wl.Type]; ok {
+			id, err := NewWorkloadID(d.TwinID, d.ContractID, wl.Name)
+			if err != nil {
+				log.Warn().Err(err).Msg("deployment has invalid name. please run validation")
+				continue
+			}
+
+			results = append(
+				results,
+				&WorkloadWithID{
+					Workload: wl,
+					ID:       id,
+				},
+			)
+		}
+	}
+
+	return results
+}
+
 // ByType gets all workloads from this reservation by type.
 func (d *Deployment) ByType(typ ...WorkloadType) []*WorkloadWithID {
 	in := func(t WorkloadType) bool {

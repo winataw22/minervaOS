@@ -21,6 +21,8 @@ var (
 	deploymentSchemaV1 = versioned.MustParse("1.0.0")
 	// ReservationSchemaLastVersion link to latest version
 	deploymentSchemaLastVersion = deploymentSchemaV1
+
+	sharedSubDir = "shared"
 )
 
 // Fs is a in reservation cache using the filesystem as backend
@@ -37,11 +39,17 @@ func NewFSStore(root string) (*Fs, error) {
 		root: root,
 	}
 
-	if err := os.MkdirAll(root, 0770); err != nil {
-		return nil, err
+	for _, dir := range []string{sharedSubDir} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0770); err != nil {
+			return nil, err
+		}
 	}
 
 	return store, nil
+}
+
+func (s *Fs) sharedLinkPath(twinID uint32, name gridtypes.Name) string {
+	return filepath.Join(sharedSubDir, fmt.Sprint(twinID), string(name))
 }
 
 func (s *Fs) deploymentPath(d *gridtypes.Deployment) string {
@@ -60,6 +68,20 @@ func (s *Fs) Add(d gridtypes.Deployment) error {
 	path := s.rooted(s.deploymentPath(&d))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return errors.Wrap(err, "failed to crate directory")
+	}
+
+	// make sure that this deployment does not actually
+	// redefine a "sharable" workload.
+	for _, wl := range d.GetShareables() {
+		conflict, err := s.shared(d.TwinID, wl.Name)
+		if err == nil {
+			return errors.Wrapf(
+				provision.ErrDeploymentConflict,
+				"sharable workload '%s' is conflicting with another workload '%s'",
+				string(wl.Name), conflict)
+		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return errors.Wrap(err, "failed to check conflicts")
+		}
 	}
 
 	file, err := os.OpenFile(
@@ -84,6 +106,14 @@ func (s *Fs) Add(d gridtypes.Deployment) error {
 		return errors.Wrap(err, "failed to write workload data")
 	}
 
+	// make sure that this deployment does not actually
+	// redefine a "sharable" workload.
+	for _, wl := range d.GetShareables() {
+		if err := s.sharedCreate(&d, wl.Name); err != nil {
+			return errors.Wrap(err, "failed to store sharable workloads")
+		}
+	}
+
 	return nil
 }
 
@@ -92,6 +122,34 @@ func (s *Fs) Add(d gridtypes.Deployment) error {
 func (s *Fs) Set(dl gridtypes.Deployment) error {
 	s.m.Lock()
 	defer s.m.Unlock()
+
+	sharedIDs, err := s.sharedByTwin(dl.TwinID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get all sharable user workloads")
+	}
+
+	this := map[gridtypes.Name]gridtypes.WorkloadID{}
+	taken := map[gridtypes.Name]gridtypes.WorkloadID{}
+	for _, shared := range sharedIDs {
+		_, contract, name, _ := shared.Parts()
+		if contract == dl.ContractID {
+			this[name] = shared
+		} else {
+			taken[name] = shared
+		}
+	}
+
+	// does this workload defines a new sharable workload. In that case
+	// we need to make sure that this does not conflict with the current
+	// set of twin sharable workloads. but should not conflict with itself
+	for _, wl := range dl.GetShareables() {
+		if conflict, ok := taken[wl.Name]; ok {
+			return errors.Wrapf(
+				provision.ErrDeploymentConflict,
+				"sharable workload '%s' is conflicting with another workload '%s'",
+				string(wl.Name), conflict)
+		}
+	}
 
 	path := s.rooted(s.deploymentPath(&dl))
 	file, err := os.OpenFile(
@@ -114,14 +172,49 @@ func (s *Fs) Set(dl gridtypes.Deployment) error {
 		return errors.Wrap(err, "failed to write workload data")
 	}
 
+	// now we make sure that all sharable (and active) workloads
+	// on this deployment is referenced correctly
+	var tolink []gridtypes.Name
+	for _, wl := range dl.GetShareables() {
+		// if workload result is not set yet. or if the state is OK
+		// it means the workload still need to be treated as shared object
+		if wl.Result.IsNil() || wl.Result.State == gridtypes.StateOk {
+			// workload with no results, so we should keep the link
+			if _, ok := this[wl.Name]; ok {
+				// avoid unlinking
+				delete(this, wl.Name)
+			} else {
+				// or if new, add to tolink
+				tolink = append(tolink, wl.Name)
+			}
+		}
+		// if result state is set to anything else (deleted, or error)
+		// we then leave it in the `this` map which means they
+		// get to be unlinked. so the name can be used again by the same twin
+	}
+	// we either removed the names that should be kept (state = ok or no result yet)
+	// and new ones have been added to tolink. so it's safe to clean up all links
+	// in this.
+	for name := range this {
+		if err := s.sharedDelete(&dl, name); err != nil {
+			log.Error().Err(err).
+				Uint64("contract", dl.ContractID).
+				Stringer("name", name).
+				Msg("failed to clean up shared workload '%d.%s'")
+		}
+	}
+
+	for _, new := range tolink {
+		if err := s.sharedCreate(&dl, new); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // Get gets a workload by id
 func (s *Fs) get(path string) (gridtypes.Deployment, error) {
-	s.m.RLock()
-	defer s.m.RUnlock()
-
 	var wl gridtypes.Deployment
 	file, err := os.Open(path)
 	if os.IsNotExist(err) {
@@ -148,6 +241,9 @@ func (s *Fs) get(path string) (gridtypes.Deployment, error) {
 
 // Get gets a workload by id
 func (s *Fs) Get(twin uint32, deployment uint64) (gridtypes.Deployment, error) {
+	s.m.RLock()
+	defer s.m.RUnlock()
+
 	path := s.rooted(filepath.Join(fmt.Sprint(twin), fmt.Sprint(deployment)))
 
 	return s.get(path)

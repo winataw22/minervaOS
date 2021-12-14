@@ -1,6 +1,7 @@
 package yggdrasil
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 
 	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/network/latency"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
@@ -35,6 +38,37 @@ func (n *NodeConfig) Address() (net.IP, error) {
 	copy(ip, address.AddrForKey(pk)[:])
 
 	return ip, nil
+}
+
+func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
+	pl := fetchPeerList()
+	peersUp, err := pl.Ups(filter...)
+	if err != nil {
+		return errors.Wrap(err, "failed to get peers list")
+	}
+
+	endpoints := make([]string, len(peersUp))
+	for i, p := range peersUp {
+		endpoints[i] = p.Endpoint
+	}
+
+	ls := latency.NewSorter(endpoints, 5)
+	results := ls.Run(ctx)
+	if len(results) == 0 {
+		return fmt.Errorf("cannot find public yggdrasil peer to connect to")
+	}
+
+	// select the best 3 public peers
+	peers := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		if len(results) > i {
+			peers[i] = results[i].Endpoint
+			log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
+		}
+	}
+
+	n.Peers = peers
+	return nil
 }
 
 // GenerateConfig creates a new yggdrasil configuration and generate the

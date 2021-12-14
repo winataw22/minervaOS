@@ -59,6 +59,10 @@ func (s *YggServer) Restart(z *zinit.Client) error {
 	return z.Kill(zinitService, zinit.SIGTERM)
 }
 
+func (s *YggServer) Reload(z *zinit.Client) error {
+	return z.Kill(zinitService, zinit.SIGHUP)
+}
+
 // Start creates an yggdrasil zinit service and starts it
 func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 	if !namespace.Exists(ns) {

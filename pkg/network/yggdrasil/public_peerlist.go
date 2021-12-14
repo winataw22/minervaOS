@@ -17,11 +17,11 @@ var PeerListFallback = Peers{
 		Up:       true,
 	},
 	{
-		Endpoint: "tcp://85.17.15.221:35239",
+		Endpoint: "tcp://51.15.204.214:12345",
 		Up:       true,
 	},
 	{
-		Endpoint: "tcp://51.255.223.60:64982",
+		Endpoint: "tls://51.255.223.60:54232",
 		Up:       true,
 	},
 }

@@ -29,8 +29,11 @@ const (
 )
 
 func init() {
+	// network is a sharable type, which means for a single
+	// twin, the network objects can be 'used' from different
+	// deployments.
+	gridtypes.RegisterSharableType(NetworkType, Network{})
 	gridtypes.RegisterType(ZMountType, ZMount{})
-	gridtypes.RegisterType(NetworkType, Network{})
 	gridtypes.RegisterType(ZDBType, ZDB{})
 	gridtypes.RegisterType(ZMachineType, ZMachine{})
 	gridtypes.RegisterType(PublicIPv4Type, PublicIP4{})
