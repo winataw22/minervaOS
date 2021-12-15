@@ -1,7 +1,14 @@
-# we make sure to kill any other running instance of zui before
-# starting a new one. this way we make sure that tty is always free
-# and also to work around the fact that openvt doesn't forward the signal
-# to it's children.
-exec: sh -c 'pkill zui; openvt -s -c 3 -w -- zui -broker unix:///var/run/redis.sock'
+# This script is trying to be compatible with zinit version 0.2.5 and the 0.2.1
+# in version 0.2.1 processes are not started in it's own sessions hence, the openvt is required
+# openvt fails in version 0.2.5 because the process is running in it's own session, hence
+# instead a redirection is used.
+exec: |
+  sh -c '
+    pkill zui
+
+    if ! openvt -s -c 3 -w -- zui -broker unix:///var/run/redis.sock; then
+      exec zui -broker unix:///var/run/redis.sock <> /dev/tty3 >&0 2>&1
+    fi
+  '
 after:
   - quiet

@@ -1,5 +1,5 @@
-PROMTAIL_VERSION="1.3.0"
-PROMTAIL_CHECKSUM="a8babf2a10a2762d5a8f996d83ef4134"
+PROMTAIL_VERSION="2.4.1"
+PROMTAIL_CHECKSUM="6db692f6e80d2b3d41b4b16583d46dea"
 PROMTAIL_LINK="https://github.com/grafana/loki/releases/download/v${PROMTAIL_VERSION}/promtail-linux-amd64.zip"
 
 dependencies_promtail() {
@@ -32,7 +32,6 @@ install_promtail() {
 
     cp ${WORKDIR}/promtail-linux-amd64 ${ROOTDIR}/usr/bin/promtail
 
-    cp ${FILESDIR}/zinit-promtail-config.yaml ${ROOTDIR}/etc/zinit/promtail-config.yaml
     cp ${FILESDIR}/zinit-promtail.yaml ${ROOTDIR}/etc/zinit/promtail.yaml
     cp ${FILESDIR}/promtail.yaml ${ROOTDIR}/etc/promtail/
 
@@ -55,4 +54,3 @@ build_promtail() {
 
     popd
 }
-
