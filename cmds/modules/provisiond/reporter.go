@@ -171,7 +171,7 @@ func (r *Reporter) pusher(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(3 * time.Second):
+			case <-time.After(20 * time.Second):
 				continue
 			}
 		}
