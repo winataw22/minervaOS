@@ -2,8 +2,7 @@ package qsfsd
 
 import (
 	"context"
-	"fmt"
-	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -22,30 +21,29 @@ func (m *QSFS) Metrics() (pkg.QSFSMetrics, error) {
 	networker := stubs.NewNetworkerStub(m.cl)
 	result := make(map[string]pkg.NetMetric)
 
-	items, err := ioutil.ReadDir(m.mountsPath)
+	items, err := filepath.Glob(filepath.Join(m.mountsPath, "*"))
 	if err != nil {
 		return pkg.QSFSMetrics{}, errors.Wrap(err, "failed to list mounts directory")
 	}
 	for _, item := range items {
-		if item.IsDir() {
-			name := item.Name()
-			nsName := networker.QSFSNamespace(ctx, name)
-			netNs, err := namespace.GetByName(nsName)
-			if err != nil {
-				return pkg.QSFSMetrics{}, errors.Wrap(err, "didn't find qsfs namespace")
-			}
-			defer netNs.Close()
-			metrics := pkg.NetMetric{}
-			err = netNs.Do(func(_ ns.NetNS) error {
-				metrics, err = metricsForNics([]string{"public", "ygg0"})
-				return err
-			})
-			if err != nil {
-				log.Error().Err(err).Msg(fmt.Sprintf("failed to read workload %s's metrics", name))
-				continue
-			}
-			result[name] = metrics
+		name := filepath.Base(item)
+		nsName := networker.QSFSNamespace(ctx, name)
+		netNs, err := namespace.GetByName(nsName)
+		if err != nil {
+			log.Error().Err(err).Str("workload", name).Msg("didn't find qsfs namespace")
+			continue
 		}
+		defer netNs.Close()
+		metrics := pkg.NetMetric{}
+		err = netNs.Do(func(_ ns.NetNS) error {
+			metrics, err = metricsForNics([]string{"public", "ygg0"})
+			return err
+		})
+		if err != nil {
+			log.Error().Err(err).Str("workload", name).Msg("failed to read metrics")
+			continue
+		}
+		result[name] = metrics
 	}
 	return pkg.QSFSMetrics{Consumption: result}, nil
 }

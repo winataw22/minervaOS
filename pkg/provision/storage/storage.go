@@ -300,7 +300,7 @@ func (s *Fs) twins() ([]uint32, error) {
 	}
 	ids := make([]uint32, 0, len(entities))
 	for _, entry := range entities {
-		if !entry.IsDir() {
+		if !entry.IsDir() || entry.Name() == sharedSubDir {
 			continue
 		}
 
