@@ -226,11 +226,29 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if rootfsSize < 250*gridtypes.Megabyte {
 			rootfsSize = 250 * gridtypes.Megabyte
 		}
+		// create a persisted volume for the vm. we don't do it automatically
+		// via the flist, so we have control over when to decomission this volume.
 		// remounting in RW mode
+		volName := fmt.Sprintf("rootfs:%s", wl.ID.String())
+		volume, err := storage.VolumeCreate(ctx, volName, rootfsSize)
+		if err != nil {
+			return zos.ZMachineResult{}, errors.Wrap(err, "failed to create vm rootfs")
+		}
+
+		defer func() {
+			if err != nil {
+				// vm creation failed,
+				if err := storage.VolumeDelete(ctx, volName); err != nil {
+					log.Error().Err(err).Str("volume", volName).Msg("failed to delete persisted volume")
+				}
+			}
+		}()
+
 		mnt, err = flist.Mount(ctx, wl.ID.String(), config.FList, pkg.MountOptions{
-			ReadOnly: false,
-			Limit:    rootfsSize,
+			ReadOnly:        false,
+			PersistedVolume: volume.Path,
 		})
+
 		if err != nil {
 			return result, errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
 		}
@@ -330,6 +348,7 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 		flist   = stubs.NewFlisterStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
 		vm      = stubs.NewVMModuleStub(p.zbus)
+		storage = stubs.NewStorageModuleStub(p.zbus)
 
 		cfg ZMachine
 	)
@@ -346,6 +365,11 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 
 	if err := flist.Unmount(ctx, wl.ID.String()); err != nil {
 		log.Error().Err(err).Msg("failed to unmount machine flist")
+	}
+
+	volName := fmt.Sprintf("rootfs:%s", wl.ID.String())
+	if err := storage.VolumeDelete(ctx, volName); err != nil {
+		log.Error().Err(err).Str("name", volName).Msg("failed to delete rootfs volume")
 	}
 
 	for _, inf := range cfg.Network.Interfaces {

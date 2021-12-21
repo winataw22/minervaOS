@@ -27,8 +27,14 @@ type MountOptions struct {
 	ReadOnly bool
 	// Limit size of read-write layer
 	Limit gridtypes.Unit
-	// optional storage url
+	// optional storage url (default to hub storage)
 	Storage string
+	// PersistedVolume used in RW mode. If not provided
+	// one that will be created automatically with `Limit` that uses the same mount
+	// name, and will be delete (by name) on Unmount. If provided, make sure
+	// use use a different name than the mount id, or it will also get deleted
+	// on unmount.
+	PersistedVolume string
 }
 
 //Flister is the interface for the flist module

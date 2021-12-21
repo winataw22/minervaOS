@@ -265,7 +265,7 @@ func (f *flistModule) mountBind(ctx context.Context, name, ro string) error {
 	return err
 }
 
-func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gridtypes.Unit) error {
+func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, opt *pkg.MountOptions) error {
 	mountpoint, err := f.mountpath(name)
 	if err != nil {
 		return err
@@ -275,35 +275,44 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, size gr
 		return errors.Wrap(err, "failed to create overlay mountpoint")
 	}
 
-	// check if the filesystem doesn't already exists
-	backend, err := f.storage.VolumeLookup(ctx, name)
-	newAllocation := false
-	if err != nil {
-		log.Info().Msgf("create new subvolume %s", name)
-		// and only create a new one if it doesn't exist
-		if size == 0 {
-			// sanity check in case type is not set always use hdd
-			return fmt.Errorf("invalid mount option, missing disk type")
-		}
-		newAllocation = true
-		backend, err = f.storage.VolumeCreate(ctx, name, size)
+	persited := opt.PersistedVolume
+	if len(persited) == 0 {
+		// no persisted volume provided, hence
+		// we need to create one, or find one that is already
+		// there
+		newAllocation := false
+		var volume pkg.Volume
+		defer func() {
+			// in case of an error (mount is never fully completed)
+			// we need to deallocate the filesystem
+
+			if newAllocation && err != nil {
+				_ = f.storage.VolumeDelete(ctx, name)
+			}
+		}()
+
+		// check if the filesystem doesn't already exists
+		volume, err = f.storage.VolumeLookup(ctx, name)
 		if err != nil {
-			return errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
+			log.Info().Msgf("create new subvolume %s", name)
+			// and only create a new one if it doesn't exist
+			if opt.Limit == 0 {
+				// sanity check in case type is not set always use hdd
+				return fmt.Errorf("invalid mount option, missing disk type")
+			}
+			newAllocation = true
+			volume, err = f.storage.VolumeCreate(ctx, name, opt.Limit)
+			if err != nil {
+				return errors.Wrap(err, "failed to create read-write subvolume for 0-fs")
+			}
 		}
+
+		persited = volume.Path
 	}
 
-	defer func() {
-		// in case of an error (mount is never fully completed)
-		// we need to deallocate the filesystem
-
-		if newAllocation && err != nil {
-			_ = f.storage.VolumeDelete(ctx, name)
-		}
-	}()
-
-	log.Debug().Msgf("backend: %+v", backend)
-	rw := filepath.Join(backend.Path, "rw")
-	wd := filepath.Join(backend.Path, "wd")
+	log.Debug().Str("persisted-path", persited).Str("name", name).Msg("using persisted path for mount")
+	rw := filepath.Join(persited, "rw")
+	wd := filepath.Join(persited, "wd")
 	for _, d := range []string{rw, wd} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return errors.Wrapf(err, "failed to create overlay directory: %s", d)
@@ -383,7 +392,7 @@ func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, err
 
 	// otherwise
 	sublog.Debug().Msg("mount overlay")
-	return mountpoint, f.mountOverlay(ctx, name, ro, opt.Limit)
+	return mountpoint, f.mountOverlay(ctx, name, ro, &opt)
 }
 
 func (f *flistModule) UpdateMountSize(name string, limit gridtypes.Unit) (string, error) {

@@ -296,6 +296,15 @@ func (s *Module) VolumeCreate(name string, size gridtypes.Unit) (pkg.Volume, err
 		return pkg.Volume{}, fmt.Errorf("invalid volume name. zdb prefix is reserved")
 	}
 
+	volume, err := s.VolumeLookup(name)
+	if err == nil {
+		return volume, nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return pkg.Volume{}, err
+	}
+
+	// otherwise, create a new volume
+
 	fs, err := s.createSubvolWithQuota(size, name)
 	if err != nil {
 		return pkg.Volume{}, err
