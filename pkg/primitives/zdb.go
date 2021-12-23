@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,10 +32,28 @@ const (
 	zdbPort             = 9900
 )
 
+var (
+	uuidRegex = regexp.MustCompile(`([0-9a-f]{8})\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}`)
+)
+
 // ZDB types
 type ZDB = zos.ZDB
 
 type tZDBContainer pkg.Container
+
+type safeError struct {
+	error
+}
+
+func newSafeError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &safeError{err}
+}
+func (se *safeError) Error() string {
+	return uuidRegex.ReplaceAllString(se.error.Error(), `$1-***`)
+}
 
 func (z *tZDBContainer) DataMount() (string, error) {
 	for _, mnt := range z.Mounts {
@@ -47,7 +66,8 @@ func (z *tZDBContainer) DataMount() (string, error) {
 }
 
 func (p *Primitives) zdbProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
-	return p.zdbProvisionImpl(ctx, wl)
+	res, err := p.zdbProvisionImpl(ctx, wl)
+	return res, newSafeError(err)
 }
 
 func (p *Primitives) zdbListContainers(ctx context.Context) (map[pkg.ContainerID]tZDBContainer, error) {
@@ -479,6 +499,10 @@ func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string
 }
 
 func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	return newSafeError(p.zdbDecommissionImpl(ctx, wl))
+}
+
+func (p *Primitives) zdbDecommissionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	containers, err := p.zdbListContainers(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to list running zdbs")

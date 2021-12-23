@@ -9,6 +9,15 @@ import (
 	"github.com/google/shlex"
 )
 
+const (
+	// Debug means zos is running in debug mode
+	// applications can handle this flag differently
+	Debug = "zos-debug"
+	// VirtualMachine forces zos to think it's running
+	// on a virtual machine. used mainly for development
+	VirtualMachine = "zos-debug-vm"
+)
+
 // Params represent the parameters passed to the kernel at boot
 type Params map[string][]string
 
@@ -25,6 +34,16 @@ func (k Params) Exists(key string) bool {
 func (k Params) Get(key string) ([]string, bool) {
 	v, ok := k[key]
 	return v, ok
+}
+
+func (k Params) IsDebug() bool {
+	_, ok := k.Get(Debug)
+	return ok
+}
+
+func (k Params) IsVirtualMachine() bool {
+	_, ok := k.Get(VirtualMachine)
+	return ok
 }
 
 func parseParams(content string) Params {

@@ -139,7 +139,7 @@ func (c *Module) upgrade() error {
 
 // Run creates and starts a container
 func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err error) {
-	log.Info().Str("ns", ns).Msg("starting container")
+	log.Debug().Str("ns", ns).Msg("starting container")
 
 	// create a new client connected to the default socket path for containerd
 	client, err := containerd.New(c.containerd)
@@ -224,7 +224,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 		opts = append(opts, oci.WithProcessArgs(args...))
 	}
 
-	log.Info().
+	log.Debug().
 		Str("namespace", ns).
 		Str("data", fmt.Sprintf("%+v", data)).
 		Msgf("create new container")
@@ -246,13 +246,13 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 	if err != nil {
 		return id, err
 	}
-	log.Info().Msgf("args %+v", spec.Process.Args)
-	log.Info().Msgf("env %+v", spec.Process.Env)
-	log.Info().Msgf("root %+v", spec.Root)
+	log.Debug().Msgf("args %+v", spec.Process.Args)
+	log.Debug().Msgf("env %+v", spec.Process.Env)
+	log.Debug().Msgf("root %+v", spec.Root)
 	for _, linxNS := range spec.Linux.Namespaces {
-		log.Info().Msgf("namespace %+v", linxNS.Type)
+		log.Debug().Msgf("namespace %+v", linxNS.Type)
 	}
-	log.Info().Msgf("mounts %+v", spec.Mounts)
+	log.Debug().Msgf("mounts %+v", spec.Mounts)
 
 	defer func() {
 		// if any of the next steps below fails, make sure
@@ -271,7 +271,7 @@ func (c *Module) Run(ns string, data pkg.Container) (id pkg.ContainerID, err err
 
 	// creating and serializing logs settings for external logger
 	confpath := path.Join(cfgs, fmt.Sprintf("%s-logs.json", container.ID()))
-	log.Info().Str("cfg", confpath).Msg("writing logs settings")
+	log.Debug().Str("cfg", confpath).Msg("writing logs settings")
 
 	err = logger.Serialize(confpath, data.Logs)
 	if err != nil {
@@ -388,7 +388,7 @@ func (c *Module) ensureTask(ctx context.Context, container containerd.Container)
 		return err
 	}
 
-	log.Info().Str("loguri", uri.String()).Msg("external logging process")
+	log.Debug().Str("loguri", uri.String()).Msg("external logging process")
 	task, err := container.Task(ctx, nil)
 
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -429,7 +429,7 @@ func (c *Module) start(ns, id string) error {
 
 // Inspect returns the detail about a running container
 func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, err error) {
-	log.Info().Str("id", string(id)).Str("ns", ns).Msg("inspect container")
+	log.Debug().Str("id", string(id)).Str("ns", ns).Msg("inspect container")
 
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -489,7 +489,7 @@ func (c *Module) Inspect(ns string, id pkg.ContainerID) (result pkg.Container, e
 
 // ListNS list the name of all the container namespaces
 func (c *Module) ListNS() ([]string, error) {
-	log.Info().Msg("list namespaces")
+	log.Debug().Msg("list namespaces")
 
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -503,7 +503,7 @@ func (c *Module) ListNS() ([]string, error) {
 
 // List all the existing container IDs from a certain namespace ns
 func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
-	log.Info().Str("ns", ns).Msg("list containers")
+	log.Debug().Str("ns", ns).Msg("list containers")
 
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -530,7 +530,7 @@ func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
 
 // Delete stops and remove a container
 func (c *Module) Delete(ns string, id pkg.ContainerID) error {
-	log.Info().Str("id", string(id)).Str("ns", ns).Msg("delete container")
+	log.Debug().Str("id", string(id)).Str("ns", ns).Msg("delete container")
 
 	client, err := containerd.New(c.containerd)
 	if err != nil {
@@ -618,7 +618,7 @@ func applyStartup(data *pkg.Container, path string) error {
 	}
 	defer f.Close()
 
-	log.Info().Msg("startup file found")
+	log.Debug().Msg("startup file found")
 
 	startup := startup{}
 	if _, err := toml.DecodeReader(f, &startup); err != nil {

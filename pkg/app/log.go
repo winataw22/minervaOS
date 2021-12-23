@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/kernel"
 )
 
 //nolint
@@ -61,6 +62,14 @@ func formatLevel(i interface{}) string {
 
 // Initialize Configure a zos app
 func Initialize() {
+	level := zerolog.InfoLevel
+	params := kernel.GetParams()
+	if params.IsDebug() {
+		level = zerolog.DebugLevel
+	}
+
+	zerolog.SetGlobalLevel(level)
+
 	log.Logger = log.Output(zerolog.ConsoleWriter{
 		TimeFormat:  time.RFC3339,
 		Out:         os.Stdout,

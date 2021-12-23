@@ -9,8 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shirou/gopsutil/host"
-
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -20,8 +18,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/identity"
-
-	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"flag"
 
@@ -40,25 +36,10 @@ const (
 	seedName = "seed.txt"
 )
 
-// setup is a sanity check function, the whole purpose of this
-// is to make sure at least required services are running in case
-// of upgrade failure
-// for example, in case of upgraded crash after it already stopped all
-// the services for upgrade.
-func setup(zinit *zinit.Client) error {
-	for _, required := range []string{"redis"} {
-		if err := zinit.StartWait(5*time.Second, required); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Safe makes sure function call not interrupted
 // with a signal while exection
 func Safe(fn func() error) error {
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 4)
 	defer close(ch)
 	defer signal.Stop(ch)
 
@@ -379,13 +360,4 @@ func getIdentityMgr(root string) (pkg.IdentityManager, error) {
 		Msg("farmer identified")
 
 	return manager, nil
-}
-
-// hostUptime returns the uptime of the node
-func hostUptime() (uint64, error) {
-	info, err := host.Info()
-	if err != nil {
-		return 0, err
-	}
-	return info.Uptime, nil
 }

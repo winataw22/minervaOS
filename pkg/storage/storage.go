@@ -140,8 +140,8 @@ func (s *Module) initialize() error {
 	defer s.mu.Unlock()
 	log.Info().Msgf("Initializing storage module")
 
-	vm := kernel.GetParams().Exists("zos-debug")
-	log.Debug().Bool("is-vm", vm).Msg("virtualization detection")
+	vm := kernel.GetParams().IsVirtualMachine()
+	log.Debug().Bool("is-vm", vm).Msg("debugging virtualization detection")
 
 	// Make sure we finish in 1 minute
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
