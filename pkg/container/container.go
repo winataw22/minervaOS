@@ -94,16 +94,15 @@ func New(client zbus.Client, root string, containerd string) *Module {
 		failures: cache.New(time.Minute, 20*time.Second),
 	}
 
-	if err := module.upgrade(); err != nil {
+	if err := module.startup(); err != nil {
 		log.Error().Err(err).Msg("failed to update containers configurations")
 	}
 
 	return module
 }
 
-// upgrade containers configurations. we make sure that any configuration changes apply
-// to the running containers..
-func (c *Module) upgrade() error {
+// startup makes sure container have correct config, and also make sure they are running
+func (c *Module) startup() error {
 	// We make sure that ALL containers have auto-restart disabled since this is now
 	// managed completely by the watcher.
 	client, err := containerd.New(c.containerd)
@@ -130,6 +129,10 @@ func (c *Module) upgrade() error {
 		for _, container := range containers {
 			if err := container.Update(ctx, restart.WithNoRestarts); err != nil { // mark this container as perminant down. so the watcher
 				log.Warn().Err(err).Msg("failed to clear up restart task status, continuing anyways") // does not try to restart it again
+			}
+
+			if err := c.ensureTask(ctx, container); err != nil {
+				log.Error().Err(err).Str("ns", ns).Str("id", container.ID()).Msg("failed to ensure container is running")
 			}
 		}
 	}
@@ -392,19 +395,23 @@ func (c *Module) ensureTask(ctx context.Context, container containerd.Container)
 	task, err := container.Task(ctx, nil)
 
 	if err != nil && !errdefs.IsNotFound(err) {
-		return err
+		return errors.Wrap(err, "failed to list container tasks")
 	} else if err == nil {
-		//task found, we have to stop that first
-		_, err := task.Delete(ctx)
-		if err != nil {
-			return err
+		// we found a task
+		status, _ := task.Status(ctx)
+		if status.Status == containerd.Running {
+			return nil
 		}
+
+		if _, err := task.Delete(ctx); err != nil {
+			return errors.Wrap(err, "failed to delete the container task")
+		}
+
 	}
 
-	//and finally create a new task
 	task, err = container.NewTask(ctx, cio.LogURI(uri))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create container task")
 	}
 
 	return task.Start(ctx)

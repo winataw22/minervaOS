@@ -65,7 +65,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
 	github.com/threefoldtech/go-rmb v0.1.7
-	github.com/threefoldtech/substrate-client v0.0.0-20211223163853-33130021254e
+	github.com/threefoldtech/substrate-client v0.0.0-20211228095037-1e2e85695a2b
 	github.com/threefoldtech/zbus v0.1.5
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
