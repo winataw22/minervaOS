@@ -19,6 +19,9 @@ const (
 	// SubstrateDevURL default substrate url
 	SubstrateTestURL  = "wss://tfchain.test.grid.tf/"
 	ActivationTestURL = "https://activation.test.grid.tf/activation/activate"
+
+	SubstrateMainURL  = "wss://tfchain.grid.tf/"
+	ActivationMainURL = "https://activation.grid.tf/activation/activate"
 )
 
 // Environment holds information about running environment of a node
@@ -89,8 +92,8 @@ var (
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode:   RunningMain,
-		SubstrateURL:  SubstrateDevURL,
-		ActivationURL: ActivationDevURL,
+		SubstrateURL:  SubstrateMainURL,
+		ActivationURL: ActivationMainURL,
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
 	}

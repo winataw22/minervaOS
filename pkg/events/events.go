@@ -34,7 +34,7 @@ func (m *Manager) start(ctx context.Context) {
 	log.Info().Msg("start listening to chain events")
 	for {
 		if err := m.listen(ctx); err != nil {
-			log.Error().Err(err).Msg("setting public config failed")
+			log.Error().Err(err).Msg("listening to events failed, retry in 10 seconds")
 			<-time.After(10 * time.Second)
 		}
 	}
@@ -66,6 +66,7 @@ reconnect:
 		for {
 			select {
 			case event := <-reg.Chan():
+				//m.sub.GetBlock(block types.Hash)
 				for _, change := range event.Changes {
 					if !change.HasStorageData {
 						continue
@@ -102,7 +103,7 @@ reconnect:
 				}
 			case err := <-reg.Err():
 				// need a reconnect
-				log.Error().Err(err).Msg("subscription to events stopped, reconnecting")
+				log.Warn().Err(err).Msg("subscription to events stopped, reconnecting")
 				continue reconnect
 			case <-ctx.Done():
 				return ctx.Err()

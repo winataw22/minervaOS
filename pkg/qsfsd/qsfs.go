@@ -21,14 +21,13 @@ import (
 )
 
 const (
-	qsfsFlist             = "https://hub.grid.tf/omar0.3bot/qsfs.flist"
+	qsfsFlist             = "https://hub.grid.tf/omar0.3bot/qsfs-v0.0.1.flist"
 	qsfsContainerNS       = "qsfs"
 	qsfsRootFsPropagation = pkg.RootFSPropagationSlave
 	zstorSocket           = "/var/run/zstor.sock"
 	zstorZDBFSMountPoint  = "/mnt" // hardcoded in the container
 	zstorMetricsPort      = 9100
-	zstorZDBDataDirPath   = "/data/data"
-	zstorZDBIndexDirPath  = "/data/index"
+	zstorZDBDataDirPath   = "/data/data/zdbfs-data"
 	// 30 * two significant uploads at close (zstor configured timeout)
 	// it's a lot and shouldn't be reached at all
 	// zdb doesn't wait for jump-* hooks to finish
@@ -45,7 +44,6 @@ type QSFS struct {
 type zstorConfig struct {
 	zos.QuantumSafeFSConfig
 	ZDBDataDirPath  string `toml:"zdb_data_dir_path"`
-	ZDBIndexDirPath string `toml:"zdb_index_dir_path"`
 	Socket          string `toml:"socket"`
 	MetricsPort     uint32 `toml:"prometheus_port"`
 	ZDBFSMountpoint string `toml:"zdbfs_mountpoint"`
@@ -72,7 +70,6 @@ func setQSFSDefaults(cfg *zos.QuantumSafeFS) zstorConfig {
 		MetricsPort:         zstorMetricsPort,
 		ZDBFSMountpoint:     zstorZDBFSMountPoint,
 		ZDBDataDirPath:      zstorZDBDataDirPath,
-		ZDBIndexDirPath:     zstorZDBIndexDirPath,
 	}
 }
 
