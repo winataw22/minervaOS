@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	flist = "https://hub.grid.tf/azmy.3bot/traefik.flist"
+	flist = "https://hub.grid.tf/omar0.3bot/traefik.flist"
 )
 
 // ensureTraefikBin makes sure traefik flist is mounted.
@@ -20,8 +21,11 @@ const (
 func ensureTraefikBin(ctx context.Context, cl zbus.Client) (string, error) {
 	const bin = "traefik"
 	flistd := stubs.NewFlisterStub(cl)
-
-	mnt, err := flistd.Mount(ctx, bin, flist, pkg.ReadOnlyMountOptions)
+	hash, err := flistd.FlistHash(ctx, flist)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get traefik flist hash")
+	}
+	mnt, err := flistd.Mount(ctx, fmt.Sprintf("%s:%s", bin, hash), flist, pkg.ReadOnlyMountOptions)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to mount traefik flist")
 	}

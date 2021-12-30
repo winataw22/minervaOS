@@ -26,7 +26,8 @@ import (
 )
 
 var (
-	domainRe = regexp.MustCompile("^Host(?:SNI)?\\(`([^`]+)`\\)$")
+	domainRe        = regexp.MustCompile("^Host(?:SNI)?\\(`([^`]+)`\\)$")
+	traefikBinRegex = regexp.MustCompile("/var/cache/modules/flistd/mountpoint/([a-z0-9:]+)/traefik")
 )
 
 const (
@@ -350,11 +351,25 @@ func (g *gatewayModule) isTraefikStarted(z *zinit.Client) (bool, error) {
 	return traefikStatus.State.Is(zinit.ServiceStateRunning), nil
 }
 
+func (g *gatewayModule) traefikBinary(ctx context.Context, z *zinit.Client) (string, string, error) { // path, name, err
+	info, err := z.Get(traefikService)
+	if err != nil {
+		return "", "", err
+	}
+	matches := traefikBinRegex.FindAllStringSubmatch(info.Exec, -1)
+	if len(matches) != 1 {
+		return "", "", errors.Wrapf(err, "find %d matches in %s", len(matches), info.Exec)
+	}
+
+	return matches[0][0], matches[0][1], nil
+}
+
 // ensureGateway makes sure that gateway infrastructure is in place and
 // that it is supported.
 func (g *gatewayModule) ensureGateway(ctx context.Context, forceResstart bool) (pkg.PublicConfig, error) {
 	var (
 		networker = stubs.NewNetworkerStub(g.cl)
+		flistd    = stubs.NewFlisterStub(g.cl)
 	)
 	cfg, err := networker.GetPublicConfig(ctx)
 	if err != nil {
@@ -366,6 +381,32 @@ func (g *gatewayModule) ensureGateway(ctx context.Context, forceResstart bool) (
 	if err != nil {
 		return pkg.PublicConfig{}, errors.Wrap(err, "failed to check traefik status")
 	}
+	exists, err := z.Exists(traefikService)
+	if err != nil {
+		return pkg.PublicConfig{}, errors.Wrap(err, "couldn't get traefik service status")
+	}
+	if exists {
+		path, name, err := g.traefikBinary(ctx, z)
+		if err != nil {
+			return pkg.PublicConfig{}, errors.Wrap(err, "failed to get old traefik binary path")
+		}
+		if path != g.binPath {
+			if err := z.StopWait(10*time.Second, traefikService); err != nil {
+				return pkg.PublicConfig{}, errors.Wrap(err, "failed to stop old traefik")
+			}
+			running = false
+			if err := flistd.Unmount(ctx, name); err != nil {
+				log.Error().Err(err).Msg("failed to unmount old traefik")
+			}
+		}
+
+		if !running {
+			if err := z.Forget(traefikService); err != nil {
+				return pkg.PublicConfig{}, errors.Wrap(err, "failed to forget old traefik")
+			}
+		}
+	}
+
 	if running && forceResstart {
 		// note: a kill is basically a singal to traefik process to
 		// die. but zinit will restart it again anyway. so this is

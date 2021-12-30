@@ -1,11 +1,14 @@
 package zinit
 
 import (
-	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -130,6 +133,38 @@ func (c *Client) List() (out map[string]ServiceState, err error) {
 func (c *Client) Status(service string) (result ServiceStatus, err error) {
 	err = c.cmd(fmt.Sprintf("status %s", service), &result)
 	return
+}
+
+// Exists checks whether a service is monitored or not
+func (c *Client) Exists(service string) (bool, error) {
+	var status ServiceStatus
+	err := c.cmd(fmt.Sprintf("status %s", service), &status)
+	if errors.Is(err, ErrUnknownService) {
+		return false, nil
+	} else if err == nil {
+		return true, nil
+	}
+	return false, err
+}
+
+// Get gets the service info
+func (c *Client) Get(service string) (InitService, error) {
+	var result InitService
+	_, err := c.Status(service)
+	if err != nil {
+		// check that it exists
+		return result, err
+	}
+	f, err := os.Open(fmt.Sprintf("/etc/zinit/%s.yaml", service))
+	if err != nil {
+		return result, errors.Wrap(err, "couldn't open service file")
+	}
+	err = yaml.NewDecoder(f).Decode(&result)
+	if err != nil {
+		return result, errors.Wrap(err, "couldn't decode service file")
+	}
+
+	return result, nil
 }
 
 // Start start service. has no effect if the service is already running
