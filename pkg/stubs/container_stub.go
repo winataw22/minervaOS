@@ -132,3 +132,16 @@ func (s *ContainerModuleStub) Run(ctx context.Context, arg0 string, arg1 pkg.Con
 	}
 	return
 }
+
+func (s *ContainerModuleStub) SignalDelete(ctx context.Context, arg0 string, arg1 pkg.ContainerID) (ret0 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SignalDelete", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}

@@ -105,6 +105,7 @@ type ContainerModule interface {
 
 	// Inspect, return information about the container, given its container id
 	Inspect(ns string, id ContainerID) (Container, error)
+	SignalDelete(ns string, id ContainerID) error
 	Delete(ns string, id ContainerID) error
 
 	// Get logs of the container

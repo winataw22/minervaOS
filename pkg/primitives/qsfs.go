@@ -29,7 +29,7 @@ func (p *Primitives) qsfsProvision(ctx context.Context, wl *gridtypes.WorkloadWi
 
 func (p *Primitives) qsfsDecommision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	qsfs := stubs.NewQSFSDStub(p.zbus)
-	err := qsfs.Unmount(ctx, wl.ID.String())
+	err := qsfs.SignalDelete(ctx, wl.ID.String())
 	if err != nil {
 		return errors.Wrap(err, "failed to delete qsfs")
 	}

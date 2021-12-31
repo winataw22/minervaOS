@@ -535,6 +535,36 @@ func (c *Module) List(ns string) ([]pkg.ContainerID, error) {
 	return ids, nil
 }
 
+func (c *Module) SignalDelete(ns string, id pkg.ContainerID) error {
+	log.Debug().Str("id", string(id)).Str("ns", ns).Msg("delete container")
+
+	client, err := containerd.New(c.containerd)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// log.Debug().Msg("fetching namespace")
+	ctx := namespaces.WithNamespace(context.Background(), ns)
+
+	// log.Debug().Str("id", string(id)).Msg("fetching container")
+	container, err := client.LoadContainer(ctx, string(id))
+	if err != nil {
+		return err
+	}
+	// mark this container as perminant down. so the watcher
+	// does not try to restart it again
+	c.failures.Set(string(id), permanent, cache.DefaultExpiration)
+
+	task, err := container.Task(ctx, nil)
+	if err == nil {
+		// err == nil, there is a task running inside the container
+		log.Debug().Str("id", string(id)).Int("signal", int(syscall.SIGTERM)).Msg("sending signal")
+		_ = task.Kill(ctx, syscall.SIGTERM)
+	}
+	return nil
+}
+
 // Delete stops and remove a container
 func (c *Module) Delete(ns string, id pkg.ContainerID) error {
 	log.Debug().Str("id", string(id)).Str("ns", ns).Msg("delete container")
