@@ -1031,22 +1031,18 @@ func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.OptionPublic
 }
 
 func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-	// we don't use monitorNS because
-	// 1- this is the host namespace
-	// 2- the ZOS bridge must exist all the time
-	updates := make(chan netlink.AddrUpdate)
-	if err := netlink.AddrSubscribe(updates, ctx.Done()); err != nil {
-		log.Fatal().Err(err).Msg("failed to listen to netlink address updates")
-	}
-
-	link, err := netlink.LinkByName(types.DefaultBridge)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not find the '%s' bridge", types.DefaultBridge)
-	}
-
 	get := func() pkg.NetlinkAddresses {
 		var result pkg.NetlinkAddresses
-		values, _ := netlink.AddrList(link, netlink.FAMILY_ALL)
+		link, err := netlink.LinkByName(types.DefaultBridge)
+		if err != nil {
+			log.Error().Err(err).Msgf("could not find the '%s' bridge", types.DefaultBridge)
+			return nil
+		}
+		values, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			log.Error().Err(err).Msgf("could not list the '%s' bridge ips", types.DefaultBridge)
+			return nil
+		}
 		for _, value := range values {
 			result = append(result, *value.IPNet)
 		}
@@ -1063,13 +1059,7 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 			select {
 			case <-ctx.Done():
 				return
-			case update := <-updates:
-				if update.LinkIndex != link.Attrs().Index {
-					continue
-				}
-
-				addresses = get()
-			case <-time.After(2 * time.Second):
+			case <-time.After(30 * time.Second):
 				ch <- addresses
 			}
 		}

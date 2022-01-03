@@ -38,6 +38,10 @@ func FilesUsage(path string) (uint64, error) {
 		}
 
 		if info.IsDir() {
+			if IsMountPoint(path) {
+				return filepath.SkipDir
+			}
+
 			return nil
 		}
 

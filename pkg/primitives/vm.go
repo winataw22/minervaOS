@@ -222,10 +222,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err := flist.Unmount(ctx, wl.ID.String()); err != nil {
 			return result, errors.Wrapf(err, "failed to unmount flist: %s", wl.ID.String())
 		}
-		rootfsSize := config.Size
-		if rootfsSize < 250*gridtypes.Megabyte {
-			rootfsSize = 250 * gridtypes.Megabyte
-		}
+		rootfsSize := config.RootSize()
 		// create a persisted volume for the vm. we don't do it automatically
 		// via the flist, so we have control over when to decomission this volume.
 		// remounting in RW mode

@@ -11,6 +11,10 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
+const (
+	sizeInGBPerCU = 50 // GB
+)
+
 // MachineInterface structure
 type MachineInterface struct {
 	// Network name (znet name) to join
@@ -58,6 +62,10 @@ func (n *MachineNetwork) Challenge(w io.Writer) error {
 type MachineCapacity struct {
 	CPU    uint8          `json:"cpu"`
 	Memory gridtypes.Unit `json:"memory"`
+}
+
+func (c *MachineCapacity) String() string {
+	return fmt.Sprintf("cpu(%d)+mem(%d)", c.CPU, c.Memory)
 }
 
 // Challenge builder
@@ -119,6 +127,22 @@ type ZMachine struct {
 	Env map[string]string `json:"env"`
 }
 
+func (m *ZMachine) MinRootSize() gridtypes.Unit {
+	// sru = (cpu * mem_in_gb) / 8
+	// each 1 SRU is 50GB of storage
+	su := gridtypes.Unit(m.ComputeCapacity.CPU) * m.ComputeCapacity.Memory / 8
+	return gridtypes.Unit(su * sizeInGBPerCU)
+}
+
+func (m *ZMachine) RootSize() gridtypes.Unit {
+	min := m.MinRootSize()
+	if m.Size > min {
+		return m.Size
+	}
+
+	return min
+}
+
 // Valid implementation
 func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 	if len(v.Network.Interfaces) != 1 {
@@ -136,8 +160,9 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 	if v.ComputeCapacity.Memory < 250*gridtypes.Megabyte {
 		return fmt.Errorf("mem capacity can't be less that 250M")
 	}
-	if v.Size != 0 && v.Size < 250*gridtypes.Megabyte {
-		return fmt.Errorf("disk size can't be less that 250M")
+	minRoot := v.MinRootSize()
+	if v.Size != 0 && v.Size < minRoot {
+		return fmt.Errorf("disk size can't be less that %d. Set to 0 for minimum", minRoot)
 	}
 	if !v.Network.PublicIP.IsEmpty() {
 		wl, err := getter.Get(v.Network.PublicIP)
@@ -182,14 +207,10 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 
 // Capacity implementation
 func (v ZMachine) Capacity() (gridtypes.Capacity, error) {
-	var sru uint64
-	if v.Size > 250*gridtypes.Megabyte {
-		sru += uint64(v.Size) - 250*uint64(gridtypes.Megabyte)
-	}
 	return gridtypes.Capacity{
 		CRU: uint64(v.ComputeCapacity.CPU),
 		MRU: v.ComputeCapacity.Memory,
-		SRU: gridtypes.Unit(sru),
+		SRU: v.RootSize(),
 	}, nil
 }
 

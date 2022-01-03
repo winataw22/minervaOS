@@ -337,7 +337,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 		name:     "pool-1",
 		reserved: 2000,
 		usage: filesystem.Usage{
-			Size: 10000,
+			Size: 5000,
 			Used: 100,
 		},
 		ptype: zos.SSDDevice,
@@ -347,7 +347,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 		name:     "pool-2",
 		reserved: 1000,
 		usage: filesystem.Usage{
-			Size: 10000,
+			Size: 5000,
 			Used: 100,
 		},
 		ptype: zos.SSDDevice,
@@ -385,4 +385,37 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	if ok := pool3.AssertCalled(t, "AddVolume", vdiskVolumeName); !ok {
 		t.Fail()
 	}
+}
+
+func TestVDiskFindCandidatesOverProvision(t *testing.T) {
+	require := require.New(t)
+
+	pool1 := &testPool{
+		name:     "pool-1",
+		reserved: 2000,
+		usage: filesystem.Usage{
+			Size: 5000,
+			Used: 100,
+		},
+		ptype: zos.SSDDevice,
+	}
+
+	mod := Module{
+		ssds: []filesystem.Pool{
+			pool1,
+		},
+	}
+
+	sub := &testVolume{
+		name: vdiskVolumeName,
+	}
+
+	pool1.On("Volumes").Return([]filesystem.Volume{sub}, nil)
+
+	_, err := mod.diskFindCandidate(8000)
+	require.NoError(err)
+
+	_, err = mod.diskFindCandidate(10000)
+	require.Error(err)
+
 }

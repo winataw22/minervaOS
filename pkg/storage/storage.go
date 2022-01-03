@@ -23,6 +23,8 @@ import (
 )
 
 const (
+	// SSDOverProvisionFactor over provision factor for SSDs
+	SSDOverProvisionFactor = 2
 	// CacheTarget is the path where the cache disk is mounted
 	CacheTarget = "/var/cache"
 	// cacheLabel is the name of the cache
@@ -645,7 +647,7 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 			Uint64("new size", reserved+uint64(size)).
 			Msgf("usage of pool %s", pool.Name())
 		// Make sure adding this filesystem would not bring us over the disk limit
-		if reserved+uint64(size) > usage.Size {
+		if reserved+uint64(size) > usage.Size*SSDOverProvisionFactor {
 			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
 
 			if !poolIsMounted && !mounted {
