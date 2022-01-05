@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
+	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -50,6 +53,15 @@ const (
 	BtrfsFSType FSType = "btrfs"
 )
 
+var (
+	subvolFindmntOption = regexp.MustCompile(`(^|,)subvol=/($|,)`)
+)
+
+// blockDevices lsblk output
+type blockDevices struct {
+	BlockDevices []DeviceInfo `json:"blockdevices"`
+}
+
 // DeviceInfo contains information about the device
 type DeviceInfo struct {
 	Path       string `json:"path"`
@@ -57,6 +69,7 @@ type DeviceInfo struct {
 	Size       uint64 `json:"size"`
 	Mountpoint string `json:"mountpoint"`
 	Filesystem FSType `json:"fstype"`
+	Subsystems string `json:"subsystems"`
 }
 
 // func (i *DeviceInfo) ID() (id string, err error) {
@@ -216,15 +229,17 @@ func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device De
 }
 
 func (l *lsblkDeviceManager) lsblk(ctx context.Context, output interface{}, device ...string) error {
+	var devices blockDevices
+
 	args := []string{
 		"--json",
-		"--output-all",
+		"-o",
+		"PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL",
 		"--bytes",
 		"--exclude",
 		"1,2,11",
 		"--path",
 	}
-
 	if len(device) == 1 {
 		args = append(args, device[0])
 	} else if len(device) > 1 {
@@ -243,11 +258,65 @@ func (l *lsblkDeviceManager) lsblk(ctx context.Context, output interface{}, devi
 	}
 
 	// parsing lsblk response
+	if err := json.Unmarshal(bytes, &devices); err != nil {
+		return err
+	}
+	// lsblk blocks for blocking file systems
+	if err := l.fillMountpointInfo(ctx, &devices, device...); err != nil {
+		return err
+	}
+	bytes, err = json.Marshal(devices)
+	if err != nil {
+		return err
+	}
 	if err := json.Unmarshal(bytes, output); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+func (l *lsblkDeviceManager) fillMountpointInfo(ctx context.Context, devices *blockDevices, device ...string) error {
+	// to not pollute global namespace with ugly hack types
+	type findmntOutput struct {
+		Filesystems []struct {
+			Source  string
+			Target  string
+			Options string
+		}
+	}
+	args := []string{
+		"-J",
+	}
+	if len(device) == 1 {
+		args = append(args, "-S", device[0])
+	} else if len(device) > 1 {
+		return fmt.Errorf("only one device is supported")
+	}
+	bytes, err := l.run(ctx, "findmnt", args...)
+	if err != nil {
+		// empty output and exit code 1 in case the device is not found
+		return nil
+	}
+	var mounts findmntOutput
+	if len(bytes) != 0 {
+		if err := json.Unmarshal(bytes, &mounts); err != nil {
+			return err
+		}
+	}
+	mountpoints := make(map[string]string)
+	for _, m := range mounts.Filesystems {
+		if subvolFindmntOption.MatchString(m.Options) {
+			mountpoints[m.Source] = m.Target
+		}
+	}
+	for idx := range devices.BlockDevices {
+		source := devices.BlockDevices[idx].Path
+		if target, ok := mountpoints[source]; ok {
+			devices.BlockDevices[idx].Mountpoint = target
+		}
+	}
+	return nil
+
 }
 
 func (l *lsblkDeviceManager) raw(ctx context.Context) ([]minDevice, error) {
@@ -289,12 +358,33 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) ([]minDevice, error) {
 	return l.cache, nil
 }
 
+func isTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if status, ok := exitErr.ProcessState.Sys().(syscall.WaitStatus); ok {
+			return status.Signaled() && status.Signal() == syscall.SIGKILL
+		}
+	}
+
+	return false
+}
+
 // seektime uses the seektime binary to try and determine the type of a disk
 // This function returns the type of the device, as reported by seektime,
 // and the elapsed time in microseconds (also reported by seektime)
 func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string, uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
 	bytes, err := l.run(ctx, "seektime", "-j", path)
-	if err != nil {
+	if isTimeout(err) {
+		// the seektime is taking too long that's defintely a HDD
+		log.Warn().Str("device", path).Msg("checking readtime for device timedout. assuming HDD")
+		return "HDD", 5 * 60, nil
+	} else if err != nil {
 		return "", 0, err
 	}
 
@@ -312,13 +402,11 @@ func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string,
 func (l *lsblkDeviceManager) setDeviceTypes(devices []minDevice) error {
 	for idx := range devices {
 		d := &devices[idx]
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
 
-		typ, rt, err := l.seektime(ctx, d.IPath)
+		typ, rt, err := l.seektime(context.Background(), d.IPath)
 		if err != nil {
 			// don't include errored devices in the result
-			log.Error().Msgf("Failed to get disk read time: %v", err)
+			log.Error().Err(err).Msgf("failed to get disk read time")
 			return err
 		}
 

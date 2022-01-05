@@ -67,13 +67,7 @@ func New() (*Module, error) {
 	}
 
 	// go for a simple linear setup right now
-	err := s.initialize()
-
-	if err == nil {
-		log.Info().Msgf("Finished initializing storage module")
-	}
-
-	return s, err
+	return s, s.initialize()
 }
 
 // Total gives the total amount of storage available for a device type

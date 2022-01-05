@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/pkg/errors"
 )
 
 func getMountTarget(f io.Reader, device string) (string, bool) {
@@ -107,7 +109,8 @@ func run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	output, err := exec.CommandContext(ctx, name, args...).Output()
 	if err != nil {
 		if err, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("%s", string(err.Stderr))
+			// using wrap to avoid masking the underlying error type.
+			return nil, errors.Wrapf(err, "stderr: %s", string(err.Stderr))
 		}
 		return nil, err
 	}

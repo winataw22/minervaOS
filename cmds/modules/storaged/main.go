@@ -47,6 +47,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to initialize storage module")
 	}
 
+	log.Info().Msg("storage initialization complete")
 	server, err := zbus.NewRedisServer(module, msgBrokerCon, workerNr)
 	if err != nil {
 		return errors.Wrap(err, "fail to connect to message broker server")

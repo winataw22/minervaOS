@@ -28,12 +28,14 @@ const (
 	zstorZDBFSMountPoint  = "/mnt" // hardcoded in the container
 	zstorMetricsPort      = 9100
 	zstorZDBDataDirPath   = "/data/data/zdbfs-data"
+	tombstonesDir         = "tombstones"
 )
 
 type QSFS struct {
 	cl zbus.Client
 
-	mountsPath string
+	mountsPath     string
+	tombstonesPath string
 }
 
 type zstorConfig struct {
@@ -45,19 +47,47 @@ type zstorConfig struct {
 }
 
 func New(ctx context.Context, cl zbus.Client, root string) (pkg.QSFSD, error) {
-
 	mountPath := filepath.Join(root, "mounts")
 	err := os.MkdirAll(mountPath, 0644)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't make qsfs mounts dir")
 	}
+	tombstonesPath := filepath.Join(root, tombstonesDir)
+	err = os.MkdirAll(tombstonesPath, 0644)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't make qsfs tombstones dir")
+	}
 
 	qsfs := &QSFS{
-		cl:         cl,
-		mountsPath: mountPath,
+		cl:             cl,
+		mountsPath:     mountPath,
+		tombstonesPath: tombstonesPath,
+	}
+	if err := qsfs.migrateTombstones(ctx, cl); err != nil {
+		return nil, err
 	}
 	go qsfs.periodicCleanup(ctx)
 	return qsfs, nil
+}
+
+func (q *QSFS) migrateTombstones(ctx context.Context, cl zbus.Client) error {
+	contd := stubs.NewContainerModuleStub(q.cl)
+	containers, err := contd.List(ctx, qsfsContainerNS)
+	if err != nil {
+		return errors.Wrap(err, "couldn't list qsfs containers")
+	}
+	for _, contID := range containers {
+		marked, err := q.isOldMarkedForDeletion(ctx, string(contID))
+		if err != nil {
+			log.Error().Err(err).Str("id", string(contID)).Msg("failed to check container old mark")
+		}
+		if marked {
+			if err := q.markDelete(ctx, string(contID)); err != nil {
+				log.Error().Err(err).Str("id", string(contID)).Msg("failed to mark container for deletion")
+			}
+		}
+	}
+	return nil
 }
 
 func setQSFSDefaults(cfg *zos.QuantumSafeFS) zstorConfig {
@@ -81,7 +111,8 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 	flistd := stubs.NewFlisterStub(q.cl)
 	contd := stubs.NewContainerModuleStub(q.cl)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	t := time.Now()
 	defer cancel()
 	marked, _ := q.isMarkedForDeletion(ctx, wlID)
 	if marked {
@@ -132,6 +163,7 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 		qsfsContainerNS,
 		cont,
 	)
+	log.Debug().Str("duration", time.Since(t).String()).Msg("time before waiting for qsfs mountpoint")
 	if lerr := q.waitUntilMounted(ctx, mountPath); lerr != nil {
 		logs, containerErr := contd.Logs(ctx, qsfsContainerNS, wlID)
 		if containerErr != nil {
@@ -140,6 +172,7 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 		err = errors.Wrapf(lerr, fmt.Sprintf("Container Logs:\n%s", logs))
 		return
 	}
+	log.Debug().Str("duration", time.Since(t).String()).Msg("waiting for qsfs deployment took")
 	info.Path = mountPath
 	info.MetricsEndpoint = fmt.Sprintf("http://[%s]:%d/metrics", yggIP, zstorMetricsPort)
 

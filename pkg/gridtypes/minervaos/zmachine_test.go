@@ -15,7 +15,7 @@ func TestZMachineSRU(t *testing.T) {
 	}
 	cases := []Case{
 		{
-			Expected: 50 * gridtypes.Gigabyte,
+			Expected: 2 * gridtypes.Gigabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -25,7 +25,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 25 * gridtypes.Gigabyte,
+			Expected: 500 * gridtypes.Megabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -35,7 +35,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 50 * gridtypes.Gigabyte,
+			Expected: 2 * gridtypes.Gigabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -45,7 +45,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 75 * gridtypes.Gigabyte,
+			Expected: 2 * gridtypes.Gigabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -55,7 +55,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 125 * gridtypes.Gigabyte,
+			Expected: 2 * gridtypes.Gigabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -65,7 +65,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 6400 * gridtypes.Megabyte,
+			Expected: 500 * gridtypes.Megabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
@@ -75,7 +75,7 @@ func TestZMachineSRU(t *testing.T) {
 			},
 		},
 		{
-			Expected: 1600000 * gridtypes.Kilobyte, // ~= 1562.5 Megabytes
+			Expected: 500 * gridtypes.Megabyte,
 			VM: ZMachine{
 
 				ComputeCapacity: MachineCapacity{
