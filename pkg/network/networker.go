@@ -415,13 +415,13 @@ nft 'add rule bridge filter prerouting iifname "{{.Iface}}" jump {{.Name}}-pre'
 nft 'add rule bridge filter postrouting oifname "{{.Iface}}" jump {{.Name}}-post'
 
 nft 'add rule bridge filter {{.Name}}-pre ip saddr . ether saddr != { {{.IPv4}} . {{.Mac}} } counter drop'
-nft 'add rule bridge filter {{.Name}}-pre ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
+# nft 'add rule bridge filter {{.Name}}-pre ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
 
 nft 'add rule bridge filter {{.Name}}-pre arp operation reply arp saddr ip != {{.IPv4}} counter drop'
 nft 'add rule bridge filter {{.Name}}-pre arp operation request arp saddr ip != {{.IPv4}} counter drop'
 
 nft 'add rule bridge filter {{.Name}}-post ip daddr . ether daddr != { {{.IPv4}} . {{.Mac}} } counter drop'
-nft 'add rule bridge filter {{.Name}}-post ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
+# nft 'add rule bridge filter {{.Name}}-post ip6 saddr . ether saddr != { {{.IPv6}} . {{.Mac}} } counter drop'
 `))
 
 	pubIpTemplateDestroy = template.Must(template.New("filter-destroy").Parse(
