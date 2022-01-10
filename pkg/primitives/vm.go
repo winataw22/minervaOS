@@ -115,10 +115,9 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		return result, errors.Wrap(err, "failed to decode reservation schema")
 	}
 	machine := pkg.VM{
-		Name:        wl.ID.String(),
-		CPU:         config.ComputeCapacity.CPU,
-		Memory:      config.ComputeCapacity.Memory,
-		Environment: config.Env,
+		Name:   wl.ID.String(),
+		CPU:    config.ComputeCapacity.CPU,
+		Memory: config.ComputeCapacity.Memory,
 	}
 	// Should config.Vaid() be called here?
 
@@ -330,6 +329,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	machine.KernelArgs = cmd
 	machine.Boot = boot
 	machine.Entrypoint = entrypoint
+	machine.Environment = config.Env
 
 	if err = vm.Run(ctx, machine); err != nil {
 		// attempt to delete the vm, should the process still be lingering

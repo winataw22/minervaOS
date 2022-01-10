@@ -54,7 +54,7 @@ func main() {
 
 func check() error {
 	f := func() error {
-		cmd := exec.Command("ping", "-c", "1", "google.com")
+		cmd := exec.Command("wget", "google.com", "-O", "/dev/null", "-T", "5")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 

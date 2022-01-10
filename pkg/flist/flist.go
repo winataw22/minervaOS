@@ -552,8 +552,9 @@ func (f *flistModule) FlistHash(url string) (string, error) {
 	md5URL := url + ".md5"
 	resp, err := http.Get(md5URL)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "failed to get flist hash from '%s'", md5URL)
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {

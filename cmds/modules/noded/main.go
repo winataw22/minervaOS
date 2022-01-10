@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/events"
@@ -53,6 +54,13 @@ func action(cli *cli.Context) error {
 		printID      bool   = cli.Bool("id")
 		printNet     bool   = cli.Bool("net")
 	)
+	if app.CheckFlag(app.LimitedCache) {
+		for app.CheckFlag(app.LimitedCache) {
+			// relog the error in case it got lost
+			log.Error().Msg("The node doesn't have ssd attached, it won't register.")
+			time.Sleep(time.Minute * 5)
+		}
+	}
 
 	env := environment.MustGet()
 

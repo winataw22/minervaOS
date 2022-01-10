@@ -3,9 +3,11 @@ package zui
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -18,6 +20,10 @@ func green(s string) string {
 
 func red(s string) string {
 	return fmt.Sprintf("[%s](fg:red)", s)
+}
+
+func isNodeNotFoundErr(err error) bool {
+	return strings.HasSuffix(err.Error(), substrate.ErrNotFound.Error())
 }
 
 // func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
@@ -56,14 +62,18 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 			}
 
 			if node, err := identity.NodeIDNumeric(ctx); err != nil {
-				nodeID = red(err.Error())
+				if isNodeNotFoundErr(err) {
+					nodeID = red("node is not registered")
+				} else {
+					nodeID = red(err.Error())
+				}
 			} else {
 				nodeID = green(fmt.Sprint(node))
 			}
 
 			cache := green("OK")
 			if app.CheckFlag(app.LimitedCache) {
-				cache = red("LIMITED CACHE")
+				cache = red("no ssd disks detected")
 			}
 
 			h.Text = fmt.Sprintf(s, nodeID, farm, version.String(), env.RunningMode.String(), cache)
