@@ -47,6 +47,7 @@ func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
 		return errors.Wrap(err, "failed to get peers list")
 	}
 
+	log.Info().Int("count", len(peersUp)).Msg("found yggdrasil up peers")
 	endpoints := make([]string, len(peersUp))
 	for i, p := range peersUp {
 		endpoints[i] = p.Endpoint

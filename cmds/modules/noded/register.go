@@ -24,6 +24,9 @@ import (
 
 const (
 	reportUptimeEvery = 8 * time.Hour
+
+	tcUrl  = ""
+	tcHash = ""
 )
 
 func registration(ctx context.Context, cl zbus.Client, env environment.Environment, cap gridtypes.Capacity) (nodeID, twinID uint32, err error) {
@@ -205,7 +208,7 @@ func registerNode(
 	if err != nil {
 		return 0, 0, err
 	}
-	if _, err := sub.EnsureAccount(id, env.ActivationURL); err != nil {
+	if _, err := sub.EnsureAccount(id, env.ActivationURL, tcUrl, tcHash); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 

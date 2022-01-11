@@ -158,6 +158,17 @@ func (n *NodeClient) NetworkListWGPorts(ctx context.Context) ([]uint16, error) {
 	return result, nil
 }
 
+func (n *NodeClient) HasPublicIPv6(ctx context.Context) (bool, error) {
+	const cmd = "zos.network.has_ipv6"
+	var result bool
+
+	if err := n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
+		return false, err
+	}
+
+	return result, nil
+}
+
 func (n *NodeClient) NetworkListInterfaces(ctx context.Context) (map[string][]net.IP, error) {
 	const cmd = "zos.network.interfaces"
 	var result map[string][]net.IP

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
 //PeerListFallback is an hardcoded list of public yggdrasil node
@@ -116,11 +116,13 @@ next:
 		// we have filters, we need to process the endpoint
 		u, err := url.Parse(n.Endpoint)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse: %s", err)
+			log.Error().Err(err).Str("url", n.Endpoint).Msg("failed to parse url")
+			continue
 		}
 		ips, err := net.LookupIP(u.Hostname())
 		if err != nil {
-			return nil, err
+			log.Error().Err(err).Str("url", n.Endpoint).Msg("failed to lookup ip")
+			continue
 		}
 
 		for _, ip := range ips {

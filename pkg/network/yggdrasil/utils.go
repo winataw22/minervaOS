@@ -3,7 +3,6 @@ package yggdrasil
 import (
 	"context"
 	"crypto/ed25519"
-	"fmt"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -59,7 +58,7 @@ func EnsureYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, ns Yggd
 
 	cfg := GenerateConfig(privateKey)
 	if err := cfg.FindPeers(ctx, filter); err != nil {
-		return nil, fmt.Errorf("cannot find public yggdrasil peer to connect to")
+		return nil, err
 	}
 
 	server := NewYggServer(&cfg)

@@ -39,6 +39,9 @@ func (n *Network) listPortsHandler(ctx context.Context, payload []byte) (interfa
 	return data, nil
 }
 
+func (n *Network) hasPublicIPv6Handler(ctx context.Context, payload []byte) (interface{}, error) {
+	return n.hasPublicIPv6(ctx), nil
+}
 func (n *Network) interfacesHandler(ctx context.Context, payload []byte) (interface{}, error) {
 	data, err := n.listInterfaces(ctx)
 	if err != nil {
@@ -71,6 +74,7 @@ func (n *Network) setup(router rmb.Router) {
 	sub.WithHandler("list_public_ips", n.listPublicIPsHandler)
 	sub.WithHandler("public_config_get", n.getPublicConfigHandler)
 	sub.WithHandler("interfaces", n.interfacesHandler)
+	sub.WithHandler("has_ipv6", n.hasPublicIPv6Handler)
 }
 
 func (n *Network) listPorts(ctx context.Context) (interface{}, mw.Response) {
@@ -82,6 +86,10 @@ func (n *Network) listPorts(ctx context.Context) (interface{}, mw.Response) {
 	return ports, nil
 }
 
+func (n *Network) hasPublicIPv6(ctx context.Context) interface{} {
+	ipData, err := stubs.NewNetworkerStub(n.cl).GetPublicIPv6Subnet(ctx)
+	return ipData.IP != nil && err == nil
+}
 func (n *Network) listInterfaces(ctx context.Context) (interface{}, mw.Response) {
 	mgr := stubs.NewNetworkerStub(n.cl)
 	results := make(map[string][]net.IP)

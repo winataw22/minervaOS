@@ -119,6 +119,8 @@ func (d *DHCPMon) startZinit() error {
 	if status.State.Exited() {
 		log.Info().Msgf("zinit service %s already exists but is stopped, starting it", d.service)
 		return d.z.Start(d.service)
+	} else if status.State.Is(zinit.ServiceStateRunning) {
+		return nil
 	}
 
 	log.Info().Msgf("create and start %s zinit service", d.service)
@@ -139,7 +141,7 @@ func (d *DHCPMon) startZinit() error {
 		return err
 	}
 
-	if err := d.z.Monitor(d.service); err != nil {
+	if err := d.z.Monitor(d.service); err != nil && err != zinit.ErrAlreadyMonitored {
 		log.Error().Err(err).Msg("fail to start monitoring dhcp-zos zinit service")
 		return err
 	}
