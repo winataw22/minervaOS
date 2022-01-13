@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	reportUptimeEvery = 8 * time.Hour
+	reportUptimeEvery = 10 * time.Minute
 
 	tcUrl  = ""
 	tcHash = ""
