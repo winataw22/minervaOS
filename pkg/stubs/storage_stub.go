@@ -199,6 +199,22 @@ func (s *StorageModuleStub) DiskLookup(ctx context.Context, arg0 string) (ret0 p
 	return
 }
 
+func (s *StorageModuleStub) DiskResize(ctx context.Context, arg0 string, arg1 gridtypes.Unit) (ret0 pkg.VDisk, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "DiskResize", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	ret1 = new(zbus.RemoteError)
+	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *StorageModuleStub) DiskWrite(ctx context.Context, arg0 string, arg1 string) (ret0 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "DiskWrite", args...)

@@ -124,6 +124,9 @@ type StorageModule interface {
 	// DiskCreate creates a virtual disk given name and size
 	DiskCreate(name string, size gridtypes.Unit) (VDisk, error)
 
+	// DiskResize resizes the disk to given size
+	DiskResize(name string, size gridtypes.Unit) (VDisk, error)
+
 	// DiskWrite writes the given raw image to disk
 	DiskWrite(name string, image string) error
 

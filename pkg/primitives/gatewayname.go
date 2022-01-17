@@ -32,8 +32,7 @@ func (p *Primitives) gwProvision(ctx context.Context, wl *gridtypes.WorkloadWith
 	// what we need to do:
 	// - does this node support gateways ?
 	// this can be validated by checking if we have a "public" namespace
-	deployment := provision.GetDeployment(ctx)
-	twinID := deployment.TwinID
+	twinID, _ := provision.GetDeploymentID(ctx)
 	if err := validateNameContract(twinID, proxy.Name); err != nil {
 		return nil, errors.Wrap(err, "failed to validate name contract")
 	}

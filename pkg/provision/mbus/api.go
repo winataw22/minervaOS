@@ -31,6 +31,7 @@ func (d *Deployments) setup(router rmb.Router) {
 	sub.WithHandler("update", d.updateHandler)
 	sub.WithHandler("delete", d.deleteHandler)
 	sub.WithHandler("get", d.getHandler)
+	sub.WithHandler("changes", d.changesHandler)
 }
 
 func (d *Deployments) updateHandler(ctx context.Context, payload []byte) (interface{}, error) {
@@ -59,6 +60,14 @@ func (d *Deployments) deleteHandler(ctx context.Context, payload []byte) (interf
 
 func (d *Deployments) getHandler(ctx context.Context, payload []byte) (interface{}, error) {
 	data, err := d.get(ctx, payload)
+	if err != nil {
+		return nil, err.Err()
+	}
+	return data, nil
+}
+
+func (d *Deployments) changesHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	data, err := d.changes(ctx, payload)
 	if err != nil {
 		return nil, err.Err()
 	}

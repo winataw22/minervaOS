@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
+	"gopkg.in/yaml.v2"
 )
 
 // CreateNamespace creates a new namespace. Only admin can do this.
@@ -132,4 +133,20 @@ func (c *clientImpl) DBSize() (uint64, error) {
 		return 0, err
 	}
 	return size, nil
+}
+
+func (c *clientImpl) Namespace(name string) (ns Namespace, err error) {
+	con := c.pool.Get()
+	defer con.Close()
+
+	data, err := redis.Bytes(con.Do("NSINFO", name))
+	if err != nil {
+		return ns, err
+	}
+
+	if err := yaml.Unmarshal(data, &ns); err != nil {
+		return ns, err
+	}
+
+	return
 }

@@ -40,7 +40,10 @@ func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.Work
 	// otherwise we do the following:
 
 	// - We need to get the contract and the farm object this node belongs to
-	deployment := provision.GetDeployment(ctx)
+	deployment, err := provision.GetDeployment(ctx)
+	if err != nil {
+		return ip, gw, errors.Wrap(err, "failed to get deployment")
+	}
 	contract := provision.GetContract(ctx)
 
 	// - now we find out ALL ips belonging to this contract
@@ -129,7 +132,7 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	fName := filterName(tapName)
 
 	if network.PubIPFilterExists(ctx, fName) {
-		return result, provision.ErrDidNotChange
+		return result, provision.ErrNoActionNeeded
 	}
 
 	var ipv6 gridtypes.IPNet

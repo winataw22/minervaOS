@@ -94,10 +94,27 @@ func (d *Deployments) get(ctx context.Context, payload []byte) (interface{}, mw.
 
 	deployment, err := d.engine.Storage().Get(rmb.GetTwinID(ctx), args.ContractID)
 	if errors.Is(err, provision.ErrDeploymentNotExists) {
-		return nil, mw.NotFound(fmt.Errorf("workload not found"))
+		return nil, mw.NotFound(fmt.Errorf("deployment not found"))
 	} else if err != nil {
 		return nil, mw.Error(err)
 	}
 
 	return deployment, nil
+}
+
+func (d *Deployments) changes(ctx context.Context, payload []byte) (interface{}, mw.Response) {
+	var args idArgs
+	err := json.Unmarshal(payload, &args)
+	if err != nil {
+		return nil, mw.Error(err)
+	}
+
+	changes, err := d.engine.Storage().Changes(rmb.GetTwinID(ctx), args.ContractID)
+	if errors.Is(err, provision.ErrDeploymentNotExists) {
+		return nil, mw.NotFound(fmt.Errorf("deployment not found"))
+	} else if err != nil {
+		return nil, mw.Error(err)
+	}
+
+	return changes, nil
 }

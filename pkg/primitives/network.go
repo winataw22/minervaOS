@@ -17,7 +17,7 @@ import (
 
 // networkProvision is entry point to provision a network
 func (p *Primitives) networkProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
-	deployment := provision.GetDeployment(ctx)
+	twin, _ := provision.GetDeploymentID(ctx)
 
 	var network zos.Network
 	if err := json.Unmarshal(wl.Data, &network); err != nil {
@@ -29,7 +29,7 @@ func (p *Primitives) networkProvisionImpl(ctx context.Context, wl *gridtypes.Wor
 
 	_, err := mgr.CreateNR(ctx, pkg.Network{
 		Network: network,
-		NetID:   zos.NetworkID(deployment.TwinID, wl.Name),
+		NetID:   zos.NetworkID(twin, wl.Name),
 	})
 
 	if err != nil {
@@ -51,10 +51,11 @@ func (p *Primitives) networkDecommission(ctx context.Context, wl *gridtypes.Work
 		return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
 	}
 
-	deployment := provision.GetDeployment(ctx)
+	twin, _ := provision.GetDeploymentID(ctx)
+
 	if err := mgr.DeleteNR(ctx, pkg.Network{
 		Network: network,
-		NetID:   zos.NetworkID(deployment.TwinID, wl.Name),
+		NetID:   zos.NetworkID(twin, wl.Name),
 	}); err != nil {
 		return fmt.Errorf("failed to delete network resource: %w", err)
 	}

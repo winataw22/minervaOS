@@ -8,7 +8,17 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
+
+type Namespace struct {
+	Name              string         `yaml:"name"`
+	DataLimit         gridtypes.Unit `yaml:"data_limits_bytes"`
+	DataDiskFreespace gridtypes.Unit `yaml:"data_disk_freespace_bytes"`
+	Mode              string         `yaml:"mode"`
+	PasswordProtected bool           `yaml:"password"`
+	Public            bool           `yaml:"public"`
+}
 
 // Client interface
 type Client interface {
@@ -18,6 +28,7 @@ type Client interface {
 	Exist(name string) (bool, error)
 	DeleteNamespace(name string) error
 	Namespaces() ([]string, error)
+	Namespace(name string) (Namespace, error)
 	NamespaceSetSize(name string, size uint64) error
 	NamespaceSetPassword(name, password string) error
 	NamespaceSetMode(name, mode string) error

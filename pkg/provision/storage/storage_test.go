@@ -1,12 +1,13 @@
 package storage
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,8 +15,11 @@ import (
 	"github.com/threefoldtech/zos/pkg/provision"
 )
 
-var TestType = gridtypes.WorkloadType("test")
-var TestSharableType = gridtypes.WorkloadType("sharable")
+const (
+	testType1         = gridtypes.WorkloadType("type1")
+	testType2         = gridtypes.WorkloadType("type2")
+	testSharableType1 = gridtypes.WorkloadType("sharable1")
+)
 
 type TestData struct{}
 
@@ -32,370 +36,399 @@ func (t TestData) Capacity() (gridtypes.Capacity, error) {
 }
 
 func init() {
-	gridtypes.RegisterType(TestType, TestData{})
-	gridtypes.RegisterSharableType(TestSharableType, TestData{})
+	gridtypes.RegisterType(testType1, TestData{})
+	gridtypes.RegisterType(testType2, TestData{})
+	gridtypes.RegisterSharableType(testSharableType1, TestData{})
 }
 
-func TestStorageAdd(t *testing.T) {
+func TestCreateDeployment(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
 
-	store, err := NewFSStore(root)
+	db, err := New(path)
 	require.NoError(err)
 
-	twin := uint32(1)
-	id := uint64(1)
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	})
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+	err = db.Create(dl)
+	require.NoError(err)
 
-	require.NoError(err)
-	stat, err := os.Lstat(filepath.Join(root, fmt.Sprint(twin), fmt.Sprint(id)))
-	require.NoError(err)
-	require.True(stat.Mode().IsRegular())
+	err = db.Create(dl)
+	require.ErrorIs(err, provision.ErrDeploymentExists)
 }
 
-func TestStorageAddSharable(t *testing.T) {
+func TestCreateDeploymentWithWorkloads(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
 
-	store, err := NewFSStore(root)
+	db, err := New(path)
 	require.NoError(err)
 
-	twin := uint32(1)
-	id := uint64(1)
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
 		Workloads: []gridtypes.Workload{
 			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Type: testType1,
+				Name: "vm1",
 			},
 			{
-				Name: "shared",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Type: testType2,
+				Name: "vm2",
 			},
 		},
-	})
+	}
 
+	err = db.Create(dl)
 	require.NoError(err)
-	stat, err := os.Lstat(filepath.Join(root, fmt.Sprint(twin), fmt.Sprint(id)))
-	require.NoError(err)
-	require.True(stat.Mode().IsRegular())
 
-	shared, err := store.SharedByTwin(twin)
+	err = db.Create(dl)
+	require.ErrorIs(err, provision.ErrDeploymentExists)
+
+	loaded, err := db.Get(1, 10)
 	require.NoError(err)
-	require.Len(shared, 1)
-	require.Equal(gridtypes.NewUncheckedWorkloadID(twin, 1, "shared"), shared[0])
+	require.Len(loaded.Workloads, 2)
 }
 
-func TestStorageAddConflictingSharable(t *testing.T) {
+func TestCreateDeploymentWithSharableWorkloads(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
 
-	store, err := NewFSStore(root)
+	db, err := New(path)
 	require.NoError(err)
 
-	twin := uint32(1)
-	id := uint64(1)
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
 		Workloads: []gridtypes.Workload{
 			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Type: testType1,
+				Name: "vm1",
 			},
 			{
-				Name: "shared",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Type: testSharableType1,
+				Name: "network",
 			},
 		},
-	})
+	}
 
+	err = db.Create(dl)
 	require.NoError(err)
 
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  2,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "shared",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	})
+	dl.ContractID = 11
+	err = db.Create(dl)
+	require.ErrorIs(err, provision.ErrDeploymentConflict)
 
-	require.Error(err)
-	require.True(errors.Is(err, provision.ErrDeploymentConflict))
+	require.NoError(db.Remove(1, 10, "networkd"))
+	err = db.Create(dl)
+	require.ErrorIs(err, provision.ErrDeploymentConflict)
 
-	wlID, err := store.GetShared(twin, "shared")
-	require.NoError(err)
-	require.Equal(gridtypes.NewUncheckedWorkloadID(twin, id, "shared"), wlID)
 }
 
-func TestStorageSetSharable(t *testing.T) {
+func TestAddWorkload(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
 
-	store, err := NewFSStore(root)
+	db, err := New(path)
 	require.NoError(err)
 
-	twin := uint32(1)
-	id := uint64(1)
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "shared",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.ErrorIs(err, provision.ErrDeploymentNotExists)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.NoError(err)
+
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.ErrorIs(err, provision.ErrWorkloadExists)
+}
+
+func TestRemoveWorkload(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.NoError(err)
+
+	err = db.Remove(1, 10, "vm1")
+	require.NoError(err)
+
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.NoError(err)
+
+}
+
+func TestTransactions(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	_, err = db.Current(1, 10, "vm1")
+	require.ErrorIs(err, provision.ErrWorkloadNotExist)
+
+	err = db.Add(1, 10, gridtypes.Workload{Name: "vm1", Type: testType1})
+	require.NoError(err)
+
+	wl, err := db.Current(1, 10, "vm1")
+	require.NoError(err)
+	require.Equal(gridtypes.StateInit, wl.Result.State)
+
+	err = db.Transaction(1, 10, gridtypes.Workload{
+		Type: testType1,
+		Name: gridtypes.Name("wrong"), // wrong name
+		Result: gridtypes.Result{
+			Created: gridtypes.Now(),
+			State:   gridtypes.StateOk,
+		},
+	})
+
+	require.ErrorIs(err, provision.ErrWorkloadNotExist)
+
+	err = db.Transaction(1, 10, gridtypes.Workload{
+		Type: testType2, // wrong type
+		Name: gridtypes.Name("vm1"),
+		Result: gridtypes.Result{
+			Created: gridtypes.Now(),
+			State:   gridtypes.StateOk,
+		},
+	})
+
+	require.ErrorIs(err, ErrInvalidWorkloadType)
+
+	err = db.Transaction(1, 10, gridtypes.Workload{
+		Type: testType1,
+		Name: gridtypes.Name("vm1"),
+		Result: gridtypes.Result{
+			Created: gridtypes.Now(),
+			State:   gridtypes.StateOk,
 		},
 	})
 
 	require.NoError(err)
 
-	shared, err := store.SharedByTwin(twin)
+	wl, err = db.Current(1, 10, "vm1")
 	require.NoError(err)
-	require.Len(shared, 1)
-	require.Equal(gridtypes.NewUncheckedWorkloadID(twin, 1, "shared"), shared[0])
+	require.Equal(gridtypes.Name("vm1"), wl.Name)
+	require.Equal(testType1, wl.Type)
+	require.Equal(gridtypes.StateOk, wl.Result.State)
+}
 
-	err = store.Set(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
+func TestTwins(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	dl.TwinID = 2
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	twins, err := db.Twins()
+	require.NoError(err)
+
+	require.Len(twins, 2)
+	require.EqualValues(1, twins[0])
+	require.EqualValues(2, twins[1])
+}
+
+func TestGet(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	require.NoError(db.Add(dl.TwinID, dl.ContractID, gridtypes.Workload{Name: "vm1", Type: testType1}))
+	require.NoError(db.Add(dl.TwinID, dl.ContractID, gridtypes.Workload{Name: "vm2", Type: testType2}))
+
+	loaded, err := db.Get(1, 10)
+	require.NoError(err)
+
+	require.EqualValues(1, loaded.Version)
+	require.EqualValues(1, loaded.TwinID)
+	require.EqualValues(10, loaded.ContractID)
+	require.EqualValues("description", loaded.Description)
+	require.EqualValues("some metadata", loaded.Metadata)
+	require.Len(loaded.Workloads, 2)
+}
+
+func TestError(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	someError := fmt.Errorf("something is wrong")
+	err = db.Error(1, 10, someError)
+	require.ErrorIs(err, provision.ErrDeploymentNotExists)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+		Workloads: []gridtypes.Workload{
+			{Name: "vm1", Type: testType1},
+		},
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	err = db.Error(1, 10, someError)
+	require.NoError(err)
+
+	loaded, err := db.Get(1, 10)
+	require.NoError(err)
+	require.Equal(gridtypes.StateError, loaded.Workloads[0].Result.State)
+	require.Equal(someError.Error(), loaded.Workloads[0].Result.Error)
+}
+
+func TestMigrate(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
 		Workloads: []gridtypes.Workload{
 			{
-				Name: "shared",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
-				Result: gridtypes.Result{
-					Created: gridtypes.Now(),
-					State:   gridtypes.StateDeleted,
-				},
-			},
-			{
-				Name: "new",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Name: "vm1",
+				Type: testType1,
+				Data: json.RawMessage("null"),
 				Result: gridtypes.Result{
 					Created: gridtypes.Now(),
 					State:   gridtypes.StateOk,
+					Data:    json.RawMessage("\"hello\""),
 				},
 			},
 			{
-				Name: "errord",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
+				Name: "vm2",
+				Type: testType2,
+				Data: json.RawMessage("\"input\""),
 				Result: gridtypes.Result{
 					Created: gridtypes.Now(),
 					State:   gridtypes.StateError,
+					Data:    json.RawMessage("null"),
+					Error:   "some error",
 				},
 			},
 		},
+	}
+
+	migration := db.Migration()
+	err = migration.Migrate(dl)
+	require.NoError(err)
+
+	loaded, err := db.Get(1, 10)
+	sort.Slice(loaded.Workloads, func(i, j int) bool {
+		return loaded.Workloads[i].Name < loaded.Workloads[j].Name
 	})
 
 	require.NoError(err)
-
-	shared, err = store.SharedByTwin(twin)
-	require.NoError(err)
-	require.Len(shared, 1)
-	require.Equal(gridtypes.NewUncheckedWorkloadID(twin, 1, "new"), shared[0])
-
-	err = store.Add(gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  2,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "new",
-				Type: TestSharableType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	})
-
-	require.Error(err)
-	require.True(errors.Is(err, provision.ErrDeploymentConflict))
-
-	wlID, err := store.GetShared(twin, "new")
-	require.NoError(err)
-	require.Equal(gridtypes.NewUncheckedWorkloadID(twin, id, "new"), wlID)
+	require.EqualValues(dl, loaded)
 }
 
-func TestStorageSet(t *testing.T) {
+func TestMigrateUnsafe(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
 
-	store, err := NewFSStore(root)
-	require.NoError(err)
-
-	twin := uint32(1)
-	id := uint64(1)
-	deployment := gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	}
-
-	err = store.Set(deployment)
-
-	require.Error(err)
-	require.True(errors.Is(err, provision.ErrDeploymentNotExists))
-
-	err = store.Add(deployment)
+	db, err := New(path)
 	require.NoError(err)
 
-	err = store.Set(deployment)
-	require.NoError(err)
-}
+	migration := db.Migration()
 
-func TestStorageGet(t *testing.T) {
-	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
-
-	store, err := NewFSStore(root)
-	require.NoError(err)
-	twin := uint32(1)
-	id := uint64(1)
-	deployment := gridtypes.Deployment{
-		TwinID:      twin,
-		ContractID:  id,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	}
-
-	err = store.Add(deployment)
-	require.NoError(err)
-
-	loaded, err := store.Get(deployment.TwinID, deployment.ContractID)
-	require.NoError(err)
-	require.Equal(deployment.Description, loaded.Description)
-	require.Equal(deployment.Metadata, loaded.Metadata)
-	require.Equal(len(deployment.Workloads), len(deployment.Workloads))
-}
-
-func TestStorageByTwin(t *testing.T) {
-	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
-
-	store, err := NewFSStore(root)
-	require.NoError(err)
-
-	deployment1 := gridtypes.Deployment{
-		TwinID:      1,
-		ContractID:  1,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	}
-
-	err = store.Add(deployment1)
-	require.NoError(err)
-
-	deployment2 := gridtypes.Deployment{
-		TwinID:      1,
-		ContractID:  2,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	}
-
-	err = store.Add(deployment2)
-	require.NoError(err)
-
-	deployment3 := gridtypes.Deployment{
-		TwinID:      2,
-		ContractID:  1,
-		Metadata:    "meta",
-		Description: "descriptions",
-		Workloads: []gridtypes.Workload{
-			{
-				Name: "volume",
-				Type: TestType,
-				Data: gridtypes.MustMarshal(TestData{}),
-			},
-		},
-	}
-
-	err = store.Add(deployment3)
-	require.NoError(err)
-
-	ids, err := store.ByTwin(1)
-	require.NoError(err)
-	require.Len(ids, 2)
-
-	ids, err = store.ByTwin(2)
-	require.NoError(err)
-	require.Len(ids, 1)
-
+	require.False(db.unsafe)
+	require.True(migration.unsafe.unsafe)
 }

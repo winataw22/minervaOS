@@ -140,11 +140,11 @@ func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) error {
 }
 
 // Provision implements the provisioner interface
-func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (*gridtypes.Result, error) {
+func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (result gridtypes.Result, err error) {
 	current := s.Current()
 	needed, err := wl.Capacity()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to calculate workload needed capacity")
+		return result, errors.Wrap(err, "failed to calculate workload needed capacity")
 	}
 
 	// we add extra overhead for some workload types here
@@ -154,11 +154,11 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 	} // TODO: other types ?
 
 	if err := s.hasEnoughCapacity(&needed); err != nil {
-		return nil, errors.Wrap(err, "failed to satisfy required capacity")
+		return result, errors.Wrap(err, "failed to satisfy required capacity")
 	}
 
 	ctx = context.WithValue(ctx, currentCapacityKey{}, current)
-	result, err := s.inner.Provision(ctx, wl)
+	result, err = s.inner.Provision(ctx, wl)
 	if err != nil {
 		return result, err
 	}
@@ -188,7 +188,7 @@ func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.WorkloadWit
 }
 
 // Update implements the provisioner interface
-func (s *Statistics) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (*gridtypes.Result, error) {
+func (s *Statistics) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error) {
 	return s.inner.Update(ctx, wl)
 }
 

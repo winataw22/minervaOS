@@ -171,7 +171,7 @@ func (s *Module) initialize() error {
 			// force ssd device for vms
 			typ = zos.SSDDevice
 
-			if device.Name() == "/dev/vdd" || device.Name() == "/dev/vde" {
+			if device.Path() == "/dev/vdd" || device.Path() == "/dev/vde" {
 				typ = zos.HDDDevice
 			}
 		}

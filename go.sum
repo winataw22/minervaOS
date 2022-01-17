@@ -153,6 +153,7 @@ github.com/blang/semver v3.5.1+incompatible h1:cQNTCjp13qL8KC3Nbxr/y2Bqb63oX6wdn
 github.com/blang/semver v3.5.1+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869/go.mod h1:Ekp36dRnpXw/yCqJaO+ZrUyxD+3VXMFFr56k5XYrpB4=
 github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40/go.mod h1:8rLXio+WjiTceGBHIoTvn60HIbs7Hm7bcHjyrSqYB9c=
+github.com/boltdb/bolt v1.3.1 h1:JQmyP4ZBrce+ZQu0dY660FMfatumYDLun9hBCUVIkF4=
 github.com/boltdb/bolt v1.3.1/go.mod h1:clJnj/oiGkjum5o1McbSZDSLxVThjynRyGBgiAx27Ps=
 github.com/bshuster-repo/logrus-logstash-hook v0.4.1/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
 github.com/btcsuite/btcd v0.0.0-20171128150713-2e60448ffcc6/go.mod h1:Dmm/EzmjnCiweXmzRIAiUWCInVmPgjkzgv5k4tVyXiQ=
@@ -333,6 +334,7 @@ github.com/d2g/dhcp4client v1.0.0/go.mod h1:j0hNfjhrt2SxUOw55nL0ATM/z4Yt3t2Kd1mW
 github.com/d2g/dhcp4server v0.0.0-20181031114812-7d4a0a7f59a5/go.mod h1:Eo87+Kg/IX2hfWJfwxMzLyuSZyxSoAug2nGa1G2QAi8=
 github.com/d2g/hardwareaddr v0.0.0-20190221164911-e7d9fbe030e4/go.mod h1:bMl4RjIciD2oAxI7DmWRx6gbeqrkoLqv3MV0vzNad+I=
 github.com/dave/jennifer v1.2.0/go.mod h1:fIb+770HOpJ2fmN9EPPKOqm1vMGhB+TwXKMZhrIygKg=
+github.com/dave/jennifer v1.3.0 h1:p3tl41zjjCZTNBytMwrUuiAnherNUZktlhPTKoF/sEk=
 github.com/dave/jennifer v1.3.0/go.mod h1:fIb+770HOpJ2fmN9EPPKOqm1vMGhB+TwXKMZhrIygKg=
 github.com/davecgh/go-spew v0.0.0-20171005155431-ecdeabc65495/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -1026,6 +1028,8 @@ github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7 h1:64QIPSO1Ac
 github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
 github.com/threefoldtech/go-rmb v0.1.7 h1:3xpGgPx/nxDSkEFm1chaXZ4iKkwkYdplgsqQHicg83c=
 github.com/threefoldtech/go-rmb v0.1.7/go.mod h1:+9ql1bqMqmBpudtafk5HG4WO0E7Y5AX9Q2njM8SAvnU=
+github.com/threefoldtech/go-rmb v0.1.8-0.20220114102147-d3d03a1678f4 h1:C9IzXo3hEcLd8gh0OYMUN+fc2Pxr5pBvqcX2aNCq3fY=
+github.com/threefoldtech/go-rmb v0.1.8-0.20220114102147-d3d03a1678f4/go.mod h1:+9ql1bqMqmBpudtafk5HG4WO0E7Y5AX9Q2njM8SAvnU=
 github.com/threefoldtech/substrate-client v0.0.0-20210930125201-9bd88e80762d/go.mod h1:t/85gAaltVbJmUnCVwu5lpNKn0HLn9Z9vu/NFJlJcrk=
 github.com/threefoldtech/substrate-client v0.0.0-20211231191725-b8f9d49d9a97 h1:3fm4M2cpOMgjirzLLNTxElUI7ksSu+z3z+NtP7zAY+E=
 github.com/threefoldtech/substrate-client v0.0.0-20211231191725-b8f9d49d9a97/go.mod h1:kI84UXFN+t0v7I3Qtj+otQwIaGel+AT86L5B0t/zQpI=

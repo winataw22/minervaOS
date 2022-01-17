@@ -185,6 +185,24 @@ func (s *Module) DiskCreate(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 	return pkg.VDisk{Path: path, Size: int64(size)}, err
 }
 
+// DiskCreate with given size, return path to virtual disk (size in MB)
+func (s *Module) DiskResize(name string, size gridtypes.Unit) (disk pkg.VDisk, err error) {
+	path, err := s.findDisk(name)
+	if err != nil {
+		return disk, errors.Wrapf(os.ErrNotExist, "disk with id '%s' does not exists", name)
+	}
+
+	file, err := os.OpenFile(path, os.O_RDWR, 0666)
+	if err != nil {
+		return pkg.VDisk{}, err
+	}
+
+	defer file.Close()
+
+	err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size))
+	return pkg.VDisk{Path: path, Size: int64(size)}, err
+}
+
 func (s *Module) ensureFS(disk string) error {
 	output, err := exec.Command("mkfs.btrfs", disk).CombinedOutput()
 	if err == nil {

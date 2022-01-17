@@ -108,7 +108,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		config ZMachine
 	)
 	if vm.Exists(ctx, wl.ID.String()) {
-		return result, provision.ErrDidNotChange
+		return result, provision.ErrNoActionNeeded
 	}
 
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
@@ -136,8 +136,10 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	result.ID = wl.ID.String()
 	result.IP = netConfig.IP.String()
 
-	deployment := provision.GetDeployment(ctx)
-
+	deployment, err := provision.GetDeployment(ctx)
+	if err != nil {
+		return result, errors.Wrap(err, "failed to get deployment")
+	}
 	networkInfo := pkg.VMNetworkInfo{
 		Nameservers: []net.IP{net.ParseIP("8.8.8.8"), net.ParseIP("1.1.1.1"), net.ParseIP("2001:4860:4860::8888")},
 	}
@@ -385,8 +387,9 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 
 	if len(cfg.Network.PublicIP) > 0 {
-		deployment := provision.GetDeployment(ctx)
-		ipWl, err := deployment.Get(cfg.Network.PublicIP)
+		// TODO: we need to make sure workload status reflects the actual status by the engine
+		// this is not the case anymore.
+		ipWl, err := provision.GetWorkload(ctx, cfg.Network.PublicIP)
 		if err != nil {
 			return err
 		}

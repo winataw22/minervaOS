@@ -16,8 +16,11 @@ const (
 //Devices list all "allocated" devices
 func (m *Module) Devices() ([]pkg.Device, error) {
 	var devices []pkg.Device
+	log.Debug().Int("disks", len(m.hdds)).Msg("listing zdb devices")
 	for _, hdd := range m.hdds {
+		log.Debug().Str("device", hdd.Path()).Msg("checking device")
 		if _, err := hdd.Mounted(); err != nil {
+			log.Debug().Str("device", hdd.Path()).Msg("not mounted")
 			continue
 		}
 
@@ -31,6 +34,7 @@ func (m *Module) Devices() ([]pkg.Device, error) {
 			return nil, err
 		}
 		for _, vol := range volumes {
+			log.Debug().Str("volume", vol.Path()).Str("name", vol.Name()).Msg("checking volume")
 			if vol.Name() != zdbVolume {
 				continue
 			}

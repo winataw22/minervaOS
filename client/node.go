@@ -120,6 +120,20 @@ func (n *NodeClient) DeploymentGet(ctx context.Context, contractID uint64) (dl g
 	return dl, nil
 }
 
+// DeploymentGet gets a deployment via contract ID
+func (n *NodeClient) DeploymentChanges(ctx context.Context, contractID uint64) (changes []gridtypes.Workload, err error) {
+	const cmd = "zos.deployment.changes"
+	in := args{
+		"contract_id": contractID,
+	}
+
+	if err = n.bus.Call(ctx, n.nodeTwin, cmd, in, &changes); err != nil {
+		return changes, err
+	}
+
+	return changes, nil
+}
+
 // DeploymentDelete deletes a deployment, the node will make sure to decomission all deployments
 // and set all workloads to deleted. A call to Get after delete is valid
 func (n *NodeClient) DeploymentDelete(ctx context.Context, contractID uint64) error {

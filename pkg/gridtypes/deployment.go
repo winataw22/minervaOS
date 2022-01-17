@@ -90,7 +90,7 @@ type KeyGetter interface {
 type Deployment struct {
 	// Version must be set to 0 on deployment creation. And then it has to
 	// be incremented with each call to update.
-	Version int `json:"version"`
+	Version uint32 `json:"version"`
 	// TwinID is the id of the twin sendign the deployment. A twin then can only
 	// `get` status about deployments he owns.
 	TwinID uint32 `json:"twin_id"`
@@ -589,3 +589,16 @@ const (
 	OpAdd
 	OpUpdate
 )
+
+func (o JobOperation) String() string {
+	switch o {
+	case OpRemove:
+		return "remove"
+	case OpAdd:
+		return "add"
+	case OpUpdate:
+		return "update"
+	default:
+		return "unknown"
+	}
+}

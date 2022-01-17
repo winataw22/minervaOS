@@ -3,8 +3,10 @@ package provisiond
 import (
 	"context"
 	"crypto/ed25519"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
@@ -21,6 +23,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/primitives"
 	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
+	fsStorage "github.com/threefoldtech/zos/pkg/provision/storage.fs"
 	"github.com/threefoldtech/zos/pkg/rmb"
 	"github.com/urfave/cli/v2"
 
@@ -38,6 +41,11 @@ const (
 	provisionModule  = "provision"
 	statisticsModule = "statistics"
 	gib              = 1024 * 1024 * 1024
+
+	boltStorageDB = "workloads.bolt"
+
+	// deprecated, kept for migration
+	fsStorageDB = "workloads"
 )
 
 // Module entry point
@@ -147,9 +155,27 @@ func action(cli *cli.Context) error {
 	// keep track of resource units reserved and amount of workloads provisionned
 
 	// to store reservation locally on the node
-	store, err := storage.NewFSStore(filepath.Join(rootDir, "workloads"))
+	store, err := storage.New(filepath.Join(rootDir, boltStorageDB))
 	if err != nil {
 		return errors.Wrap(err, "failed to create local reservation store")
+	}
+	defer store.Close()
+	// we check if the old fs storage still exists
+	fsStoragePath := filepath.Join(rootDir, fsStorageDB)
+	if _, err := os.Stat(fsStoragePath); err == nil {
+		// if it does we need to migrate this storage to new bolt storage
+		fs, err := fsStorage.NewFSStore(fsStoragePath)
+		if err != nil {
+			return err
+		}
+
+		if err := storageMigration(store, fs); err != nil {
+			return errors.Wrap(err, "storage migration failed")
+		}
+
+		if err := os.RemoveAll(fsStoragePath); err != nil {
+			log.Error().Err(err).Msg("failed to clean up deprecated storage")
+		}
 	}
 
 	provisioners := primitives.NewPrimitivesProvisioner(cl)
@@ -268,7 +294,9 @@ func action(cli *cli.Context) error {
 		Msg("starting provision module")
 
 	// call the runtime upgrade before running engine
-	provisioners.InitializeZDB(ctx)
+	if err := provisioners.InitializeZDB(ctx); err != nil {
+		log.Error().Err(err).Msg("failed to initialize zdb subsystem")
+	}
 
 	// spawn the engine
 	go func() {
@@ -344,6 +372,52 @@ func setupMessageBusses(router rmb.Router, cl zbus.Client, engine provision.Engi
 	_ = mbus.NewDeploymentMessageBus(router, engine)
 
 	_ = mbus.NewNetworkMessagebus(router, engine, cl)
+
+	return nil
+}
+
+func storageMigration(db *storage.BoltStorage, fs *fsStorage.Fs) error {
+	log.Info().Msg("starting storage migration")
+	twins, err := fs.Twins()
+	if err != nil {
+		return err
+	}
+	migration := db.Migration()
+	errorred := false
+	for _, twin := range twins {
+		dls, err := fs.ByTwin(twin)
+		if err != nil {
+			log.Error().Err(err).Uint32("twin", twin).Msg("failed to list twin deployments")
+			continue
+		}
+
+		sort.Slice(dls, func(i, j int) bool {
+			return dls[i] < dls[j]
+		})
+
+		for _, dl := range dls {
+			log.Info().Uint32("twin", twin).Uint64("deployment", dl).Msg("processing deployment migration")
+			deployment, err := fs.Get(twin, dl)
+			if err != nil {
+				log.Error().Err(err).Uint32("twin", twin).Uint64("deployment", dl).Msg("failed to get deployment")
+				errorred = true
+				continue
+			}
+			if err := migration.Migrate(deployment); err != nil {
+				log.Error().Err(err).Uint32("twin", twin).Uint64("deployment", dl).Msg("failed to migrate deployment")
+				errorred = true
+				continue
+			}
+			if err := fs.Delete(deployment); err != nil {
+				log.Error().Err(err).Uint32("twin", twin).Uint64("deployment", dl).Msg("failed to delete migrated deployment")
+				continue
+			}
+		}
+	}
+
+	if errorred {
+		return fmt.Errorf("not all deployments where migrated")
+	}
 
 	return nil
 }
