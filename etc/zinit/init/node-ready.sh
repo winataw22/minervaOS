@@ -23,6 +23,8 @@ main() {
 
     # does not expose qemu overlay to the system
     disable_overlay
+
+    exit 0
 }
 
 main

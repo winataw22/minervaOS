@@ -147,7 +147,7 @@ func (r *Reporter) pushOne() ([]Consumption, error) {
 		return nil, errors.Wrap(err, "failed to publish consumption report")
 	}
 
-	log.Info().Str("hash", hash).Msg("report block hash")
+	log.Info().Str("hash", hash.Hex()).Msg("report block hash")
 
 	// only removed if report is reported to substrate
 	// remove item from queue

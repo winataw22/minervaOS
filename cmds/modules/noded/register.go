@@ -322,9 +322,12 @@ func uptime(ctx context.Context, cl zbus.Client) error {
 			return errors.Wrap(err, "failed to get uptime")
 		}
 		log.Debug().Msg("updating node uptime")
-		if err := sub.UpdateNodeUptime(id, uptime); err != nil {
-			log.Error().Err(err).Msg("failed to report uptime")
+		hash, err := sub.UpdateNodeUptime(id, uptime)
+		if err != nil {
+			return errors.Wrap(err, "failed to report uptime")
 		}
+
+		log.Info().Str("hash", hash.Hex()).Msg("node uptime hash")
 
 		select {
 		case <-ctx.Done():
