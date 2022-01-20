@@ -120,7 +120,8 @@ type ZMachine struct {
 	// is going to be used
 	Entrypoint string `json:"entrypoint"`
 	// Env variables available for a container
-	Env map[string]string `json:"env"`
+	Env   map[string]string `json:"env"`
+	Corex bool              `json:"corex"`
 }
 
 func (m *ZMachine) MinRootSize() gridtypes.Unit {

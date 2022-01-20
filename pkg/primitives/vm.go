@@ -5,7 +5,9 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -282,6 +284,12 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err := p.vmMounts(ctx, deployment, config.Mounts, true, &machine); err != nil {
 			return result, err
 		}
+		if config.Corex {
+			if err := p.copyFile("/usr/bin/corex", filepath.Join(mnt, "corex"), 0755); err != nil {
+				return result, errors.Wrap(err, "failed to inject corex binary")
+			}
+			entrypoint = "/corex --ipv6 -d 7 --interface eth0"
+		}
 	} else {
 		// if a VM the vm has to have at least one mount
 		if len(config.Mounts) == 0 {
@@ -340,6 +348,23 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	}
 
 	return result, err
+}
+func (p *Primitives) copyFile(srcPath string, destPath string, permissions os.FileMode) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return errors.Wrapf(err, "Coludn't find %s on the node", srcPath)
+	}
+	defer src.Close()
+	dest, err := os.OpenFile(destPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, permissions)
+	if err != nil {
+		return errors.Wrapf(err, "Coludn't create %s file", destPath)
+	}
+	defer dest.Close()
+	_, err = io.Copy(dest, src)
+	if err != nil {
+		return errors.Wrapf(err, "Couldn't copy to %s", destPath)
+	}
+	return nil
 }
 
 func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
