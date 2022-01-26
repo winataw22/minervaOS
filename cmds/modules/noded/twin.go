@@ -4,19 +4,17 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/go-rmb"
+	"github.com/threefoldtech/substrate-client"
 )
 
-func runMsgBus(ctx context.Context, twin uint32, substrate string) error {
+func runMsgBus(ctx context.Context, substrate string, identity substrate.Identity) error {
 	// todo: make it argument or parse from broker
 	const redis = "/var/run/redis.sock"
-	app, err := rmb.NewServer(substrate, redis, int(twin), 100)
+	app, err := rmb.NewServer(substrate, redis, 100, identity)
 	if err != nil {
 		return err
 	}
-
-	log.Info().Uint32("twin", twin).Msg("starting twin")
 
 	if err := app.Serve(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err

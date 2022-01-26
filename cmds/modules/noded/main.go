@@ -2,6 +2,7 @@ package noded
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -201,6 +203,12 @@ func action(cli *cli.Context) error {
 
 	log.Info().Uint32("twin", twin).Msg("node has been registered")
 	log.Debug().Msg("start message bus")
+	identityd := stubs.NewIdentityManagerStub(redis)
+	sk := ed25519.PrivateKey(identityd.PrivateKey(ctx))
+	id, err := substrate.NewIdentityFromEd25519Key(sk)
+	if err != nil {
+		return err
+	}
 
-	return runMsgBus(ctx, twin, env.SubstrateURL)
+	return runMsgBus(ctx, env.SubstrateURL, id)
 }
