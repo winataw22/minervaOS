@@ -61,7 +61,7 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/go-rmb v0.1.9
+	github.com/threefoldtech/go-rmb v0.1.10-0.20220127085422-3c3667e4fc58
 	github.com/threefoldtech/substrate-client v0.0.0-20220118133601-4e68945dc064
 	github.com/threefoldtech/zbus v0.1.5
 	github.com/tinylib/msgp v1.1.5 // indirect

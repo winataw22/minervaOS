@@ -1021,10 +1021,8 @@ github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954/go.mod h1:u2MKk
 github.com/tchap/go-patricia v2.2.6+incompatible/go.mod h1:bmLyhP68RS6kStMGxByiQ23RP/odRBOTVjwp2cDyi6I=
 github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7 h1:64QIPSO1Acx7ENdMwQ0Q4tnE94By1BljA/2R2NbY51Y=
 github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
-github.com/threefoldtech/go-rmb v0.1.8-0.20220126082719-8d5ea5b2d798 h1:H927/dBtFaGf0efixeU3axjxRwb5DdSj6mMcjUJ2Sww=
-github.com/threefoldtech/go-rmb v0.1.8-0.20220126082719-8d5ea5b2d798/go.mod h1:kWpSCWxgc7OUGVYmDqioSUkV99xLoZVlBZNbxleex8o=
-github.com/threefoldtech/go-rmb v0.1.9 h1:Cz+YH6j4SNtWTje78+Dzp3Omp9mGVdvMANwMf4AwZII=
-github.com/threefoldtech/go-rmb v0.1.9/go.mod h1:kWpSCWxgc7OUGVYmDqioSUkV99xLoZVlBZNbxleex8o=
+github.com/threefoldtech/go-rmb v0.1.10-0.20220127085422-3c3667e4fc58 h1:oefoA0KRgyH9RSN/UXXcwc3+pUkzXU50cYmfiOIRPng=
+github.com/threefoldtech/go-rmb v0.1.10-0.20220127085422-3c3667e4fc58/go.mod h1:kWpSCWxgc7OUGVYmDqioSUkV99xLoZVlBZNbxleex8o=
 github.com/threefoldtech/substrate-client v0.0.0-20220118133601-4e68945dc064 h1:JgJ2X7EnJuZ311wDF/3zLBttU/so4maOoKQDQQ3U6ZY=
 github.com/threefoldtech/substrate-client v0.0.0-20220118133601-4e68945dc064/go.mod h1:kI84UXFN+t0v7I3Qtj+otQwIaGel+AT86L5B0t/zQpI=
 github.com/threefoldtech/zbus v0.1.5 h1:S9kXbjejoRRnJw1yKHEXFGF2vqL+Drae2n4vpj0pGHo=
