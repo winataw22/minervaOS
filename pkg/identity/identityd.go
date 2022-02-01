@@ -54,7 +54,7 @@ func NewManager(path string) (pkg.IdentityManager, error) {
 
 	sub, err := substrate.NewSubstrate(env.SubstrateURL)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to substrate")
 	}
 	return &identityManager{
 		key: pair,
