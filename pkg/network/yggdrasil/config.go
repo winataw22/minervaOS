@@ -40,7 +40,7 @@ func (n *NodeConfig) Address() (net.IP, error) {
 	return ip, nil
 }
 
-func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
+func (n *NodeConfig) FindPeers(ctx context.Context, top uint, filter ...Filter) error {
 	pl := fetchPeerList()
 	peersUp, err := pl.Ups(filter...)
 	if err != nil {
@@ -60,12 +60,10 @@ func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
 	}
 
 	// select the best 3 public peers
-	peers := make([]string, 3)
-	for i := 0; i < 3; i++ {
-		if len(results) > i {
-			peers[i] = results[i].Endpoint
-			log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
-		}
+	var peers []string
+	for i := 0; i < int(top); i++ {
+		peers = append(peers, results[i].Endpoint)
+		log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
 	}
 
 	n.Peers = peers

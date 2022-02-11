@@ -57,7 +57,7 @@ func EnsureYggdrasil(ctx context.Context, privateKey ed25519.PrivateKey, ns Yggd
 	z := zinit.Default()
 
 	cfg := GenerateConfig(privateKey)
-	if err := cfg.FindPeers(ctx, filter); err != nil {
+	if err := cfg.FindPeers(ctx, 4, filter); err != nil {
 		return nil, err
 	}
 
