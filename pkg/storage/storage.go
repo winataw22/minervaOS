@@ -55,10 +55,7 @@ type Module struct {
 
 // New create a new storage module service
 func New() (*Module, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-
-	m := filesystem.DefaultDeviceManager(ctx)
+	m := filesystem.DefaultDeviceManager()
 
 	s := &Module{
 		ssds:          []filesystem.Pool{},
@@ -108,7 +105,7 @@ func (s *Module) dump() {
 			log.Debug().Msgf("pool %s is mounted at: %s", pool.Name(), path)
 		}
 		device := pool.Device()
-		log.Debug().Str("path", device.Path()).Str("label", pool.Name()).Str("type", string(zos.SSDDevice)).Send()
+		log.Debug().Str("path", device.Path).Str("label", pool.Name()).Str("type", string(zos.SSDDevice)).Send()
 	}
 
 	for _, pool := range s.hdds {
@@ -117,7 +114,7 @@ func (s *Module) dump() {
 			log.Debug().Msgf("pool %s is mounted at: %s", pool.Name(), path)
 		}
 		device := pool.Device()
-		log.Debug().Str("path", device.Path()).Str("label", pool.Name()).Str("type", string(zos.HDDDevice)).Send()
+		log.Debug().Str("path", device.Path).Str("label", pool.Name()).Str("type", string(zos.HDDDevice)).Send()
 	}
 
 }
@@ -149,21 +146,23 @@ func (s *Module) initialize() error {
 	}
 
 	for _, device := range devices {
+		log.Debug().Msgf("device: %+v", device)
 		pool, err := filesystem.NewBtrfsPool(device)
 		if err != nil {
-			log.Error().Err(err).Str("device", device.Path()).Msg("failed to create pool on device")
-			s.brokenDevices = append(s.brokenDevices, pkg.BrokenDevice{Path: device.Path(), Err: err})
+			log.Error().Err(err).Str("device", device.Path).Msg("failed to create pool on device")
+			s.brokenDevices = append(s.brokenDevices, pkg.BrokenDevice{Path: device.Path, Err: err})
 			continue
 		}
 
 		_, err = pool.Mount()
 		if err != nil {
+			log.Error().Err(err).Str("device", device.Path).Msg("failed to mount pool")
 			s.brokenPools = append(s.brokenPools, pkg.BrokenPool{Label: pool.Name(), Err: err})
 			continue
 		}
 		usage, err := pool.Usage()
 		if err != nil {
-			log.Error().Err(err).Str("pool", pool.Name()).Str("device", device.Path()).Msg("failed to get usage of pool")
+			log.Error().Err(err).Str("pool", pool.Name()).Str("device", device.Path).Msg("failed to get usage of pool")
 		}
 
 		typ := device.Type()
@@ -171,7 +170,7 @@ func (s *Module) initialize() error {
 			// force ssd device for vms
 			typ = zos.SSDDevice
 
-			if device.Path() == "/dev/vdd" || device.Path() == "/dev/vde" {
+			if device.Path == "/dev/vdd" || device.Path == "/dev/vde" {
 				typ = zos.HDDDevice
 			}
 		}
@@ -511,6 +510,8 @@ func (s *Module) ensureCache() error {
 		return syscall.Mount("", "/var/cache", "tmpfs", 0, "size=500M")
 	}
 
+	_ = app.DeleteFlag(app.LimitedCache)
+
 	log.Info().Msgf("set cache quota to %d GiB", cacheSize/gib)
 	if err := cacheFs.Limit(cacheSize); err != nil {
 		log.Error().Err(err).Msg("failed to set cache quota")
@@ -704,7 +705,7 @@ func (s *Module) Monitor(ctx context.Context) <-chan pkg.PoolsStats {
 
 				var deviceNames []string
 				for _, device := range devices {
-					deviceNames = append(deviceNames, device.Path())
+					deviceNames = append(deviceNames, device.Path)
 				}
 
 				usage, err := disk.UsageWithContext(ctx, pool.Path())
@@ -755,8 +756,8 @@ func (s *Module) shutdownDisks(vm bool) {
 	for _, set := range [][]filesystem.Pool{s.ssds, s.hdds} {
 		for _, pool := range set {
 			device := pool.Device()
-			log.Debug().Msgf("checking device: %s", device.Path())
-			on, err := checkDiskPowerStatus(device.Path())
+			log.Debug().Msgf("checking device: %s", device.Path)
+			on, err := checkDiskPowerStatus(device.Path)
 			if err != nil {
 				log.Err(err).Msgf("error occurred while checking disk power status")
 				continue
@@ -771,10 +772,10 @@ func (s *Module) shutdownDisks(vm bool) {
 				continue
 			}
 
-			log.Debug().Msgf("shutting down device %s because it is not mounted and the device is on", device.Path())
+			log.Debug().Msgf("shutting down device %s because it is not mounted and the device is on", device.Path)
 			err = pool.Shutdown()
 			if err != nil {
-				log.Err(err).Msgf("failed to shutdown device %s", device.Path())
+				log.Err(err).Msgf("failed to shutdown device %s", device.Path)
 				continue
 			}
 		}

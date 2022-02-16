@@ -14,23 +14,23 @@ func TestDeviceManagerScan(t *testing.T) {
 	ctx := context.Background()
 
 	// we expect this call to lsblk
-	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL", "--bytes", "--exclude", "1,2,11", "--path").
+	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL,ROTA", "--bytes", "--exclude", "1,2,11", "--path").
 		Return(TestMap{
 			"blockdevices": []TestMap{
-				{"subsystems": "block:scsi:pci", "path": "/tmp/dev1", "name": "dev1"},
-				{"subsystems": "block:scsi:pci", "path": "/tmp/dev2", "name": "dev2"},
+				{"subsystems": "block:scsi:pci", "path": "/tmp/dev1", "name": "dev1", "label": "test"},
+				{"subsystems": "block:scsi:pci", "path": "/tmp/dev2", "name": "dev2", "label": "test2"},
 			},
 		}.Bytes(), nil)
 
 	// then other calls per device for extended details
-	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL", "--bytes", "--exclude", "1,2,11", "--path", "/tmp/dev1").
+	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL,ROTA", "--bytes", "--exclude", "1,2,11", "--path", "/tmp/dev1").
 		Return(TestMap{
 			"blockdevices": []TestMap{
 				{"subsystems": "block:scsi:pci", "path": "/tmp/dev1", "name": "dev1", "label": "test"},
 			},
 		}.Bytes(), nil)
 
-	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL", "--bytes", "--exclude", "1,2,11", "--path", "/tmp/dev2").
+	exec.On("run", ctx, "lsblk", "--json", "-o", "PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL,ROTA", "--bytes", "--exclude", "1,2,11", "--path", "/tmp/dev2").
 		Return(TestMap{
 			"blockdevices": []TestMap{
 				{"subsystems": "block:scsi:pci", "path": "/tmp/dev2", "name": "dev2", "label": "test2"},
@@ -66,7 +66,7 @@ func TestDeviceManagerScan(t *testing.T) {
 	exec.On("run", mock.Anything, "seektime", "-j", "/tmp/dev2").
 		Return([]byte(`{"type": "HDD", "elapsed": 5000}`), nil)
 
-	mgr := defaultDeviceManager(ctx, &exec)
+	mgr := defaultDeviceManager(&exec)
 
 	cached, err := mgr.Devices(ctx)
 	require.NoError(err)
@@ -81,6 +81,6 @@ func TestDeviceManagerScan(t *testing.T) {
 	require.NoError(err)
 	require.Len(filtered, 1)
 
-	require.Equal("/tmp/dev1", filtered[0].Path())
+	require.Equal("/tmp/dev1", filtered[0].Path)
 
 }

@@ -24,6 +24,7 @@ const (
 
 // VDiskPools return a list of all vdisk pools
 func (s *Module) diskPools() ([]string, error) {
+
 	var paths []string
 	for _, pool := range s.ssds {
 		if _, err := pool.Mounted(); err != nil {

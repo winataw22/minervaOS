@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
-	"strings"
 	"syscall"
 	"time"
 
@@ -15,35 +15,20 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
-// Device interface
-type Device interface {
-	// Path returns path to the device like /dev/sda
-	Path() string
-	// Name returns name of the device like sda
-	Name() string
-	// Size device size
-	Size() uint64
-	// Type returns detected device type (hdd, ssd)
-	Type() zos.DeviceType
-	// Info is current device information, this should not be cached because
-	// it might change over time
-	Info() (DeviceInfo, error)
-	// ReadTime detected read time of the device
-	ReadTime() uint64
-}
-
 // DeviceManager is able to list all/specific devices on a system
 type DeviceManager interface {
 	// Device returns the device at the specified path
-	Device(ctx context.Context, device string) (Device, error)
+	Device(ctx context.Context, device string) (DeviceInfo, error)
 	// Devices finds all devices on a system
 	Devices(ctx context.Context) (Devices, error)
 	// ByLabel finds all devices with the specified label
 	ByLabel(ctx context.Context, label string) (Devices, error)
+	// Mountpoint returns mount point of a device
+	Mountpoint(ctx context.Context, device string) (string, error)
 }
 
 // Devices represents a list of cached in memory devices
-type Devices []Device
+type Devices []DeviceInfo
 
 // FSType type of filesystem on device
 type FSType string
@@ -64,92 +49,36 @@ type blockDevices struct {
 
 // DeviceInfo contains information about the device
 type DeviceInfo struct {
+	mgr DeviceManager
+
 	Path       string `json:"path"`
 	Label      string `json:"label"`
 	Size       uint64 `json:"size"`
-	Mountpoint string `json:"mountpoint"`
 	Filesystem FSType `json:"fstype"`
+	Rota       bool   `json:"rota"`
 	Subsystems string `json:"subsystems"`
+	Readtime   uint64 `json:"-"`
 }
 
-// func (i *DeviceInfo) ID() (id string, err error) {
-// 	// check if it's a pool using the label format.
-// 	// if it has a filesystem then it should have the label in correct format
-// 	if _, err = fmt.Sscanf(i.Label, PoolLabelPrefix+"%s", &id); err != nil {
-// 		return id, ErrInvalidLabel
-// 	}
-
-// 	return
-// }
-
-// func (i *DeviceInfo) IsPool() bool {
-// 	id, err := i.ID()
-// 	if err != nil {
-// 		return false
-// 	}
-
-// 	return len(id) != 0
-// }
+func (i *DeviceInfo) Name() string {
+	return filepath.Base(i.Path)
+}
 
 // Used assumes that the device is used if it has custom label or fstype or children
 func (i *DeviceInfo) Used() bool {
 	return len(i.Label) != 0 || len(i.Filesystem) != 0
 }
 
-type deviceImpl struct {
-	minDevice
-	mgr *lsblkDeviceManager
-}
-
-func (d *deviceImpl) Info() (DeviceInfo, error) {
-	var devices struct {
-		BlockDevices []DeviceInfo `json:"blockdevices"`
+func (d *DeviceInfo) Type() zos.DeviceType {
+	if d.Rota {
+		return zos.HDDDevice
 	}
 
-	if err := d.mgr.lsblk(context.Background(), &devices, d.IPath); err != nil {
-		return DeviceInfo{}, err
-	}
-	if len(devices.BlockDevices) != 1 {
-		return DeviceInfo{}, fmt.Errorf("device not found")
-	}
-
-	return devices.BlockDevices[0], nil
+	return zos.SSDDevice
 }
 
-func (d *deviceImpl) Type() zos.DeviceType {
-	return d.DiskType
-}
-
-func (d *deviceImpl) ReadTime() uint64 {
-	return d.RTime
-}
-
-type minDevice struct {
-	IPath      string         `json:"path"`
-	IName      string         `json:"name"`
-	ISize      uint64         `json:"size"`
-	DiskType   zos.DeviceType `json:"-"`
-	RTime      uint64         `json:"-"`
-	Subsystems string         `json:"subsystems"`
-}
-
-func (m minDevice) toDevice(mgr *lsblkDeviceManager) Device {
-	return &deviceImpl{
-		minDevice: m,
-		mgr:       mgr,
-	}
-}
-
-func (m *minDevice) Path() string {
-	return m.IPath
-}
-
-func (m *minDevice) Size() uint64 {
-	return m.ISize
-}
-
-func (m *minDevice) Name() string {
-	return m.IName
+func (d *DeviceInfo) Mountpoint(ctx context.Context) (string, error) {
+	return d.mgr.Mountpoint(ctx, d.Path)
 }
 
 // lsblkDeviceManager uses the lsblk utility to scann the disk for devices, and
@@ -159,15 +88,15 @@ func (m *minDevice) Name() string {
 // method is called.
 type lsblkDeviceManager struct {
 	executer
-	cache []minDevice
+	cache []DeviceInfo
 }
 
 // DefaultDeviceManager returns a default device manager implementation
-func DefaultDeviceManager(ctx context.Context) DeviceManager {
-	return defaultDeviceManager(ctx, executerFunc(run))
+func DefaultDeviceManager() DeviceManager {
+	return defaultDeviceManager(executerFunc(run))
 }
 
-func defaultDeviceManager(ctx context.Context, exec executer) DeviceManager {
+func defaultDeviceManager(exec executer) DeviceManager {
 	m := &lsblkDeviceManager{
 		executer: exec,
 	}
@@ -177,17 +106,7 @@ func defaultDeviceManager(ctx context.Context, exec executer) DeviceManager {
 
 // Devices gets available block devices
 func (l *lsblkDeviceManager) Devices(ctx context.Context) (Devices, error) {
-	devices, err := l.scan(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(Devices, 0, len(devices))
-	for _, dev := range devices {
-		result = append(result, dev.toDevice(l))
-	}
-
-	return result, nil
+	return l.scan(ctx)
 }
 
 func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (Devices, error) {
@@ -199,12 +118,7 @@ func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (Devices
 	var filtered Devices
 
 	for _, device := range devices {
-		info, err := device.Info()
-		if err != nil {
-			return nil, err
-		}
-
-		if info.Label == label {
+		if device.Label == label {
 			filtered = append(filtered, device)
 		}
 	}
@@ -212,72 +126,60 @@ func (l *lsblkDeviceManager) ByLabel(ctx context.Context, label string) (Devices
 	return filtered, nil
 }
 
-func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device Device, err error) {
+func (l *lsblkDeviceManager) Device(ctx context.Context, path string) (device DeviceInfo, err error) {
 	devices, err := l.scan(ctx)
 	if err != nil {
-		return nil, err
+		return device, err
 	}
 
 	for _, dev := range devices {
-		if dev.IPath == path {
-			return dev.toDevice(l), nil
+		if dev.Path == path {
+			return dev, nil
 		}
 	}
 
-	return nil, fmt.Errorf("device not found")
+	return device, fmt.Errorf("device not found")
 
 }
 
-func (l *lsblkDeviceManager) lsblk(ctx context.Context, output interface{}, device ...string) error {
+func (l *lsblkDeviceManager) lsblk(ctx context.Context) ([]DeviceInfo, error) {
 	var devices blockDevices
 
 	args := []string{
 		"--json",
 		"-o",
-		"PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL",
+		"PATH,NAME,SIZE,SUBSYSTEMS,FSTYPE,LABEL,ROTA",
 		"--bytes",
 		"--exclude",
 		"1,2,11",
 		"--path",
 	}
-	if len(device) == 1 {
-		args = append(args, device[0])
-	} else if len(device) > 1 {
-		return fmt.Errorf("only one device is supported")
-	}
 
 	bytes, err := l.run(ctx, "lsblk", args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// skipping unmarshal when lsblk response is empty
 	if len(bytes) == 0 {
-		log.Warn().Msg("no disks found on the system")
-		return nil
+		return nil, nil
 	}
 
 	// parsing lsblk response
 	if err := json.Unmarshal(bytes, &devices); err != nil {
-		return err
+		return nil, err
 	}
-	// lsblk blocks for blocking file systems
-	if err := l.fillMountpointInfo(ctx, &devices, device...); err != nil {
-		return err
+
+	for i := range devices.BlockDevices {
+		devices.BlockDevices[i].mgr = l
 	}
-	bytes, err = json.Marshal(devices)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(bytes, output); err != nil {
-		return err
-	}
-	return nil
+
+	return devices.BlockDevices, nil
 }
 
-func (l *lsblkDeviceManager) fillMountpointInfo(ctx context.Context, devices *blockDevices, device ...string) error {
+func (l *lsblkDeviceManager) Mountpoint(ctx context.Context, device string) (string, error) {
 	// to not pollute global namespace with ugly hack types
-	type findmntOutput struct {
+	var mounts struct {
 		Filesystems []struct {
 			Source  string
 			Target  string
@@ -286,51 +188,38 @@ func (l *lsblkDeviceManager) fillMountpointInfo(ctx context.Context, devices *bl
 	}
 	args := []string{
 		"-J",
+		"-S", device,
 	}
-	if len(device) == 1 {
-		args = append(args, "-S", device[0])
-	} else if len(device) > 1 {
-		return fmt.Errorf("only one device is supported")
-	}
+
 	bytes, err := l.run(ctx, "findmnt", args...)
 	if err != nil {
 		// empty output and exit code 1 in case the device is not found
-		return nil
+		return "", nil
 	}
-	var mounts findmntOutput
 	if len(bytes) != 0 {
 		if err := json.Unmarshal(bytes, &mounts); err != nil {
-			return err
+			return "", err
 		}
 	}
-	mountpoints := make(map[string]string)
+
 	for _, m := range mounts.Filesystems {
 		if subvolFindmntOption.MatchString(m.Options) {
-			mountpoints[m.Source] = m.Target
+			return m.Target, nil
 		}
 	}
-	for idx := range devices.BlockDevices {
-		source := devices.BlockDevices[idx].Path
-		if target, ok := mountpoints[source]; ok {
-			devices.BlockDevices[idx].Mountpoint = target
-		}
-	}
-	return nil
+
+	return "", nil
 
 }
 
-func (l *lsblkDeviceManager) raw(ctx context.Context) ([]minDevice, error) {
-
-	var devices struct {
-		BlockDevices []minDevice `json:"blockdevices"`
-	}
-
-	if err := l.lsblk(ctx, &devices); err != nil {
+func (l *lsblkDeviceManager) raw(ctx context.Context) ([]DeviceInfo, error) {
+	devices, err := l.lsblk(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	filtered := devices.BlockDevices[:0]
-	for _, device := range devices.BlockDevices {
+	filtered := devices[:0]
+	for _, device := range devices {
 		if device.Subsystems != "block:scsi:usb:pci" {
 			filtered = append(filtered, device)
 		}
@@ -340,7 +229,7 @@ func (l *lsblkDeviceManager) raw(ctx context.Context) ([]minDevice, error) {
 }
 
 // scan the system for disks using the `lsblk` command
-func (l *lsblkDeviceManager) scan(ctx context.Context) ([]minDevice, error) {
+func (l *lsblkDeviceManager) scan(ctx context.Context) ([]DeviceInfo, error) {
 	if l.cache != nil {
 		return l.cache, nil
 	}
@@ -350,7 +239,7 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) ([]minDevice, error) {
 		return nil, errors.Wrap(err, "failed to scan devices")
 	}
 
-	if err := l.setDeviceTypes(devs); err != nil {
+	if err := l.setDeviceReadTimes(devs); err != nil {
 		return nil, err
 	}
 
@@ -382,7 +271,6 @@ func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string,
 	bytes, err := l.run(ctx, "seektime", "-j", path)
 	if isTimeout(err) {
 		// the seektime is taking too long that's defintely a HDD
-		log.Warn().Str("device", path).Msg("checking readtime for device timedout. assuming HDD")
 		return "HDD", 5 * 60, nil
 	} else if err != nil {
 		return "", 0, err
@@ -399,46 +287,19 @@ func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string,
 	return seekTime.Typ, seekTime.Time, err
 }
 
-func (l *lsblkDeviceManager) setDeviceTypes(devices []minDevice) error {
+func (l *lsblkDeviceManager) setDeviceReadTimes(devices []DeviceInfo) error {
 	for idx := range devices {
 		d := &devices[idx]
 
-		typ, rt, err := l.seektime(context.Background(), d.IPath)
+		_, rt, err := l.seektime(context.Background(), d.Path)
 		if err != nil {
 			// don't include errored devices in the result
 			log.Error().Err(err).Msgf("failed to get disk read time")
 			return err
 		}
 
-		l.setDeviceType(d, l.deviceTypeFromString(typ), rt)
+		d.Readtime = rt
 	}
 
 	return nil
 }
-
-// setDeviceType recursively sets a device type and read time on a device and
-// all of its children
-func (l *lsblkDeviceManager) setDeviceType(device *minDevice, typ zos.DeviceType, readTime uint64) {
-	device.DiskType = typ
-	device.RTime = readTime
-
-}
-
-func (l *lsblkDeviceManager) deviceTypeFromString(typ string) zos.DeviceType {
-	switch strings.ToLower(typ) {
-	case string(zos.SSDDevice):
-		return zos.SSDDevice
-	case string(zos.HDDDevice):
-		return zos.HDDDevice
-	default:
-		// if we have an error or unrecognized type, set type to HDD
-		return zos.HDDDevice
-	}
-}
-
-// ByReadTime implements sort.Interface for []Device based on the ReadTime field
-type ByReadTime Devices
-
-func (a ByReadTime) Len() int           { return len(a) }
-func (a ByReadTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByReadTime) Less(i, j int) bool { return a[i].ReadTime() < a[j].ReadTime() }

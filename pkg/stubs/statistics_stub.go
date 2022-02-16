@@ -23,9 +23,21 @@ func NewStatisticsStub(client zbus.Client) *StatisticsStub {
 	}
 }
 
-func (s *StatisticsStub) Reserved(ctx context.Context) (<-chan gridtypes.Capacity, error) {
+func (s *StatisticsStub) Current(ctx context.Context) (ret0 gridtypes.Capacity) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Current", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StatisticsStub) ReservedStream(ctx context.Context) (<-chan gridtypes.Capacity, error) {
 	ch := make(chan gridtypes.Capacity)
-	recv, err := s.client.Stream(ctx, s.module, s.object, "Reserved")
+	recv, err := s.client.Stream(ctx, s.module, s.object, "ReservedStream")
 	if err != nil {
 		return nil, err
 	}
@@ -45,4 +57,16 @@ func (s *StatisticsStub) Reserved(ctx context.Context) (<-chan gridtypes.Capacit
 		}
 	}()
 	return ch, nil
+}
+
+func (s *StatisticsStub) Total(ctx context.Context) (ret0 gridtypes.Capacity) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Total", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
 }

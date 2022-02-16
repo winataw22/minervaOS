@@ -115,8 +115,8 @@ func (p *testPool) RemoveVolume(name string) error {
 	return args.Error(1)
 }
 
-func (p *testPool) Device() filesystem.Device {
-	return nil
+func (p *testPool) Device() filesystem.DeviceInfo {
+	return filesystem.DeviceInfo{}
 }
 
 func (p *testPool) Shutdown() error {

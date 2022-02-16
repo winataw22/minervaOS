@@ -1,8 +1,11 @@
 package capacity
 
 import (
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -10,6 +13,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -52,6 +56,45 @@ func (r *ResourceOracle) Total() (c gridtypes.Capacity, err error) {
 	}
 
 	return c, nil
+}
+
+func IsSecureBoot() (bool, error) {
+	// check if node is booted via efi
+	const (
+		efivars    = "/sys/firmware/efi/efivars"
+		secureBoot = "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+	)
+
+	_, err := os.Stat(efivars)
+	if os.IsNotExist(err) {
+		// not even booted with uefi
+		return false, nil
+	}
+
+	if !filesystem.IsMountPoint(efivars) {
+		if err := syscall.Mount("none", efivars, "efivarfs", 0, ""); err != nil {
+			return false, errors.Wrap(err, "failed to mount efivars")
+		}
+
+		defer func() {
+			if err := syscall.Unmount(efivars, 0); err != nil {
+				log.Error().Err(err).Msg("failed to unmount efivars")
+			}
+		}()
+	}
+
+	bytes, err := ioutil.ReadFile(secureBoot)
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "failed to read secure boot status")
+	}
+
+	if len(bytes) != 5 {
+		return false, errors.Wrap(err, "invalid efivar data for secure boot flag")
+	}
+
+	return bytes[4] == 1, nil
 }
 
 // DMI run and parse dmidecode commands

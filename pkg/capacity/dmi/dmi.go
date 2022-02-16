@@ -143,6 +143,19 @@ func Decode() (*DMI, error) {
 
 }
 
+func (d *DMI) BoardVersion() string {
+	if len(d.Sections) < int(TypeBaseboard) {
+		return ""
+	}
+
+	board := d.Sections[TypeBaseboard]
+	if len(board.SubSections) < 1 {
+		return ""
+	}
+
+	return board.SubSections[0].Properties["Serial Number"].Val
+}
+
 // dmiTypeToString returns string representation of Type t
 func dmiTypeToString(t Type) string {
 	str := dmitypeToString[t]

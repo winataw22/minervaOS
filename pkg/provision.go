@@ -15,5 +15,7 @@ type Provision interface {
 }
 
 type Statistics interface {
-	Reserved(ctx context.Context) <-chan gridtypes.Capacity
+	ReservedStream(ctx context.Context) <-chan gridtypes.Capacity
+	Current() gridtypes.Capacity
+	Total() gridtypes.Capacity
 }

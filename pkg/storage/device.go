@@ -104,7 +104,7 @@ func (m *Module) DeviceAllocate(min gridtypes.Unit) (pkg.Device, error) {
 			continue
 		}
 
-		if hdd.Device().Size() < uint64(min) {
+		if hdd.Device().Size < uint64(min) {
 			continue
 		}
 

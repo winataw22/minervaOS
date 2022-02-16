@@ -54,7 +54,7 @@ type Pool interface {
 	// Shutdown spins down the device where the pool is mounted
 	Shutdown() error
 	// Device return device associated with pool
-	Device() Device
+	Device() DeviceInfo
 }
 
 // Filter closure for Filesystem list

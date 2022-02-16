@@ -232,7 +232,7 @@ func NewStatisticsStream(s *Statistics) pkg.Statistics {
 	return &statsStream{s}
 }
 
-func (s *statsStream) Reserved(ctx context.Context) <-chan gridtypes.Capacity {
+func (s *statsStream) ReservedStream(ctx context.Context) <-chan gridtypes.Capacity {
 	ch := make(chan gridtypes.Capacity)
 	go func(ctx context.Context) {
 		defer close(ch)
@@ -246,4 +246,12 @@ func (s *statsStream) Reserved(ctx context.Context) <-chan gridtypes.Capacity {
 		}
 	}(ctx)
 	return ch
+}
+
+func (s *statsStream) Current() gridtypes.Capacity {
+	return s.stats.Current()
+}
+
+func (s *statsStream) Total() gridtypes.Capacity {
+	return s.stats.Total()
 }

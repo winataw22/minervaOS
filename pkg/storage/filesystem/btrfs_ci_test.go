@@ -21,13 +21,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 var (
@@ -41,10 +39,9 @@ func (d TestDevices) Loops() Devices {
 		executer: executerFunc(run),
 	}
 	for _, loop := range d {
-		mgr.cache = append(mgr.cache, minDevice{
-			IPath:    loop,
-			IName:    filepath.Base(loop),
-			DiskType: zos.SSDDevice,
+		mgr.cache = append(mgr.cache, DeviceInfo{
+			Path: loop,
+			Rota: false,
 		})
 	}
 

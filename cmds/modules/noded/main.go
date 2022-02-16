@@ -149,7 +149,18 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	node, twin, err := registration(ctx, redis, env, cap)
+	secureBoot, err := capacity.IsSecureBoot()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to detect secure boot flags")
+	}
+
+	var info RegistrationInfo
+	info = info.WithCapacity(cap).
+		WithSerialNumber(dmi.BoardVersion()).
+		WithSecureBoot(secureBoot).
+		WithVirtualized(len(hypervisor) != 0)
+
+	node, twin, err := registration(ctx, redis, env, info)
 	if err != nil {
 		return errors.Wrap(err, "failed during node registration")
 	}
@@ -195,6 +206,16 @@ func action(cli *cli.Context) error {
 	go func() {
 		for {
 			if err := uptime(ctx, redis); err != nil {
+				log.Error().Err(err).Msg("sending uptime failed")
+				<-time.After(10 * time.Second)
+			}
+		}
+	}()
+
+	// reporting stats
+	go func() {
+		for {
+			if err := reportStatistics(ctx, msgBrokerCon, redis); err != nil {
 				log.Error().Err(err).Msg("sending uptime failed")
 				<-time.After(10 * time.Second)
 			}
