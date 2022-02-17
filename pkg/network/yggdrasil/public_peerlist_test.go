@@ -8,7 +8,7 @@ import (
 )
 
 func TestFetchPeerList(t *testing.T) {
-	pl, err := FetchPeerList()
+	pl, err := FetchPubYggPeerList()
 	require.NoError(t, err)
 	peers, err := pl.Ups()
 	require.NoError(t, err)
@@ -18,7 +18,7 @@ func TestFetchPeerList(t *testing.T) {
 }
 
 func TestUps(t *testing.T) {
-	pl, err := FetchPeerList()
+	pl, err := FetchPubYggPeerList()
 	require.NoError(t, err)
 
 	peers, err := pl.Ups()

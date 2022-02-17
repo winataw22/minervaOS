@@ -36,44 +36,46 @@ func reportStatistics(ctx context.Context, redis string, cl zbus.Client) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't get an rmb bus instance")
 	}
-	tc := time.NewTicker(ReportInterval)
 	updateCounter := CyclesToUpdate
 	extended, err := environment.GetConfig()
 	if err != nil {
 		return err
 	}
 	for {
+		if updateCounter == 0 {
+			extended, err = environment.GetConfig()
+			if err != nil {
+				log.Error().Err(err).Msg("couldn't get twins to report to")
+			}
+			updateCounter = CyclesToUpdate
+		}
+		updateCounter--
+		version := stubs.NewVersionMonitorStub(cl).GetVersion(ctx2).String()
+
+		// TODO: .Current should return error
+		current := stats.Current(ctx)
+		report := client.NodeStatus{
+			Current:    current,
+			Total:      total,
+			ZosVersion: version,
+			Hypervisor: hypervisor,
+		}
+
+		for _, twin := range extended.Monitor {
+			go func(twinID uint32) {
+				log.Debug().Uint32("twin", twinID).Msg("sending status update to twin")
+				cl := client.NewProxyClient(twinID, bus)
+				if err := sendStatisticsReport(ctx, cl, report); err != nil {
+					log.Error().Err(err).Uint32("twin", twinID).Msg("couldn't send report to twin")
+				}
+			}(twin)
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-tc.C:
-			if updateCounter == 0 {
-				extended, err = environment.GetConfig()
-				if err != nil {
-					log.Error().Err(err).Msg("couldn't get twins to report to")
-				}
-				updateCounter = CyclesToUpdate
-			}
-			updateCounter--
-
-			version := stubs.NewVersionMonitorStub(cl).GetVersion(ctx2).String()
-
-			// TODO: .Current should return error
-			current := stats.Current(ctx)
-			report := client.NodeStatus{
-				Current:    current,
-				Total:      total,
-				ZosVersion: version,
-				Hypervisor: hypervisor,
-			}
-			for _, twin := range extended.Monitor {
-				go func(twinID uint32) {
-					cl := client.NewProxyClient(twinID, bus)
-					if err := sendStatisticsReport(ctx, cl, report); err != nil {
-						log.Error().Err(err).Uint32("twin", twinID).Msg("couldn't send report to twin")
-					}
-				}(twin)
-			}
+		case <-time.After(ReportInterval):
+			continue
 		}
 	}
 }

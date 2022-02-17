@@ -40,16 +40,28 @@ func (n *NodeConfig) Address() (net.IP, error) {
 	return ip, nil
 }
 
-func (n *NodeConfig) FindPeers(ctx context.Context, top uint, filter ...Filter) error {
-	pl := fetchPeerList()
-	peersUp, err := pl.Ups(filter...)
+func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
+	// fetching a peer list goes as this
+	// - Always include the list of peers from
+	zos, err := fetchZosYggList()
+	if err != nil {
+		return errors.Wrap(err, "failed to get zos public peer list")
+	}
+
+	zos, err = zos.Ups(filter...)
+	if err != nil {
+		return errors.Wrap(err, "failed to filter out peer list")
+	}
+
+	pub := fetchPubYggList()
+	pub, err = pub.Ups(filter...)
 	if err != nil {
 		return errors.Wrap(err, "failed to get peers list")
 	}
 
-	log.Info().Int("count", len(peersUp)).Msg("found yggdrasil up peers")
-	endpoints := make([]string, len(peersUp))
-	for i, p := range peersUp {
+	log.Info().Int("count", len(pub)).Msg("found yggdrasil up peers")
+	endpoints := make([]string, len(pub))
+	for i, p := range pub {
 		endpoints[i] = p.Endpoint
 	}
 
@@ -61,7 +73,11 @@ func (n *NodeConfig) FindPeers(ctx context.Context, top uint, filter ...Filter) 
 
 	// select the best 3 public peers
 	var peers []string
-	for i := 0; i < int(top); i++ {
+	for _, peer := range zos {
+		peers = append(peers, peer.Endpoint)
+	}
+
+	for i := 0; i < 3; i++ {
 		peers = append(peers, results[i].Endpoint)
 		log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
 	}

@@ -34,7 +34,7 @@ func TestLatencySorter(t *testing.T) {
 }
 
 func TestYggPeering(t *testing.T) {
-	pl, err := yggdrasil.FetchPeerList()
+	pl, err := yggdrasil.FetchPubYggPeerList()
 	require.NoError(t, err)
 
 	peersUp, err := pl.Ups()

@@ -1,16 +1,10 @@
 package environment
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg"
 
@@ -48,13 +42,6 @@ type Environment struct {
 	ActivationURL string
 
 	ExtendedConfigURL string
-}
-
-// Extended is configuration set by the organization
-type Extended struct {
-	// Monitor is a list of twins that need to updated continuesly
-	// with node free capacity and status.
-	Monitor []uint32 `json:"monitor"`
 }
 
 // RunningMode type
@@ -139,16 +126,21 @@ func (e *Environment) GetSubstrate() (*substrate.Substrate, error) {
 }
 
 func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
-	var runmode []string
 	var env Environment
-
-	runmode, found := params.Get("runmode")
-	if !found || len(runmode) < 1 {
-		// Fallback to default production mode
-		runmode = []string{string(RunningMain)}
+	runmode := ""
+	if modes, ok := params.Get("runmode"); ok {
+		if len(modes) >= 1 {
+			runmode = modes[0]
+		}
+	} else {
+		runmode = os.Getenv("ZOS_RUNMODE")
 	}
 
-	switch RunningMode(runmode[0]) {
+	if len(runmode) == 0 {
+		runmode = string(RunningMain)
+	}
+
+	switch RunningMode(runmode) {
 	case RunningDev:
 		env = envDev
 	case RunningTest:
@@ -221,61 +213,4 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	}
 
 	return env, nil
-}
-
-// GetConfig returns extend config for specific run mode
-func GetConfig() (ext Extended, err error) {
-	env, err := Get()
-	if err != nil {
-		return
-	}
-	ext, err = getConfig(env.RunningMode, BaseExtendedURL)
-	if err != nil {
-		return
-	}
-	if env.ExtendedConfigURL != "" {
-		config2, err := getConfig(env.RunningMode, env.ExtendedConfigURL)
-		if err != nil {
-			log.Error().Err(err).Msg("fetching the config from the env config-url failed")
-		}
-		ext.Monitor = unique(append(ext.Monitor, config2.Monitor...))
-	}
-	return ext, nil
-}
-
-func unique(intSlice []uint32) []uint32 {
-	keys := make(map[uint32]struct{})
-	list := []uint32{}
-	for _, entry := range intSlice {
-		if _, exists := keys[entry]; !exists {
-			keys[entry] = struct{}{}
-			list = append(list, entry)
-		}
-	}
-	return list
-}
-
-func getConfig(run RunningMode, url string) (ext Extended, err error) {
-	if !strings.HasSuffix(url, "/") {
-		url += "/"
-	}
-	u := url + fmt.Sprintf("%s.json", run)
-
-	response, err := http.Get(u)
-	if err != nil {
-		return ext, err
-	}
-
-	defer func() {
-		_, _ = ioutil.ReadAll(response.Body)
-	}()
-	if response.StatusCode != http.StatusOK {
-		return ext, fmt.Errorf("failed to get extended config: %s", response.Status)
-	}
-
-	if err := json.NewDecoder(response.Body).Decode(&ext); err != nil {
-		return ext, errors.Wrap(err, "failed to decode extended settings")
-	}
-
-	return
 }

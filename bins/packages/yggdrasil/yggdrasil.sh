@@ -1,5 +1,5 @@
-YGGDRASIL_VERSION="0.4.2"
-YGGDRASIL_CHECKSUM="bac68c7b5de45c37add50138df8f2c7f"
+YGGDRASIL_VERSION="0.4.3"
+YGGDRASIL_CHECKSUM="2a57c995bfdf2933e4113014fc828d52"
 YGGDRASIL_LINK="https://github.com/yggdrasil-network/yggdrasil-go/releases/download/v${YGGDRASIL_VERSION}/yggdrasil-${YGGDRASIL_VERSION}-amd64.deb"
 
 download_yggdrasil() {

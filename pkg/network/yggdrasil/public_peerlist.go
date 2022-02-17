@@ -5,8 +5,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/environment"
 )
 
 //PeerListFallback is an hardcoded list of public yggdrasil node
@@ -30,8 +33,6 @@ var PeerListFallback = Peers{
 type NodeInfo struct {
 	Endpoint   string `json:"-"`
 	Up         bool   `json:"up"`
-	BoxPubKey  string `json:"key"`
-	LastSeen   int    `json:"last_seen"`
 	ProtoMinor int    `json:"proto_minor"`
 }
 
@@ -72,8 +73,53 @@ func IPV4Only(ip net.IP) bool {
 	return ip.To4() != nil
 }
 
-// FetchPeerList download the list of public yggdrasil peer from https://publicpeers.neilalexander.dev/publicnodes.json
-func FetchPeerList() (Peers, error) {
+func fetchZosYggList() (Peers, error) {
+	cfg, err := environment.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	var peers Peers
+	for _, peer := range cfg.Yggdrasil.Peers {
+		peers = append(peers, NodeInfo{
+			Endpoint:   peer,
+			Up:         true,
+			ProtoMinor: 4,
+		})
+	}
+
+	return peers, nil
+}
+
+func fetchPubYggList() Peers {
+	// Try to fetch public peer
+	// If we failed to do so, use the fallback hardcoded peer list
+	var pl Peers
+
+	// Do not retry more than 4 times
+	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Second), 4)
+
+	fetchPeerList := func() error {
+		p, err := FetchPubYggPeerList()
+		if err != nil {
+			log.Debug().Err(err).Msg("failed to fetch yggdrasil peers")
+			return err
+		}
+		pl = p
+		return nil
+	}
+
+	err := backoff.Retry(fetchPeerList, bo)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to read yggdrasil public peer list online, using fallback")
+		pl = PeerListFallback
+	}
+
+	return pl
+}
+
+// FetchPubYggPeerList download the list of public yggdrasil peer from https://publicpeers.neilalexander.dev/publicnodes.json
+func FetchPubYggPeerList() (Peers, error) {
 	//pl := PeerList{}
 	pl := map[string]map[string]NodeInfo{}
 

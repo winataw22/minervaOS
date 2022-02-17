@@ -256,80 +256,47 @@ func registerNode(
 
 	nodeID, err = sub.GetNodeByTwinID(twinID)
 
+	create := substrate.Node{
+		FarmID:      types.U32(env.FarmerID),
+		TwinID:      types.U32(twinID),
+		Resources:   resources,
+		Location:    location,
+		Country:     info.Location.Country,
+		City:        info.Location.City,
+		Interfaces:  interfaces,
+		SecureBoot:  info.SecureBoot,
+		Virtualized: info.Virtualized,
+		BoardSerial: info.SerialNumber,
+	}
+
 	if errors.Is(err, substrate.ErrNotFound) {
-		// create node here
-
 		// create node
-		nodeID, err = sub.CreateNode(id, substrate.Node{
-			FarmID:     types.U32(env.FarmerID),
-			TwinID:     types.U32(twinID),
-			Resources:  resources,
-			Location:   location,
-			Country:    info.Location.Country,
-			City:       info.Location.City,
-			Interfaces: interfaces,
-		})
+		nodeID, err = sub.CreateNode(id, create)
 
-		if err != nil {
-			return nodeID, 0, err
-		}
+		return nodeID, twinID, err
 	} else if err != nil {
 		return 0, 0, errors.Wrapf(err, "failed to get node information for twin id: %d", twinID)
 	}
 
+	create.ID = types.U32(nodeID)
+
 	// node exists. we validate everything is good
 	// otherwise we update the node
 	log.Debug().Uint32("node", nodeID).Msg("node already found on blockchain")
-	node, err := sub.GetNode(nodeID)
+	current, err := sub.GetNode(nodeID)
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 	}
 
-	if !reflect.DeepEqual(node.Resources, resources) ||
-		!reflect.DeepEqual(node.Location, location) ||
-		!reflect.DeepEqual(node.Interfaces, interfaces) ||
-		node.Country != info.Location.Country {
-		// node information has changed. we need to update the node object
-		// we need to update the node
-		node.ID = types.U32(nodeID)
-		node.FarmID = types.U32(env.FarmerID)
-		node.TwinID = types.U32(twinID)
-		node.Resources = resources
-		node.Location = location
-		node.Country = info.Location.Country
-		node.City = info.Location.City
-		node.Interfaces = interfaces
-
-		log.Debug().Msgf("node data have changing, issuing an update node: %+v", node)
-		_, err := sub.UpdateNode(id, *node)
+	if !reflect.DeepEqual(create, current) {
+		log.Debug().Msgf("node data have changing, issuing an update node: %+v", create)
+		_, err := sub.UpdateNode(id, create)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to update node data with id: %d", nodeID)
 		}
 	}
 
-	current := substrate.NodeExtra{
-		Secure:       info.SecureBoot,
-		Virtualized:  info.Virtualized,
-		SerialNumber: info.SerialNumber,
-	}
-
-	// last thing we need to do to validate the node extra information.
-	extra, err := sub.GetNodeExtra(nodeID)
-	force := false
-	if errors.Is(err, substrate.ErrNotFound) {
-		force = true
-	} else if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get node extra information")
-	}
-
-	if !reflect.DeepEqual(current, extra) || force {
-		// set node extra information
-		if err := sub.SetNodeExtra(id, current); err != nil {
-			return 0, 0, errors.Wrap(err, "failed to set set node extra information")
-		}
-	}
-	return uint32(node.ID), uint32(node.TwinID), err
-
+	return uint32(nodeID), uint32(twinID), err
 }
 
 func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
