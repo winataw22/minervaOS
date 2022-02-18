@@ -6,7 +6,7 @@ ldflags = '-w -s -X $(version).Branch=$(branch) -X $(version).Revision=$(revisio
 
 _base: $(shell ls -d */)
 
-all: _base explorer
+all: _base
 	strip $(OUT)/*
 
 .PHONY: output clean
@@ -64,10 +64,4 @@ testrace: verifiers
 
 
 %: %/*.go output
-	cd $(shell dirname $<) && go build -ldflags $(ldflags)
-
-explorer/: explorer/*.go output
-	cd $(shell dirname $<)/frontend && yarn install
-	cd $(shell dirname $<)/frontend && NODE_ENV=production yarn build
-	cd $(shell dirname $<) && go generate
-	cd $(shell dirname $<) && go build -ldflags $(ldflags)
+	cd $(shell dirname $<) && CGO_ENABLED=0 go build -ldflags $(ldflags)
