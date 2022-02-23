@@ -52,7 +52,7 @@ func NewManager(path string) (pkg.IdentityManager, error) {
 		}
 	}
 
-	sub, err := substrate.NewSubstrate(env.SubstrateURL)
+	sub, err := env.GetSubstrate()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to substrate")
 	}

@@ -12,18 +12,7 @@ import (
 )
 
 const (
-	// SubstrateDevURL default substrate url
-	SubstrateDevURL  = "wss://tfchain.dev.grid.tf/"
-	ActivationDevURL = "https://activation.dev.grid.tf/activation/activate"
-
-	// SubstrateDevURL default substrate url
-	SubstrateTestURL  = "wss://tfchain.test.grid.tf/"
-	ActivationTestURL = "https://activation.test.grid.tf/activation/activate"
-
-	SubstrateMainURL  = "wss://tfchain.grid.tf/"
-	ActivationMainURL = "https://activation.grid.tf/activation/activate"
-
-	BaseExtendedURL = "https://raw.githubusercontent.com/threefoldtech/zos-config/main/"
+	baseExtendedURL = "https://raw.githubusercontent.com/threefoldtech/zos-config/main/"
 )
 
 // Environment holds information about running environment of a node
@@ -38,7 +27,7 @@ type Environment struct {
 	Orphan   bool
 
 	FarmSecret    string
-	SubstrateURL  string
+	SubstrateURL  []string
 	ActivationURL string
 
 	ExtendedConfigURL string
@@ -77,9 +66,11 @@ const (
 
 var (
 	envDev = Environment{
-		RunningMode:   RunningDev,
-		SubstrateURL:  SubstrateDevURL,
-		ActivationURL: ActivationDevURL,
+		RunningMode: RunningDev,
+		SubstrateURL: []string{
+			"wss://tfchain.dev.grid.tf/",
+		},
+		ActivationURL: "https://activation.dev.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.dev",
 	}
@@ -87,17 +78,24 @@ var (
 	envTest = Environment{
 		RunningMode: RunningTest,
 		// TODO: this should become a different substrate ?
-		SubstrateURL:  SubstrateTestURL,
-		ActivationURL: ActivationTestURL,
+		SubstrateURL: []string{
+			"wss://tfchain.test.grid.tf/",
+		},
+		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
-		RunningMode:   RunningMain,
-		SubstrateURL:  SubstrateMainURL,
-		ActivationURL: ActivationMainURL,
+		RunningMode: RunningMain,
+		SubstrateURL: []string{
+			"wss://tfchain.grid.tf/",
+			"wss://02.tfchain.grid.tf/",
+			"wss://03.tfchain.grid.tf/",
+			"wss://04.tfchain.grid.tf/",
+		},
+		ActivationURL: "https://activation.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
 	}
@@ -122,7 +120,7 @@ func Get() (Environment, error) {
 
 // GetSubstrate gets a client to subsrate blockchain
 func (e *Environment) GetSubstrate() (*substrate.Substrate, error) {
-	return substrate.NewSubstrate(e.SubstrateURL)
+	return substrate.NewSubstrate(e.SubstrateURL...)
 }
 
 func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
@@ -158,7 +156,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 
 	if substrate, ok := params.Get("substrate"); ok {
 		if len(substrate) > 0 {
-			env.SubstrateURL = substrate[len(substrate)-1]
+			env.SubstrateURL = substrate
 		}
 	}
 
@@ -201,7 +199,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	// override default settings
 
 	if e := os.Getenv("ZOS_SUBSTRATE_URL"); e != "" {
-		env.SubstrateURL = e
+		env.SubstrateURL = []string{e}
 	}
 
 	if e := os.Getenv("ZOS_FLIST_URL"); e != "" {

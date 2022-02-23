@@ -57,5 +57,5 @@ func TestEnvironmentOverride(t *testing.T) {
 	value, err := getEnvironmentFromParams(params)
 	require.NoError(t, err)
 
-	assert.Equal(t, value.SubstrateURL, "localhost:1234")
+	assert.Equal(t, []string{"localhost:1234"}, value.SubstrateURL)
 }

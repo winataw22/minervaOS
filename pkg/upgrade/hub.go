@@ -230,6 +230,11 @@ func (b *FListInfo) Version() (semver.Version, error) {
 	return b.extractVersion(b.Name)
 }
 
+func (b *FListInfo) TryVersion() semver.Version {
+	ver, _ := b.Version()
+	return ver
+}
+
 // Absolute returns the actual flist name
 func (b *FListInfo) Absolute() string {
 	name := b.Name

@@ -231,5 +231,6 @@ func action(cli *cli.Context) error {
 		return err
 	}
 
-	return runMsgBus(ctx, env.SubstrateURL, id)
+	// todo: change rmb to support using multiple urls.
+	return runMsgBus(ctx, env.SubstrateURL[0], id)
 }

@@ -88,22 +88,17 @@ func (b *Boot) SetBins(current map[string]FListInfo) error {
 }
 
 // Current returns current flist information
-func (b *Boot) Current() (FListEvent, error) {
+func (b *Boot) Current() (FullFListInfo, error) {
 	name := b.Name()
 	if len(name) == 0 {
-		return FListEvent{}, fmt.Errorf("flist name is not known")
+		return FullFListInfo{}, fmt.Errorf("flist name is not known")
 	}
 
-	info, err := loadInfo(name, FlistInfoFile)
-	if err != nil {
-		return FListEvent{}, err
-	}
-
-	return FListEvent{info}, nil
+	return loadInfo(name, FlistInfoFile)
 }
 
 // Set updates the stored flist info
-func (b *Boot) Set(c FListEvent) error {
+func (b *Boot) Set(c FullFListInfo) error {
 	return c.Commit(FlistInfoFile)
 }
 

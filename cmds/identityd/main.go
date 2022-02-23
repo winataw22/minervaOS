@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -96,7 +97,7 @@ func main() {
 		log.Fatal().Err(err).Str("root", root).Msg("failed to create root directory")
 	}
 
-	boot := upgrade.Boot{}
+	var boot upgrade.Boot
 
 	bootMethod := boot.DetectBootMethod()
 
@@ -185,7 +186,7 @@ func installBinaries(boot *upgrade.Boot, upgrader *upgrade.Upgrader) {
 
 	env, _ := environment.Get()
 
-	repoWatcher := upgrade.FListRepoWatcher{
+	repoWatcher := upgrade.FListRepo{
 		Repo:    env.BinRepo,
 		Current: bins,
 	}
@@ -222,117 +223,85 @@ func upgradeLoop(
 		debugReinstall(boot, upgrader)
 	}
 
-	flistWatcher := upgrade.FListSemverWatcher{
-		FList:    boot.Name(),
-		Current:  boot.MustVersion(), //if we are here version must be valid
-		Duration: 600 * time.Second,
-	}
+	var hub upgrade.HubClient
 
-	// make sure we push the current version to monitor
-	monitor.C <- boot.MustVersion()
-
-	flistEvents, err := flistWatcher.Watch(ctx)
-	if err != nil {
-		log.Fatal().Err(err).Str("flist", flistWatcher.FList).Msg("failed to watch flist")
-	}
-
-	bins, err := boot.CurrentBins()
-	if err != nil {
-		log.Warn().Err(err).Msg("could not load current binaries list")
-	}
-
-	env, _ := environment.Get()
-
-	repoWatcher := upgrade.FListRepoWatcher{
-		Repo:    env.BinRepo,
-		Current: bins,
-	}
-
-	repoEvents, err := repoWatcher.Watch(ctx)
-	if err != nil {
-		log.Fatal().Err(err).Str("repo", repoWatcher.Repo).Msg("failed to watch repo")
-	}
-
+	flist := boot.Name()
+	//current := boot.MustVersion()
 	for {
+		// delay in case of error
 		select {
+		case <-time.After(5 * time.Second):
 		case <-ctx.Done():
 			return
-		case e := <-flistEvents:
-			if e == nil {
-				continue
-			}
-			event := e.(*upgrade.FListEvent)
-			// new flist available
-			version, err := event.Version()
-			if err != nil {
-				log.Error().Err(err).Msg("failed to parse new version")
-				continue
-			}
+		}
 
-			from, err := boot.Current()
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to load current boot information")
+		current, err := boot.Current()
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot get current boot flist information")
+		}
+
+		latest, err := hub.Info(flist)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get flist info")
+			continue
+		}
+		log.Info().
+			Str("current", current.TryVersion().String()).
+			Str("latest", current.TryVersion().String()).
+			Msg("checking if update is required")
+
+		if !latest.TryVersion().GT(current.TryVersion()) {
+			// We wanted to use the node id to actually calculate the delay to wait but it's not
+			// possible to get the numeric node id from the identityd
+			next := time.Duration(60+rand.Intn(60)) * time.Minute
+			log.Info().Dur("wait", next).Msg("checking for update after milliseconds")
+			select {
+			case <-time.After(next):
+			case <-ctx.Done():
 				return
 			}
 
-			exp := backoff.NewExponentialBackOff()
-			exp.MaxInterval = 3 * time.Minute
-			exp.MaxElapsedTime = 60 * time.Minute
-			err = backoff.Retry(func() error {
-				log.Debug().Str("version", version.String()).Msg("trying to update")
+			continue
+		}
 
-				err := Safe(func() error {
-					return upgrader.Upgrade(from, *event)
-				})
+		installBinaries(boot, upgrader)
 
-				if err == upgrade.ErrRestartNeeded {
-					return backoff.Permanent(err)
-				}
+		// next check for update
+		exp := backoff.NewExponentialBackOff()
+		exp.MaxInterval = 3 * time.Minute
+		exp.MaxElapsedTime = 60 * time.Minute
+		err = backoff.Retry(func() error {
+			log.Debug().Str("version", latest.TryVersion().String()).Msg("trying to update")
 
-				if err != nil {
-					log.Error().Err(err).Msg("update failure. retrying")
-				}
-				return err
-			}, exp)
+			err := Safe(func() error {
+				return upgrader.Upgrade(current, latest)
+			})
 
 			if err == upgrade.ErrRestartNeeded {
-				log.Info().Msg("restarting upgraded")
-				return
-			} else if err != nil {
-				//TODO: crash or continue!
-				log.Error().Err(err).Msg("upgrade failed")
-				continue
-			} else {
-				log.Info().Msg("update completed")
-			}
-			if err := boot.Set(*event); err != nil {
-				log.Error().Err(err).Msg("failed to update boot information")
+				return backoff.Permanent(err)
 			}
 
-			monitor.C <- version
-		case e := <-repoEvents:
-			if e == nil {
-				continue
+			if err != nil {
+				log.Error().Err(err).Msg("update failure. retrying")
 			}
-			event := e.(*upgrade.RepoEvent)
-			for _, bin := range event.ToDel {
-				if err := upgrader.UninstallBinary(bin); err != nil {
-					log.Error().Err(err).Str("flist", bin.Fqdn()).Msg("failed to uninstall flist")
-				}
-			}
+			return err
+		}, exp)
 
-			for _, bin := range event.ToAdd {
-				if err := upgrader.InstallBinary(bin); err != nil {
-					log.Error().Err(err).Str("flist", bin.Fqdn()).Msg("failed to install flist")
-				}
-			}
-
-			if err := boot.SetBins(repoWatcher.Current); err != nil {
-				log.Error().Err(err).Msg("failed to update local db of installed binaries")
-			}
-
-			log.Debug().Msg("finish processing binary updates")
+		if err == upgrade.ErrRestartNeeded {
+			log.Info().Msg("restarting upgraded")
+			return
+		} else if err != nil {
+			//TODO: crash or continue!
+			log.Error().Err(err).Msg("upgrade failed")
+			continue
+		} else {
+			log.Info().Str("version", latest.TryVersion().String()).Msg("update completed")
 		}
+		if err := boot.Set(latest); err != nil {
+			log.Fatal().Err(err).Msg("failed to update boot information")
+		}
+
+		monitor.C <- latest.TryVersion()
 	}
 }
 

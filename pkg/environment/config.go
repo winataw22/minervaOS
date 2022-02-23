@@ -37,7 +37,7 @@ func GetConfig() (base Config, err error) {
 	if err != nil {
 		return
 	}
-	base, err = getConfig(env.RunningMode, BaseExtendedURL)
+	base, err = getConfig(env.RunningMode, baseExtendedURL)
 	if err != nil {
 		return
 	}

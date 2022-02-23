@@ -112,7 +112,7 @@ func (u *Upgrader) flistCache() string {
 // if yes, applies the upgrade
 // on a successfully update, upgrade WILL NOT RETURN
 // instead the upgraded daemon will be completely stopped
-func (u *Upgrader) Upgrade(from, to FListEvent) error {
+func (u *Upgrader) Upgrade(from, to FullFListInfo) error {
 	return u.applyUpgrade(from, to)
 }
 
@@ -401,7 +401,7 @@ func (u *Upgrader) uninstall(flist FListInfo) error {
 	return nil
 }
 
-func (u *Upgrader) applyUpgrade(from, to FListEvent) error {
+func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 	log.Info().Str("flist", to.Fqdn()).Str("version", to.TryVersion().String()).Msg("start applying upgrade")
 
 	store, err := u.getFlist(to.Fqdn())
