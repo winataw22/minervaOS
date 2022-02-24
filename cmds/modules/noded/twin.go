@@ -8,10 +8,10 @@ import (
 	"github.com/threefoldtech/substrate-client"
 )
 
-func runMsgBus(ctx context.Context, substrate string, identity substrate.Identity) error {
+func runMsgBus(ctx context.Context, sub substrate.Manager, identity substrate.Identity) error {
 	// todo: make it argument or parse from broker
 	const redis = "/var/run/redis.sock"
-	app, err := rmb.NewServer(substrate, redis, 100, identity)
+	app, err := rmb.NewServer(sub, redis, 100, identity)
 	if err != nil {
 		return err
 	}

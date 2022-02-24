@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/BurntSushi/toml v0.4.1
-	github.com/ChainSafe/go-schnorrkel v0.0.0-20210318173838-ccb5cd955283
+	github.com/ChainSafe/go-schnorrkel v1.0.0
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
 	github.com/alexflint/go-filemutex v1.1.0
@@ -12,7 +12,7 @@ require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v3 v3.2.2
-	github.com/centrifuge/go-substrate-rpc-client/v3 v3.0.2
+	github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/containerd/cgroups v1.0.1
 	github.com/containerd/containerd v1.5.0-rc.2
@@ -21,7 +21,7 @@ require (
 	github.com/containernetworking/cni v0.8.1
 	github.com/containernetworking/plugins v0.9.1
 	github.com/coreos/go-iptables v0.6.0 // indirect
-	github.com/deckarep/golang-set v1.7.1
+	github.com/deckarep/golang-set v1.8.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
@@ -61,8 +61,8 @@ require (
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/go-rmb v0.1.10-0.20220127085422-3c3667e4fc58
-	github.com/threefoldtech/substrate-client v0.0.0-20220222101439-a349d66a36cf
+	github.com/threefoldtech/go-rmb v0.1.11-0.20220224131627-825c23c921d3
+	github.com/threefoldtech/substrate-client v0.0.0-20220224131248-f56a2e9fa1d4
 	github.com/threefoldtech/zbus v0.1.5
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -75,9 +75,8 @@ require (
 	github.com/yggdrasil-network/yggdrasil-go v0.4.0
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/net v0.0.0-20211005001312-d4b1ae081e3b // indirect
-	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c
+	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881
 	golang.org/x/text v0.3.7 // indirect
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
@@ -89,3 +88,5 @@ require (
 )
 
 replace github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
+
+replace github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.0 => github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.1-0.20220224103912-af82b63a1bda

@@ -49,7 +49,7 @@ var (
 type gatewayModule struct {
 	cl       zbus.Client
 	resolver *net.Resolver
-	sub      *substrate.Substrate
+	sub      substrate.Manager
 	// maps domain to workload id
 	reservedDomains map[string]string
 	domainLock      sync.RWMutex
@@ -208,14 +208,11 @@ func New(ctx context.Context, cl zbus.Client, root string) (pkg.Gateway, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load old domains")
 	}
-	env, err := environment.Get()
+	sub, err := environment.GetSubstrate()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get env")
+		return nil, err
 	}
-	sub, err := env.GetSubstrate()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get substrate client")
-	}
+
 	gw := &gatewayModule{
 		cl:               cl,
 		resolver:         r,
@@ -469,14 +466,19 @@ func (g *gatewayModule) configPath(name string) string {
 }
 
 func (g *gatewayModule) validateNameContract(name string, twinID uint32) error {
-	contractID, err := g.sub.GetContractIDByNameRegistration(string(name))
+	sub, err := g.sub.Substrate()
+	if err != nil {
+		return err
+	}
+	defer sub.Close()
+	contractID, err := sub.GetContractIDByNameRegistration(string(name))
 	if errors.Is(err, substrate.ErrNotFound) {
 		return ErrContractNotReserved
 	}
 	if err != nil {
 		return err
 	}
-	contract, err := g.sub.GetContract(contractID)
+	contract, err := sub.GetContract(contractID)
 	if errors.Is(err, substrate.ErrNotFound) {
 		return fmt.Errorf("contract by name returned %d, but retreiving it results in 'not found' error", contractID)
 	}

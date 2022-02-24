@@ -10,19 +10,19 @@ import (
 )
 
 type substrateTwins struct {
-	sub *substrate.Substrate
+	mgr substrate.Manager
 	mem *lru.Cache
 }
 
 // NewSubstrateTwins creates a substrate users db that implements the provision.Users interface.
-func NewSubstrateTwins(sub *substrate.Substrate) (Twins, error) {
+func NewSubstrateTwins(sub substrate.Manager) (Twins, error) {
 	cache, err := lru.New(1024)
 	if err != nil {
 		return nil, err
 	}
 
 	return &substrateTwins{
-		sub: sub,
+		mgr: sub,
 		mem: cache,
 	}, nil
 }
@@ -32,8 +32,13 @@ func (s *substrateTwins) GetKey(id uint32) ([]byte, error) {
 	if value, ok := s.mem.Get(id); ok {
 		return value.([]byte), nil
 	}
+	sub, err := s.mgr.Substrate()
+	if err != nil {
+		return nil, err
+	}
+	defer sub.Close()
 
-	user, err := s.sub.GetTwin(id)
+	user, err := sub.GetTwin(id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get user with id '%d'", id)
 	}
@@ -44,14 +49,18 @@ func (s *substrateTwins) GetKey(id uint32) ([]byte, error) {
 }
 
 type substrateAdmins struct {
-	sub  *substrate.Substrate
 	twin uint32
 	pk   ed25519.PublicKey
 }
 
 // NewSubstrateAdmins creates a substrate twins db that implements the provision.Users interface.
 // but it also make sure the user is an admin
-func NewSubstrateAdmins(sub *substrate.Substrate, farmID uint32) (Twins, error) {
+func NewSubstrateAdmins(mgr substrate.Manager, farmID uint32) (Twins, error) {
+	sub, err := mgr.Substrate()
+	if err != nil {
+		return nil, err
+	}
+	defer sub.Close()
 	farm, err := sub.GetFarm(farmID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get farm")
@@ -62,7 +71,6 @@ func NewSubstrateAdmins(sub *substrate.Substrate, farmID uint32) (Twins, error) 
 		return nil, err
 	}
 	return &substrateAdmins{
-		sub:  sub,
 		twin: uint32(farm.TwinID),
 		pk:   twin.Account.PublicKey(),
 	}, nil

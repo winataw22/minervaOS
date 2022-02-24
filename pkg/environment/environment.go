@@ -3,6 +3,7 @@ package environment
 import (
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/substrate-client"
@@ -65,6 +66,9 @@ const (
 )
 
 var (
+	pool     substrate.Manager
+	poolOnce sync.Once
+
 	envDev = Environment{
 		RunningMode: RunningDev,
 		SubstrateURL: []string{
@@ -119,8 +123,17 @@ func Get() (Environment, error) {
 }
 
 // GetSubstrate gets a client to subsrate blockchain
-func (e *Environment) GetSubstrate() (*substrate.Substrate, error) {
-	return substrate.NewSubstrate(e.SubstrateURL...)
+func GetSubstrate() (substrate.Manager, error) {
+	env, err := Get()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get boot environment")
+	}
+
+	poolOnce.Do(func() {
+		pool = substrate.NewManager(env.SubstrateURL...)
+	})
+
+	return pool, nil
 }
 
 func getEnvironmentFromParams(params kernel.Params) (Environment, error) {

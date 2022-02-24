@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v3/types"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/joncrlsn/dque"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -77,7 +77,7 @@ type Reporter struct {
 	identity  substrate.Identity
 	engine    provision.Engine
 	queue     *dque.DQue
-	substrate *substrate.Substrate
+	substrate substrate.Manager
 }
 
 func reportBuilder() interface{} {
@@ -86,15 +86,11 @@ func reportBuilder() interface{} {
 
 // NewReporter creates a new capacity reporter
 func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root string) (*Reporter, error) {
-	env, err := environment.Get()
+	sub, err := environment.GetSubstrate()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get runtime environment")
+		return nil, err
 	}
 
-	sub, err := env.GetSubstrate()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create substrate client")
-	}
 	const queueName = "consumption"
 	var queue *dque.DQue
 	for i := 0; i < 3; i++ {
@@ -142,7 +138,14 @@ func (r *Reporter) pushOne() ([]Consumption, error) {
 		log.Debug().Uint64("contract", uint64(cmp.ContractID)).Msg("has consumption to report")
 		consumptions = append(consumptions, cmp.Consumption)
 	}
-	hash, err := r.substrate.Report(r.identity, consumptions)
+	sub, err := r.substrate.Substrate()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to chain")
+	}
+
+	defer sub.Close()
+
+	hash, err := sub.Report(r.identity, consumptions)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to publish consumption report")
 	}
@@ -198,9 +201,16 @@ func (r *Reporter) synchronize(ctx context.Context, reported []Consumption) erro
 		local[report.ContractID] = report
 	}
 
+	sub, err := r.substrate.Substrate()
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to chain")
+	}
+
+	defer sub.Close()
+
 	// the idea here is that we bring ALL active node contracts from chain.
 	// then compare it with what we have atm (the one we just reported)
-	contracts, err := r.substrate.GetNodeContracts(r.nodeID)
+	contracts, err := sub.GetNodeContracts(r.nodeID)
 	if err != nil {
 		return err
 	}

@@ -165,9 +165,9 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed during node registration")
 	}
 
-	sub, err := env.GetSubstrate()
+	sub, err := environment.GetSubstrate()
 	if err != nil {
-		return errors.Wrap(err, "failed to get connection to tfchain")
+		return err
 	}
 	events := events.New(sub, node)
 
@@ -231,6 +231,5 @@ func action(cli *cli.Context) error {
 		return err
 	}
 
-	// todo: change rmb to support using multiple urls.
-	return runMsgBus(ctx, env.SubstrateURL[0], id)
+	return runMsgBus(ctx, sub, id)
 }

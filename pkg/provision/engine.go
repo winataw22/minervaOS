@@ -45,7 +45,7 @@ func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
 // WithSubstrate sets the substrate client. If set it will
 // be used by the engine to fetch (and validate) the deployment contract
 // then contract with be available on the deployment context
-func WithSubstrate(node uint32, sub *substrate.Substrate) EngineOption {
+func WithSubstrate(node uint32, sub substrate.Manager) EngineOption {
 	return &withSubstrate{node, sub}
 }
 
@@ -92,7 +92,7 @@ type NativeEngine struct {
 	rerunAll  bool
 	//substrate specific attributes
 	nodeID uint32
-	sub    *substrate.Substrate
+	sub    substrate.Manager
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -116,7 +116,7 @@ func (o *withAdminsKeyGetter) apply(e *NativeEngine) {
 
 type withSubstrate struct {
 	nodeID uint32
-	sub    *substrate.Substrate
+	sub    substrate.Manager
 }
 
 func (o *withSubstrate) apply(e *NativeEngine) {
@@ -231,8 +231,8 @@ func withContract(ctx context.Context, contract *substrate.NodeContract) context
 }
 
 // GetSubstrate if engine has substrate set, panics otherwise
-func GetSubstrate(ctx context.Context) *substrate.Substrate {
-	return ctx.Value(substrateKey{}).(*substrate.Substrate)
+func GetSubstrate(ctx context.Context) substrate.Manager {
+	return ctx.Value(substrateKey{}).(substrate.Manager)
 }
 
 // New creates a new engine. Once started, the engine
@@ -456,7 +456,12 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 
 	ctx = context.WithValue(ctx, substrateKey{}, e.sub)
 	// if substrate is set. we need to get contract
-	contract, err := e.sub.GetContract(uint64(dl.ContractID))
+	sub, err := e.sub.Substrate()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to chain")
+	}
+	defer sub.Close()
+	contract, err := sub.GetContract(uint64(dl.ContractID))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get deployment contract")
 	}
