@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg/app"
@@ -25,7 +26,7 @@ func run(opt options) error {
 		return errors.Wrap(err, "failed to create identity from mnemonics")
 	}
 
-	cl, err := substrate.NewSubstrate(opt.url)
+	cl, err := substrate.NewManager(opt.url).Substrate()
 	if err != nil {
 		return err
 	}
@@ -42,8 +43,13 @@ func run(opt options) error {
 		return errors.Wrap(err, "failed to start node scanning")
 	}
 
+	possible := 0
+	certified := 0
+
 	for scanned := range ch {
-		if scanned.Err != nil {
+		if errors.Is(scanned.Err, substrate.ErrNotFound) {
+			continue
+		} else if scanned.Err != nil {
 			log.Error().Err(scanned.Err).Msgf("error while getting node: %d", scanned.ID)
 			continue
 		}
@@ -55,7 +61,7 @@ func run(opt options) error {
 			Bool("certified", node.CertificationType.IsCertified).
 			Logger()
 
-		log.Info().Msg("node found")
+		log.Debug().Msg("node found")
 
 		if !node.SecureBoot || node.CertificationType.IsCertified {
 			// notthing to do anyway
@@ -63,27 +69,41 @@ func run(opt options) error {
 		}
 
 		log.Info().Msg("possible node to certify")
+		possible += 1
 		if opt.dry {
 			continue
 		}
 
 		if err := cl.SetNodeCertificate(sudo, uint32(node.ID), substrate.CertificationType{IsCertified: true}); err != nil {
-			return errors.Wrap(err, "failed to mark node as certified")
+			log.Error().Err(err).Msg("failed to mark node as certified")
+			continue
 		}
+
+		certified += 1
 	}
 
+	log.Info().Int("count", possible).Msg("found nodes that can be certified")
+	log.Info().Int("count", certified).Msg("nodes that has been certified by this run")
 	return nil
 }
 
 func main() {
 	app.Initialize()
 	var opt options
+	var debug bool
 
 	flag.StringVar(&opt.url, "substrate", "wss://tfchain.dev.grid.tf", "chain url")
 	flag.BoolVar(&opt.dry, "dry-run", false, "print the list of the nodes to be migrated")
 	flag.Uint64Var(&opt.from, "from", 1, "start scanning nodes with id")
 	flag.StringVar(&opt.mnemonics, "mnemonics", "", "mnemonics for the sudo key")
+	flag.BoolVar(&debug, "debug", false, "show debugging logs")
 	flag.Parse()
+
+	if debug {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
 
 	if len(opt.mnemonics) == 0 {
 		fmt.Fprintln(os.Stderr, "mnemonics is required")
