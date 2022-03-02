@@ -88,4 +88,5 @@ no need to specify a kernel yourself (it will be provided).
     variables.
 - We need to do proper performance testing for `virtio-fs`. There seems to be some
     suboptimal performance right now.
+- It's not currently possible to get container logs.
 - TODO: more testing
