@@ -1,16 +1,1 @@
-all: start
-
-prepare: kernel zinit
-
-zinit:
-	@echo "copy zinit into overlay"
-	cp $(shell which zinit) overlay/sbin/zinit
-
-kernel:
-	@echo "Download 0-OS kernel"
-	wget https://bootstrap.grid.tf/kernel/zero-os-development-zos-v2-generic.efi -O zos.efi
-
-start:
-	bash vm.sh -n node1 -c "runmode=dev farmer_id=$(FARMERID)"
-test:
-	bash vm.sh -n node1 -c "runmode=test farmer_id=$(FARMERID)"
+/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/819f3d14846d5b26cd4c37268eca4277

@@ -111,7 +111,7 @@ sudo dnsmasq --strict-order \
 1. Now run your vm
 
 ```bash
-./vm.sh -n myzos-01 -c farmer_id=2 printk.devmsg=on runmode=dev
+sudo ./vm.sh -n myzos-01 -c "farmer_id=47 printk.devmsg=on runmode=dev"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 
@@ -145,7 +145,7 @@ sudo ip link set forzos up
 1. Now run your vm
 
 ```bash
-./vm.sh -n myzos-01 -c "farmer_id=2 printk.devmsg=on runmode=dev"
+./vm.sh -n myzos-01 -c "farmer_id=47 version=v3 printk.devmsg=on runmode=dev"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 
@@ -157,7 +157,7 @@ Note: `double quotes around the flags after -c are very important`
 ## To ssh into the machine
 
 ### Authorizing yourself
-- `cp ~/.ssh/authorized_keys qemu/overlay/root/.ssh/`
+- `cp ~/.ssh/id_rsa.pub qemu/overlay/root/.ssh/authorized_keys`
 
 
 ### SSH to the node
