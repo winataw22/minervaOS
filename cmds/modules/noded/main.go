@@ -216,7 +216,7 @@ func action(cli *cli.Context) error {
 	go func() {
 		for {
 			if err := reportStatistics(ctx, msgBrokerCon, redis); err != nil {
-				log.Error().Err(err).Msg("sending uptime failed")
+				log.Error().Err(err).Msg("sending stats report failed")
 				<-time.After(10 * time.Second)
 			}
 		}

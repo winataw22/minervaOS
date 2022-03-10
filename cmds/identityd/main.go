@@ -223,6 +223,7 @@ func upgradeLoop(
 		debugReinstall(boot, upgrader)
 	}
 
+	monitor.C <- boot.MustVersion()
 	var hub upgrade.HubClient
 
 	flist := boot.Name()
