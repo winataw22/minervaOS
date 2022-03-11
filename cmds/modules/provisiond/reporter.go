@@ -1,12 +1,10 @@
 package provisiond
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -18,64 +16,25 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/rrd"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
-	every = 60 * 60 // 1 hour
+	every           = 60 * 60 // 1 hour
+	lastReportedKey = ".last-reported-ts"
 )
 
-type many []error
-
-func (m many) Error() string {
-	return m.WithPrefix("")
-}
-
-func (m many) WithPrefix(p string) string {
-	var buf bytes.Buffer
-	for _, err := range m {
-		if buf.Len() > 0 {
-			buf.WriteRune('\n')
-		}
-		if err, ok := err.(many); ok {
-			buf.WriteString(err.WithPrefix(p + " "))
-			continue
-		}
-
-		buf.WriteString(err.Error())
-	}
-
-	return buf.String()
-}
-
-func (m many) append(err error) many {
-	return append(m, err)
-}
-
-func (m many) AsError() error {
-	if len(m) == 0 {
-		return nil
-	}
-
-	return m
-}
-
-type Consumption struct {
-	substrate.Consumption
-	TwinID uint32
-}
-
 type Report struct {
-	Consumption []Consumption
+	Consumption []substrate.Consumption
 }
 
 // Reporter structure
 type Reporter struct {
-	cl        zbus.Client
-	nodeID    uint32
+	cl  zbus.Client
+	rrd rrd.RRD
+
 	identity  substrate.Identity
-	engine    provision.Engine
 	queue     *dque.DQue
 	substrate substrate.Manager
 }
@@ -85,8 +44,10 @@ func reportBuilder() interface{} {
 }
 
 // NewReporter creates a new capacity reporter
-func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root string) (*Reporter, error) {
-	sub, err := environment.GetSubstrate()
+func NewReporter(metricsPath string, cl zbus.Client, root string) (*Reporter, error) {
+	idMgr := stubs.NewIdentityManagerStub(cl)
+	sk := ed25519.PrivateKey(idMgr.PrivateKey(context.TODO()))
+	id, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return nil, err
 	}
@@ -106,48 +67,45 @@ func NewReporter(engine provision.Engine, nodeID uint32, cl zbus.Client, root st
 		return nil, errors.Wrap(err, "failed to setup report persisted queue")
 	}
 
-	idMgr := stubs.NewIdentityManagerStub(cl)
-	sk := ed25519.PrivateKey(idMgr.PrivateKey(context.TODO()))
-	id, err := substrate.NewIdentityFromEd25519Key(sk)
+	sub, err := environment.GetSubstrate()
 	if err != nil {
 		return nil, err
 	}
 
+	rrd, err := rrd.NewRRDBolt(metricsPath, 5*time.Minute, 24*time.Hour)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create metrics database")
+	}
+
 	return &Reporter{
 		cl:        cl,
-		engine:    engine,
-		nodeID:    nodeID,
+		rrd:       rrd,
 		identity:  id,
 		queue:     queue,
 		substrate: sub,
 	}, nil
 }
 
-func (r *Reporter) pushOne() ([]Consumption, error) {
+func (r *Reporter) pushOne() error {
 	item, err := r.queue.PeekBlock()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to peek into capacity queue. #properlyfatal")
+		return errors.Wrap(err, "failed to peek into capacity queue. #properlyfatal")
 	}
 
 	report := item.(*Report)
 
 	log.Info().Int("len", len(report.Consumption)).Msgf("sending capacity report")
 
-	consumptions := make([]substrate.Consumption, 0, len(report.Consumption))
-	for _, cmp := range report.Consumption {
-		log.Debug().Uint64("contract", uint64(cmp.ContractID)).Msg("has consumption to report")
-		consumptions = append(consumptions, cmp.Consumption)
-	}
 	sub, err := r.substrate.Substrate()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to chain")
+		return errors.Wrap(err, "failed to connect to chain")
 	}
 
 	defer sub.Close()
 
-	hash, err := sub.Report(r.identity, consumptions)
+	hash, err := sub.Report(r.identity, report.Consumption)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to publish consumption report")
+		return errors.Wrap(err, "failed to publish consumption report")
 	}
 
 	log.Info().Str("hash", hash.Hex()).Msg("report block hash")
@@ -156,7 +114,7 @@ func (r *Reporter) pushOne() ([]Consumption, error) {
 	// remove item from queue
 	_, err = r.queue.Dequeue()
 
-	return report.Consumption, err
+	return err
 }
 
 func (r *Reporter) pusher(ctx context.Context) {
@@ -170,7 +128,7 @@ func (r *Reporter) pusher(ctx context.Context) {
 		// problem is pushOne is a blocker call. so if ctx is canceled
 		// while we are inside pushOne, no way to detect that until the pushOne call
 		// returns
-		reported, err := r.pushOne()
+		err := r.pushOne()
 		if err != nil {
 			log.Error().Err(err).Msg("error while processing capacity report")
 			select {
@@ -180,54 +138,71 @@ func (r *Reporter) pusher(ctx context.Context) {
 				continue
 			}
 		}
+	}
+}
 
-		log.Debug().Msg("capacity report pushed to chain")
-		if r.queue.Size() == 0 {
-			// we only synchronize once ALL queued reports are pushed.
-			if err := r.synchronize(ctx, reported); err != nil {
-				log.Error().Err(err).Msg("failed to synchronize active contracts")
+// getMetrics will collect network consumption every 5 min and store
+// it in the rrd database.
+func (r *Reporter) getMetrics(ctx context.Context) error {
+	log.Debug().Msg("collecting networking metrics")
+	vmd := stubs.NewVMModuleStub(r.cl)
+
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+	metrics, err := vmd.Metrics(ctx)
+	if err != nil {
+		return err
+	}
+	slot, err := r.rrd.Slot()
+	if err != nil {
+		return errors.Wrap(err, "failed to create rrd slot")
+	}
+
+	for vm, consumption := range metrics {
+		nu := r.computeNU(consumption)
+		log.Debug().Str("vm", vm).Uint64("computed", uint64(nu)).Msgf("consumption: %+v", consumption)
+		if err := slot.Counter(vm, float64(nu)); err != nil {
+			return errors.Wrapf(err, "failed to store metrics for '%s'", vm)
+		}
+	}
+
+	return nil
+}
+
+func (r *Reporter) metrics(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := r.getMetrics(ctx); err != nil {
+				log.Error().Err(err).Msg("failed to collect network metrics")
 			}
 		}
 	}
 }
 
-// synchronize will make sure that the node only runs
-// active contracts.
-func (r *Reporter) synchronize(ctx context.Context, reported []Consumption) error {
-	log.Debug().Msg("synchronize active contracts")
-
-	local := make(map[types.U64]Consumption)
-	for _, report := range reported {
-		local[report.ContractID] = report
-	}
-
-	sub, err := r.substrate.Substrate()
+func (r *Reporter) setLastReportTime(ts int64) error {
+	slot, err := r.rrd.Slot()
 	if err != nil {
-		return errors.Wrap(err, "failed to connect to chain")
+		return errors.Wrap(err, "failed to create rrd slot")
 	}
-
-	defer sub.Close()
-
-	// the idea here is that we bring ALL active node contracts from chain.
-	// then compare it with what we have atm (the one we just reported)
-	contracts, err := sub.GetNodeContracts(r.nodeID)
-	if err != nil {
-		return err
-	}
-
-	for _, contract := range contracts {
-		// is there a consumption report for a contract
-		delete(local, contract)
-	}
-	// any LOCAL contract that is not in the map must be decommissioned
-	for _, local := range local {
-		log.Debug().Uint64("contract", uint64(local.ContractID)).Msg("decomission contract because it has been deleted")
-		if err := r.engine.Deprovision(ctx, local.TwinID, uint64(local.ContractID), "contract terminated"); err != nil {
-			log.Error().Err(err).Msgf("failed to decomission contract(%d)", local.ContractID)
-		}
+	// we set it in storage anyway in case of reboot
+	if err := slot.Counter(lastReportedKey, float64(ts)); err != nil {
+		return errors.Wrap(err, "failed to set last report time")
 	}
 
 	return nil
+}
+
+func (r *Reporter) getLastReportTime() (int64, bool, error) {
+	stored, ok, err := r.rrd.Last(lastReportedKey)
+	if err != nil {
+		return 0, false, errors.Wrap(err, "failed to get timestamp of last report")
+	}
+	return int64(stored), ok, nil
 }
 
 // Run runs the reporter
@@ -235,108 +210,100 @@ func (r *Reporter) Run(ctx context.Context) error {
 	// go over all user reservations
 	// take into account the following:
 	// every is in seconds.
-	events := stubs.NewEventsStub(r.cl)
-	stream, err := events.ContractCancelledEvent(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to register to node events")
-	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	go r.metrics(ctx)
 	go r.pusher(ctx)
-
-	ticker := time.NewTicker(every * time.Second)
-	defer ticker.Stop()
 
 	// we always start by reporting capacity, and then once each
 	// `every` seconds
-report:
 	for {
-		log.Info().Msg("collecting consumption")
-		// align time.
+		log.Debug().Msg("collecting consumption since last report")
 		u := time.Now().Unix()
-		u = (u / every) * every
-		// so any reservation that is deleted but this
-		// happened 'after' this time stamp is still
-		// considered as consumption because it lies in the current
-		// 5 minute slot.
-		// but if it was stopped before that timestamp, then it will
-		// not be counted.
-		report, err := r.collect(ctx, time.Unix(u, 0))
+
+		lastReport, ok, err := r.getLastReportTime()
 		if err != nil {
-			log.Error().Err(err).Msg("failed to collect users consumptions")
-			<-time.After(3 * time.Second)
-			continue
+			return err
 		}
-
-		log.Info().Int("size", len(report.Consumption)).Msg("queue consumption report for reproting")
-		if err := r.push(report); err != nil {
-			log.Error().Err(err).Msg("failed to push capacity report")
-		}
-
-		log.Info().Msg("consumption report queued")
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case event := <-stream:
-				if event.Kind == pkg.EventSubscribed {
-					// TODO:
-					// possible loss of events. either we synchronize
-					// all contracts now. Or we wait until next timer
-
-					// for now, wait until next report cycle
-					continue
-				}
-				log.Debug().Msgf("received a cancel contract event %+v", event)
-
-				// otherwise we know what contract to be deleted
-				if err := r.engine.Deprovision(ctx, event.TwinId, event.Contract, "contract canceled"); err != nil {
-					log.Error().Err(err).
-						Uint32("twin", event.TwinId).
-						Uint64("contract", event.Contract).
-						Msg("failed to decomission contract")
-				}
-			case <-ticker.C:
-				continue report
+		if !ok {
+			log.Debug().Msg("no previous reports found")
+			// no reports where made. we can't report consumption now
+			// because we have no window. It won't be fair for the user.
+			// (only during update of old nodes that has running workloads)
+			// hence we only set last report to now
+			lastReport = u
+			if err := r.setLastReportTime(u); err != nil {
+				return err
 			}
+		}
+		log.Debug().Time("last-report", time.Unix(lastReport, 0)).Msg("time of last report")
+		// compute when we should send next report.
+		delay := (lastReport + every) - u
+
+		if delay < 0 {
+			delay = 0
+		}
+		// wait for delay
+		log.Debug().Int64("duration", delay).Msg("seconds to wait before collecting consumption")
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(time.Duration(delay) * time.Second):
+		}
+
+		since := time.Unix(lastReport, 0)
+		log.Debug().Time("since", since).Msg("collecting consumption since")
+		ts, err := r.report(ctx, since)
+		if err != nil {
+			return errors.Wrap(err, "failed to create consumption report")
+		}
+
+		if err := r.setLastReportTime(ts.Unix()); err != nil {
+			return err
 		}
 	}
 }
 
-func (r *Reporter) collect(ctx context.Context, since time.Time) (rep Report, err error) {
-	users, err := r.engine.Storage().Twins()
+func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, error) {
+	now := time.Now()
+	window := now.Sub(since)
+	values, err := r.rrd.Counters(since)
 	if err != nil {
-		return rep, err
+		return now, errors.Wrap(err, "failed to get stored metrics from rrd")
 	}
 
-	// to optimize we get ALL vms vmMetrics in one call.
-	vmMetrics, err := stubs.NewVMModuleStub(r.cl).Metrics(ctx)
-	if err != nil {
-		return Report{}, errors.Wrap(err, "failed to get VMs network metrics")
-	}
-
-	gwMetrics, err := stubs.NewGatewayStub(r.cl).Metrics(ctx)
-	if err != nil && !strings.Contains(err.Error(), "metrics not available") {
-		return Report{}, errors.Wrap(err, "failed to get gateway metrics")
-	}
-
-	qsfsMetrics, err := stubs.NewQSFSDStub(r.cl).Metrics(ctx)
-	if err != nil {
-		return Report{}, errors.Wrap(err, "failed to get qsfs metrics")
-	}
-
-	for _, user := range users {
-		cap, err := r.user(since, user, vmMetrics, gwMetrics, qsfsMetrics)
+	reports := make(map[uint64]substrate.Consumption)
+	for key, value := range values {
+		_, deploment, _, err := gridtypes.WorkloadID(key).Parts()
 		if err != nil {
-			log.Error().Err(err).Msg("failed to collect all user capacity")
-			// NOTE: we intentionally not doing a 'continue' or 'return'
-			// here because even if an error is returned we can have partially
-			// collected some of the user consumption, we still can report that
+			log.Error().Err(err).Msgf("failed to parse metric key '%s'", key)
+			continue
 		}
 
-		rep.Consumption = append(rep.Consumption, cap...)
+		rep, ok := reports[deploment]
+		if !ok {
+			rep = substrate.Consumption{
+				ContractID: types.U64(deploment),
+				Timestamp:  types.U64(now.Unix()),
+				Window:     types.U64(window / time.Second),
+			}
+		}
+
+		rep.NRU += types.U64(value)
+		reports[deploment] = rep
 	}
 
-	return rep, nil
+	report := Report{
+		Consumption: make([]substrate.Consumption, 0, len(reports)),
+	}
+
+	for _, v := range reports {
+		report.Consumption = append(report.Consumption, v)
+	}
+
+	return now, r.push(report)
 }
 
 func (r *Reporter) push(report Report) error {
@@ -344,79 +311,6 @@ func (r *Reporter) push(report Report) error {
 		return nil
 	}
 	return r.queue.Enqueue(&report)
-}
-
-func (r *Reporter) user(since time.Time, user uint32, vmMetrics pkg.MachineMetrics, gwMetrics pkg.GatewayMetrics, qsfsMetrics pkg.QSFSMetrics) ([]Consumption, error) {
-	var m many
-
-	var consumptions []Consumption
-	ids, err := r.engine.Storage().ByTwin(user)
-	if err != nil {
-		m = m.append(errors.Wrapf(err, "failed to get reservation for user '%s'", user))
-	}
-
-	for _, id := range ids {
-		dl, err := r.engine.Storage().Get(user, id)
-		if err != nil {
-			m = m.append(errors.Wrapf(err, "failed to get reservation '%d'", id))
-			continue
-		}
-
-		consumption := Consumption{
-			TwinID: user,
-			Consumption: substrate.Consumption{
-				ContractID: types.U64(id),
-				Timestamp:  types.U64(since.Unix()),
-			},
-		}
-
-		for i := range dl.Workloads {
-			wl := &dl.Workloads[i]
-
-			if wl.Result.IsNil() {
-				// no results yet
-				continue
-			}
-
-			wlID, err := gridtypes.NewWorkloadID(user, id, wl.Name)
-			if err != nil {
-				log.Error().Err(err).Msg("invalid workload id (shouldn't happen here)")
-				continue
-			}
-
-			if !r.shouldCount(since, &wl.Result) {
-				continue
-			}
-
-			cap, err := wl.Capacity()
-			if err != nil {
-				m = m.append(errors.Wrapf(err, "failed to get reservation '%s' capacity", id))
-				continue
-			}
-
-			consumption.CRU += types.U64(cap.CRU)
-			consumption.MRU += types.U64(cap.MRU)
-			consumption.HRU += types.U64(cap.HRU)
-			consumption.SRU += types.U64(cap.SRU)
-
-			// special handling for ZMachine types. if they exist
-			// we also need to get network usage.
-			metric, ok := vmMetrics[wlID.String()]
-			if ok {
-				// add metric to consumption
-				consumption.NRU += types.U64(r.computeNU(metric))
-			}
-			consumption.NRU += types.U64(qsfsMetrics.Nu(wlID.String()))
-			// special handling for gw types.
-			consumption.NRU += types.U64(gwMetrics.Nu(wlID.String()))
-		}
-
-		if !consumption.IsEmpty() {
-			consumptions = append(consumptions, consumption)
-		}
-	}
-
-	return consumptions, m.AsError()
 }
 
 func (r *Reporter) computeNU(m pkg.MachineMetric) gridtypes.Unit {
@@ -429,17 +323,4 @@ func (r *Reporter) computeNU(m pkg.MachineMetric) gridtypes.Unit {
 	nu := m.Public.Nu()*public + m.Private.Nu()*private
 
 	return gridtypes.Unit(nu)
-}
-
-func (r *Reporter) shouldCount(since time.Time, result *gridtypes.Result) bool {
-	if result.State == gridtypes.StateOk {
-		return true
-	}
-
-	if result.State == gridtypes.StateDeleted {
-		// if it was stopped before the 'since' .
-		return !result.Created.Time().Before(since)
-	}
-
-	return false
 }

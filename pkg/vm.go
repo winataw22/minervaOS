@@ -209,7 +209,7 @@ func (n *NetMetric) Nu() float64 {
 	const (
 		// weights knobs for nu calculations
 		bytes   float64 = 1.0
-		packets float64 = 0.2
+		packets float64 = 0.0
 		rx      float64 = 1.0
 		tx      float64 = 1.0
 	)
