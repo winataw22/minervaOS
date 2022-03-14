@@ -136,7 +136,7 @@ func (r *rrdBolt) Counters(since time.Time) (map[string]float64, error) {
 	ts = (ts / r.window) * r.window
 
 	// we start from the previous slot so we check from the last value.
-	ts -= r.window
+	//ts -= r.window
 	change := make(map[string]float64)
 
 	err := r.db.View(func(tx *bolt.Tx) error {

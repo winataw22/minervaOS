@@ -55,12 +55,32 @@ func WithRerunAll(t bool) EngineOption {
 	return &withRerunAll{t}
 }
 
+type Callback func(twin uint32, contract uint64, delete bool)
+
+// WithCallback sets a callback that is called when a deployment is being Created, Updated, Or Deleted
+// The handler then can use the id to get current "state" of the deployment from storage and
+// take proper action. A callback must not block otherwise the engine operation will get blocked
+func WithCallback(cb Callback) EngineOption {
+	return &withCallback{cb}
+}
+
 type jobOperation int
 
 const (
+	// opProvision installs a deployment
 	opProvision jobOperation = iota
+	// removes a deployment
 	opDeprovision
+	// deletes a deployment
 	opUpdate
+	// opProvisionNoContract is used to reinstall
+	// a deployment on node reboot without validating
+	// against the chain again because 1) validation
+	// has already been done on first installation
+	// 2) hash is not granteed to match because of the
+	// order of the workloads doesn't have to match
+	// the one sent by the user
+	opProvisionNoContract
 )
 
 // engineJob is a persisted job instance that is
@@ -91,8 +111,9 @@ type NativeEngine struct {
 	typeIndex map[gridtypes.WorkloadType]int
 	rerunAll  bool
 	//substrate specific attributes
-	nodeID uint32
-	sub    substrate.Manager
+	nodeID   uint32
+	sub      substrate.Manager
+	callback Callback
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -157,6 +178,14 @@ type withRerunAll struct {
 
 func (w *withRerunAll) apply(e *NativeEngine) {
 	e.rerunAll = w.t
+}
+
+type withCallback struct {
+	cb Callback
+}
+
+func (w *withCallback) apply(e *NativeEngine) {
+	e.callback = w.cb
 }
 
 type nullKeyGetter struct{}
@@ -397,7 +426,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 
 		// contract validation
 		// this should ONLY be done on provosion and update operation
-		if job.Op != opDeprovision {
+		if job.Op == opProvision || job.Op == opUpdate {
 			// otherwise, contract validation is needed
 			ctx, err = e.contract(ctx, &job.Target)
 			if err != nil {
@@ -415,6 +444,8 @@ func (e *NativeEngine) Run(root context.Context) error {
 		}
 
 		switch job.Op {
+		case opProvisionNoContract:
+			fallthrough
 		case opProvision:
 			e.installDeployment(ctx, &job.Target)
 		case opDeprovision:
@@ -444,7 +475,23 @@ func (e *NativeEngine) Run(root context.Context) error {
 		if err != nil {
 			log.Error().Err(err).Msg("failed to dequeue job")
 		}
+
+		e.safeCallback(&job.Target, job.Op == opDeprovision)
 	}
+}
+
+func (e *NativeEngine) safeCallback(d *gridtypes.Deployment, delete bool) {
+	if e.callback == nil {
+		return
+	}
+	// in case callback panics we don't want to kill the engine
+	defer func() {
+		if err := recover(); err != nil {
+			log.Error().Msgf("panic while processing callback: %v", err)
+		}
+	}()
+
+	e.callback(d.TwinID, d.ContractID, delete)
 }
 
 // contract validates and injects the deployment contracts is substrate is configured
@@ -511,8 +558,22 @@ func (e *NativeEngine) boot(root context.Context) error {
 			// unfortunately we have to inject this value here
 			// since the boot runs outside the engine queue.
 
-			ctx := withDeployment(root, dl.TwinID, dl.ContractID)
-			e.installDeployment(ctx, &dl)
+			if !dl.IsActive() {
+				continue
+			}
+
+			job := engineJob{
+				Target: dl,
+				Op:     opProvisionNoContract,
+			}
+
+			if err := e.queue.Enqueue(&job); err != nil {
+				log.Error().
+					Err(err).
+					Uint32("twin", dl.TwinID).
+					Uint64("dl", dl.ContractID).
+					Msg("failed to queue deployment for processing")
+			}
 		}
 	}
 

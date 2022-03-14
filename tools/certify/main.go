@@ -69,7 +69,7 @@ func run(opt options) error {
 		}
 
 		log.Info().Msg("possible node to certify")
-		possible += 1
+		possible++
 		if opt.dry {
 			continue
 		}
@@ -79,7 +79,7 @@ func run(opt options) error {
 			continue
 		}
 
-		certified += 1
+		certified++
 	}
 
 	log.Info().Int("count", possible).Msg("found nodes that can be certified")

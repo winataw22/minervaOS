@@ -195,6 +195,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get node reserved capacity")
 	}
 	var current gridtypes.Capacity
+	var active []gridtypes.Deployment
 	if !app.IsFirstBoot(serverName) {
 		// if this is the first boot of this module.
 		// it means the provision engine will still
@@ -203,7 +204,7 @@ func action(cli *cli.Context) error {
 		// since the counters will get populated anyway.
 		// but if not, we need to set the current counters
 		// from store.
-		current, err = store.Capacity()
+		current, active, err = store.Capacity()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to compute current consumed capacity")
 		}
@@ -264,6 +265,21 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create storage for queues")
 	}
 
+	setter := NewCapacitySetter(kp, mgr, store)
+
+	log.Info().Int("contracts", len(active)).Msg("setting used capacity by contracts")
+	if err := setter.Set(active...); err != nil {
+		log.Error().Err(err).Msg("failed to set capacity for active contracts")
+	}
+
+	log.Info().Msg("setting contracts used cpacity done")
+
+	go func() {
+		if err := setter.Run(ctx); err != nil {
+			log.Fatal().Err(err).Msg("capacity reporter exited unexpectedly")
+		}
+	}()
+
 	engine, err := provision.New(
 		store,
 		statistics,
@@ -284,6 +300,10 @@ func action(cli *cli.Context) error {
 		// if this is a node reboot, the node needs to
 		// recreate all reservations. so we set rerun = true
 		provision.WithRerunAll(app.IsFirstBoot(serverName)),
+		// Callback when a deployment changes capacity it must
+		// be called. this one used by the setter to set used
+		// capacity on chain.
+		provision.WithCallback(setter.Callback),
 	)
 
 	if err != nil {
@@ -337,7 +357,7 @@ func action(cli *cli.Context) error {
 	go func() {
 		for {
 			err := reporter.Run(ctx)
-			if err != context.Canceled {
+			if err == context.Canceled {
 				return
 			} else if err != nil {
 				log.Error().Err(err).Msg("capacity reported stopped unexpectedely")

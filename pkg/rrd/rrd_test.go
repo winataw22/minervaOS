@@ -218,3 +218,33 @@ func TestCountersLast(t *testing.T) {
 	require.EqualValues(120, v)
 
 }
+
+func TestCountersMultipleReports(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	window := 5 * time.Minute
+	db, err := newRRDBolt(path, window, 24*time.Hour)
+	require.NoError(err)
+	now := time.Now()
+
+	lastReportTime := now.Unix()
+	total := 0.0
+	for i := 0; i <= 24; i++ {
+		slot, err := db.slotAt(uint64(now.Add(time.Duration(i) * 5 * time.Minute).Unix()))
+		require.NoError(err)
+		err = slot.Counter("test-0", float64(i))
+		require.NoError(err)
+		if i%6 == 0 && i != 0 {
+			counters, err := db.Counters(time.Unix(lastReportTime, 0))
+			require.NoError(err)
+			require.Len(counters, 1)
+			lastReportTime = now.Add(time.Duration(i) * 5 * time.Minute).Unix()
+			require.EqualValues(6, counters["test-0"])
+			total += counters["test-0"]
+		}
+	}
+
+	require.EqualValues(24, total)
+}

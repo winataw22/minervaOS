@@ -122,6 +122,21 @@ type Deployment struct {
 	Workloads []Workload `json:"workloads"`
 }
 
+// IsActive return true if the deployment has
+// workloads in deployable state
+func (d *Deployment) IsActive() bool {
+	active := false
+	for i := range d.Workloads {
+		wl := &d.Workloads[i]
+		if !wl.Result.State.IsAny(StateDeleted, StateError) {
+			// not delete or error so is probably active
+			return true
+		}
+	}
+
+	return active
+}
+
 // SetError sets an error on ALL workloads. this is mostly
 // an error caused by validation AFTTER the deployment was initially accepted
 func (d *Deployment) SetError(err error) {
