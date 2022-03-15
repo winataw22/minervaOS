@@ -26,7 +26,7 @@ const (
 )
 
 type Report struct {
-	Consumption []substrate.Consumption
+	Consumption []substrate.NruConsumption
 }
 
 // Reporter structure
@@ -274,7 +274,7 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 		return now, errors.Wrap(err, "failed to get stored metrics from rrd")
 	}
 
-	reports := make(map[uint64]substrate.Consumption)
+	reports := make(map[uint64]substrate.NruConsumption)
 	for key, value := range values {
 		_, deploment, _, err := gridtypes.WorkloadID(key).Parts()
 		if err != nil {
@@ -284,7 +284,7 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 
 		rep, ok := reports[deploment]
 		if !ok {
-			rep = substrate.Consumption{
+			rep = substrate.NruConsumption{
 				ContractID: types.U64(deploment),
 				Timestamp:  types.U64(now.Unix()),
 				Window:     types.U64(window / time.Second),
@@ -296,7 +296,7 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 	}
 
 	report := Report{
-		Consumption: make([]substrate.Consumption, 0, len(reports)),
+		Consumption: make([]substrate.NruConsumption, 0, len(reports)),
 	}
 
 	for _, v := range reports {

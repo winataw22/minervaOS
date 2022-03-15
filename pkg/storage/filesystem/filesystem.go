@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/zos/pkg"
 )
 
 // Usage struct (in bytes)
@@ -39,10 +38,6 @@ type Pool interface {
 	Mount() (string, error)
 	// UnMount the pool
 	UnMount() error
-	//AddDevice to the pool
-	// RemoveDevice from the pool
-	// Type of the physical storage in this pool
-	Type() pkg.DeviceType
 	// Reserved is reserved size of the devices in bytes
 	Reserved() (uint64, error)
 	// Volumes are all subvolumes of this volume

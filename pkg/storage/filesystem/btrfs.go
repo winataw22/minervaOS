@@ -11,8 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-
-	"github.com/threefoldtech/zos/pkg"
 )
 
 var (
@@ -251,12 +249,6 @@ func (p *btrfsPool) Usage() (usage Usage, err error) {
 	}
 
 	return Usage{Size: p.device.Size, Used: du.Data.Used}, nil
-}
-
-// Type of the physical storage used for this pool
-func (p *btrfsPool) Type() pkg.DeviceType {
-	// We only create heterogenous pools for now
-	return p.device.Type()
 }
 
 // Reserved is reserved size of the devices in bytes

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 type TestDeviceManager struct {
@@ -36,6 +37,11 @@ func (m *TestDeviceManager) Mountpoint(ctx context.Context, device string) (stri
 	return args.String(0), args.Error(1)
 }
 
+func (m *TestDeviceManager) Seektime(ctx context.Context, device string) (zos.DeviceType, error) {
+	args := m.Called(ctx, device)
+	return zos.DeviceType(args.String(0)), args.Error(1)
+}
+
 func TestBtrfsCreatePoolExists(t *testing.T) {
 	require := require.New(t)
 	exe := &TestExecuter{}
@@ -47,7 +53,6 @@ func TestBtrfsCreatePoolExists(t *testing.T) {
 		mgr:        &mgr,
 		Path:       "/tmp/disk",
 		Rota:       false,
-		Readtime:   0,
 		Label:      "some-label",
 		Filesystem: BtrfsFSType,
 	}
@@ -66,7 +71,6 @@ func TestBtrfsCreatePoolExists(t *testing.T) {
 		mgr:        &mgr,
 		Path:       "/tmp/disk",
 		Rota:       false,
-		Readtime:   0,
 		Label:      "some-label",
 		Filesystem: BtrfsFSType,
 	}
@@ -85,9 +89,8 @@ func TestBtrfsCreatePoolNotExist(t *testing.T) {
 
 	exe := &TestExecuter{}
 	dev := DeviceInfo{
-		Path:     "/tmp/disk",
-		Rota:     false,
-		Readtime: 0,
+		Path: "/tmp/disk",
+		Rota: false,
 	}
 
 	// expected formating of the device

@@ -165,7 +165,12 @@ func (s *Module) initialize() error {
 			log.Error().Err(err).Str("pool", pool.Name()).Str("device", device.Path).Msg("failed to get usage of pool")
 		}
 
-		typ := device.Type()
+		typ, err := device.Type()
+		if err != nil {
+			log.Error().Str("device", device.Path).Err(err).Msg("failed to check device type")
+			continue
+		}
+
 		if vm {
 			// force ssd device for vms
 			typ = zos.SSDDevice

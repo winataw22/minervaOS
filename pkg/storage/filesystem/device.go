@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"syscall"
-	"time"
+	"strings"
 
 	"github.com/pkg/errors"
-	log "github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -25,6 +23,8 @@ type DeviceManager interface {
 	ByLabel(ctx context.Context, label string) (Devices, error)
 	// Mountpoint returns mount point of a device
 	Mountpoint(ctx context.Context, device string) (string, error)
+	// Seektime checks device seektime
+	Seektime(ctx context.Context, device string) (zos.DeviceType, error)
 }
 
 // Devices represents a list of cached in memory devices
@@ -57,7 +57,6 @@ type DeviceInfo struct {
 	Filesystem FSType `json:"fstype"`
 	Rota       bool   `json:"rota"`
 	Subsystems string `json:"subsystems"`
-	Readtime   uint64 `json:"-"`
 }
 
 func (i *DeviceInfo) Name() string {
@@ -69,12 +68,8 @@ func (i *DeviceInfo) Used() bool {
 	return len(i.Label) != 0 || len(i.Filesystem) != 0
 }
 
-func (d *DeviceInfo) Type() zos.DeviceType {
-	if d.Rota {
-		return zos.HDDDevice
-	}
-
-	return zos.SSDDevice
+func (d *DeviceInfo) Type() (zos.DeviceType, error) {
+	return d.mgr.Seektime(context.Background(), d.Path)
 }
 
 func (d *DeviceInfo) Mountpoint(ctx context.Context) (string, error) {
@@ -102,6 +97,25 @@ func defaultDeviceManager(exec executer) DeviceManager {
 	}
 
 	return m
+}
+
+// Devices gets available block devices
+func (l *lsblkDeviceManager) Seektime(ctx context.Context, device string) (zos.DeviceType, error) {
+	log.Debug().Str("device", device).Msg("checking seektim for device")
+	out, err := l.executer.run(ctx, "seektime", "-j", device)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to check device seektime")
+	}
+
+	var result struct {
+		Type string `json:"type"`
+	}
+
+	if err := json.Unmarshal(out, &result); err != nil {
+		return "", errors.Wrap(err, "failed to load seektime data")
+	}
+
+	return zos.DeviceType(strings.ToLower(result.Type)), nil
 }
 
 // Devices gets available block devices
@@ -239,67 +253,6 @@ func (l *lsblkDeviceManager) scan(ctx context.Context) ([]DeviceInfo, error) {
 		return nil, errors.Wrap(err, "failed to scan devices")
 	}
 
-	if err := l.setDeviceReadTimes(devs); err != nil {
-		return nil, err
-	}
-
 	l.cache = devs
 	return l.cache, nil
-}
-
-func isTimeout(err error) bool {
-	if err == nil {
-		return false
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		if status, ok := exitErr.ProcessState.Sys().(syscall.WaitStatus); ok {
-			return status.Signaled() && status.Signal() == syscall.SIGKILL
-		}
-	}
-
-	return false
-}
-
-// seektime uses the seektime binary to try and determine the type of a disk
-// This function returns the type of the device, as reported by seektime,
-// and the elapsed time in microseconds (also reported by seektime)
-func (l *lsblkDeviceManager) seektime(ctx context.Context, path string) (string, uint64, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-
-	bytes, err := l.run(ctx, "seektime", "-j", path)
-	if isTimeout(err) {
-		// the seektime is taking too long that's defintely a HDD
-		return "HDD", 5 * 60, nil
-	} else if err != nil {
-		return "", 0, err
-	}
-
-	var seekTime struct {
-		Typ  string `json:"type"`
-		Time uint64 `json:"elapsed"`
-	}
-
-	err = json.Unmarshal(bytes, &seekTime)
-	log.Debug().Str("disk", path).Str("type", seekTime.Typ).Uint64("time", seekTime.Time).Msg("seektime")
-
-	return seekTime.Typ, seekTime.Time, err
-}
-
-func (l *lsblkDeviceManager) setDeviceReadTimes(devices []DeviceInfo) error {
-	for idx := range devices {
-		d := &devices[idx]
-
-		_, rt, err := l.seektime(context.Background(), d.Path)
-		if err != nil {
-			// don't include errored devices in the result
-			log.Error().Err(err).Msgf("failed to get disk read time")
-			return err
-		}
-
-		d.Readtime = rt
-	}
-
-	return nil
 }
