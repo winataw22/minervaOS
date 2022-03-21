@@ -217,7 +217,7 @@ func (s *Module) initialize() error {
 		Int("ssd-pools", len(s.ssds)).
 		Int("hdd-pools", len(s.hdds)).
 		Int("broken-pools", len(s.brokenPools)).
-		Int("borken-devices", len(s.brokenDevices)).
+		Int("broken-devices", len(s.brokenDevices)).
 		Msg("pool creations completed")
 
 	s.dump()
