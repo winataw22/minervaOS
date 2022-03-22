@@ -23,7 +23,7 @@ import (
 
 const (
 	// this probably need a way to update. for now just hard code it
-	cloudContainerFlist = "https://hub.grid.tf/omar0.3bot/cloud-container.flist"
+	cloudContainerFlist = "https://hub.grid.tf/azmy.3bot/cloud-container.flist"
 	cloudContainerName  = "cloud-container"
 )
 
