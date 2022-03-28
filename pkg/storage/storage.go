@@ -202,7 +202,10 @@ func (s *Module) initialize() error {
 		}
 
 		for _, vol := range volumes {
-			if vol.Name() != zdbVolume {
+			if vol.Name() != zdbVolume && vol.Name() != cacheLabel {
+				// we don't delete zdb volumes, also zos-cache volumes
+				// although they should not exist on hdd for protection
+				// in case of error or bad detection of device speed.
 				if err := hdd.RemoveVolume(vol.Name()); err != nil {
 					log.Error().Err(err).
 						Str("volume", vol.Name()).
