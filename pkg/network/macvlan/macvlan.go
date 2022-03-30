@@ -92,7 +92,7 @@ func Create(name string, master string, netns ns.NetNS) (*netlink.Macvlan, error
 // Install configures a macvlan interfaces created with Create method
 func Install(link *netlink.Macvlan, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netns ns.NetNS) error {
 	f := func(_ ns.NetNS) error {
-		if hw != nil && len(hw) != 0 {
+		if len(hw) != 0 {
 			if !bytes.Equal(link.HardwareAddr, hw) {
 				if err := netlink.LinkSetHardwareAddr(link, hw); err != nil {
 					return fmt.Errorf("failed to set MAC address on interface %s: %w", link.Attrs().Name, err)

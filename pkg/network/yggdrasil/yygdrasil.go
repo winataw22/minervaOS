@@ -10,12 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/zinit"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
@@ -38,23 +35,6 @@ func NewYggServer(cfg *NodeConfig) *YggServer {
 	}
 }
 
-func (s *YggServer) pidsOf(ns string) ([]uint32, error) {
-	output, err := exec.Command("ip", "netns", "pids", ns).CombinedOutput()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to list namespace '%s' pids", ns)
-	}
-	parts := strings.Fields(string(output))
-	results := make([]uint32, 0, len(parts))
-	for _, str := range parts {
-		pid, err := strconv.ParseUint(str, 10, 32)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse pid '%s'", str)
-		}
-		results = append(results, uint32(pid))
-	}
-	return results, nil
-}
-
 func (s *YggServer) Restart(z *zinit.Client) error {
 	return z.Kill(zinitService, zinit.SIGTERM)
 }
@@ -69,41 +49,19 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		return fmt.Errorf("invalid namespace '%s'", ns)
 	}
 
-	status, err := z.Status(zinitService)
-
-	//TODO: what if it runs in the correct namespace but wrong config ?
 	if err := writeConfig(confPath, s.cfg); err != nil {
 		return err
 	}
 
-	if err == nil && status.State.Is(zinit.ServiceStateRunning) {
-		pids, err := s.pidsOf(ns)
-		if err != nil {
-			return errors.Wrap(err, "failed to check if yggdrasil is running in the correct namespace")
-		}
-
-		in := func(pid uint32) bool {
-			for _, p := range pids {
-				if p == pid {
-					return true
-				}
-			}
-
-			return false
-		}
-
-		if in(uint32(status.Pid)) {
-			if err := z.Kill(zinitService, zinit.SIGHUP); err != nil {
-				log.Error().Err(err).Msg("failed to reload config")
-			}
-			return nil
-		}
-
+	// service found.
+	// better if we just stop, forget and start over to make
+	// sure we using the right exec params
+	if _, err := z.Status(zinitService); err == nil {
 		// not here we need to stop it
-		if err := z.StopWait(5*time.Second, zinitService); err != nil {
+		if err := z.StopWait(5*time.Second, zinitService); err != nil && !errors.Is(err, zinit.ErrUnknownService) {
 			return errors.Wrap(err, "failed to stop yggdrasil service")
 		}
-		if err := z.Forget(zinitService); err != nil {
+		if err := z.Forget(zinitService); err != nil && !errors.Is(err, zinit.ErrUnknownService) {
 			return errors.Wrap(err, "failed to forget yggdrasil service")
 		}
 	}
@@ -113,13 +71,20 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 		return err
 	}
 
+	cmd := `sh -c '
+		ulimit -n 16384
+
+		exec ip netns exec %s %s -useconffile %s
+	'`
+
 	err = zinit.AddService(zinitService, zinit.InitService{
-		Exec: fmt.Sprintf("ip netns exec %s %s -useconffile %s", ns, bin, confPath),
+		Exec: fmt.Sprintf(cmd, ns, bin, confPath),
 		After: []string{
 			"node-ready",
 		},
 		Test: "yggdrasilctl getself | grep -i coords",
 	})
+
 	if err != nil {
 		return err
 	}
@@ -130,20 +95,6 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 
 	return z.StartWait(time.Second*20, zinitService)
 }
-
-// // Stop stop the yggdrasil zinit service
-// func (s *YggServer) Stop(z *zinit.Client) error {
-// 	status, err := z.Status(zinitService)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if !status.State.Is(zinit.ServiceStateRunning) {
-// 		return nil
-// 	}
-
-// 	return z.StopWait(time.Second*5, zinitService)
-// }
 
 // NodeID returns the yggdrasil node ID of s
 func (s *YggServer) NodeID() (ed25519.PublicKey, error) {

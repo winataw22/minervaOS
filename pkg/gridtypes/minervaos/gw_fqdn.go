@@ -28,7 +28,7 @@ func (b Backend) Valid() error {
 	}
 
 	ip := net.ParseIP(u.Hostname())
-	if ip == nil || len(ip) == 0 || ip.IsLoopback() {
+	if len(ip) == 0 || ip.IsLoopback() {
 		return fmt.Errorf("invalid ip address in backend: %s", u.Hostname())
 	}
 	return nil
