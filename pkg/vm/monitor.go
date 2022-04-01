@@ -94,7 +94,7 @@ func (m *Module) monitorID(ctx context.Context, running map[string]Process, id s
 		// if the marker is permanent. it means that this vm
 		// is being deleted or not monitored. we don't need to take any more action here
 		// (don't try to restart or delete)
-		os.RemoveAll(m.configPath(id))
+		m.removeConfig(id)
 		return nil
 	}
 
@@ -132,7 +132,7 @@ func (m *Module) monitorID(ctx context.Context, running map[string]Process, id s
 
 	if reason != nil {
 		log.Debug().Err(reason).Msg("deleting vm due to restart error")
-		os.RemoveAll(m.configPath(id))
+		m.removeConfig(id)
 
 		stub := stubs.NewProvisionStub(m.client)
 		if err := stub.DecommissionCached(ctx, id, reason.Error()); err != nil {

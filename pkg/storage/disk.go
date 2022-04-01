@@ -144,7 +144,7 @@ func (s *Module) DiskWrite(name string, image string) error {
 		return errors.Wrap(err, "failed to write disk image")
 	}
 
-	return s.expandFs(path)
+	return nil
 }
 
 // DiskCreate with given size, return path to virtual disk (size in MB)
@@ -221,30 +221,6 @@ func (s *Module) ensureFS(disk string) error {
 	}
 
 	return errors.Wrapf(err, "unknown btrfs error '%s'", string(output))
-}
-
-func (s *Module) expandFs(disk string) error {
-	dname, err := ioutil.TempDir("", "btrfs-resize")
-	if err != nil {
-		return errors.Wrap(err, "couldn't create a temp dir to mount the btrfs fs to resize it")
-	}
-	defer os.RemoveAll(dname)
-
-	cmd := exec.Command("mount", disk, dname)
-
-	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "couldn't mount the btrfs fs to resize it")
-	}
-
-	defer func() {
-		_ = syscall.Unmount(dname, 0)
-	}()
-	cmd = exec.Command("btrfs", "filesystem", "resize", "max", dname)
-
-	if err := cmd.Run(); err != nil {
-		return errors.Wrap(err, "failed to resize file system to disk size")
-	}
-	return nil
 }
 
 func (s *Module) safePath(base, id string) (string, error) {

@@ -1,7 +1,6 @@
 package vm
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -20,6 +19,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/vm/cloudinit"
 )
 
 const (
@@ -30,6 +30,9 @@ const (
 	ConfigDir = "config"
 	// logsDir is logs directory name
 	logsDir = "logs"
+
+	// cloud-init directory
+	cloudInitDir = "cloud-init"
 )
 
 var (
@@ -39,19 +42,6 @@ var (
 		"console": "ttyS0",
 		"reboot":  "k",
 		"panic":   "1",
-	}
-)
-var (
-	protectedKernelEnv = map[string]struct{}{
-		"init":       {},
-		"root":       {},
-		"rootfstype": {},
-		"console":    {},
-		"net_eth1":   {},
-		"net_eth2":   {},
-		"net_dns":    {},
-		"panic":      {},
-		"reboot":     {},
 	}
 )
 
@@ -75,6 +65,7 @@ func NewVMModule(cl zbus.Client, root, config string) (*Module, error) {
 	for _, dir := range []string{
 		socketDir,
 		filepath.Join(root, logsDir),
+		filepath.Join(root, cloudInitDir),
 	} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, err
@@ -145,31 +136,17 @@ func (m *Module) logsPath(name string) string {
 	return filepath.Join(m.root, logsDir, name)
 }
 
+func (m *Module) cloudInitImage(name string) string {
+	return filepath.Join(m.root, cloudInitDir, name)
+}
+
 // Exists checks if firecracker process running for this machine
 func (m *Module) Exists(id string) bool {
 	_, err := Find(id)
 	return err == nil
 }
 
-func (m *Module) buildRouteParam(defaultGw net.IP, table map[string]string) string {
-	var buf bytes.Buffer
-	if defaultGw != nil {
-		buf.WriteString(fmt.Sprintf("default,%s", defaultGw.String()))
-	}
-
-	for k, v := range table {
-		if buf.Len() > 0 {
-			buf.WriteRune(';')
-		}
-		buf.WriteString(k)
-		buf.WriteRune(',')
-		buf.WriteString(v)
-	}
-
-	return buf.String()
-}
-
-func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
+func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interface, error) {
 	// assume there is always at least 1 iface present
 
 	// we do 2 things here:
@@ -181,7 +158,6 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
 	// method uses a custom script inside the image to set proper IP. The config
 	// is also passed through the command line.
 
-	args := pkg.KernelArgs{}
 	v4Routes := make(map[string]string)
 	v6Routes := make(map[string]string)
 	var defaultGw4 net.IP
@@ -196,15 +172,27 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
 		}
 		nics = append(nics, nic)
 
-		var ips []string
-		for _, ip := range ifcfg.IPs {
-			ips = append(ips, ip.String())
+		cinet := cloudinit.Ethernet{
+			Name:  nic.ID,
+			Mac:   cloudinit.MacMatch(nic.Mac),
+			DHCP4: false,
 		}
-		// configure nic ips
-		args[fmt.Sprintf("net_%s", nic.ID)] = strings.Join(ips, ";")
+		// cfg.Network = append(cfg.Network,)
+		for _, ip := range ifcfg.IPs {
+			cinet.Addresses = append(cinet.Addresses, ip.String())
+		}
+
 		// configure nic routes
+		if ifcfg.IP4DefaultGateway != nil {
+			cinet.Gateway4 = ifcfg.IP4DefaultGateway.String()
+		}
+
 		if defaultGw4 == nil && ifcfg.IP4DefaultGateway != nil {
 			defaultGw4 = ifcfg.IP4DefaultGateway
+		}
+
+		if ifcfg.IP6DefaultGateway != nil {
+			cinet.Gateway6 = ifcfg.IP6DefaultGateway.String()
 		}
 
 		if defaultGw6 == nil && ifcfg.IP6DefaultGateway != nil {
@@ -218,6 +206,11 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
 
 		// inserting extra routes in right places
 		for _, route := range ifcfg.Routes {
+			cinet.Routes = append(cinet.Routes, cloudinit.Route{
+				To:  route.Net.String(),
+				Via: route.Gateway.String(),
+			})
+
 			table := v4Routes
 			if route.Net.IP.To4() == nil {
 				table = v6Routes
@@ -228,18 +221,21 @@ func (m *Module) makeNetwork(vm *pkg.VM) ([]Interface, pkg.KernelArgs, error) {
 			}
 			table[route.Net.String()] = gw
 		}
+
+		cfg.Network = append(cfg.Network, cinet)
 	}
 
-	args["net_r4"] = m.buildRouteParam(defaultGw4, v4Routes)
-	args["net_r6"] = m.buildRouteParam(defaultGw6, v6Routes)
-
 	dnsSection := make([]string, 0, len(vm.Network.Nameservers))
+
 	for _, ns := range vm.Network.Nameservers {
 		dnsSection = append(dnsSection, ns.String())
 	}
-	args["net_dns"] = strings.Join(dnsSection, ";")
 
-	return nics, args, nil
+	if len(cfg.Network) > 0 {
+		cfg.Network[0].Nameservers.Addresses = dnsSection
+	}
+
+	return nics, nil
 }
 
 func (m *Module) tail(path string) (string, error) {
@@ -333,6 +329,37 @@ func (m *Module) Run(vm pkg.VM) error {
 		return fmt.Errorf("a vm with same name already exists")
 	}
 
+	cfg := cloudinit.Configuration{
+		Metadata: cloudinit.Metadata{
+			InstanceID: vm.Name,
+			Hostname:   vm.KernelArgs["host"],
+		},
+		Extension: cloudinit.Extension{
+			Entrypoint:  vm.Entrypoint,
+			Environment: vm.Environment,
+		},
+	}
+
+	// TODO: user config should be added as another property on the
+	// VM workload data. For now we always use the SSH_KEY from the env
+	// if provided
+	if key, ok := vm.Environment["SSH_KEY"]; ok {
+		cfg.Users = append(cfg.Users, cloudinit.User{
+			Name: "root",
+			Keys: func() []string {
+				// in case ssh_key container multiple keys. is this a usecase (?)
+				// to be backward compatible, we split over "newlines"
+				lines := strings.Split(key, "\n")
+				var keys []string
+				// but we also support using `,` as a separator
+				for _, line := range lines {
+					keys = append(keys, strings.Split(line, ",")...)
+				}
+				return keys
+			}(),
+		})
+	}
+
 	devices, err := m.makeDevices(&vm)
 	if err != nil {
 		return err
@@ -364,36 +391,40 @@ func (m *Module) Run(vm pkg.VM) error {
 		env = vm.Environment
 		// add we also add disk mounts
 		for i, mnt := range vm.Disks {
-			name := fmt.Sprintf("vd%c", 'a'+i)
-			cmdline[name] = mnt.Target
+			name := fmt.Sprintf("/dev/vd%c", 'a'+i)
+			cfg.Mounts = append(cfg.Mounts,
+				cloudinit.Mount{
+					Source: name,
+					Target: mnt.Target,
+					Type:   cloudinit.MountTypeAuto,
+				})
 		}
 		for _, q := range vm.Shared {
-			key := fmt.Sprintf("qsfs_%s", q.ID)
-			cmdline[key] = q.Target
-		}
-	} else {
-		// if with no virtio fs we can only
-		// set the given environment to the linux kernel
-		// but this is not safe.
-		// TODO: Should we only allow UPPER_CASE
-		// env to pass to avoid overriding other params ?!
-		for k, v := range vm.Environment {
-			if strings.HasPrefix(k, "vd") {
-				continue
-			}
-			if _, ok := protectedKernelEnv[k]; ok {
-				continue
-			}
-			cmdline[k] = v
+			cfg.Mounts = append(cfg.Mounts,
+				cloudinit.Mount{
+					Source: q.ID,
+					Target: q.Target,
+					Type:   cloudinit.MountTypeVirtiofs,
+				})
 		}
 	}
 
-	nics, args, err := m.makeNetwork(&vm)
+	nics, err := m.makeNetwork(&vm, &cfg)
 	if err != nil {
 		return err
 	}
 
-	cmdline.Extend(args)
+	ciImage := m.cloudInitImage(vm.Name)
+
+	if err := cloudinit.CreateImage(ciImage, cfg); err != nil {
+		return errors.Wrap(err, "failed to create cloud-init image")
+	}
+
+	devices = append(devices, Disk{
+		ID:       fmt.Sprintf("%d", len(devices)+1),
+		Path:     ciImage,
+		ReadOnly: true,
+	})
 
 	machine := Machine{
 		ID: vm.Name,
@@ -501,6 +532,16 @@ func (m *Module) Inspect(name string) (pkg.VMInfo, error) {
 	}, nil
 }
 
+func (m *Module) removeConfig(name string) {
+	if name == "" {
+		return
+	}
+
+	_ = os.Remove(m.configPath(name))
+
+	_ = os.Remove(m.cloudInitImage(name))
+}
+
 // Delete deletes a machine by name (id)
 func (m *Module) Delete(name string) error {
 	defer m.failures.Delete(name)
@@ -508,7 +549,7 @@ func (m *Module) Delete(name string) error {
 	// before we do anything we set failures to permanent to prevent monitoring from trying
 	// to revive this machine
 	m.failures.Set(name, permanent, cache.NoExpiration)
-	defer os.RemoveAll(m.configPath(name))
+	defer m.removeConfig(name)
 
 	//is this the real life? is this just legacy?
 	if pid, err := findFC(name); err == nil {

@@ -48,8 +48,6 @@ type InterfaceType string
 const (
 	// InterfaceTAP tuntap type
 	InterfaceTAP InterfaceType = "tuntap"
-	// InterfaceMACvTAP mactap type
-	InterfaceMACvTAP InterfaceType = "macvtap"
 )
 
 // Interface nic struct
@@ -57,17 +55,6 @@ type Interface struct {
 	ID  string `json:"iface_id"`
 	Tap string `json:"host_dev_name"`
 	Mac string `json:"guest_mac,omitempty"`
-}
-
-// asMACvTap returns the command line argument for this interface as a macvtap
-func (i Interface) asMACvTap(fd int) string {
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("fd=%d", fd))
-	if len(i.Mac) > 0 {
-		buf.WriteString(fmt.Sprintf(",mac=%s", i.Mac))
-	}
-
-	return buf.String()
 }
 
 // asTap returns the command line argument for this interface as a tap device
@@ -90,8 +77,6 @@ func (i *Interface) getType() (InterfaceType, int, error) {
 	log.Debug().Str("name", i.Tap).Str("type", link.Type()).Msg("checking device type")
 
 	switch InterfaceType(link.Type()) {
-	case InterfaceMACvTAP:
-		return InterfaceMACvTAP, link.Attrs().Index, nil
 	case InterfaceTAP:
 		return InterfaceTAP, link.Attrs().Index, nil
 	default:

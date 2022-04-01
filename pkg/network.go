@@ -87,7 +87,7 @@ type Networker interface {
 
 	// SetupPrivTap sets up a tap device in the network namespace for the networkID. It is hooked
 	// to the network bridge. The name of the tap interface is returned
-	SetupPrivTap(networkID NetID, name string) (string, error)
+	SetupPrivTap(networkID NetID, name string) (tap string, mac string, err error)
 
 	// SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
 	SetupYggTap(name string) (YggdrasilTap, error)

@@ -23,6 +23,7 @@ require (
 	github.com/coreos/go-iptables v0.6.0 // indirect
 	github.com/deckarep/golang-set v1.8.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/diskfs/go-diskfs v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/g0rbe/go-chattr v0.0.0-20190906133247-aa435a6a0a37
 	github.com/gizak/termui/v3 v3.1.0

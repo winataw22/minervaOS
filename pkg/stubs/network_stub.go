@@ -398,7 +398,7 @@ func (s *NetworkerStub) SetPublicConfig(ctx context.Context, arg0 pkg.PublicConf
 	return
 }
 
-func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 error) {
+func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 string, ret2 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPrivTap", args...)
 	if err != nil {
@@ -407,8 +407,11 @@ func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 s
 	if err := result.Unmarshal(0, &ret0); err != nil {
 		panic(err)
 	}
-	ret1 = new(zbus.RemoteError)
 	if err := result.Unmarshal(1, &ret1); err != nil {
+		panic(err)
+	}
+	ret2 = new(zbus.RemoteError)
+	if err := result.Unmarshal(2, &ret2); err != nil {
 		panic(err)
 	}
 	return

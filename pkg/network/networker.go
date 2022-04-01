@@ -265,36 +265,41 @@ func (n networker) createMacVlan(iface string, master string, hw net.HardwareAdd
 
 // SetupTap interface in the network resource. We only allow 1 tap interface to be
 // set up per NR currently
-func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (string, error) {
+func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (ifc string, mac string, err error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
 
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
-		return "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
+		return "", "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
 
 	netRes, err := nr.New(localNR)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to load network resource")
+		return "", "", errors.Wrap(err, "failed to load network resource")
 	}
 
 	bridgeName, err := netRes.BridgeName()
 	if err != nil {
-		return "", errors.Wrap(err, "could not get network namespace bridge")
+		return "", "", errors.Wrap(err, "could not get network namespace bridge")
 	}
 
 	tapIface, err := tapName(name)
 	if err != nil {
-		return "", errors.Wrap(err, "could not get network namespace tap device name")
+		return "", "", errors.Wrap(err, "could not get network namespace tap device name")
 	}
 
-	if ifaceutil.Exists(tapIface, nil) {
-		return tapIface, nil
+	tap, err := ifaceutil.Get(tapIface, nil)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); !ok {
+			return "", "", errors.Wrap(err, "failed to get tap device")
+		}
+	} else if err == nil {
+		return tapIface, tap.Attrs().HardwareAddr.String(), nil
 	}
 
-	_, err = tuntap.CreateTap(tapIface, bridgeName)
+	tap, err = tuntap.CreateTap(tapIface, bridgeName)
 
-	return tapIface, err
+	return tapIface, tap.Attrs().HardwareAddr.String(), err
 }
 
 func (n *networker) TapExists(name string) (bool, error) {

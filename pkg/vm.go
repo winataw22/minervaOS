@@ -77,8 +77,6 @@ const (
 type Boot struct {
 	Type BootType
 	Path string
-	//Environment only works with Boot type virtiofs
-	Environment map[string]string
 }
 
 // KernelArgs are arguments passed to the kernel
