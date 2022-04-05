@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 	"github.com/shirou/gopsutil/disk"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/app"
+	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/kernel"
@@ -51,16 +54,49 @@ type Module struct {
 	totalHDD uint64
 
 	mu sync.RWMutex
+
+	// cache is a cache directory can be used with some files
+	cache TypeCache
+}
+
+type TypeCache struct {
+	base string
+}
+
+func (t *TypeCache) Set(name string, typ pkg.DeviceType) error {
+	if err := ioutil.WriteFile(filepath.Join(t.base, name), []byte(typ), 0644); err != nil {
+		return errors.Wrapf(err, "failed to store device type for '%s'", name)
+	}
+
+	return nil
+}
+
+func (t *TypeCache) Get(name string) (pkg.DeviceType, bool) {
+	data, err := ioutil.ReadFile(filepath.Join(t.base, name))
+	if err != nil {
+		return "", false
+	}
+
+	if len(data) == 0 {
+		return "", false
+	}
+
+	return pkg.DeviceType(data), true
 }
 
 // New create a new storage module service
 func New() (*Module, error) {
 	m := filesystem.DefaultDeviceManager()
+	cache, err := cache.VolatileDir("storage", 1*cache.Megabyte)
+	if err != nil && !os.IsExist(err) {
+		return nil, errors.Wrap(err, "failed to create volatile types cache directory")
+	}
 
 	s := &Module{
 		ssds:          []filesystem.Pool{},
 		devices:       m,
 		brokenDevices: []pkg.BrokenDevice{},
+		cache:         TypeCache{cache},
 	}
 
 	// go for a simple linear setup right now
@@ -165,10 +201,21 @@ func (s *Module) initialize() error {
 			log.Error().Err(err).Str("pool", pool.Name()).Str("device", device.Path).Msg("failed to get usage of pool")
 		}
 
-		typ, err := device.Type()
-		if err != nil {
-			log.Error().Str("device", device.Path).Err(err).Msg("failed to check device type")
-			continue
+		typ, ok := s.cache.Get(device.Name())
+		if !ok {
+			log.Debug().Str("device", device.Path).Msg("detecting device type")
+			typ, err = device.Type()
+			if err != nil {
+				log.Error().Str("device", device.Path).Err(err).Msg("failed to check device type")
+				continue
+			}
+
+			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("caching device type")
+			if err := s.cache.Set(device.Name(), typ); err != nil {
+				log.Error().Str("device", device.Path).Err(err).Msg("failed to cache device type")
+			}
+		} else {
+			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("device type loaded from cache")
 		}
 
 		if vm {
@@ -187,6 +234,8 @@ func (s *Module) initialize() error {
 		case zos.HDDDevice:
 			s.totalHDD += usage.Size
 			s.hdds = append(s.hdds, pool)
+		default:
+			log.Error().Str("type", string(typ)).Str("device", device.Path).Msg("unknown device type")
 		}
 	}
 

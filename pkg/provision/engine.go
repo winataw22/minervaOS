@@ -600,6 +600,7 @@ func (e *NativeEngine) uninstallWorkload(ctx context.Context, wl *gridtypes.Work
 
 	result := gridtypes.Result{
 		State: gridtypes.StateDeleted,
+		Error: reason,
 	}
 	if err := e.provisioner.Decommission(ctx, wl); err != nil {
 		log.Error().Err(err).Stringer("id", wl.ID).Msg("failed to uninstall workload")

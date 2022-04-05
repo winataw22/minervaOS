@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
@@ -66,7 +65,7 @@ func reportStatistics(ctx context.Context, redis string, cl zbus.Client) error {
 				log.Debug().Uint32("twin", twinID).Msg("sending status update to twin")
 				cl := client.NewProxyClient(twinID, bus)
 				if err := sendStatisticsReport(ctx, cl, report); err != nil {
-					log.Error().Err(err).Uint32("twin", twinID).Msg("couldn't send report to twin")
+					log.Warn().Err(err).Uint32("twin", twinID).Msg("couldn't send report to twin")
 				}
 			}(twin)
 		}
@@ -81,20 +80,12 @@ func reportStatistics(ctx context.Context, redis string, cl zbus.Client) error {
 }
 
 func sendStatisticsReport(ctx context.Context, cl *client.ProxyClient, report client.NodeStatus) error {
-	ctx2, cancel := context.WithTimeout(ctx, operationTimeout)
+	ctx, cancel := context.WithTimeout(ctx, operationTimeout)
 	defer cancel()
 
-	errHandler := func(err error, t time.Duration) {
-		if err != nil {
-			log.Error().Err(err).Msg("error while sending twin report")
-		}
+	if err := cl.ReportStats(ctx, report); err != nil {
+		return errors.Wrap(err, "error while sending twin report")
 	}
 
-	exp := backoff.NewExponentialBackOff()
-	exp.MaxInterval = 10 * time.Second
-	exp.MaxElapsedTime = ReportMaxElapsedTime
-	return backoff.RetryNotify(func() error {
-		return cl.ReportStats(ctx2, report)
-	}, exp, errHandler)
-
+	return nil
 }
