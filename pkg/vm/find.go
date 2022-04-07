@@ -50,7 +50,7 @@ func FindAll() (map[string]Process, error) {
 	const (
 		proc   = "/proc"
 		search = "cloud-hypervisor"
-		idFlag = "--log-file"
+		idFlag = "--api-socket"
 	)
 
 	found := make(map[string]Process)

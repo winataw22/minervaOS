@@ -71,14 +71,14 @@ type Nameservers struct {
 }
 
 type Ethernet struct {
-	Name        string      `yaml:"-"`
-	Mac         MacMatch    `yaml:"match"`
-	DHCP4       bool        `yaml:"dhcp4"`
-	Addresses   []string    `yaml:"addresses"`
-	Gateway4    string      `yaml:"gateway4,omitempty"`
-	Gateway6    string      `yaml:"gateway6,omitempty"`
-	Routes      []Route     `yaml:"routes,omitempty"`
-	Nameservers Nameservers `yaml:"nameservers"`
+	Name        string       `yaml:"-"`
+	Mac         MacMatch     `yaml:"match"`
+	DHCP4       bool         `yaml:"dhcp4"`
+	Addresses   []string     `yaml:"addresses"`
+	Gateway4    string       `yaml:"gateway4,omitempty"`
+	Gateway6    string       `yaml:"gateway6,omitempty"`
+	Routes      []Route      `yaml:"routes,omitempty"`
+	Nameservers *Nameservers `yaml:"nameservers,omitempty"`
 }
 
 type Configuration struct {

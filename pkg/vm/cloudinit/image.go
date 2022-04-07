@@ -49,7 +49,7 @@ func CreateImage(file string, cfg Configuration) error {
 		}
 		defer meta.Close()
 
-		if _, err := meta.Write([]byte("#cloud-config\r\n")); err != nil {
+		if _, err := meta.Write([]byte("#cloud-config\n")); err != nil {
 			return errors.Wrap(err, "failed to write config header")
 		}
 

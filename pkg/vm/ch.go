@@ -31,9 +31,8 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 		"--cpus":   {m.Config.CPU.String()},
 		"--memory": {fmt.Sprintf("%s,shared=on", m.Config.Mem.String())},
 
-		"--log-file":   {logs},
 		"--console":    {"off"},
-		"--serial":     {fmt.Sprintf("file=%s.console", logs)},
+		"--serial":     {"tty"},
 		"--api-socket": {socket},
 	}
 	var err error
@@ -114,10 +113,20 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	// but we always get permission denied error and it's not
 	// clear why. so for now we use busybox setsid command to do
 	// this.
+	logFd, err := os.Create(logs)
+	if err != nil {
+		return err
+	}
+	defer logFd.Close()
+
 	fullArgs = append(fullArgs, "setsid", chBin)
 	fullArgs = append(fullArgs, argsList...)
 	log.Debug().Msgf("ch: %+v", fullArgs)
+
 	cmd := exec.CommandContext(ctx, "busybox", fullArgs...)
+	cmd.Stdout = logFd
+	cmd.Stderr = logFd
+
 	// TODO: always get permission denied when setting
 	// sid with sys proc attr
 	// cmd.SysProcAttr = &syscall.SysProcAttr{

@@ -300,6 +300,9 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 	}
 
 	for _, v := range reports {
+		if v.NRU == 0 {
+			continue
+		}
 		report.Consumption = append(report.Consumption, v)
 	}
 

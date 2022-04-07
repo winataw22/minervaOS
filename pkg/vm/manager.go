@@ -160,8 +160,11 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 
 	v4Routes := make(map[string]string)
 	v6Routes := make(map[string]string)
-	var defaultGw4 net.IP
-	var defaultGw6 net.IP
+
+	hasPub := false
+	for _, ifcfg := range vm.Network.Ifaces {
+		hasPub = ifcfg.Public || hasPub
+	}
 
 	nics := make([]Interface, 0, len(vm.Network.Ifaces))
 	for i, ifcfg := range vm.Network.Ifaces {
@@ -182,26 +185,14 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 			cinet.Addresses = append(cinet.Addresses, ip.String())
 		}
 
-		// configure nic routes
-		if ifcfg.IP4DefaultGateway != nil {
-			cinet.Gateway4 = ifcfg.IP4DefaultGateway.String()
-		}
-
-		if defaultGw4 == nil && ifcfg.IP4DefaultGateway != nil {
-			defaultGw4 = ifcfg.IP4DefaultGateway
+		if ifcfg.Public == hasPub {
+			if ifcfg.IP4DefaultGateway != nil {
+				cinet.Gateway4 = ifcfg.IP4DefaultGateway.String()
+			}
 		}
 
 		if ifcfg.IP6DefaultGateway != nil {
 			cinet.Gateway6 = ifcfg.IP6DefaultGateway.String()
-		}
-
-		if defaultGw6 == nil && ifcfg.IP6DefaultGateway != nil {
-			defaultGw6 = ifcfg.IP6DefaultGateway
-		}
-		// one extra check to always use public nic as default
-		// gw
-		if ifcfg.Public && ifcfg.IP4DefaultGateway != nil {
-			defaultGw4 = ifcfg.IP4DefaultGateway
 		}
 
 		// inserting extra routes in right places
@@ -232,7 +223,9 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 	}
 
 	if len(cfg.Network) > 0 {
-		cfg.Network[0].Nameservers.Addresses = dnsSection
+		cfg.Network[0].Nameservers = &cloudinit.Nameservers{
+			Addresses: dnsSection,
+		}
 	}
 
 	return nics, nil
