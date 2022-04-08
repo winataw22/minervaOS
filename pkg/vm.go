@@ -142,6 +142,8 @@ type VM struct {
 	// it's up to the caller to check for the machine status
 	// and do clean up (module.Delete(vm)) when needed
 	NoKeepAlive bool
+	// Hostname for the vm
+	Hostname string
 }
 
 // Validate vm data

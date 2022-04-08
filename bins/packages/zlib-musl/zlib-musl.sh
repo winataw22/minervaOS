@@ -1,6 +1,6 @@
 ZLIB_MUSL_PKGNAME="zlib"
-ZLIB_MUSL_VERSION="1.2.11"
-ZLIB_MUSL_CHECKSUM="85adef240c5f370b308da8c938951a68"
+ZLIB_MUSL_VERSION="1.2.12"
+ZLIB_MUSL_CHECKSUM="28687d676c04e7103bb6ff2b9694c471"
 ZLIB_MUSL_LINK="https://www.zlib.net/zlib-${ZLIB_MUSL_VERSION}.tar.xz"
 
 download_zlib-musl() {
@@ -14,7 +14,7 @@ extract_zlib-musl() {
 prepare_zlib-musl() {
     echo "[+] configuring: ${ZLIB_MUSL_PKGNAME}"
 
-    CC="musl-gcc" ./configure --prefix /
+    CC="musl-gcc" CFLAGS="-fPIC" ./configure --prefix /
 }
 
 compile_zlib-musl() {

@@ -42,6 +42,7 @@ var (
 		"console": "ttyS0",
 		"reboot":  "k",
 		"panic":   "1",
+		"root":    "/dev/vda",
 	}
 )
 
@@ -325,7 +326,7 @@ func (m *Module) Run(vm pkg.VM) error {
 	cfg := cloudinit.Configuration{
 		Metadata: cloudinit.Metadata{
 			InstanceID: vm.Name,
-			Hostname:   vm.KernelArgs["host"],
+			Hostname:   vm.Hostname,
 		},
 		Extension: cloudinit.Extension{
 			Entrypoint:  vm.Entrypoint,

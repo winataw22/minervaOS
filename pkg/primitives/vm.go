@@ -209,15 +209,6 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 
 	log.Debug().Msgf("detected flist type: %+v", imageInfo)
 
-	// "root=/dev/vda rw console=ttyS0 reboot=k panic=1"
-	cmd := pkg.KernelArgs{
-		"rw":      "",
-		"console": "ttyS0",
-		"reboot":  "k",
-		"panic":   "1",
-		"root":    "/dev/vda",
-	}
-
 	var (
 		boot       pkg.Boot
 		entrypoint string
@@ -286,7 +277,6 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 			return result, errors.Wrap(err, "failed to apply startup config from flist")
 		}
 
-		cmd["host"] = string(wl.Name)
 		entrypoint = config.Entrypoint
 		if err := p.vmMounts(ctx, deployment, config.Mounts, true, &machine); err != nil {
 			return result, err
@@ -344,10 +334,10 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 	machine.Network = networkInfo
 	machine.KernelImage = kernel
 	machine.InitrdImage = initrd
-	machine.KernelArgs = cmd
 	machine.Boot = boot
 	machine.Entrypoint = entrypoint
 	machine.Environment = config.Env
+	machine.Hostname = wl.Name.String()
 
 	if err = vm.Run(ctx, machine); err != nil {
 		// attempt to delete the vm, should the process still be lingering
