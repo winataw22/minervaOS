@@ -7,10 +7,10 @@ import (
 
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/registrar"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -22,8 +22,8 @@ func red(s string) string {
 	return fmt.Sprintf("[%s](fg:red)", s)
 }
 
-func isNodeNotFoundErr(err error) bool {
-	return strings.HasSuffix(err.Error(), substrate.ErrNotFound.Error())
+func isInProgressError(err error) bool {
+	return strings.Contains(err.Error(), registrar.ErrInProgress.Error())
 }
 
 // func headerRenderer(c zbus.Client, h *widgets.Paragraph, r *Flag) error {
@@ -34,6 +34,7 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 	}
 
 	identity := stubs.NewIdentityManagerStub(c)
+	registrar := stubs.NewRegistrarStub(c)
 	farmID, _ := identity.FarmID(ctx)
 
 	h.Text = "\n    Fetching realtime node information... please wait."
@@ -61,9 +62,9 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 				farm = green(fmt.Sprintf("%d: %s", farmID, name))
 			}
 
-			if node, err := identity.NodeIDNumeric(ctx); err != nil {
-				if isNodeNotFoundErr(err) {
-					nodeID = red("node is not registered")
+			if node, err := registrar.NodeID(ctx); err != nil {
+				if isInProgressError(err) {
+					nodeID = green(err.Error())
 				} else {
 					nodeID = red(err.Error())
 				}

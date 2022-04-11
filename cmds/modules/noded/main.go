@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/monitord"
+	"github.com/threefoldtech/zos/pkg/registrar"
 	"github.com/threefoldtech/zos/pkg/rmb"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
@@ -26,7 +28,10 @@ import (
 	"github.com/threefoldtech/zbus"
 )
 
-const module = "node"
+const (
+	module          = "node"
+	registrarModule = "registrar"
+)
 
 // Module is entry point for module
 var Module cli.Command = cli.Command{
@@ -50,20 +55,33 @@ var Module cli.Command = cli.Command{
 	Action: action,
 }
 
+func registerationServer(ctx context.Context, msgBrokerCon string, env environment.Environment, info registrar.RegistrationInfo) error {
+
+	redis, err := zbus.NewRedisClient(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "fail to connect to message broker server")
+	}
+
+	server, err := zbus.NewRedisServer(registrarModule, msgBrokerCon, 1)
+	if err != nil {
+		return errors.Wrap(err, "fail to connect to message broker server")
+	}
+
+	registrar := registrar.NewRegistrar(ctx, redis, env, info)
+	server.Register(zbus.ObjectID{Name: "registrar", Version: "0.0.1"}, registrar)
+	log.Debug().Msg("object registered")
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		log.Fatal().Err(err).Msg("unexpected error exited registrar")
+	}
+	return nil
+}
+
 func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 		printID      bool   = cli.Bool("id")
 		printNet     bool   = cli.Bool("net")
 	)
-	if app.CheckFlag(app.LimitedCache) {
-		for app.CheckFlag(app.LimitedCache) {
-			// relog the error in case it got lost
-			log.Error().Msg("The node doesn't have ssd attached, it won't register.")
-			time.Sleep(time.Minute * 5)
-		}
-	}
-
 	env := environment.MustGet()
 
 	redis, err := zbus.NewRedisClient(msgBrokerCon)
@@ -97,10 +115,9 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get node capacity")
 	}
-
-	bus, err := rmb.New(msgBrokerCon)
+	secureBoot, err := capacity.IsSecureBoot()
 	if err != nil {
-		return errors.Wrap(err, "failed to initialize message bus server")
+		log.Error().Err(err).Msg("failed to detect secure boot flags")
 	}
 
 	dmi, err := oracle.DMI()
@@ -111,6 +128,18 @@ func action(cli *cli.Context) error {
 	hypervisor, err := oracle.GetHypervisor()
 	if err != nil {
 		return errors.Wrap(err, "failed to get hypervisors")
+	}
+
+	var info registrar.RegistrationInfo
+	info = info.WithCapacity(cap).
+		WithSerialNumber(dmi.BoardVersion()).
+		WithSecureBoot(secureBoot).
+		WithVirtualized(len(hypervisor) != 0)
+
+	go registerationServer(ctx, msgBrokerCon, env, info)
+	bus, err := rmb.New(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "failed to initialize message bus server")
 	}
 
 	bus.WithHandler("zos.system.version", func(ctx context.Context, payload []byte) (interface{}, error) {
@@ -149,22 +178,34 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	secureBoot, err := capacity.IsSecureBoot()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to detect secure boot flags")
+	// block indefinietly, and other modules will get an error
+	// when calling the registrar NodeID
+	if app.CheckFlag(app.LimitedCache) {
+		for app.CheckFlag(app.LimitedCache) {
+			// logs are in the registrar
+			time.Sleep(time.Minute * 5)
+		}
 	}
-
-	var info RegistrationInfo
-	info = info.WithCapacity(cap).
-		WithSerialNumber(dmi.BoardVersion()).
-		WithSecureBoot(secureBoot).
-		WithVirtualized(len(hypervisor) != 0)
-
-	node, twin, err := registration(ctx, redis, env, info)
+	registrar := stubs.NewRegistrarStub(redis)
+	var twin, node uint32
+	exp := backoff.NewExponentialBackOff()
+	exp.MaxInterval = 2 * time.Minute
+	bo := backoff.WithContext(exp, ctx)
+	err = backoff.RetryNotify(func() error {
+		var err error
+		node, err = registrar.NodeID(ctx)
+		if err != nil {
+			return err
+		}
+		twin, err = registrar.TwinID(ctx)
+		if err != nil {
+			return err
+		}
+		return err
+	}, bo, retryNotify)
 	if err != nil {
-		return errors.Wrap(err, "failed during node registration")
+		return errors.Wrap(err, "failed to get node id")
 	}
-
 	sub, err := environment.GetSubstrate()
 	if err != nil {
 		return err
@@ -212,16 +253,6 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	// reporting stats
-	go func() {
-		for {
-			if err := reportStatistics(ctx, msgBrokerCon, redis); err != nil {
-				log.Error().Err(err).Msg("sending stats report failed")
-				<-time.After(10 * time.Second)
-			}
-		}
-	}()
-
 	log.Info().Uint32("twin", twin).Msg("node has been registered")
 	log.Debug().Msg("start message bus")
 	identityd := stubs.NewIdentityManagerStub(redis)
@@ -233,4 +264,9 @@ func action(cli *cli.Context) error {
 	}
 
 	return runMsgBus(ctx, sub, id)
+}
+
+func retryNotify(err error, d time.Duration) {
+	// .Err() is scary (red)
+	log.Warn().Str("err", err.Error()).Str("sleep", d.String()).Msg("the node isn't ready yet")
 }
