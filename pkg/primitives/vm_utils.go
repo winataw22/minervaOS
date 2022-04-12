@@ -90,14 +90,18 @@ func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.D
 	}
 
 	tapName := tapNameFromName(wl.ID, string(inf.Network))
-	iface, mac, err := network.SetupPrivTap(ctx, netID, tapName)
+	iface, err := network.SetupPrivTap(ctx, netID, tapName)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
 	}
 
+	// the mac address uses the global workload id
+	// this needs to be the same as how we get it in the actual IP reservation
+	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(tapName))
+
 	out := pkg.VMIface{
 		Tap: iface,
-		MAC: mac,
+		MAC: mac.String(),
 		IPs: []net.IPNet{
 			addrCIDR, privIP6,
 		},
