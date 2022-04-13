@@ -186,31 +186,35 @@ ln -s /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 ```
 
 Finally installing the boot loader as follows
+> Only grub2 has been tested and known to work.
+
 ```bash
-bootctl install
+pacman -S grub
 ```
-Then we need to create a config file for arch boot
+Then we need to install grub
 ```
-vim /boot/loader/entries/arch.conf
-```
-And add the following
-```
-title Arch Linux
-linux /vmlinuz-linux
-initrd /initramfs-linux.img
-options root="LABEL=cloud-root" rw console=tty1 console=ttyS0 panic=1 reboot=k
+grub-install --target=x86_64-efi --efi-directory=esp --removable
 ```
 
-Note, we used the right label we used when creating the ext4 file system. Setting `console=tty1 console=ttyS0` is important so logs will
-be available to zos for diagnoses.
+Change default values as follows
+```
+vim /etc/default/grub
+```
+And make sure to change `GRUB_CMDLINE_LINUX_DEFAULT` as follows
 
-Then change the loader config as follows
-```bash
-vim /boot/loader/loader.conf
 ```
-and add the following
+GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 console=tty console=ttyS0"
 ```
-default arch.conf
+> Note: we removed the `quiet` and add the console flags.
+
+Also set the `GRUB_TIMEOUT` to 0 for a faster boot
+```
+GRUB_TIMEOUT=0
+```
+
+Then finally generating the config
+```
+grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 Last thing we need to do is clean up

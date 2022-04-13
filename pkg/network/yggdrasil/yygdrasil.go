@@ -74,7 +74,7 @@ func (s *YggServer) Ensure(z *zinit.Client, ns string) error {
 	cmd := `sh -c '
 		ulimit -n 16384
 
-		exec ip netns exec %s %s -useconffile %s
+		exec ip netns exec %s %s -loglevel error -useconffile %s
 	'`
 
 	err = zinit.AddService(zinitService, zinit.InitService{

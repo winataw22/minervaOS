@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net"
 
 	"github.com/jbenet/go-base58"
@@ -77,7 +78,10 @@ func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
 		peers = append(peers, peer.Endpoint)
 	}
 
-	for i := 0; i < 3; i++ {
+	// take max of 3 from the results list
+	to := math.Min(3, float64(len(results)))
+
+	for i := 0; i < int(to); i++ {
 		peers = append(peers, results[i].Endpoint)
 		log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
 	}
