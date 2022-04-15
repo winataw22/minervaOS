@@ -5,15 +5,15 @@ RUNC_LINK="https://github.com/opencontainers/runc/archive/v${RUNC_VERSION}.tar.g
 dependencies_runc() {
     apt-get install -y btrfs-progs libbtrfs-dev libseccomp-dev build-essential pkg-config
 
-    if [ -z $GOPATH ]; then
-        if command -v go > /dev/null; then
+    if [ -z $GOPATH ] || [ ! -z $CI ]; then
+        if command -v go > /dev/null && [ ! -z $CI ]; then
             export GOPATH=$(go env GOPATH)
         else
             curl -L https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz > /tmp/go1.13.1.linux-amd64.tar.gz
             tar -C /usr/local -xzf /tmp/go1.13.1.linux-amd64.tar.gz
             mkdir -p /gopath
 
-            export PATH=$PATH:/usr/local/go/bin
+            export PATH=/usr/local/go/bin:$PATH
             export GOPATH=/gopath
         fi
     fi
