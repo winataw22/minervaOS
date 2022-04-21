@@ -107,18 +107,22 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	}
 
 	var fullArgs []string
+
+	// open the log file for full stdout/stderr piping. The file is
+	// open in append mode so we can safely truncate the file on the disk
+	// to save up storage.
+	logFd, err := os.OpenFile(logs, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer logFd.Close()
+
 	// setting setsid
 	// without this the CH process will exit if vmd is stopped.
 	// optimally, this should be done by the SysProcAttr
 	// but we always get permission denied error and it's not
 	// clear why. so for now we use busybox setsid command to do
 	// this.
-	logFd, err := os.Create(logs)
-	if err != nil {
-		return err
-	}
-	defer logFd.Close()
-
 	fullArgs = append(fullArgs, "setsid", chBin)
 	fullArgs = append(fullArgs, argsList...)
 	log.Debug().Msgf("ch: %+v", fullArgs)

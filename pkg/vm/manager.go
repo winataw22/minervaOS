@@ -534,6 +534,8 @@ func (m *Module) removeConfig(name string) {
 	_ = os.Remove(m.configPath(name))
 
 	_ = os.Remove(m.cloudInitImage(name))
+
+	_ = os.Remove(m.logsPath(name))
 }
 
 // Delete deletes a machine by name (id)
