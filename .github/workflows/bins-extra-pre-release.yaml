@@ -482,3 +482,40 @@ jobs:
           user: tf-zos-v3-bins.test
           name: msgbusd.flist
           target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
+
+  tailstream:
+    name: "Package: tailstream"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Setup basesystem
+        run: |
+          cd bins
+          sudo ./bins-extra.sh --package basesystem
+
+      - name: Build package
+        id: package
+        run: |
+          cd bins
+          sudo ./bins-extra.sh --package tailstream
+      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: publish
+          user: tf-autobuilder
+          root: bins/releases/tailstream
+          name: ${{ steps.package.outputs.name }}.flist
+
+      - name: Crosslink flist (tf-zos-v3-bins.test)
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: crosslink
+          user: tf-zos-v3-bins.test
+          name: tailstream.flist
+          target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
