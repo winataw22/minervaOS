@@ -47,6 +47,9 @@ type Networker interface {
 	// Delete a network resource
 	DeleteNR(Network) error
 
+	// Namespace returns the namespace name for given netid.
+	// it doesn't check if network exists.
+	Namespace(id zos.NetID) string
 	// deprecated all uses taps now
 
 	// // Join a network (with network id) will create a new isolated namespace

@@ -83,9 +83,24 @@ func (s *ServiceState) Is(state PossibleState) bool {
 	return strings.EqualFold(string(s.state), string(state))
 }
 
+// Is checks if service state is equal to a possible state
+func (s *ServiceState) Any(states ...PossibleState) bool {
+	for _, state := range states {
+		if s.Is(state) {
+			return true
+		}
+	}
+	return false
+}
+
 // Exited is true if the service state in a (stopped) state
 func (s *ServiceState) Exited() bool {
-	return s.Is(ServiceStateSuccess) || s.Is(ServiceStateError) || s.Is(ServiceStateFailure) || s.Is(ServiceStateBlocked)
+	return s.Any(
+		ServiceStateSuccess,
+		ServiceStateError,
+		ServiceStateFailure,
+		ServiceStateBlocked,
+	)
 }
 
 // MarshalYAML implements the  yaml.Unmarshaler interface

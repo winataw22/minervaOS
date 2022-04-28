@@ -1,4 +1,0 @@
-exec: registrar 
-after:
-  - boot
-  - networkd

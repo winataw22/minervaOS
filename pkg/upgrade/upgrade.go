@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/shirou/gopsutil/process"
 
 	"github.com/threefoldtech/0-fs/meta"
 	"github.com/threefoldtech/0-fs/rofs"
@@ -217,6 +219,70 @@ func (u *Upgrader) UninstallBinary(flist FListInfo) error {
 	return u.uninstall(flist)
 }
 
+func (u Upgrader) startMultiple(timeout time.Duration, service ...string) error {
+	services := make(map[string]struct{})
+	for _, name := range service {
+		log.Info().Str("service", name).Msg("starting service")
+		if err := u.zinit.Monitor(name); err != nil && err != zinit.ErrAlreadyMonitored {
+			log.Error().Err(err).Str("service", name).Msg("error on zinit monitor")
+		}
+
+		if err := u.zinit.Start(name); err != nil {
+			log.Debug().Str("service", name).Msg("service undefined")
+			continue
+		}
+
+		services[name] = struct{}{}
+	}
+
+	deadline := time.After(timeout)
+
+	for len(services) > 0 {
+		var running []string
+		for service := range services {
+			log.Info().Str("service", service).Msg("check if service is started")
+			status, err := u.zinit.Status(service)
+			if err != nil {
+				return err
+			}
+
+			if status.Target != zinit.ServiceTargetUp {
+				// it means some other entity (another client or command line)
+				// has set the service back to up. I think we should immediately return
+				// with an error instead.
+				return fmt.Errorf("expected service '%s' target should be UP. found DOWN", service)
+			}
+
+			// if is running or exited successfully
+			if status.State.Any(zinit.ServiceStateRunning, zinit.ServiceStateSuccess) {
+				running = append(running, service)
+			}
+		}
+
+		for _, service := range running {
+			if _, ok := services[service]; ok {
+				log.Debug().Str("service", service).Msg("service started")
+				delete(services, service)
+			}
+		}
+
+		if len(services) == 0 {
+			break
+		}
+
+		select {
+		case <-deadline:
+			for service := range services {
+				log.Warn().Str("service", service).Msg("service didn't start in time.")
+			}
+			return nil
+		case <-time.After(1 * time.Second):
+		}
+	}
+
+	return nil
+}
+
 func (u Upgrader) stopMultiple(timeout time.Duration, service ...string) error {
 	services := make(map[string]struct{})
 	for _, name := range service {
@@ -271,6 +337,7 @@ func (u Upgrader) stopMultiple(timeout time.Duration, service ...string) error {
 					log.Error().Err(err).Msgf("failed to send SIGKILL to service %s", service)
 				}
 			}
+			return nil
 		case <-time.After(1 * time.Second):
 		}
 	}
@@ -377,7 +444,6 @@ func (u *Upgrader) uninstall(flist FListInfo) error {
 
 	// now delete ALL files, ignore what doesn't delete
 	for _, file := range files {
-		log.Debug().Str("file", file.Path).Msg("deleting file")
 		stat, err := os.Stat(file.Path)
 		if err != nil {
 			log.Debug().Err(err).Str("file", file.Path).Msg("failed to check file")
@@ -387,6 +453,8 @@ func (u *Upgrader) uninstall(flist FListInfo) error {
 		if stat.IsDir() {
 			continue
 		}
+
+		log.Debug().Str("file", file.Path).Msg("deleting file")
 
 		if file.Path == flistIdentityPath {
 			log.Debug().Str("file", file.Path).Msg("skip deleting file")
@@ -429,17 +497,79 @@ func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 	}
 
 	log.Debug().Msg("copying files complete")
-	// start all services in the flist
-	for _, service := range services {
-		if err := u.zinit.Monitor(service); err != nil && err != zinit.ErrAlreadyMonitored {
-			log.Error().Err(err).Str("service", service).Msg("error on zinit monitor")
+	log.Debug().Msg("make sure all services are monitored")
+	if err := u.startMultiple(20*time.Minute, services...); err != nil {
+		return errors.Wrap(err, "failed to monitor services")
+	}
+
+	return u.cleanup(services)
+}
+
+func (u *Upgrader) cleanup(services []string) error {
+	/*
+		this is a hack to clean up duplicate services duo to a bug in zinit version 0.2.6 (and earlier)
+		the issue has been fixed in next release of zinit (starting 0.2.7)
+
+		the issue is duo to this bug we can end up with multiple running instances of the same service.
+
+		to make sure this is cleaned up as expected we need to do the following:
+		- get the pid of each service from zinit status. Those are the processes that are known and
+		  managed by zinit
+		- for each service, find all processes that is running using the same command
+		- for the found service(s), kill the ones that their PIDs does not match the one managed by zinit
+
+		We will always assume that the binary name is the same as the service name
+	*/
+
+	names := make(map[string]struct{})
+	for _, name := range services {
+		names[name] = struct{}{}
+	}
+
+	all := make(map[string][]int)
+	processes, err := process.Processes()
+	if err != nil {
+		return err
+	}
+
+	for _, ps := range processes {
+		cmdline, err := ps.CmdlineSlice()
+		if err != nil {
+			log.Debug().Err(err).Msgf("failed to parse process '%d' commandline", ps.Pid)
+			continue
+		}
+		if len(cmdline) == 0 {
+			continue
+		}
+		name := cmdline[0]
+		if _, ok := names[name]; !ok {
+			continue
 		}
 
-		// while we totally do not need to call start after monitor but
-		// monitor won't take an action on a monitored service if it's
-		// stopped (but not forgoten). So we call start just to be sure
-		if err := u.zinit.Start(service); err != nil {
-			log.Error().Err(err).Str("service", service).Msg("error on zinit start")
+		all[name] = append(all[name], int(ps.Pid))
+	}
+
+	cl := zinit.Default()
+
+	for _, service := range services {
+		ps, err := cl.Status(service)
+		if errors.Is(err, zinit.ErrUnknownService) {
+			continue
+		} else if err != nil {
+			log.Error().Err(err).Msg("failed to get service status")
+		}
+
+		pids, ok := all[service]
+		if !ok {
+			// probably a short lived service, or has exited
+			continue
+		}
+
+		for _, pid := range pids {
+			if ps.Pid != pid {
+				log.Warn().Str("service", service).Int("pid", pid).Msg("found unmanaged process for service. terminating.")
+				_ = syscall.Kill(pid, syscall.SIGKILL)
+			}
 		}
 	}
 

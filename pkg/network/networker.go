@@ -17,6 +17,7 @@ import (
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
@@ -823,6 +824,10 @@ func (n *networker) DeleteNR(netNR pkg.Network) error {
 	}
 
 	return nil
+}
+
+func (n *networker) Namespace(id zos.NetID) string {
+	return fmt.Sprintf("n-%s", id)
 }
 
 // Set node public namespace config

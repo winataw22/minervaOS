@@ -232,6 +232,24 @@ type MachineMetric struct {
 // MachineMetrics container for metrics from multiple machines
 type MachineMetrics map[string]MachineMetric
 
+type Stream struct {
+	//ID stream ID must be unique
+	ID string
+	// Network namespace where the streamer will
+	// run
+	Namespace string
+	// Output URL as accepted by the streamer tool
+	Output string
+}
+
+func (s *Stream) Valid() error {
+	if len(s.ID) == 0 {
+		return fmt.Errorf("missing stream id")
+	}
+
+	return nil
+}
+
 // VMModule defines the virtual machine module interface
 type VMModule interface {
 	Run(vm VM) error
@@ -241,4 +259,11 @@ type VMModule interface {
 	Logs(name string) (string, error)
 	List() ([]string, error)
 	Metrics() (MachineMetrics, error)
+
+	// VM Log streams
+
+	// StreamCreate creates a stream for vm `name`
+	StreamCreate(name string, stream Stream) error
+	// delete stream by stream id.
+	StreamDelete(id string) error
 }

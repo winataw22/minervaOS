@@ -209,6 +209,18 @@ func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net
 	return
 }
 
+func (s *NetworkerStub) Namespace(ctx context.Context, arg0 zos.NetID) (ret0 string) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Namespace", args...)
+	if err != nil {
+		panic(err)
+	}
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) PubIPFilterExists(ctx context.Context, arg0 string) (ret0 bool) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "PubIPFilterExists", args...)
