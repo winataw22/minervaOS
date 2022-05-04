@@ -314,8 +314,10 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 			return result, errors.Wrap(err, "disk does not exist")
 		}
 
-		//TODO: this should not happen if disk image was written before !!
-		// fs detection must be done here
+		//TODO: DiskWrite will not override the disk if it already has a partition table
+		// or a filesystem. this means that if later the disk is assigned to a new VM with
+		// a different flist it will have the same old operating system copied from previous
+		// setup.
 		if err = storage.DiskWrite(ctx, disk.ID.String(), imageInfo.ImagePath); err != nil {
 			return result, errors.Wrap(err, "failed to write image to disk")
 		}
