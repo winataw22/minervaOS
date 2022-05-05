@@ -141,9 +141,8 @@ func (r *Reporter) pusher(ctx context.Context) {
 	}
 }
 
-// getMetrics will collect network consumption every 5 min and store
-// it in the rrd database.
-func (r *Reporter) getMetrics(ctx context.Context) error {
+// getVmMetrics will collect network consumption for vms and store it in the given slot
+func (r *Reporter) getVmMetrics(ctx context.Context, slot rrd.Slot) error {
 	log.Debug().Msg("collecting networking metrics")
 	vmd := stubs.NewVMModuleStub(r.cl)
 
@@ -153,10 +152,6 @@ func (r *Reporter) getMetrics(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	slot, err := r.rrd.Slot()
-	if err != nil {
-		return errors.Wrap(err, "failed to create rrd slot")
-	}
 
 	for vm, consumption := range metrics {
 		nu := r.computeNU(consumption)
@@ -164,6 +159,58 @@ func (r *Reporter) getMetrics(ctx context.Context) error {
 		if err := slot.Counter(vm, float64(nu)); err != nil {
 			return errors.Wrapf(err, "failed to store metrics for '%s'", vm)
 		}
+	}
+
+	return nil
+}
+
+// getVmMetrics will collect network consumption every 5 min and store
+// it in the rrd database.
+func (r *Reporter) getGwMetrics(ctx context.Context, slot rrd.Slot) error {
+	log.Debug().Msg("collecting networking metrics")
+	gw := stubs.NewGatewayStub(r.cl)
+
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+	metrics, err := gw.Metrics(ctx)
+	if err != nil {
+		return err
+	}
+	sent := metrics.Sent
+	recv := metrics.Received
+
+	sums := make(map[string]float64)
+	for wl, v := range sent {
+		sums[wl] = v + recv[wl]
+		delete(recv, wl)
+	}
+
+	for wl, v := range recv {
+		sums[wl] = v
+	}
+
+	for wl, nu := range sums {
+		log.Debug().Str("gw", wl).Uint64("computed", uint64(nu)).Msg("consumption")
+		if err := slot.Counter(wl, float64(nu)); err != nil {
+			return errors.Wrapf(err, "failed to store metrics for '%s'", wl)
+		}
+	}
+
+	return nil
+}
+
+func (r *Reporter) getMetrics(ctx context.Context) error {
+	slot, err := r.rrd.Slot()
+	if err != nil {
+		return err
+	}
+
+	if err := r.getVmMetrics(ctx, slot); err != nil {
+		log.Error().Err(err).Msg("failed to get vm network consumption")
+	}
+
+	if err := r.getGwMetrics(ctx, slot); err != nil {
+		log.Error().Err(err).Msg("failed to get gateway network consumption")
 	}
 
 	return nil
@@ -295,9 +342,7 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 		reports[deploment] = rep
 	}
 
-	report := Report{
-		Consumption: make([]substrate.NruConsumption, 0, len(reports)),
-	}
+	var report Report
 
 	for _, v := range reports {
 		if v.NRU == 0 {

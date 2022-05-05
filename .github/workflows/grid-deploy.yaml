@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      grid:
+        description: "grid to deploy"
+        required: true
+        default: "testing"
+        type: choice
+        options:
+          - testing
+          - production
+      version:
+        description: "version to release"
+        required: true
+        type: string
+jobs:
+  link-release:
+    name: linking
+    runs-on: ubuntu-latest
+    steps:
+      - name: Symlink flist (development)
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.HUB_JWT }}
+          action: crosslink
+          user: tf-zos
+          name: zos:${{ github.event.inputs.grid }}-3:latest.flist
+          target: tf-autobuilder/zos:${{ github.event.inputs.version }}.flist

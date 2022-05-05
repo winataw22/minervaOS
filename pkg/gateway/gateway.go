@@ -622,12 +622,15 @@ func (g *gatewayModule) setupRouting(wlID string, fqdn string, backends []string
 func (g *gatewayModule) DeleteNamedProxy(wlID string) error {
 	path := g.configPath(wlID)
 	_, domain, err := domainFromConfig(path)
-	if err != nil {
-		log.Warn().Err(err).Str("path", path).Msg("failed to load domain from config file")
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		log.Error().Err(err).Str("path", path).Msg("failed to load domain from config file")
 	}
-	if err := os.Remove(path); err != nil {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return errors.Wrap(err, "couldn't remove config file")
 	}
+
 	if domain != "" {
 		g.deleteReservedDomain(domain)
 	}

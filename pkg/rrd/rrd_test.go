@@ -86,9 +86,7 @@ func TestCountersSeries(t *testing.T) {
 	counters, err := db.Counters(now.Add(-10 * time.Minute))
 	require.NoError(err)
 	require.Len(counters, 1)
-
-	// we go up by one for each slot. so query last 10 blocks (including now) should return 9
-	require.EqualValues(9, counters["test-1"])
+	require.EqualValues(10, counters["test-1"])
 }
 
 func TestCountersRandomIncrese(t *testing.T) {
@@ -230,20 +228,25 @@ func TestCountersMultipleReports(t *testing.T) {
 	now := time.Now()
 
 	lastReportTime := now.Unix()
+	slot, err := db.slotAt(uint64(now.Add(-5 * time.Minute).Unix()))
+	require.NoError(slot.Counter("test-0", 0))
+	require.NoError(err)
+
 	total := 0.0
 	for i := 0; i <= 24; i++ {
 		slot, err := db.slotAt(uint64(now.Add(time.Duration(i) * 5 * time.Minute).Unix()))
-		require.NoError(err)
-		err = slot.Counter("test-0", float64(i))
 		require.NoError(err)
 		if i%6 == 0 && i != 0 {
 			counters, err := db.Counters(time.Unix(lastReportTime, 0))
 			require.NoError(err)
 			require.Len(counters, 1)
-			lastReportTime = now.Add(time.Duration(i) * 5 * time.Minute).Unix()
+			lastReportTime = int64(slot.Key()) // now.Add(time.Duration(i) * 5 * time.Minute).Unix()
 			require.EqualValues(6, counters["test-0"])
 			total += counters["test-0"]
 		}
+		err = slot.Counter("test-0", float64(i)+1)
+		require.NoError(err)
+
 	}
 
 	require.EqualValues(24, total)

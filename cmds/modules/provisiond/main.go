@@ -42,8 +42,11 @@ const (
 	statisticsModule = "statistics"
 	gib              = 1024 * 1024 * 1024
 
-	boltStorageDB    = "workloads.bolt"
-	metricsStorageDB = "metrics.bolt"
+	boltStorageDB = "workloads.bolt"
+	// old style rrd, make sure we clean it up
+	metricsStorageDBOld = "metrics.bolt"
+	// new style db after rrd implementation change
+	metricsStorageDB = "metrics-diff.bolt"
 
 	// deprecated, kept for migration
 	fsStorageDB = "workloads"
@@ -349,6 +352,9 @@ func action(cli *cli.Context) error {
 			log.Fatal().Err(err).Msg("handling contracts events failed")
 		}
 	}()
+
+	// clean up old rrd db that uses previous style reporting
+	_ = os.Remove(filepath.Join(rootDir, metricsStorageDBOld))
 
 	reporter, err := NewReporter(filepath.Join(rootDir, metricsStorageDB), cl, queues)
 	if err != nil {

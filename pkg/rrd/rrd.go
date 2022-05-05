@@ -2,6 +2,8 @@ package rrd
 
 import (
 	"encoding/binary"
+	"fmt"
+	"io"
 	"math"
 	"time"
 
@@ -23,6 +25,10 @@ type RRD interface {
 	Last(key string) (value float64, ok bool, err error)
 }
 
+type Printer interface {
+	Print(w io.Writer) error
+}
+
 type Slot interface {
 	// Counter sets (or overrides) the current stored value for this key,
 	// with value
@@ -30,6 +36,11 @@ type Slot interface {
 	// Key return the key of the slot which is the window timestamp
 	Key() uint64
 }
+
+const (
+	lastBucket = ".last"
+	keyLen     = 8 // float64 size
+)
 
 type rrdBolt struct {
 	db        *bolt.DB
@@ -75,14 +86,52 @@ func newRRDBolt(path string, window time.Duration, retention time.Duration) (*rr
 	}, nil
 }
 
+func (r *rrdBolt) printBucket(bucket *bolt.Bucket, out io.Writer) error {
+	cur := bucket.Cursor()
+	for k, v := cur.First(); k != nil; k, v = cur.Next() {
+		if _, err := fmt.Fprintf(out, "\t%s: %f\n", k, lf64(v)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *rrdBolt) Print(out io.Writer) error {
+	return r.db.View(func(tx *bolt.Tx) error {
+		last := tx.Bucket([]byte(lastBucket))
+		if _, err := fmt.Fprintln(out, lastBucket); err != nil {
+			return err
+		}
+		if err := r.printBucket(last, out); err != nil {
+			return err
+		}
+
+		cur := tx.Cursor()
+		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
+			if len(k) != keyLen {
+				continue
+			}
+			n := lu64(k)
+			fmt.Fprintf(out, "%s (%d)\n", time.Unix(int64(n), 0).String(), n)
+			bucket := tx.Bucket(k)
+			if err := r.printBucket(bucket, out); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (r *rrdBolt) retain(now uint64) error {
 	retain := now - r.retention
 	return r.db.Update(func(tx *bolt.Tx) error {
 		cur := tx.Cursor()
 
 		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
-			if len(k) != 8 {
-				continue // uknown key size
+			if len(k) != keyLen {
+				continue // unknown key size
 			}
 
 			if lu64(k) <= retain {
@@ -101,6 +150,9 @@ func (r *rrdBolt) Slots() ([]uint64, error) {
 	err := r.db.View(func(tx *bolt.Tx) error {
 		cur := tx.Cursor()
 		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
+			if len(k) != keyLen {
+				continue
+			}
 			slots = append(slots, lu64(k))
 		}
 
@@ -112,17 +164,7 @@ func (r *rrdBolt) Slots() ([]uint64, error) {
 
 func (r *rrdBolt) Last(key string) (value float64, ok bool, err error) {
 	err = r.db.View(func(tx *bolt.Tx) error {
-		cur := tx.Cursor()
-		for k, _ := cur.Last(); k != nil; k, _ = cur.Prev() {
-			bucket := tx.Bucket(k)
-			bytes := bucket.Get([]byte(key))
-			if bytes != nil {
-				value = lf64(bytes)
-				ok = true
-				break
-			}
-		}
-
+		value, ok = getLast(tx, key)
 		return nil
 	})
 
@@ -140,29 +182,24 @@ func (r *rrdBolt) Counters(since time.Time) (map[string]float64, error) {
 	change := make(map[string]float64)
 
 	err := r.db.View(func(tx *bolt.Tx) error {
-		last := make(map[string]float64)
-		first := true
 		cur := tx.Cursor()
 		for k, _ := cur.Seek(u64(ts)); k != nil; k, _ = cur.Next() {
+			if len(k) != keyLen {
+				// this check can be replaced by
+				// bytes.Equal(k, []byte(lastBucket))
+				// to make sure this is a slot bucket
+				// but it's faster to check the length
+				continue
+			}
+
 			bucket := tx.Bucket(k)
 			values := bucket.Cursor()
 			for k, v := values.First(); k != nil; k, v = values.Next() {
-				vf := lf64(v)
+				diff := lf64(v)
 				key := string(k)
 
-				if !first {
-					prev := last[key]
-					if prev > vf {
-						change[key] += vf
-					} else {
-						change[key] += vf - prev
-					}
-				}
-
-				last[key] = vf
+				change[key] += diff
 			}
-
-			first = false
 		}
 
 		return nil
@@ -194,6 +231,38 @@ func (r *rrdBolt) Slot() (Slot, error) {
 	return r.slotAt(ts)
 }
 
+func (r *rrdSlot) Counter(key string, value float64) error {
+	return r.db.Update(func(tx *bolt.Tx) error {
+		last, ok := getLast(tx, key)
+		if err := setLast(tx, key, value); err != nil {
+			return err
+		}
+		// there was no last value, we just
+		// return
+		if !ok {
+			return nil
+		}
+		diff := 0.0
+		if value >= last {
+			diff = value - last
+		} else {
+			// this is either an overflow
+			// or counter has been reset (node was restarted hence)
+			// metrics are counting from 0 again.
+			// hence it's safer to assume diff is just the value
+			// reported
+			diff = value
+		}
+
+		bucket := tx.Bucket(u64(r.key))
+		return bucket.Put([]byte(key), f64(diff))
+	})
+}
+
+func (r *rrdSlot) Key() uint64 {
+	return r.key
+}
+
 func lu64(v []byte) uint64 {
 	return binary.BigEndian.Uint64(v)
 }
@@ -212,13 +281,26 @@ func lf64(v []byte) float64 {
 	return math.Float64frombits(lu64(v))
 }
 
-func (r *rrdSlot) Counter(key string, value float64) error {
-	return r.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(u64(r.key))
-		return bucket.Put([]byte(key), f64(value))
-	})
+func getLast(tx *bolt.Tx, key string) (value float64, ok bool) {
+	bucket := tx.Bucket([]byte(lastBucket))
+	if bucket == nil {
+		return
+	}
+
+	bytes := bucket.Get([]byte(key))
+	if bytes != nil {
+		value = lf64(bytes)
+		ok = true
+	}
+
+	return
 }
 
-func (r *rrdSlot) Key() uint64 {
-	return r.key
+func setLast(tx *bolt.Tx, key string, value float64) error {
+	bucket, err := tx.CreateBucketIfNotExists([]byte(lastBucket))
+	if err != nil {
+		return err
+	}
+
+	return bucket.Put([]byte(key), f64(value))
 }
