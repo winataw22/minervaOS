@@ -174,7 +174,9 @@ func (r *Reporter) getGwMetrics(ctx context.Context, slot rrd.Slot) error {
 	defer cancel()
 	metrics, err := gw.Metrics(ctx)
 	if err != nil {
-		return err
+		// this happens when no gateway support or trafick is not running
+		// so can be ignored
+		return nil
 	}
 	sent := metrics.Sent
 	recv := metrics.Received

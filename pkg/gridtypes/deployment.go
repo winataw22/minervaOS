@@ -1,6 +1,7 @@
 package gridtypes
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/md5"
 	"encoding/hex"
@@ -186,6 +187,21 @@ type Signature struct {
 	SignatureType string `json:"signature_type"`
 }
 
+// SignatureStyle specify the signature style for the signature
+// verification.
+type SignatureStyle string
+
+const (
+	// SignatureStyleDefault default signature style is done by verifying the
+	// signature against the computed ChallengeHash of the deployment. In other
+	// words the signature results from signing the
+	SignatureStyleDefault SignatureStyle = ""
+	// SignatureStylePolka signature by polka-wallet surrounds the ChallengeHash with
+	// <Bytes>$hash</Bytes> tags. If this signature-style is selected validation is done
+	// against the same constructed message.
+	SignatureStylePolka SignatureStyle = "polka-wallet"
+)
+
 // SignatureRequirement struct describes the signatures that are needed to be valid
 // for the node to accept the deployment
 // for example
@@ -226,6 +242,7 @@ type SignatureRequirement struct {
 	Requests       []SignatureRequest `json:"requests"`
 	WeightRequired uint               `json:"weight_required"`
 	Signatures     []Signature        `json:"signatures"`
+	SignatureStyle SignatureStyle     `json:"signature_style"`
 }
 
 // Challenge computes challenge for SignatureRequest
@@ -237,6 +254,10 @@ func (r *SignatureRequirement) Challenge(w io.Writer) error {
 	}
 
 	if _, err := fmt.Fprintf(w, "%d", r.WeightRequired); err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "%s", r.SignatureStyle); err != nil {
 		return err
 	}
 
@@ -366,6 +387,24 @@ func (d *Deployment) Verify(getter KeyGetter) error {
 	}
 
 	requirements := &d.SignatureRequirement
+
+	// if signature style is `polka-wallet` the hash
+	// is surrounded by <Byte></Byte> tags
+	if requirements.SignatureStyle == SignatureStylePolka {
+		buf := bytes.Buffer{}
+		if _, err := buf.WriteString("<Bytes>"); err != nil {
+			return err
+		}
+		if _, err := buf.Write(message); err != nil {
+			return err
+		}
+		if _, err := buf.WriteString("</Bytes>"); err != nil {
+			return err
+		}
+
+		message = buf.Bytes()
+	}
+
 	get := func(twin uint32) (Signature, bool) {
 		for _, sig := range requirements.Signatures {
 			if sig.TwinID == twin {

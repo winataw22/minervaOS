@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/g0rbe/go-chattr"
 	"github.com/pkg/errors"
@@ -189,8 +188,11 @@ func (s *Module) DiskCreate(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 		return disk, err
 	}
 
-	err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size))
-	return pkg.VDisk{Path: path, Size: int64(size)}, err
+	if err := file.Truncate(int64(size)); err != nil {
+		return disk, errors.Wrap(err, "failed to truncate disk to size")
+	}
+
+	return pkg.VDisk{Path: path, Size: int64(size)}, nil
 }
 
 // DiskCreate with given size, return path to virtual disk (size in MB)
@@ -207,8 +209,11 @@ func (s *Module) DiskResize(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 
 	defer file.Close()
 
-	err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size))
-	return pkg.VDisk{Path: path, Size: int64(size)}, err
+	if err := file.Truncate(int64(size)); err != nil {
+		return disk, errors.Wrap(err, "failed to truncate disk to size")
+	}
+
+	return pkg.VDisk{Path: path, Size: int64(size)}, nil
 }
 
 func (s *Module) ensureFS(disk string) error {
