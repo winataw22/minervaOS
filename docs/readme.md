@@ -1,22 +1,15 @@
 # Table Of Content
 
-![Architecture](../assets/0-OS_v2_architecture.png)
+![Architecture](assets/0-OS_v2_architecture.png)
 
 - Documentation about version:
   - [Release workflow](release/readme.md)
-  - [Migration to V2](migration/readme.md)
-
-- Documentation for each modules:
-  - [Container](container/readme.md)
-  - [Flist](flist/readme.md)
-  - [Identity](identity/readme.md)
-  - [Network](network/readme.md)
-  - [Provision](provision/readme.md)
-  - [Storage](storage/readme.md)
-  
+- Developer manual:
+  - [Manual](manual/manual.md)
+- Internal modules:
+  - [Internals](internals/internals.md)
 - Developer tools
-  - [Development environment](../qemu)
-  - [tfuser](tfuser/readme.md)
-  - [MacOS Development environment](macdev/readme.md)
+  - [Development environment](../qemu/README.md)
+  - [MacOS Development environment](internals/macdev/readme.md)
 
 - [FAQ](faq/readme.md)

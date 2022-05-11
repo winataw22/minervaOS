@@ -194,17 +194,6 @@ func (n *NodeClient) NetworkListInterfaces(ctx context.Context) (map[string][]ne
 	return result, nil
 }
 
-// RandomFreePort query the node for used ports, then it tries to find a ramdom
-// port that is in not in the "taken" ports list, this can be used to set up
-// network wireguard ports
-// func (n *NodeClient) RandomFreePort(ctx context.Context) (uint16, error) {
-// 	used, err := n.NetworkListWGPorts(ctx)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	//rand.
-// }
-
 // NetworkListIPs list taken public IPs on the node
 func (n *NodeClient) NetworkListIPs(ctx context.Context) ([]string, error) {
 	const cmd = "zos.network.list_public_ips"
@@ -227,18 +216,6 @@ func (n *NodeClient) NetworkGetPublicConfig(ctx context.Context) (cfg pkg.Public
 	}
 
 	return
-}
-
-// NetworkGetPublicConfig returns the current public node network configuration. A node with a
-// public config can be used as an access node for wireguard.
-func (n *NodeClient) NetworkSetPublicConfig(ctx context.Context, cfg pkg.PublicConfig) error {
-	const cmd = "zos.network.public_config_set"
-
-	if err := n.bus.Call(ctx, n.nodeTwin, cmd, cfg, nil); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (n *NodeClient) SystemVersion(ctx context.Context) (ver Version, err error) {

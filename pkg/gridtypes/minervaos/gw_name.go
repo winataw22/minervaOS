@@ -13,7 +13,7 @@ type GatewayNameProxy struct {
 	// Name the fully qualified domain name to use (cannot be present with Name)
 	Name string `json:"name"`
 
-	// Passthroug whether to pass tls traffic or not
+	// Passthrough whether to pass tls traffic or not
 	TLSPassthrough bool `json:"tls_passthrough"`
 
 	// Backends are list of backend ips
