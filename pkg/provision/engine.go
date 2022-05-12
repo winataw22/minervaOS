@@ -335,14 +335,16 @@ func (e *NativeEngine) Deprovision(ctx context.Context, twin uint32, id uint64, 
 		return err
 	}
 
-	log.Debug().
+	log.Info().
 		Uint32("twin", deployment.TwinID).
 		Uint64("contract", deployment.ContractID).
+		Str("reason", reason).
 		Msg("schedule for deprovision")
 
 	job := engineJob{
-		Target: deployment,
-		Op:     opDeprovision,
+		Target:  deployment,
+		Op:      opDeprovision,
+		Message: reason,
 	}
 
 	return e.queue.Enqueue(&job)
@@ -793,7 +795,9 @@ func (e *NativeEngine) DecommissionCached(id string, reason string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
-	err = e.uninstallWorkload(ctx, &gridtypes.WorkloadWithID{Workload: &wl, ID: globalID}, reason)
+	err = e.uninstallWorkload(ctx, &gridtypes.WorkloadWithID{Workload: &wl, ID: globalID},
+		fmt.Sprintf("workload decommissioned by system, reason: %s", reason),
+	)
 
 	return err
 }

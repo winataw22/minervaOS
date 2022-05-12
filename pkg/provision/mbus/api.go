@@ -2,6 +2,7 @@ package mbus
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/rmb"
@@ -51,11 +52,15 @@ func (d *Deployments) deployHandler(ctx context.Context, payload []byte) (interf
 }
 
 func (d *Deployments) deleteHandler(ctx context.Context, payload []byte) (interface{}, error) {
-	data, err := d.delete(ctx, payload)
-	if err != nil {
-		return nil, err.Err()
-	}
-	return data, nil
+	return nil, fmt.Errorf("deletion over the api is disabled, please cancel your contract instead")
+
+	// code disabled.
+
+	// data, err := d.delete(ctx, payload)
+	// if err != nil {
+	// 	return nil, err.Err()
+	// }
+	// return data, nil
 }
 
 func (d *Deployments) getHandler(ctx context.Context, payload []byte) (interface{}, error) {

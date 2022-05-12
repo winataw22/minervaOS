@@ -174,9 +174,7 @@ func (r *Reporter) getGwMetrics(ctx context.Context, slot rrd.Slot) error {
 	defer cancel()
 	metrics, err := gw.Metrics(ctx)
 	if err != nil {
-		// this happens when no gateway support or trafick is not running
-		// so can be ignored
-		return nil
+		return err
 	}
 	sent := metrics.Sent
 	recv := metrics.Received
@@ -325,6 +323,10 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 
 	reports := make(map[uint64]substrate.NruConsumption)
 	for key, value := range values {
+		if key == lastReportedKey {
+			continue
+		}
+
 		_, deploment, _, err := gridtypes.WorkloadID(key).Parts()
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to parse metric key '%s'", key)

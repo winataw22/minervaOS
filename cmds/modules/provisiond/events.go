@@ -133,7 +133,7 @@ func (r *ContractEventHandler) Run(ctx context.Context) error {
 			log.Debug().Msgf("received a cancel contract event %+v", event)
 
 			// otherwise we know what contract to be deleted
-			if err := r.engine.Deprovision(ctx, event.TwinId, event.Contract, "contract canceled"); err != nil {
+			if err := r.engine.Deprovision(ctx, event.TwinId, event.Contract, "contract canceled event received"); err != nil {
 				log.Error().Err(err).
 					Uint32("twin", event.TwinId).
 					Uint64("contract", event.Contract).

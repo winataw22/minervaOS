@@ -63,27 +63,29 @@ func (d *Deployments) createOrUpdate(ctx context.Context, payload []byte, update
 	return nil, mw.Accepted()
 }
 
-func (d *Deployments) delete(ctx context.Context, payload []byte) (interface{}, mw.Response) {
-	var args idArgs
-	err := json.Unmarshal(payload, &args)
-	if err != nil {
-		return nil, mw.Error(err)
-	}
+// func (d *Deployments) delete(ctx context.Context, payload []byte) (interface{}, mw.Response) {
+// 	var args idArgs
+// 	err := json.Unmarshal(payload, &args)
+// 	if err != nil {
+// 		return nil, mw.Error(err)
+// 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
+// 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+// 	defer cancel()
 
-	err = d.engine.Deprovision(ctx, rmb.GetTwinID(ctx), args.ContractID, "requested by user")
-	if err == context.DeadlineExceeded {
-		return nil, mw.Unavailable(ctx.Err())
-	} else if errors.Is(err, provision.ErrDeploymentNotExists) {
-		return nil, mw.NotFound(err)
-	} else if err != nil {
-		return nil, mw.Error(err)
-	}
+// 	err = d.engine.Deprovision(ctx, rmb.GetTwinID(ctx), args.ContractID,
+// 		fmt.Sprintf("requested by twin %d over rmb api", rmb.GetTwinID(ctx)),
+// 	)
+// 	if err == context.DeadlineExceeded {
+// 		return nil, mw.Unavailable(ctx.Err())
+// 	} else if errors.Is(err, provision.ErrDeploymentNotExists) {
+// 		return nil, mw.NotFound(err)
+// 	} else if err != nil {
+// 		return nil, mw.Error(err)
+// 	}
 
-	return nil, mw.Accepted()
-}
+// 	return nil, mw.Accepted()
+// }
 
 func (d *Deployments) get(ctx context.Context, payload []byte) (interface{}, mw.Response) {
 	var args idArgs

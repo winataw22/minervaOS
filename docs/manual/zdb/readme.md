@@ -1,1 +1,4 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/3cec040076816ea4dcafe6fca172d428
+# `zdb` type
+`zdb` is a storage primitives that gives you a persisted key value store over RESP protocol. Please check [`zdb` docs](https://github.com/threefoldtech/0-db)
+
+Please check [here](../../../pkg/gridtypes/zos/zdb.go) for workload data.
