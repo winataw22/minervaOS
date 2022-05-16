@@ -13,11 +13,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func validateNameContract(twinID uint32, name string) error {
-	// TODO: validate against substrate?
-	return nil
-}
-
 func (p *Primitives) gwProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 
 	result := zos.GatewayProxyResult{}
@@ -29,20 +24,7 @@ func (p *Primitives) gwProvision(ctx context.Context, wl *gridtypes.WorkloadWith
 	for idx, backend := range proxy.Backends {
 		backends[idx] = string(backend)
 	}
-	// what we need to do:
-	// - does this node support gateways ?
-	// this can be validated by checking if we have a "public" namespace
 	twinID, _ := provision.GetDeploymentID(ctx)
-	if err := validateNameContract(twinID, proxy.Name); err != nil {
-		return nil, errors.Wrap(err, "failed to validate name contract")
-	}
-	// - Validation of ownership of the name (later)
-	// this must be done against substrate. Make sure that same user (twin) owns the
-	// name int he workload config
-
-	// - make necessary calls to gateway daemon.
-	// gateway := stubs.NewGatewayStub(p.zbus)
-	// gateway.SetNamedProxy(ctx context.Context, arg0 string, arg1 []string)
 	gateway := stubs.NewGatewayStub(p.zbus)
 	fqdn, err := gateway.SetNamedProxy(ctx, wl.ID.String(), proxy.Name, backends, proxy.TLSPassthrough, twinID)
 	if err != nil {

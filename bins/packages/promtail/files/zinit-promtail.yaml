@@ -9,7 +9,7 @@ exec: |
             -config.file /etc/promtail/promtail.yaml \
             -server.disable \
             -config.expand-env=true \
-            -client.url http://explorer.devnet.grid.tf:3100/loki/api/v1/push \
+            -client.url http://loki.grid.tf:3100/loki/api/v1/push \
   '
 log: stdout
 signal:

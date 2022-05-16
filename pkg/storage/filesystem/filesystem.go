@@ -38,8 +38,6 @@ type Pool interface {
 	Mount() (string, error)
 	// UnMount the pool
 	UnMount() error
-	// Reserved is reserved size of the devices in bytes
-	Reserved() (uint64, error)
 	// Volumes are all subvolumes of this volume
 	Volumes() ([]Volume, error)
 	// AddVolume adds a new subvolume with the given name

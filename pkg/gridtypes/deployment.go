@@ -395,7 +395,7 @@ func (d *Deployment) Verify(getter KeyGetter) error {
 		if _, err := buf.WriteString("<Bytes>"); err != nil {
 			return err
 		}
-		if _, err := buf.Write(message); err != nil {
+		if _, err := buf.WriteString(hex.EncodeToString(message)); err != nil {
 			return err
 		}
 		if _, err := buf.WriteString("</Bytes>"); err != nil {

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/g0rbe/go-chattr"
 	"github.com/pkg/errors"
@@ -176,6 +177,8 @@ func (s *Module) DiskCreate(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 			os.RemoveAll(path)
 		}
 	}()
+
+	defer syscall.Sync()
 
 	var file *os.File
 	file, err = os.Create(path)

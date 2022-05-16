@@ -243,32 +243,23 @@ func (p *btrfsPool) Usage() (usage Usage, err error) {
 		return usage, err
 	}
 
-	du, err := p.utils.GetDiskUsage(context.Background(), mnt)
-	if err != nil {
-		return Usage{}, err
-	}
-
-	return Usage{Size: p.device.Size, Used: du.Data.Used}, nil
-}
-
-// Reserved is reserved size of the devices in bytes
-func (p *btrfsPool) Reserved() (uint64, error) {
-
 	volumes, err := p.Volumes()
+
 	if err != nil {
-		return 0, err
+		return usage, errors.Wrapf(err, "failed to list pool '%s' volumes", mnt)
 	}
 
-	var total uint64
+	var used uint64
 	for _, volume := range volumes {
 		usage, err := volume.Usage()
 		if err != nil {
-			return 0, err
+			return Usage{}, errors.Wrapf(err, "failed to calculate volume '%s' usage", volume.Path())
 		}
-		total += usage.Size
+
+		used += usage.Used
 	}
 
-	return total, nil
+	return Usage{Size: p.device.Size, Used: used}, nil
 }
 
 func (p *btrfsPool) maintenance() error {
@@ -369,19 +360,20 @@ func (v *btrfsVolume) Usage() (usage Usage, err error) {
 		return
 	}
 
-	size := group.MaxRfer
-	if size == 0 {
+	// used is basically amount of space reserved for this
+	// volume. We assume that's total usage of the volume
+	used := group.MaxRfer
+
+	if used == 0 {
 		// in case no limit is set on the subvolume, we assume
 		// it's size is the size of the files on that volumes
-		size, err = FilesUsage(v.Path())
+		used, err = FilesUsage(v.Path())
 		if err != nil {
 			return usage, errors.Wrap(err, "failed to get subvolume usage")
 		}
 	}
-	// otherwise, we return the size as maxrefer and usage as the rfer of the
-	// associated group
-	// todo: size should be the size of the pool, if maxrfer is 0
-	return Usage{Used: group.Rfer, Size: size}, nil
+
+	return Usage{Used: used, Size: group.MaxRfer}, nil
 }
 
 // Limit size of volume, setting size to 0 means unlimited

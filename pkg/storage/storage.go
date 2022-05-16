@@ -210,21 +210,22 @@ func (s *Module) initialize() error {
 				continue
 			}
 
+			// for development purposes only
+			if vm {
+				// force ssd device for vms
+				typ = zos.SSDDevice
+
+				if device.Path == "/dev/vdd" || device.Path == "/dev/vde" {
+					typ = zos.HDDDevice
+				}
+			}
+
 			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("caching device type")
 			if err := s.cache.Set(device.Name(), typ); err != nil {
 				log.Error().Str("device", device.Path).Err(err).Msg("failed to cache device type")
 			}
 		} else {
 			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("device type loaded from cache")
-		}
-
-		if vm {
-			// force ssd device for vms
-			typ = zos.SSDDevice
-
-			if device.Path == "/dev/vdd" || device.Path == "/dev/vde" {
-				typ = zos.HDDDevice
-			}
 		}
 
 		switch typ {
@@ -687,19 +688,14 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 			continue
 		}
 
-		reserved, err := pool.Reserved()
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to get size of pool %s", pool.Name())
-			continue
-		}
-
 		log.Debug().
-			Uint64("max size", usage.Size).
-			Uint64("reserved", reserved).
-			Uint64("new size", reserved+uint64(size)).
+			Uint64("pool size", usage.Size).
+			Uint64("used", usage.Used).
+			Uint64("new used", usage.Used+uint64(size)).
 			Msgf("usage of pool %s", pool.Name())
+
 		// Make sure adding this filesystem would not bring us over the disk limit
-		if reserved+uint64(size) > usage.Size*SSDOverProvisionFactor {
+		if usage.Used+uint64(size) > usage.Size*SSDOverProvisionFactor {
 			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
 
 			if !poolIsMounted && !mounted {
@@ -719,7 +715,7 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 
 		candidates = append(candidates, candidate{
 			Pool:      pool,
-			Available: usage.Size - (reserved + uint64(size)),
+			Available: usage.Size*SSDOverProvisionFactor - (usage.Used + uint64(size)),
 		})
 
 		// if we are looking for not mounted pools, break here
@@ -727,7 +723,6 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 			return candidates, nil
 		}
 	}
-
 	sort.Slice(candidates, func(i, j int) bool {
 		// reverse sorting so most available is at beginning
 		return candidates[i].Available > candidates[j].Available

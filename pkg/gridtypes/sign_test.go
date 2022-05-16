@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -21,7 +22,7 @@ func (s *polkaSigner) Sign(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if _, err := buf.Write(msg); err != nil {
+	if _, err := buf.WriteString(hex.EncodeToString(msg)); err != nil {
 		return nil, err
 	}
 

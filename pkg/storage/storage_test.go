@@ -44,10 +44,9 @@ func (p *testVolume) FsType() string {
 
 type testPool struct {
 	mock.Mock
-	name     string
-	usage    filesystem.Usage
-	reserved uint64
-	ptype    zos.DeviceType
+	name  string
+	usage filesystem.Usage
+	ptype zos.DeviceType
 }
 
 var _ filesystem.Pool = &testPool{}
@@ -96,10 +95,6 @@ func (p *testPool) Type() zos.DeviceType {
 	return p.ptype
 }
 
-func (p *testPool) Reserved() (uint64, error) {
-	return p.reserved, nil
-}
-
 func (p *testPool) Volumes() ([]filesystem.Volume, error) {
 	args := p.Called()
 	return args.Get(0).([]filesystem.Volume), args.Error(1)
@@ -127,18 +122,16 @@ func TestCreateSubvol(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 10000,
-			Used: 100,
+			Used: 300,
 		},
 		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
+		name: "pool-2",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -171,18 +164,16 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 10000,
-			Used: 100,
+			Used: 200,
 		},
 		ptype: zos.SSDDevice,
 	}
 
 	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
+		name: "pool-2",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -191,8 +182,7 @@ func TestCreateSubvolUnlimited(t *testing.T) {
 	}
 
 	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
+		name: "pool-3",
 		usage: filesystem.Usage{
 			Size: 100000,
 			Used: 0,
@@ -229,8 +219,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -239,8 +228,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	}
 
 	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
+		name: "pool-2",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -249,8 +237,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 	}
 
 	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
+		name: "pool-3",
 		usage: filesystem.Usage{
 			Size: 100000,
 			Used: 0,
@@ -279,8 +266,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -289,8 +275,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 	}
 
 	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
+		name: "pool-2",
 		usage: filesystem.Usage{
 			Size: 10000,
 			Used: 100,
@@ -299,8 +284,7 @@ func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {
 	}
 
 	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
+		name: "pool-3",
 		usage: filesystem.Usage{
 			Size: 100000,
 			Used: 0,
@@ -334,8 +318,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 5000,
 			Used: 100,
@@ -344,8 +327,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	}
 
 	pool2 := &testPool{
-		name:     "pool-2",
-		reserved: 1000,
+		name: "pool-2",
 		usage: filesystem.Usage{
 			Size: 5000,
 			Used: 100,
@@ -354,8 +336,7 @@ func TestVDiskFindCandidatesNoSpace(t *testing.T) {
 	}
 
 	pool3 := &testPool{
-		name:     "pool-3",
-		reserved: 0,
+		name: "pool-3",
 		usage: filesystem.Usage{
 			Size: 100000,
 			Used: 0,
@@ -391,8 +372,7 @@ func TestVDiskFindCandidatesOverProvision(t *testing.T) {
 	require := require.New(t)
 
 	pool1 := &testPool{
-		name:     "pool-1",
-		reserved: 2000,
+		name: "pool-1",
 		usage: filesystem.Usage{
 			Size: 5000,
 			Used: 100,
