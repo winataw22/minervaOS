@@ -22,6 +22,7 @@ const (
 
 // Run run the machine with cloud-hypervisor
 func (m *Machine) Run(ctx context.Context, socket, logs string) error {
+	_ = os.Remove(socket)
 
 	// build command line
 	args := map[string][]string{

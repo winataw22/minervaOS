@@ -38,7 +38,50 @@ exec: gateway --broker unix://var/run/redis.sock --root /var/cache/modules/gatew
 after:
   - boot
 ```
+## Implementation details
 
+Traefik is used as the reverse proxy forwarding traffic to upstream servers. All worklaods deployed on the node is associated with a domain that resolves to the node IP. In the name workload case, it's a subdomain of the gateway main domain. In the FQDN case, the user must create a DNS A record pointing it to the node IP. The node by default redirects all http traffic to https.
+
+When an https request reaches the node, it looks at the domain and determines the correct service that should handle the request. The services defintions are in `/var/cache/modules/gateway/proxy/` and is hot-reloaded by traefik every time a service is added/removed to/from it. Zos currently supports enabling `tls_passthrough` in which case the https request is passed as is to the backend (at the TCP level). The default is `tls_passthrough` is false which means the node terminates the TLS traffic and then forwards the request as http to the backend. 
+Example of a FQDN service definition with tls_passthrough enabled:
+```yaml
+tcp:
+  routers:
+    37-2039-testname-route:
+      rule: HostSNI(`remote.omar.grid.tf`)
+      service: 37-2039-testname
+      tls:
+        passthrough: "true"
+  services:
+    37-2039-testname:
+      loadbalancer:
+        servers:
+        - address: 137.184.106.152:443
+```
+Example of a "name" service definition with tls_passthrough disabled:
+```yaml
+http:
+  routers:
+    37-1976-workloadname-route:
+      rule: Host(`workloadname.gent01.dev.grid.tf`)
+      service: 40-1976-workloadname
+      tls:
+        certResolver: dnsresolver
+        domains:
+        - sans:
+          - '*.gent01.dev.grid.tf'
+  services:
+    40-1976-workloadname:
+      loadbalancer:
+        servers:
+        - url: http://[backendip]:9000
+```
+
+The `certResolver` option has two valid values, `resolver` and `dnsresolver`. The `resolver` is an http resolver and is used in FQDN services with `tls_passthrough` disabled. It uses the http challenge to generate a single-domain certificate. The `dnsresolver` is used for name services with `tls_passthrough` disabled. The `dnsresolver` is responsible for generating a wildcard certificate to be used for all subdomains of the gateway domain. Its flow is described below.
+
+The CNAME record is used to make all subdomains (reserved or not) resolve to the ip of the gateway. Generating a wildcard certificate requires adding a TXT record at `__acme-challenge.gatewaydomain.com`. The NS record is used to delegate this specific subdomain to the node. So if someone did `dig TXT __acme-challenge.gatewaydomain.com`, the query is served by the node, not the DNS provider used for the gateway domain.
+
+Traefik has, as a config parameter, multiple dns [providers](https://doc.traefik.io/traefik/https/acme/#providers) to communicate with when it wants to add the required TXT record. For non-supported providers, a bash script can be provided to do the record generation and clean up (i.e. External program). The bash [script](https://github.com/threefoldtech/zos/blob/main/pkg/gateway/static/cert.sh) starts dnsmasq managing a dns zone for the `__acme-challenge` subdomain with the given TXT record. It then kills the dnsmasq process and removes the config file during cleanup.
 ## Interface
 
 ```go

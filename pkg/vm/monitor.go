@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -103,7 +104,17 @@ func (m *Module) monitor(ctx context.Context) error {
 			log.Err(err).Str("id", id).Msg("failed to monitor machine")
 		}
 
+		// remove vm from running vms
+		delete(running, id)
 	}
+
+	// now we have running vms that shouldn't be running
+	// because they have no config.
+	for id, ps := range running {
+		log.Info().Str("id", id).Msg("machine is running but not configured")
+		_ = syscall.Kill(ps.Pid, syscall.SIGKILL)
+	}
+
 	return nil
 }
 
@@ -158,6 +169,10 @@ func (m *Module) monitorID(ctx context.Context, running map[string]Process, id s
 		reason = vm.Run(ctx, m.socketPath(id), m.logsPath(id))
 		if reason == nil {
 			reason = m.waitAndAdjOom(ctx, id)
+		}
+
+		if reason != nil {
+			reason = m.withLogs(m.logsPath(id), reason)
 		}
 	} else {
 		reason = fmt.Errorf("deleting vm due to so many crashes")
