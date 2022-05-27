@@ -191,7 +191,7 @@ func (s *Module) DiskCreate(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 		return disk, err
 	}
 
-	if err := file.Truncate(int64(size)); err != nil {
+	if err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size)); err != nil {
 		return disk, errors.Wrap(err, "failed to truncate disk to size")
 	}
 
@@ -212,7 +212,7 @@ func (s *Module) DiskResize(name string, size gridtypes.Unit) (disk pkg.VDisk, e
 
 	defer file.Close()
 
-	if err := file.Truncate(int64(size)); err != nil {
+	if err = syscall.Fallocate(int(file.Fd()), 0, 0, int64(size)); err != nil {
 		return disk, errors.Wrap(err, "failed to truncate disk to size")
 	}
 

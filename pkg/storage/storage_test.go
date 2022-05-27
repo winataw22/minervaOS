@@ -392,10 +392,10 @@ func TestVDiskFindCandidatesOverProvision(t *testing.T) {
 
 	pool1.On("Volumes").Return([]filesystem.Volume{sub}, nil)
 
-	_, err := mod.diskFindCandidate(8000)
+	_, err := mod.diskFindCandidate(4000)
 	require.NoError(err)
 
-	_, err = mod.diskFindCandidate(10000)
+	_, err = mod.diskFindCandidate(5000)
 	require.Error(err)
 
 }

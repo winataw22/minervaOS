@@ -27,7 +27,7 @@ import (
 
 const (
 	// SSDOverProvisionFactor over provision factor for SSDs
-	SSDOverProvisionFactor = 2
+	SSDOverProvisionFactor = 1
 	// CacheTarget is the path where the cache disk is mounted
 	CacheTarget = "/var/cache"
 	// cacheLabel is the name of the cache
