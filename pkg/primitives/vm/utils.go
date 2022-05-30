@@ -1,4 +1,4 @@
-package primitives
+package vm
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
+	"github.com/threefoldtech/zos/pkg/primitives/pubip"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -24,12 +25,12 @@ var (
 	}
 )
 
-func (p *Primitives) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
+func (p *Manager) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
 	//TODO: if we use `ygg` as a network name. this will conflict
 	//if the user has a network that is called `ygg`.
-	tapName := tapNameFromName(wl.ID, "ygg")
+	tapName := wl.ID.Unique("ygg")
 	iface, err := network.SetupYggTap(ctx, tapName)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
@@ -56,7 +57,7 @@ func (p *Primitives) newYggNetworkInterface(ctx context.Context, wl *gridtypes.W
 	return out, nil
 }
 
-func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.Deployment, wl *gridtypes.WorkloadWithID, inf zos.MachineInterface) (pkg.VMIface, error) {
+func (p *Manager) newPrivNetworkInterface(ctx context.Context, dl gridtypes.Deployment, wl *gridtypes.WorkloadWithID, inf zos.MachineInterface) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 	netID := zos.NetworkID(dl.TwinID, inf.Network)
 
@@ -89,7 +90,7 @@ func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.D
 		return pkg.VMIface{}, errors.Wrap(err, "could not convert private ipv4 to ipv6")
 	}
 
-	tapName := tapNameFromName(wl.ID, string(inf.Network))
+	tapName := wl.ID.Unique(string(inf.Network))
 	iface, err := network.SetupPrivTap(ctx, netID, tapName)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
@@ -117,16 +118,16 @@ func (p *Primitives) newPrivNetworkInterface(ctx context.Context, dl gridtypes.D
 	return out, nil
 }
 
-func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment gridtypes.Deployment, cfg ZMachine) (pkg.VMIface, error) {
+func (p *Manager) newPubNetworkInterface(ctx context.Context, deployment gridtypes.Deployment, cfg ZMachine) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 	ipWl, err := deployment.Get(cfg.Network.PublicIP)
 	if err != nil {
 		return pkg.VMIface{}, err
 	}
 
-	tapName := tapNameFromName(ipWl.ID, "pub")
+	tapName := ipWl.ID.Unique("pub")
 
-	config, err := p.getPubIPConfig(ipWl)
+	config, err := pubip.GetPubIPConfig(ipWl)
 	if err != nil {
 		return pkg.VMIface{}, errors.Wrap(err, "could not get public ip config")
 	}
@@ -163,23 +164,6 @@ func (p *Primitives) newPubNetworkInterface(ctx context.Context, deployment grid
 		// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
 		Public: true,
 	}, nil
-}
-
-// Get the public ip, and the gateway from the reservation ID
-func (p *Primitives) getPubIPConfig(wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
-	if wl.Type != zos.PublicIPv4Type && wl.Type != zos.PublicIPType {
-		return result, fmt.Errorf("workload for public IP is of wrong type")
-	}
-
-	if wl.Result.State != gridtypes.StateOk {
-		return result, fmt.Errorf("public ip workload is not okay")
-	}
-
-	if err := wl.Result.Unmarshal(&result); err != nil {
-		return result, errors.Wrap(err, "failed to load ip result")
-	}
-
-	return result, nil
 }
 
 func getFlistInfo(imagePath string) (FListInfo, error) {

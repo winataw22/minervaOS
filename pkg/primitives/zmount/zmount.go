@@ -1,4 +1,4 @@
-package primitives
+package zmount
 
 import (
 	"context"
@@ -7,10 +7,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
+)
+
+var (
+	_ provision.Manager = (*Manager)(nil)
+	_ provision.Updater = (*Manager)(nil)
 )
 
 // ZMount defines a mount point
@@ -19,7 +25,29 @@ type ZMount = zos.ZMount
 // ZMountResult types
 type ZMountResult = zos.ZMountResult
 
-func (p *Primitives) volumeProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (vol ZMountResult, err error) {
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+// VolumeProvision is entry point to provision a volume
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+	return p.volumeProvisionImpl(ctx, wl)
+}
+
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	vdisk := stubs.NewStorageModuleStub(p.zbus)
+	return vdisk.DiskDelete(ctx, wl.ID.String())
+}
+
+func (p *Manager) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+	return p.zMountUpdateImpl(ctx, wl)
+}
+
+func (p *Manager) volumeProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (vol ZMountResult, err error) {
 	var config ZMount
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
 		return ZMountResult{}, err
@@ -37,21 +65,7 @@ func (p *Primitives) volumeProvisionImpl(ctx context.Context, wl *gridtypes.Work
 }
 
 // VolumeProvision is entry point to provision a volume
-func (p *Primitives) zMountProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
-	return p.volumeProvisionImpl(ctx, wl)
-}
-
-func (p *Primitives) zMountDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
-	vdisk := stubs.NewStorageModuleStub(p.zbus)
-	return vdisk.DiskDelete(ctx, wl.ID.String())
-}
-
-func (p *Primitives) zMountUpdate(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
-	return p.zMountUpdateImpl(ctx, wl)
-}
-
-// VolumeProvision is entry point to provision a volume
-func (p *Primitives) zMountUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (vol ZMountResult, err error) {
+func (p *Manager) zMountUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (vol ZMountResult, err error) {
 	log.Debug().Msg("updating zmount")
 	current, err := provision.GetWorkload(ctx, wl.Name)
 	if err != nil {
@@ -72,31 +86,31 @@ func (p *Primitives) zMountUpdateImpl(ctx context.Context, wl *gridtypes.Workloa
 	if new.Size == old.Size {
 		return vol, provision.ErrNoActionNeeded
 	} else if new.Size < old.Size {
-		return vol, provision.NewUnchangedError(fmt.Errorf("not safe to shrink a disk"))
+		return vol, provision.UnChanged(fmt.Errorf("not safe to shrink a disk"))
 	}
 
 	// now validate that disk is not being used right now
 	deployment, err := provision.GetDeployment(ctx)
 	if err != nil {
-		return vol, provision.NewUnchangedError(errors.Wrap(err, "failed to get deployment"))
+		return vol, provision.UnChanged(errors.Wrap(err, "failed to get deployment"))
 	}
 
 	vms := deployment.ByType(zos.ZMachineType)
 	log.Debug().Int("count", len(vms)).Msg("found zmachines in deployment")
 	for _, vm := range vms {
 		// vm not running, no need to check
-		if !vm.Result.State.IsAny(gridtypes.StateOk) {
+		if !vm.Result.State.IsOkay() {
 			continue
 		}
 
 		var data zos.ZMachine
 		if err := json.Unmarshal(vm.Data, &data); err != nil {
-			return vol, provision.NewUnchangedError(errors.Wrap(err, "failed to load vm information"))
+			return vol, provision.UnChanged(errors.Wrap(err, "failed to load vm information"))
 		}
 
 		for _, mnt := range data.Mounts {
 			if mnt.Name == wl.Name {
-				return vol, provision.NewUnchangedError(fmt.Errorf("disk is mounted, please delete the VM first"))
+				return vol, provision.UnChanged(fmt.Errorf("disk is mounted, please delete the VM first"))
 			}
 		}
 	}
@@ -109,5 +123,5 @@ func (p *Primitives) zMountUpdateImpl(ctx context.Context, wl *gridtypes.Workloa
 	_, err = vdisk.DiskResize(ctx, wl.ID.String(), new.Size)
 	// we know it's safe to resize the disk, it won't break it so we
 	// can be sure we can wrap the error into an unchanged error
-	return vol, provision.NewUnchangedError(err)
+	return vol, provision.UnChanged(err)
 }

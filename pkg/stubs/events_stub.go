@@ -47,6 +47,30 @@ func (s *EventsStub) ContractCancelledEvent(ctx context.Context) (<-chan pkg.Con
 	return ch, nil
 }
 
+func (s *EventsStub) ContractLockedEvent(ctx context.Context) (<-chan pkg.ContractLockedEvent, error) {
+	ch := make(chan pkg.ContractLockedEvent)
+	recv, err := s.client.Stream(ctx, s.module, s.object, "ContractLockedEvent")
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer close(ch)
+		for event := range recv {
+			var obj pkg.ContractLockedEvent
+			if err := event.Unmarshal(&obj); err != nil {
+				panic(err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case ch <- obj:
+			default:
+			}
+		}
+	}()
+	return ch, nil
+}
+
 func (s *EventsStub) PublicConfigEvent(ctx context.Context) (<-chan pkg.PublicConfigEvent, error) {
 	ch := make(chan pkg.PublicConfigEvent)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "PublicConfigEvent")

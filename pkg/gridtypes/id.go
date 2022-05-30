@@ -1,9 +1,12 @@
 package gridtypes
 
 import (
+	"crypto/md5"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/decred/base58"
 )
 
 var (
@@ -51,6 +54,24 @@ func (i WorkloadID) String() string {
 func (i WorkloadID) Parts() (twin uint32, deployment uint64, name Name, err error) {
 	_, err = fmt.Sscanf(string(i), "%d-%d-%s", &twin, &deployment, &name)
 	return
+}
+
+// Unique generate a unique predetermined short name based
+// on that ID and input value n.
+// returns a max of 13 char str which is suitable
+// to be used as devices and tap devices names.
+func (i WorkloadID) Unique(n string) string {
+	m := md5.New()
+
+	fmt.Fprintf(m, "%s:%s", i.String(), n)
+
+	h := m.Sum(nil)
+	b := base58.Encode(h[:])
+	if len(b) > 13 {
+		b = b[:13]
+	}
+
+	return string(b)
 }
 
 // IsValidName validates workload name

@@ -103,6 +103,24 @@ func (c *clientImpl) NamespaceSetMode(name, mode string) error {
 	return nil
 }
 
+// NamespaceSetMode locks the namespace by a password, use * password to clear it
+func (c *clientImpl) NamespaceSetLock(name string, lock bool) error {
+	con := c.pool.Get()
+	defer con.Close()
+	l := 0
+	if lock {
+		l = 1
+	}
+	ok, err := redis.String(con.Do("NSSET", name, "freeze", l))
+	if err != nil {
+		return err
+	}
+	if ok != "OK" {
+		return fmt.Errorf(ok)
+	}
+	return nil
+}
+
 // NamespaceSetPublic changes the public flag, a public namespace can be read-only if a password is set
 func (c *clientImpl) NamespaceSetPublic(name string, public bool) error {
 	con := c.pool.Get()

@@ -80,6 +80,19 @@ func (s *VMModuleStub) List(ctx context.Context) (ret0 []string, ret1 error) {
 	return
 }
 
+func (s *VMModuleStub) Lock(ctx context.Context, arg0 string, arg1 bool) (ret0 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Lock", args...)
+	if err != nil {
+		panic(err)
+	}
+	ret0 = new(zbus.RemoteError)
+	if err := result.Unmarshal(0, &ret0); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *VMModuleStub) Logs(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Logs", args...)

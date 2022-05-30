@@ -1,4 +1,4 @@
-package primitives
+package pubip
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
@@ -17,11 +18,23 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func (p *Primitives) publicIPProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+var (
+	_ provision.Manager = (*Manager)(nil)
+)
+
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.publicIPProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.WorkloadWithID) (ip gridtypes.IPNet, gw net.IP, err error) {
+func (p *Manager) getAssignedPublicIP(ctx context.Context, wl *gridtypes.WorkloadWithID) (ip gridtypes.IPNet, gw net.IP, err error) {
 	//Okay, this implementation is tricky but will be simplified once we store the reserved IP
 	//on the contract.
 
@@ -79,7 +92,7 @@ func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.Work
 			continue
 		}
 
-		used, err := p.getPubIPConfig(ipWl)
+		used, err := GetPubIPConfig(ipWl)
 		if err != nil {
 			return ip, gw, err
 		}
@@ -107,7 +120,7 @@ func (p *Primitives) getAssignedPublicIP(ctx context.Context, wl *gridtypes.Work
 	return ip, gw, fmt.Errorf("could not allocate public IP address to workload")
 }
 
-func (p *Primitives) getPublicIPData(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIP, err error) {
+func (p *Manager) getPublicIPData(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIP, err error) {
 	switch wl.Type {
 	case zos.PublicIPv4Type:
 		// backword compatibility with older ipv4 type
@@ -121,13 +134,13 @@ func (p *Primitives) getPublicIPData(ctx context.Context, wl *gridtypes.Workload
 	return
 }
 
-func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
+func (p *Manager) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
 	config, err := p.getPublicIPData(ctx, wl)
 	if err != nil {
 		return zos.PublicIPResult{}, err
 	}
 
-	tapName := tapNameFromName(wl.ID, "pub")
+	tapName := wl.ID.Unique("pub")
 	network := stubs.NewNetworkerStub(p.zbus)
 	fName := filterName(tapName)
 
@@ -169,10 +182,10 @@ func (p *Primitives) publicIPProvisionImpl(ctx context.Context, wl *gridtypes.Wo
 	return
 }
 
-func (p *Primitives) publicIPDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	// Disconnect the public interface from the network if one exists
 	network := stubs.NewNetworkerStub(p.zbus)
-	tapName := tapNameFromName(wl.ID, "pub")
+	tapName := wl.ID.Unique("pub")
 	fName := filterName(tapName)
 	if err := network.RemovePubIPFilter(ctx, fName); err != nil {
 		log.Error().Err(err).Msg("could not remove filter rules")
@@ -206,4 +219,21 @@ func predictedSlaac(base net.IPNet, mac string) (gridtypes.IPNet, error) {
 
 	return gridtypes.IPNet{IPNet: base}, nil
 
+}
+
+// GetPubIPConfig get the public ip, and the gateway from the workload
+func GetPubIPConfig(wl *gridtypes.WorkloadWithID) (result zos.PublicIPResult, err error) {
+	if wl.Type != zos.PublicIPv4Type && wl.Type != zos.PublicIPType {
+		return result, fmt.Errorf("workload for public IP is of wrong type")
+	}
+
+	if wl.Result.State != gridtypes.StateOk {
+		return result, fmt.Errorf("public ip workload is not okay")
+	}
+
+	if err := wl.Result.Unmarshal(&result); err != nil {
+		return result, errors.Wrap(err, "failed to load ip result")
+	}
+
+	return result, nil
 }

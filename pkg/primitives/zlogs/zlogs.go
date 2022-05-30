@@ -1,4 +1,4 @@
-package primitives
+package zlogs
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -13,8 +14,19 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func (p *Primitives) zlogsProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+var (
+	_ provision.Manager = (*Manager)(nil)
+)
 
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	var (
 		vm      = stubs.NewVMModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -30,7 +42,7 @@ func (p *Primitives) zlogsProvision(ctx context.Context, wl *gridtypes.WorkloadW
 		return nil, errors.Wrapf(err, "no zmachine with name '%s'", cfg.ZMachine)
 	}
 
-	if !machine.Result.State.IsAny(gridtypes.StateOk) {
+	if !machine.Result.State.IsOkay() {
 		return nil, errors.Wrapf(err, "machine state is not ok")
 	}
 
@@ -57,7 +69,7 @@ func (p *Primitives) zlogsProvision(ctx context.Context, wl *gridtypes.WorkloadW
 
 }
 
-func (p *Primitives) zlogsDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	var (
 		vm = stubs.NewVMModuleStub(p.zbus)
 	)

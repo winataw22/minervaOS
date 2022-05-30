@@ -19,6 +19,8 @@ type Engine interface {
 	// and will be processes later
 	Provision(ctx context.Context, wl gridtypes.Deployment) error
 	Deprovision(ctx context.Context, twin uint32, id uint64, reason string) error
+	Pause(ctx context.Context, twin uint32, id uint64) error
+	Resume(ctx context.Context, twin uint32, id uint64) error
 	Update(ctx context.Context, update gridtypes.Deployment) error
 	Storage() Storage
 	Twins() Twins
@@ -33,9 +35,19 @@ type Engine interface {
 // workload provision was not carried on because it's already deployed, basically a no action
 // needed indicator. In that case, the engine can ignore the returned result
 type Provisioner interface {
+	// Initialize is called before the provision engine is started
+	Initialize(ctx context.Context) error
+	// Provision a workload
 	Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error)
-	Decommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error
+	// Deprovision a workload
+	Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error
+	// Pause a workload
+	Pause(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error)
+	// Resume a workload
+	Resume(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error)
+	// Update a workload
 	Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error)
+	// CanUpdate checks if this workload can be updated on the fly
 	CanUpdate(ctx context.Context, typ gridtypes.WorkloadType) bool
 }
 
@@ -64,29 +76,6 @@ var (
 	// ErrInvalidVersion invalid version error
 	ErrInvalidVersion = fmt.Errorf("invalid version")
 )
-
-// ErrUnchanged can be returned by the Provisioner.Update it means
-// that the update has failed but the workload is intact
-type ErrUnchanged struct {
-	cause error
-}
-
-// NewUnchangedError return an instance of ErrUnchanged
-func NewUnchangedError(cause error) error {
-	if cause == nil {
-		return nil
-	}
-
-	return ErrUnchanged{cause}
-}
-
-func (e ErrUnchanged) Unwrap() error {
-	return e.cause
-}
-
-func (e ErrUnchanged) Error() string {
-	return e.cause.Error()
-}
 
 // Field interface
 type Field interface{}

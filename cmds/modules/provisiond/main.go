@@ -330,8 +330,8 @@ func action(cli *cli.Context) error {
 		Msg("starting provision module")
 
 	// call the runtime upgrade before running engine
-	if err := provisioners.InitializeZDB(ctx); err != nil {
-		log.Error().Err(err).Msg("failed to initialize zdb subsystem")
+	if err := provisioners.Initialize(ctx); err != nil {
+		log.Error().Err(err).Msg("failed to run provisioners initializers")
 	}
 
 	// spawn the engine

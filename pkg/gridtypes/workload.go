@@ -232,6 +232,10 @@ func (s ResultState) IsAny(state ...ResultState) bool {
 	return false
 }
 
+func (s ResultState) IsOkay() bool {
+	return s.IsAny(StateOk, StatePaused)
+}
+
 const (
 	// StateInit is the first state of the workload on storage
 	StateInit ResultState = "init"
@@ -242,13 +246,15 @@ const (
 	StateError ResultState = "error"
 	// StateOk constant
 	StateOk ResultState = "ok"
-	//StateDeleted constant
+	// StateDeleted constant
 	StateDeleted ResultState = "deleted"
+	// StatePaused constant
+	StatePaused ResultState = "paused"
 )
 
 var (
 	validStates = []ResultState{
-		StateInit, StateUnChanged, StateError, StateOk, StateDeleted,
+		StateInit, StateUnChanged, StateError, StateOk, StateDeleted, StatePaused,
 	}
 )
 

@@ -1,4 +1,4 @@
-package primitives
+package network
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -15,8 +16,21 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
+var (
+	_ provision.Manager = (*Manager)(nil)
+	_ provision.Updater = (*Manager)(nil)
+)
+
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
 // networkProvision is entry point to provision a network
-func (p *Primitives) networkProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) networkProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	twin, _ := provision.GetDeploymentID(ctx)
 
 	var network zos.Network
@@ -39,11 +53,15 @@ func (p *Primitives) networkProvisionImpl(ctx context.Context, wl *gridtypes.Wor
 	return nil
 }
 
-func (p *Primitives) networkProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return nil, p.networkProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) networkDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+	return nil, p.networkProvisionImpl(ctx, wl)
+}
+
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	mgr := stubs.NewNetworkerStub(p.zbus)
 
 	var network zos.Network

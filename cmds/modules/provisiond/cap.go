@@ -51,7 +51,7 @@ func (c *CapacitySetter) setWithClient(cl *substrate.Substrate, deployments ...g
 		var total gridtypes.Capacity
 		for i := range deployment.Workloads {
 			wl := &deployment.Workloads[i]
-			if wl.Result.State.IsAny(gridtypes.StateOk) {
+			if wl.Result.State.IsOkay() {
 				cap, err := wl.Capacity()
 				if err != nil {
 					log.Error().Err(err).Str("workload", wl.Name.String()).

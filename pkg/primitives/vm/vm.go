@@ -1,8 +1,7 @@
-package primitives
+package vm
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -42,11 +41,23 @@ func (t *FListInfo) IsContainer() bool {
 	return len(t.ImagePath) == 0
 }
 
-func (p *Primitives) virtualMachineProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+var (
+	_ provision.Manager = (*Manager)(nil)
+)
+
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	return p.virtualMachineProvisionImpl(ctx, wl)
 }
 
-func (p *Primitives) vmMounts(ctx context.Context, deployment gridtypes.Deployment, mounts []zos.MachineMount, format bool, vm *pkg.VM) error {
+func (p *Manager) vmMounts(ctx context.Context, deployment gridtypes.Deployment, mounts []zos.MachineMount, format bool, vm *pkg.VM) error {
 	for _, mount := range mounts {
 		wl, err := deployment.Get(mount.Name)
 		if err != nil {
@@ -71,7 +82,7 @@ func (p *Primitives) vmMounts(ctx context.Context, deployment gridtypes.Deployme
 	return nil
 }
 
-func (p *Primitives) mountDisk(ctx context.Context, wl *gridtypes.WorkloadWithID, mount zos.MachineMount, format bool, vm *pkg.VM) error {
+func (p *Manager) mountDisk(ctx context.Context, wl *gridtypes.WorkloadWithID, mount zos.MachineMount, format bool, vm *pkg.VM) error {
 	storage := stubs.NewStorageModuleStub(p.zbus)
 
 	info, err := storage.DiskLookup(ctx, wl.ID.String())
@@ -90,7 +101,7 @@ func (p *Primitives) mountDisk(ctx context.Context, wl *gridtypes.WorkloadWithID
 	return nil
 }
 
-func (p *Primitives) mountQsfs(wl *gridtypes.WorkloadWithID, mount zos.MachineMount, vm *pkg.VM) error {
+func (p *Manager) mountQsfs(wl *gridtypes.WorkloadWithID, mount zos.MachineMount, vm *pkg.VM) error {
 
 	var info zos.QuatumSafeFSResult
 	if err := wl.Result.Unmarshal(&info); err != nil {
@@ -101,7 +112,7 @@ func (p *Primitives) mountQsfs(wl *gridtypes.WorkloadWithID, mount zos.MachineMo
 	return nil
 }
 
-func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZMachineResult, err error) {
+func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZMachineResult, err error) {
 	var (
 		storage = stubs.NewStorageModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -166,7 +177,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		if err != nil {
 			return result, err
 		}
-		ifs = append(ifs, tapNameFromName(wl.ID, string(nic.Network)))
+		ifs = append(ifs, wl.ID.Unique(string(nic.Network)))
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 	}
 
@@ -179,7 +190,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		}
 
 		ipWl, _ := deployment.Get(config.Network.PublicIP)
-		pubIf = tapNameFromName(ipWl.ID, "pub")
+		pubIf = ipWl.ID.Unique("pub")
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 	}
 
@@ -190,7 +201,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 		}
 
 		log.Debug().Msgf("Planetary: %+v", inf)
-		ifs = append(ifs, tapNameFromName(wl.ID, "ygg"))
+		ifs = append(ifs, wl.ID.Unique("ygg"))
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 		result.YggIP = inf.IPs[0].IP.String()
 	}
@@ -349,7 +360,7 @@ func (p *Primitives) virtualMachineProvisionImpl(ctx context.Context, wl *gridty
 
 	return result, err
 }
-func (p *Primitives) copyFile(srcPath string, destPath string, permissions os.FileMode) error {
+func (p *Manager) copyFile(srcPath string, destPath string, permissions os.FileMode) error {
 	src, err := os.Open(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "Coludn't find %s on the node", srcPath)
@@ -367,7 +378,7 @@ func (p *Primitives) copyFile(srcPath string, destPath string, permissions os.Fi
 	return nil
 }
 
-func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	var (
 		flist   = stubs.NewFlisterStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
@@ -397,7 +408,7 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 
 	for _, inf := range cfg.Network.Interfaces {
-		tapName := tapNameFromName(wl.ID, string(inf.Network))
+		tapName := wl.ID.Unique(string(inf.Network))
 
 		if err := network.RemoveTap(ctx, tapName); err != nil {
 			return errors.Wrap(err, "could not clean up tap device")
@@ -405,7 +416,7 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 
 	if cfg.Network.Planetary {
-		tapName := tapNameFromName(wl.ID, "ygg")
+		tapName := wl.ID.Unique("ygg")
 		if err := network.RemoveTap(ctx, tapName); err != nil {
 			return errors.Wrap(err, "could not clean up tap device")
 		}
@@ -418,24 +429,11 @@ func (p *Primitives) vmDecomission(ctx context.Context, wl *gridtypes.WorkloadWi
 		if err != nil {
 			return err
 		}
-		ifName := tapNameFromName(ipWl.ID, "pub")
+		ifName := ipWl.ID.Unique("pub")
 		if err := network.RemovePubTap(ctx, ifName); err != nil {
 			return errors.Wrap(err, "could not clean up public tap device")
 		}
 	}
 
 	return nil
-}
-
-func tapNameFromName(id gridtypes.WorkloadID, network string) string {
-	m := md5.New()
-
-	fmt.Fprintf(m, "%s:%s", id.String(), network)
-
-	h := m.Sum(nil)
-	b := base58.Encode(h[:])
-	if len(b) > 13 {
-		b = b[:13]
-	}
-	return string(b)
 }

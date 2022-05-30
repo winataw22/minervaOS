@@ -175,7 +175,7 @@ func (m *MessageBus) getOne(args redis.Args) ([][]byte, error) {
 	con := m.pool.Get()
 	defer con.Close()
 
-	data, err := redis.ByteSlices(con.Do("BLPOP", args...))
+	data, err := redis.ByteSlices(con.Do("BRPOP", args...))
 	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}

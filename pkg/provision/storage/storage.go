@@ -668,7 +668,7 @@ func (b *BoltStorage) Capacity() (cap gridtypes.Capacity, active []gridtypes.Dep
 
 			isActive := false
 			for _, wl := range deployment.Workloads {
-				if wl.Result.State != gridtypes.StateOk {
+				if !wl.Result.State.IsOkay() {
 					continue
 				}
 

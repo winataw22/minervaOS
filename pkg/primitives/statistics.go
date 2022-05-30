@@ -30,6 +30,10 @@ func GetCapacity(ctx context.Context) gridtypes.Capacity {
 	return val.(gridtypes.Capacity)
 }
 
+var (
+	_ provision.Provisioner = (*Statistics)(nil)
+)
+
 // Statistics a provisioner interceptor that keeps track
 // of consumed capacity. It also does validate of required
 // capacity and then can report that this capacity can not be fulfilled
@@ -139,6 +143,11 @@ func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) error {
 	return nil
 }
 
+// Initialize implements provisioner interface
+func (s *Statistics) Initialize(ctx context.Context) error {
+	return s.inner.Initialize(ctx)
+}
+
 // Provision implements the provisioner interface
 func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (result gridtypes.Result, err error) {
 	current := s.Current()
@@ -163,7 +172,7 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 		return result, err
 	}
 
-	if result.State == gridtypes.StateOk {
+	if result.State.IsOkay() {
 		log.Debug().Str("type", wl.Type.String()).Str("id", wl.ID.String()).Msgf("incrmenting capacity +%+v", needed)
 		s.counters.Increment(needed)
 	}
@@ -172,8 +181,8 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 }
 
 // Decommission implements the decomission interface
-func (s *Statistics) Decommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
-	if err := s.inner.Decommission(ctx, wl); err != nil {
+func (s *Statistics) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	if err := s.inner.Deprovision(ctx, wl); err != nil {
 		return err
 	}
 	cap, err := wl.Capacity()
@@ -195,6 +204,14 @@ func (s *Statistics) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (
 // CanUpdate implements the provisioner interface
 func (s *Statistics) CanUpdate(ctx context.Context, typ gridtypes.WorkloadType) bool {
 	return s.inner.CanUpdate(ctx, typ)
+}
+
+func (s *Statistics) Pause(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error) {
+	return s.inner.Pause(ctx, wl)
+}
+
+func (s *Statistics) Resume(ctx context.Context, wl *gridtypes.WorkloadWithID) (gridtypes.Result, error) {
+	return s.inner.Resume(ctx, wl)
 }
 
 // statistics api handlers for msgbus

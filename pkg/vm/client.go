@@ -49,6 +49,42 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (c *Client) Pause(ctx context.Context) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, "http://unix/api/v1/vm.pause", nil)
+	if err != nil {
+		return err
+	}
+	response, err := c.client.Do(request)
+	if err != nil {
+		return errors.Wrap(err, "error calling machine pause")
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("got unexpected http code '%s' on machine pause", response.Status)
+	}
+
+	return nil
+}
+
+func (c *Client) Resume(ctx context.Context) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, "http://unix/api/v1/vm.resume", nil)
+	if err != nil {
+		return err
+	}
+	response, err := c.client.Do(request)
+	if err != nil {
+		return errors.Wrap(err, "error calling machine pause")
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("got unexpected http code '%s' on machine resume", response.Status)
+	}
+
+	return nil
+}
+
 // Inspect return information about the vm
 func (c *Client) Inspect(ctx context.Context) (CPU, MemMib, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://unix/api/v1/vm.info", nil)

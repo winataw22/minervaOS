@@ -1,5 +1,5 @@
-TAILSTREAM_VERSION="0.1.5"
-TAILSTREAM_CHECKSUM="a5900ca37aed8193d5ead14da1b11302"
+TAILSTREAM_VERSION="0.1.6"
+TAILSTREAM_CHECKSUM="adac25b1a6bbdd6a207156167bd323aa"
 TAILSTREAM_LINK="https://github.com/threefoldtech/tailstream/releases/download/v${TAILSTREAM_VERSION}/tailstream"
 
 download_tailstream() {

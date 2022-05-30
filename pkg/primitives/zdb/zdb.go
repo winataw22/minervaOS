@@ -1,4 +1,4 @@
-package primitives
+package zdb
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/provision"
@@ -71,12 +72,27 @@ func (z *tZDBContainer) DataMount() (string, error) {
 	return "", fmt.Errorf("container '%s' does not have a valid data mount", z.Name)
 }
 
-func (p *Primitives) zdbProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+var (
+	_ provision.Manager     = (*Manager)(nil)
+	_ provision.Updater     = (*Manager)(nil)
+	_ provision.Initializer = (*Manager)(nil)
+	_ provision.Pauser      = (*Manager)(nil)
+)
+
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	res, err := p.zdbProvisionImpl(ctx, wl)
 	return res, newSafeError(err)
 }
 
-func (p *Primitives) zdbListContainers(ctx context.Context) (map[pkg.ContainerID]tZDBContainer, error) {
+func (p *Manager) zdbListContainers(ctx context.Context) (map[pkg.ContainerID]tZDBContainer, error) {
 	var (
 		contmod = stubs.NewContainerModuleStub(p.zbus)
 	)
@@ -108,7 +124,7 @@ func (p *Primitives) zdbListContainers(ctx context.Context) (map[pkg.ContainerID
 	return m, nil
 }
 
-func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (zos.ZDBResult, error) {
+func (p *Manager) zdbProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (zos.ZDBResult, error) {
 	var (
 		//contmod = stubs.NewContainerModuleStub(p.zbus)
 		storage = stubs.NewStorageModuleStub(p.zbus)
@@ -207,7 +223,7 @@ func (p *Primitives) zdbProvisionImpl(ctx context.Context, wl *gridtypes.Workloa
 	}, nil
 }
 
-func (p *Primitives) ensureZdbContainer(ctx context.Context, device pkg.Device) (tZDBContainer, error) {
+func (p *Manager) ensureZdbContainer(ctx context.Context, device pkg.Device) (tZDBContainer, error) {
 	var container = stubs.NewContainerModuleStub(p.zbus)
 
 	name := pkg.ContainerID(device.ID)
@@ -231,7 +247,7 @@ func (p *Primitives) ensureZdbContainer(ctx context.Context, device pkg.Device) 
 
 }
 
-func (p *Primitives) zdbRootFS(ctx context.Context) (string, error) {
+func (p *Manager) zdbRootFS(ctx context.Context) (string, error) {
 	var flist = stubs.NewFlisterStub(p.zbus)
 	var err error
 	var rootFS string
@@ -253,7 +269,7 @@ func (p *Primitives) zdbRootFS(ctx context.Context) (string, error) {
 	return rootFS, nil
 }
 
-func (p *Primitives) createZdbContainer(ctx context.Context, device pkg.Device) error {
+func (p *Manager) createZdbContainer(ctx context.Context, device pkg.Device) error {
 	var (
 		name       = pkg.ContainerID(device.ID)
 		cont       = stubs.NewContainerModuleStub(p.zbus)
@@ -336,7 +352,7 @@ func (p *Primitives) createZdbContainer(ctx context.Context, device pkg.Device) 
 // dataMigration will make sure that we delete any data files from v1. This is
 // hardly a data migration but at this early stage it's fine since there is still
 // no real data loads live on the grid. All v2 zdbs, will be safe.
-func (p *Primitives) dataMigration(ctx context.Context, volume string) {
+func (p *Manager) dataMigration(ctx context.Context, volume string) {
 	v1, _ := zdb.IsZDBVersion1(ctx, volume)
 	// TODO: what if there is an error?
 	if !v1 {
@@ -352,7 +368,7 @@ func (p *Primitives) dataMigration(ctx context.Context, volume string) {
 	}
 }
 
-func (p *Primitives) zdbRun(ctx context.Context, name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
+func (p *Manager) zdbRun(ctx context.Context, name string, rootfs string, cmd string, netns string, volumepath string, socketdir string) error {
 	var cont = stubs.NewContainerModuleStub(p.zbus)
 
 	// we do data migration here because this is called
@@ -386,7 +402,7 @@ func (p *Primitives) zdbRun(ctx context.Context, name string, rootfs string, cmd
 	return err
 }
 
-func (p *Primitives) waitZDBIPs(ctx context.Context, namespace string, created time.Time) ([]net.IP, error) {
+func (p *Manager) waitZDBIPs(ctx context.Context, namespace string, created time.Time) ([]net.IP, error) {
 	// TODO: this method need to be abstracted, since it's now depends on the knewledge
 	// of the networking daemon internal (interfaces names)
 	// may be at least just get all ips from all interfaces inside the namespace
@@ -458,7 +474,7 @@ func (p *Primitives) waitZDBIPs(ctx context.Context, namespace string, created t
 	return containerIPs, nil
 }
 
-func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string, config ZDB) error {
+func (p *Manager) createZDBNamespace(containerID pkg.ContainerID, nsID string, config ZDB) error {
 	zdbCl := zdbConnection(containerID)
 	defer zdbCl.Close()
 	if err := zdbCl.Connect(); err != nil {
@@ -496,11 +512,11 @@ func (p *Primitives) createZDBNamespace(containerID pkg.ContainerID, nsID string
 	return nil
 }
 
-func (p *Primitives) zdbDecommission(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	return newSafeError(p.zdbDecommissionImpl(ctx, wl))
 }
 
-func (p *Primitives) zdbDecommissionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) zdbDecommissionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	containers, err := p.zdbListContainers(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to list running zdbs")
@@ -536,12 +552,69 @@ func (p *Primitives) zdbDecommissionImpl(ctx context.Context, wl *gridtypes.Work
 	return nil
 }
 
-func (p *Primitives) zdbUpdate(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+func (p *Manager) findContainer(ctx context.Context, name string) (zdb.Client, error) {
+	containers, err := p.zdbListContainers(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list running zdbs")
+	}
+
+	for id := range containers {
+		cl := zdbConnection(id)
+		if err := cl.Connect(); err != nil {
+			log.Error().Err(err).Str("id", string(id)).Msg("failed to connect to zdb instance")
+			continue
+		}
+
+		if ok, _ := cl.Exist(name); ok {
+			return cl, nil
+		}
+
+		_ = cl.Close()
+	}
+
+	return nil, os.ErrNotExist
+}
+
+func (p *Manager) Pause(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	cl, err := p.findContainer(ctx, wl.ID.String())
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return provision.UnChanged(err)
+	}
+
+	defer cl.Close()
+
+	if err := cl.NamespaceSetLock(wl.ID.String(), true); err != nil {
+		return provision.UnChanged(errors.Wrap(err, "failed to set namespace locking"))
+	}
+
+	return provision.Paused()
+}
+
+func (p *Manager) Resume(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+	cl, err := p.findContainer(ctx, wl.ID.String())
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return provision.UnChanged(err)
+	}
+
+	defer cl.Close()
+
+	if err := cl.NamespaceSetLock(wl.ID.String(), false); err != nil {
+		return provision.UnChanged(errors.Wrap(err, "failed to set namespace locking"))
+	}
+
+	return provision.Ok()
+}
+
+func (p *Manager) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	res, err := p.zdbUpdateImpl(ctx, wl)
 	return res, newSafeError(err)
 }
 
-func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZDBResult, err error) {
+func (p *Manager) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZDBResult, err error) {
 	current, err := provision.GetWorkload(ctx, wl.Name)
 	if err != nil {
 		// this should not happen but we need to have the check anyway
@@ -559,7 +632,7 @@ func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 
 	if new.Mode != old.Mode {
-		return result, provision.NewUnchangedError(fmt.Errorf("cannot change namespace mode"))
+		return result, provision.UnChanged(fmt.Errorf("cannot change namespace mode"))
 	}
 
 	if new.Size < old.Size {
@@ -569,7 +642,7 @@ func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 		// While this makes sense fro ZDB. it will not make zos able to calculate the namespace
 		// consumption because it will only count the size used by the workload from the user
 		// data but not actual size on disk. hence shrinking is not allowed.
-		return result, provision.NewUnchangedError(fmt.Errorf("cannot shrink zdb namespace"))
+		return result, provision.UnChanged(fmt.Errorf("cannot shrink zdb namespace"))
 	}
 
 	if new.Size == old.Size && new.Password == old.Password && new.Public == old.Public {
@@ -578,7 +651,7 @@ func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 	}
 	containers, err := p.zdbListContainers(ctx)
 	if err != nil {
-		return result, provision.NewUnchangedError(errors.Wrap(err, "failed to list running zdbs"))
+		return result, provision.UnChanged(errors.Wrap(err, "failed to list running zdbs"))
 	}
 
 	name := wl.ID.String()
@@ -597,15 +670,15 @@ func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 		if new.Size != old.Size {
 			free, reserved, err := reservedSpace(con)
 			if err != nil {
-				return result, provision.NewUnchangedError(errors.Wrap(err, "failed to calculate free/reserved space from zdb"))
+				return result, provision.UnChanged(errors.Wrap(err, "failed to calculate free/reserved space from zdb"))
 			}
 
 			if reserved+new.Size-old.Size > free {
-				return result, provision.NewUnchangedError(fmt.Errorf("no enough free space to support new size"))
+				return result, provision.UnChanged(fmt.Errorf("no enough free space to support new size"))
 			}
 
 			if err := con.NamespaceSetSize(name, uint64(new.Size)); err != nil {
-				return result, provision.NewUnchangedError(errors.Wrap(err, "failed to set new zdb namespace size"))
+				return result, provision.UnChanged(errors.Wrap(err, "failed to set new zdb namespace size"))
 			}
 		}
 
@@ -613,12 +686,12 @@ func (p *Primitives) zdbUpdateImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 		// to setup the password
 		if new.Password != old.Password {
 			if err := con.NamespaceSetPassword(name, new.Password); err != nil {
-				return result, provision.NewUnchangedError(errors.Wrap(err, "failed to set new password"))
+				return result, provision.UnChanged(errors.Wrap(err, "failed to set new password"))
 			}
 		}
 		if new.Public != old.Public {
 			if err := con.NamespaceSetPublic(name, new.Public); err != nil {
-				return result, provision.NewUnchangedError(errors.Wrap(err, "failed to set public flag"))
+				return result, provision.UnChanged(errors.Wrap(err, "failed to set public flag"))
 			}
 		}
 
@@ -707,7 +780,7 @@ func isYgg(ip net.IP) bool {
 }
 
 // InitializeZDB makes sure all required zdbs are running
-func (p *Primitives) InitializeZDB(ctx context.Context) error {
+func (p *Manager) Initialize(ctx context.Context) error {
 	var (
 		storage  = stubs.NewStorageModuleStub(p.zbus)
 		contmod  = stubs.NewContainerModuleStub(p.zbus)
@@ -755,7 +828,7 @@ func (p *Primitives) InitializeZDB(ctx context.Context) error {
 	return nil
 }
 
-func (p *Primitives) upgradeRuntime(ctx context.Context, expected string, container pkg.ContainerID) error {
+func (p *Manager) upgradeRuntime(ctx context.Context, expected string, container pkg.ContainerID) error {
 	var (
 		flistmod = stubs.NewFlisterStub(p.zbus)
 		contmod  = stubs.NewContainerModuleStub(p.zbus)

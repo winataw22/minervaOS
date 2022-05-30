@@ -1,4 +1,4 @@
-package primitives
+package qsfs
 
 import (
 	"context"
@@ -6,12 +6,27 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func (p *Primitives) qsfsProvision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+var (
+	_ provision.Manager = (*Manager)(nil)
+	_ provision.Updater = (*Manager)(nil)
+)
+
+type Manager struct {
+	zbus zbus.Client
+}
+
+func NewManager(zbus zbus.Client) *Manager {
+	return &Manager{zbus}
+}
+
+func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	var result zos.QuatumSafeFSResult
 	var proxy zos.QuantumSafeFS
 	if err := json.Unmarshal(wl.Data, &proxy); err != nil {
@@ -27,7 +42,7 @@ func (p *Primitives) qsfsProvision(ctx context.Context, wl *gridtypes.WorkloadWi
 	return result, nil
 }
 
-func (p *Primitives) qsfsDecommision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
+func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	qsfs := stubs.NewQSFSDStub(p.zbus)
 	err := qsfs.SignalDelete(ctx, wl.ID.String())
 	if err != nil {
@@ -36,7 +51,7 @@ func (p *Primitives) qsfsDecommision(ctx context.Context, wl *gridtypes.Workload
 	return nil
 }
 
-func (p *Primitives) qsfsUpdate(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
+func (p *Manager) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
 	var result zos.QuatumSafeFSResult
 	var proxy zos.QuantumSafeFS
 	if err := json.Unmarshal(wl.Data, &proxy); err != nil {

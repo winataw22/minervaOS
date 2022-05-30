@@ -259,7 +259,8 @@ type VMModule interface {
 	Logs(name string) (string, error)
 	List() ([]string, error)
 	Metrics() (MachineMetrics, error)
-
+	// Lock set lock on VM (pause,resume)
+	Lock(name string, lock bool) error
 	// VM Log streams
 
 	// StreamCreate creates a stream for vm `name`

@@ -33,6 +33,7 @@ type Client interface {
 	NamespaceSetPassword(name, password string) error
 	NamespaceSetMode(name, mode string) error
 	NamespaceSetPublic(name string, public bool) error
+	NamespaceSetLock(name string, lock bool) error
 	DBSize() (uint64, error)
 }
 

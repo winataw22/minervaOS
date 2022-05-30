@@ -38,7 +38,18 @@ type ContractCancelledEvent struct {
 	TwinId   uint32
 }
 
+// ContractLockedEvent is raised when a contract is locked/unlocked. On locking the Lock flag will be set to true.
+// If Kind is EventSubscribed it means event stream has been reconnected and might be events loss. It's up to the
+// handler of this event type to make sure contracts are synched with the grid.
+type ContractLockedEvent struct {
+	Kind     EventKind
+	Contract uint64
+	TwinId   uint32
+	Lock     bool
+}
+
 type Events interface {
 	PublicConfigEvent(ctx context.Context) <-chan PublicConfigEvent
 	ContractCancelledEvent(ctx context.Context) <-chan ContractCancelledEvent
+	ContractLockedEvent(ctx context.Context) <-chan ContractLockedEvent
 }

@@ -609,3 +609,19 @@ func (m *Module) Delete(name string) error {
 
 	return nil
 }
+
+func (m *Module) Lock(name string, lock bool) error {
+	// todo: should we do locking here?
+	if !m.Exists(name) {
+		return fmt.Errorf("machine '%s' does not exist", name)
+	}
+
+	ctx := context.Background()
+
+	client := NewClient(m.socketPath(name))
+	if lock {
+		return client.Pause(ctx)
+	} else {
+		return client.Resume(ctx)
+	}
+}

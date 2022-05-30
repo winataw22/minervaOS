@@ -18,20 +18,22 @@ var (
 )
 
 type Manager struct {
-	mgr           substrate.Manager
-	node          uint32
-	pubCfg        chan pkg.PublicConfigEvent
-	contactCancel chan pkg.ContractCancelledEvent
+	mgr            substrate.Manager
+	node           uint32
+	pubCfg         chan pkg.PublicConfigEvent
+	contractCancel chan pkg.ContractCancelledEvent
+	contractLocked chan pkg.ContractLockedEvent
 
 	o sync.Once
 }
 
 func New(mgr substrate.Manager, node uint32) pkg.Events {
 	return &Manager{
-		mgr:           mgr,
-		node:          node,
-		pubCfg:        make(chan pkg.PublicConfigEvent),
-		contactCancel: make(chan pkg.ContractCancelledEvent),
+		mgr:            mgr,
+		node:           node,
+		pubCfg:         make(chan pkg.PublicConfigEvent),
+		contractCancel: make(chan pkg.ContractCancelledEvent),
+		contractLocked: make(chan pkg.ContractLockedEvent),
 	}
 }
 
@@ -54,7 +56,7 @@ func (m *Manager) events(ctx context.Context) error {
 	defer subClient.Client.Close()
 
 	m.pubCfg <- pkg.PublicConfigEvent{Kind: pkg.EventSubscribed}
-	m.contactCancel <- pkg.ContractCancelledEvent{Kind: pkg.EventSubscribed}
+	m.contractCancel <- pkg.ContractCancelledEvent{Kind: pkg.EventSubscribed}
 
 	// Subscribe to system events via storage
 	key, err := types.CreateStorageKey(meta, "System", "Events", nil)
@@ -98,10 +100,36 @@ func (m *Manager) events(ctx context.Context) error {
 						continue
 					}
 					log.Info().Uint64("contract", uint64(e.ContractID)).Msg("got contract cancel update")
-					m.contactCancel <- pkg.ContractCancelledEvent{
+					m.contractCancel <- pkg.ContractCancelledEvent{
 						Kind:     pkg.EventReceived,
 						Contract: uint64(e.ContractID),
 						TwinId:   uint32(e.Twin),
+					}
+				}
+
+				for _, e := range events.SmartContractModule_ContractGracePeriodStarted {
+					if e.NodeID != types.U32(m.node) {
+						continue
+					}
+					log.Info().Uint64("contract", uint64(e.ContractID)).Msg("got contract grace period started")
+					m.contractLocked <- pkg.ContractLockedEvent{
+						Kind:     pkg.EventReceived,
+						Contract: uint64(e.ContractID),
+						TwinId:   uint32(e.TwinID),
+						Lock:     true,
+					}
+				}
+
+				for _, e := range events.SmartContractModule_ContractGracePeriodEnded {
+					if e.NodeID != types.U32(m.node) {
+						continue
+					}
+					log.Info().Uint64("contract", uint64(e.ContractID)).Msg("got contract grace period ended")
+					m.contractLocked <- pkg.ContractLockedEvent{
+						Kind:     pkg.EventReceived,
+						Contract: uint64(e.ContractID),
+						TwinId:   uint32(e.TwinID),
+						Lock:     false,
 					}
 				}
 			}
@@ -141,5 +169,13 @@ func (m *Manager) ContractCancelledEvent(ctx context.Context) <-chan pkg.Contrac
 		go m.start(ctx)
 	})
 
-	return m.contactCancel
+	return m.contractCancel
+}
+
+func (m *Manager) ContractLockedEvent(ctx context.Context) <-chan pkg.ContractLockedEvent {
+	m.o.Do(func() {
+		go m.start(ctx)
+	})
+
+	return m.contractLocked
 }

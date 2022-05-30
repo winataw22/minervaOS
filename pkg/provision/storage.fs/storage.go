@@ -185,7 +185,7 @@ func (s *Fs) Set(dl gridtypes.Deployment) error {
 	for _, wl := range dl.GetShareables() {
 		// if workload result is not set yet. or if the state is OK
 		// it means the workload still need to be treated as shared object
-		if wl.Result.IsNil() || wl.Result.State == gridtypes.StateOk {
+		if wl.Result.IsNil() || wl.Result.State.IsOkay() {
 			// workload with no results, so we should keep the link
 			if _, ok := this[wl.Name]; ok {
 				// avoid unlinking
@@ -349,7 +349,7 @@ func (s *Fs) Capacity() (cap gridtypes.Capacity, err error) {
 			}
 
 			for _, wl := range deployment.Workloads {
-				if wl.Result.State != gridtypes.StateOk {
+				if !wl.Result.State.IsOkay() {
 					continue
 				}
 
