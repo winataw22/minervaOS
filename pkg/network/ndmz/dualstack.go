@@ -12,6 +12,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/kernel"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
@@ -415,6 +416,9 @@ func waitIP6() error {
 
 	bo := backoff.NewExponentialBackOff()
 	bo.MaxElapsedTime = 2 * time.Minute // default RA from router is every 60 secs
+	if kernel.GetParams().IsVirtualMachine() {
+		bo.MaxElapsedTime = 20 * time.Second
+	}
 	return backoff.Retry(getRoutes, bo)
 }
 
