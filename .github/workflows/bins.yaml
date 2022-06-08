@@ -1,0 +1,91 @@
+name: Runtime packages
+on:
+  push:
+    branches:
+      - "*"
+    tags-ignore:
+      - v*
+    paths:
+      - "bins/**"
+      - ".github/workflows/bins.yaml"
+      - ".github/workflows/bins-package.yaml"
+
+jobs:
+  containerd:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: containerd
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  runc:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: runc
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  promtail:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: promtail
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  virtwhat:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: virtwhat
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  logtrunc:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: logtrunc
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  yggdrasil:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: yggdrasil
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  zufs:
+    uses: ./.github/workflows/bin-package-18.yaml
+    with:
+      package: zufs
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  hdparm:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: hdparm
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  corex:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: corex
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  shimlogs:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: shimlogs
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  cloudhypervisor:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: cloudhypervisor
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  msgbusd:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: msgbusd
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
+  tailstream:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: tailstream
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
