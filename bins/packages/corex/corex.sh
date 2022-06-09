@@ -1,6 +1,7 @@
-COREX_VERSION="2.1.3"
-COREX_CHECKSUM="ddfa8582b988a82226cf9ef04e1f8515"
-COREX_LINK="https://github.com/threefoldtech/corex/releases/download/${COREX_VERSION}/corex"
+COREX_VERSION="2.1.4"
+COREX_CHECKSUM="6427daa42cf93ba65d0377e29ea57148"
+COREX_LINK="https://github.com/threefoldtech/corex/releases/download/${COREX_VERSION}/corex-${COREX_VERSION}-amd64-linux-static"
+
 
 download_corex() {
     download_file ${COREX_LINK} ${COREX_CHECKSUM} corex-${COREX_VERSION}

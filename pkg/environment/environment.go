@@ -41,6 +41,8 @@ func (r RunningMode) String() string {
 	switch r {
 	case RunningDev:
 		return "development"
+	case RunningQA:
+		return "qa"
 	case RunningMain:
 		return "production"
 	case RunningTest:
@@ -52,10 +54,13 @@ func (r RunningMode) String() string {
 
 // Possible running mode of a node
 const (
-	//RunningDev   RunningMode = "dev"
+	// RunningDev mode
 	RunningDev RunningMode = "dev"
-	//RunningTest  RunningMode = "test"
+	// RunningQA mode
+	RunningQA RunningMode = "qa"
+	// RunningTest mode
 	RunningTest RunningMode = "test"
+	// RunningMain mode
 	RunningMain RunningMode = "prod"
 
 	// Orphanage is the default farmid where nodes are registered
@@ -81,13 +86,22 @@ var (
 
 	envTest = Environment{
 		RunningMode: RunningTest,
-		// TODO: this should become a different substrate ?
 		SubstrateURL: []string{
 			"wss://tfchain.test.grid.tf/",
 		},
 		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
+	}
+
+	envQA = Environment{
+		RunningMode: RunningQA,
+		SubstrateURL: []string{
+			"wss://tfchain.qa.grid.tf/",
+		},
+		ActivationURL: "https://activation.qa.grid.tf/activation/activate",
+		FlistURL:      "redis://hub.grid.tf:9900",
+		BinRepo:       "tf-zos-v3-bins.qanet",
 	}
 
 	// same as testnet for now. will be updated the day of the launch of production network
@@ -154,6 +168,8 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 	switch RunningMode(runmode) {
 	case RunningDev:
 		env = envDev
+	case RunningQA:
+		env = envQA
 	case RunningTest:
 		env = envTest
 	case RunningMain:

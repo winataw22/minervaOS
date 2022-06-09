@@ -1,5 +1,5 @@
-ZUFS_VERSION="0.2.3"
-ZUFS_CHECKSUM="b47f1bb80a68c8735e7e58f3a9fad8c8"
+ZUFS_VERSION="0.2.6"
+ZUFS_CHECKSUM="8d576939d75b12613abdfc1bd18204f6"
 ZUFS_LINK="https://github.com/threefoldtech/rfs/releases/download/v${ZUFS_VERSION}/rfs"
 
 download_zufs() {

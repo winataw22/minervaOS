@@ -77,10 +77,10 @@ jobs:
       package: cloudhypervisor
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  msgbusd:
+  rmb:
     uses: ./.github/workflows/bin-package.yaml
     with:
-      package: msgbusd
+      package: rmb
     secrets:
       token: ${{ secrets.HUB_JWT }}
   tailstream:
