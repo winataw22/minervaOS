@@ -6,9 +6,10 @@ on:
       grid:
         description: "grid to deploy"
         required: true
-        default: "testing"
+        default: "qa"
         type: choice
         options:
+          - qa
           - testing
           - production
       version:

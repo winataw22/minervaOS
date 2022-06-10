@@ -14,9 +14,6 @@ import (
 
 // Config is configuration set by the organization
 type Config struct {
-	// Monitor is a list of twins that need to updated continuesly
-	// with node free capacity and status.
-	Monitor   []uint32 `json:"monitor"`
 	Yggdrasil struct {
 		Peers []string `json:"peers"`
 	} `json:"yggdrasil"`
@@ -25,7 +22,6 @@ type Config struct {
 // Merge, updates current config with cfg merging and override config
 // based on some update rules.
 func (c *Config) Merge(cfg Config) {
-	c.Monitor = uniqueUint32(append(c.Monitor, cfg.Monitor...))
 	c.Yggdrasil.Peers = uniqueStr(append(c.Yggdrasil.Peers, cfg.Yggdrasil.Peers...))
 	// sort peers for easier comparison
 	sort.Strings(c.Yggdrasil.Peers)
@@ -50,18 +46,6 @@ func GetConfig() (base Config, err error) {
 	}
 
 	return base, nil
-}
-
-func uniqueUint32(slice []uint32) []uint32 {
-	keys := make(map[uint32]struct{})
-	list := slice[:0]
-	for _, entry := range slice {
-		if _, exists := keys[entry]; !exists {
-			keys[entry] = struct{}{}
-			list = append(list, entry)
-		}
-	}
-	return list
 }
 
 func uniqueStr(slice []string) []string {
