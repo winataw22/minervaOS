@@ -1104,6 +1104,10 @@ github.com/threefoldtech/substrate-client v0.0.0-20220527082351-144dbbd71bfe h1:
 github.com/threefoldtech/substrate-client v0.0.0-20220527082351-144dbbd71bfe/go.mod h1:Lpsz7gVNSdbWD8erfVh1AZv2wnProc7g/QHJiYp5lP8=
 github.com/threefoldtech/substrate-client v0.0.0-20220530091709-ebbfbddb09a0 h1:wjqshpIzyzrmIVvMBd+auSMUF4Aj8i2pAX/FNc+Eek4=
 github.com/threefoldtech/substrate-client v0.0.0-20220530091709-ebbfbddb09a0/go.mod h1:Lpsz7gVNSdbWD8erfVh1AZv2wnProc7g/QHJiYp5lP8=
+github.com/threefoldtech/substrate-client v0.0.0-20220610071407-10816265db40 h1:tzeKqAY2O1P5puQ1ioOkNH4sBurBh2GgcjLVkoCT2/E=
+github.com/threefoldtech/substrate-client v0.0.0-20220610071407-10816265db40/go.mod h1:Lpsz7gVNSdbWD8erfVh1AZv2wnProc7g/QHJiYp5lP8=
+github.com/threefoldtech/substrate-client v0.0.0-20220613084053-f1f12e7dcf85 h1:cSeuTpAQi9FtrXaZx7Rk04W5RSnOOYdiUhtgtw+mlsU=
+github.com/threefoldtech/substrate-client v0.0.0-20220613084053-f1f12e7dcf85/go.mod h1:Lpsz7gVNSdbWD8erfVh1AZv2wnProc7g/QHJiYp5lP8=
 github.com/threefoldtech/zbus v0.1.5 h1:S9kXbjejoRRnJw1yKHEXFGF2vqL+Drae2n4vpj0pGHo=
 github.com/threefoldtech/zbus v0.1.5/go.mod h1:ZtiRpcqzEBJetVQDsEbw0p48h/AF3O1kf0tvd30I0BU=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
