@@ -284,9 +284,9 @@ main() {
     if [ ! -z ${package} ]; then
         if [[ -d "${ROOTPKG}/${package}" ]]; then
             echo "[+] building package: ${package}"
-
+            fixed="${package/-/_}"
             setpackage ${package}
-            build_${package}
+            build_${fixed}
             ensure_libs
             exclude_libs
 

@@ -1,0 +1,1 @@
+exec: sh -c "if grep -E '(runmode=test|runmode=dev|runmode=qa)' /proc/cmdline ; then node_exporter '--collector.netdev.device-exclude=(b|br)-.*' ; else sleep infinity ; fi"
