@@ -28,8 +28,10 @@ func (s *ProvisionStub) DecommissionCached(ctx context.Context, arg0 string, arg
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

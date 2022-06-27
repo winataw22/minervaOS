@@ -28,11 +28,12 @@ func (s *RegistrarStub) NodeID(ctx context.Context) (ret0 uint32, ret1 error) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -44,11 +45,12 @@ func (s *RegistrarStub) TwinID(ctx context.Context) (ret0 uint32, ret1 error) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

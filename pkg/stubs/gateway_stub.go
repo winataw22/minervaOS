@@ -29,8 +29,10 @@ func (s *GatewayStub) DeleteNamedProxy(ctx context.Context, arg0 string) (ret0 e
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -42,11 +44,12 @@ func (s *GatewayStub) Metrics(ctx context.Context) (ret0 pkg.GatewayMetrics, ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -58,8 +61,10 @@ func (s *GatewayStub) SetFQDNProxy(ctx context.Context, arg0 string, arg1 string
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -71,11 +76,12 @@ func (s *GatewayStub) SetNamedProxy(ctx context.Context, arg0 string, arg1 strin
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

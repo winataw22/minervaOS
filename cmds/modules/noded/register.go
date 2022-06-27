@@ -29,7 +29,9 @@ func uptime(ctx context.Context, cl zbus.Client) error {
 		return err
 	}
 
-	sk := ed25519.PrivateKey(mgr.PrivateKey(ctx))
+	busCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	sk := ed25519.PrivateKey(mgr.PrivateKey(busCtx))
 	id, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return err

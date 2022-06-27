@@ -245,11 +245,26 @@ func action(cli *cli.Context) error {
 
 	// uptime update
 	go func() {
+		safeUptime := func(ctx context.Context, redis zbus.Client) (err error) {
+			defer func() {
+				if p := recover(); p != nil {
+					err = fmt.Errorf("uptime reporting has panicked: %+v", p)
+				}
+			}()
+
+			err = uptime(ctx, redis)
+			return err
+		}
+
 		for {
-			if err := uptime(ctx, redis); err != nil {
+			err := safeUptime(ctx, redis)
+			if errors.Is(err, context.Canceled) {
+				return
+			} else if err != nil {
 				log.Error().Err(err).Msg("sending uptime failed")
-				<-time.After(10 * time.Second)
 			}
+			// even there is no error we try again until ctx is cancelled
+			<-time.After(10 * time.Second)
 		}
 	}()
 

@@ -24,7 +24,7 @@ func NewHostMonitorStub(client zbus.Client) *HostMonitorStub {
 }
 
 func (s *HostMonitorStub) Uptime(ctx context.Context) (<-chan time.Duration, error) {
-	ch := make(chan time.Duration)
+	ch := make(chan time.Duration, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Uptime")
 	if err != nil {
 		return nil, err

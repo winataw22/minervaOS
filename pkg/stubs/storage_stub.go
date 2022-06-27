@@ -31,7 +31,11 @@ func (s *StorageModuleStub) BrokenDevices(ctx context.Context) (ret0 []pkg.Broke
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -43,7 +47,11 @@ func (s *StorageModuleStub) BrokenPools(ctx context.Context) (ret0 []pkg.BrokenP
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -55,11 +63,12 @@ func (s *StorageModuleStub) Cache(ctx context.Context) (ret0 pkg.Volume, ret1 er
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -71,11 +80,12 @@ func (s *StorageModuleStub) DeviceAllocate(ctx context.Context, arg0 gridtypes.U
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -87,11 +97,12 @@ func (s *StorageModuleStub) DeviceLookup(ctx context.Context, arg0 string) (ret0
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -103,11 +114,12 @@ func (s *StorageModuleStub) Devices(ctx context.Context) (ret0 []pkg.Device, ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -119,11 +131,12 @@ func (s *StorageModuleStub) DiskCreate(ctx context.Context, arg0 string, arg1 gr
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -135,8 +148,10 @@ func (s *StorageModuleStub) DiskDelete(ctx context.Context, arg0 string) (ret0 e
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -148,7 +163,11 @@ func (s *StorageModuleStub) DiskExists(ctx context.Context, arg0 string) (ret0 b
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -160,8 +179,10 @@ func (s *StorageModuleStub) DiskFormat(ctx context.Context, arg0 string) (ret0 e
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -173,11 +194,12 @@ func (s *StorageModuleStub) DiskList(ctx context.Context) (ret0 []pkg.VDisk, ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -189,11 +211,12 @@ func (s *StorageModuleStub) DiskLookup(ctx context.Context, arg0 string) (ret0 p
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -205,11 +228,12 @@ func (s *StorageModuleStub) DiskResize(ctx context.Context, arg0 string, arg1 gr
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -221,15 +245,17 @@ func (s *StorageModuleStub) DiskWrite(ctx context.Context, arg0 string, arg1 str
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *StorageModuleStub) Monitor(ctx context.Context) (<-chan pkg.PoolsStats, error) {
-	ch := make(chan pkg.PoolsStats)
+	ch := make(chan pkg.PoolsStats, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Monitor")
 	if err != nil {
 		return nil, err
@@ -258,11 +284,12 @@ func (s *StorageModuleStub) Total(ctx context.Context, arg0 zos.DeviceType) (ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -274,11 +301,12 @@ func (s *StorageModuleStub) VolumeCreate(ctx context.Context, arg0 string, arg1 
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -290,8 +318,10 @@ func (s *StorageModuleStub) VolumeDelete(ctx context.Context, arg0 string) (ret0
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -303,11 +333,12 @@ func (s *StorageModuleStub) VolumeList(ctx context.Context) (ret0 []pkg.Volume, 
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -319,11 +350,12 @@ func (s *StorageModuleStub) VolumeLookup(ctx context.Context, arg0 string) (ret0
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -335,8 +367,10 @@ func (s *StorageModuleStub) VolumeUpdate(ctx context.Context, arg0 string, arg1 
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

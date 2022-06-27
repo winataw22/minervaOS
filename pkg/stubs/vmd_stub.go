@@ -29,8 +29,10 @@ func (s *VMModuleStub) Delete(ctx context.Context, arg0 string) (ret0 error) {
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -42,7 +44,11 @@ func (s *VMModuleStub) Exists(ctx context.Context, arg0 string) (ret0 bool) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -54,11 +60,12 @@ func (s *VMModuleStub) Inspect(ctx context.Context, arg0 string) (ret0 pkg.VMInf
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -70,11 +77,12 @@ func (s *VMModuleStub) List(ctx context.Context) (ret0 []string, ret1 error) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -86,8 +94,10 @@ func (s *VMModuleStub) Lock(ctx context.Context, arg0 string, arg1 bool) (ret0 e
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -99,11 +109,12 @@ func (s *VMModuleStub) Logs(ctx context.Context, arg0 string) (ret0 string, ret1
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -115,11 +126,12 @@ func (s *VMModuleStub) Metrics(ctx context.Context) (ret0 pkg.MachineMetrics, re
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -131,8 +143,10 @@ func (s *VMModuleStub) Run(ctx context.Context, arg0 pkg.VM) (ret0 error) {
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -144,8 +158,10 @@ func (s *VMModuleStub) StreamCreate(ctx context.Context, arg0 string, arg1 pkg.S
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -157,8 +173,10 @@ func (s *VMModuleStub) StreamDelete(ctx context.Context, arg0 string) (ret0 erro
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

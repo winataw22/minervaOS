@@ -24,7 +24,7 @@ func NewSystemMonitorStub(client zbus.Client) *SystemMonitorStub {
 }
 
 func (s *SystemMonitorStub) CPU(ctx context.Context) (<-chan pkg.TimesStat, error) {
-	ch := make(chan pkg.TimesStat)
+	ch := make(chan pkg.TimesStat, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "CPU")
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (s *SystemMonitorStub) CPU(ctx context.Context) (<-chan pkg.TimesStat, erro
 }
 
 func (s *SystemMonitorStub) Disks(ctx context.Context) (<-chan pkg.DisksIOCountersStat, error) {
-	ch := make(chan pkg.DisksIOCountersStat)
+	ch := make(chan pkg.DisksIOCountersStat, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Disks")
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (s *SystemMonitorStub) Disks(ctx context.Context) (<-chan pkg.DisksIOCounte
 }
 
 func (s *SystemMonitorStub) Memory(ctx context.Context) (<-chan pkg.VirtualMemoryStat, error) {
-	ch := make(chan pkg.VirtualMemoryStat)
+	ch := make(chan pkg.VirtualMemoryStat, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Memory")
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (s *SystemMonitorStub) Memory(ctx context.Context) (<-chan pkg.VirtualMemor
 }
 
 func (s *SystemMonitorStub) Nics(ctx context.Context) (<-chan pkg.NicsIOCounterStat, error) {
-	ch := make(chan pkg.NicsIOCounterStat)
+	ch := make(chan pkg.NicsIOCounterStat, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Nics")
 	if err != nil {
 		return nil, err
@@ -125,7 +125,11 @@ func (s *SystemMonitorStub) NodeID(ctx context.Context) (ret0 uint32) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

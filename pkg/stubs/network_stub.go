@@ -31,14 +31,13 @@ func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (re
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret2 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+		&ret1,
 	}
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	ret2 = new(zbus.RemoteError)
-	if err := result.Unmarshal(2, &ret2); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -50,18 +49,19 @@ func (s *NetworkerStub) CreateNR(ctx context.Context, arg0 pkg.Network) (ret0 st
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
-	ch := make(chan pkg.NetlinkAddresses)
+	ch := make(chan pkg.NetlinkAddresses, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "DMZAddresses")
 	if err != nil {
 		return nil, err
@@ -90,8 +90,10 @@ func (s *NetworkerStub) DeleteNR(ctx context.Context, arg0 pkg.Network) (ret0 er
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -103,8 +105,10 @@ func (s *NetworkerStub) DisconnectPubTap(ctx context.Context, arg0 string) (ret0
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -116,14 +120,13 @@ func (s *NetworkerStub) GetDefaultGwIP(ctx context.Context, arg0 zos.NetID) (ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret2 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+		&ret1,
 	}
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	ret2 = new(zbus.RemoteError)
-	if err := result.Unmarshal(2, &ret2); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -135,11 +138,12 @@ func (s *NetworkerStub) GetIPv6From4(ctx context.Context, arg0 zos.NetID, arg1 [
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -151,11 +155,12 @@ func (s *NetworkerStub) GetNet(ctx context.Context, arg0 zos.NetID) (ret0 net.IP
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -167,11 +172,12 @@ func (s *NetworkerStub) GetPublicConfig(ctx context.Context) (ret0 pkg.PublicCon
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -183,11 +189,12 @@ func (s *NetworkerStub) GetPublicIPv6Subnet(ctx context.Context) (ret0 net.IPNet
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -199,11 +206,12 @@ func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -215,7 +223,11 @@ func (s *NetworkerStub) Namespace(ctx context.Context, arg0 zos.NetID) (ret0 str
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -227,7 +239,11 @@ func (s *NetworkerStub) PubIPFilterExists(ctx context.Context, arg0 string) (ret
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -239,18 +255,19 @@ func (s *NetworkerStub) PubTapExists(ctx context.Context, arg0 string) (ret0 boo
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *NetworkerStub) PublicAddresses(ctx context.Context) (<-chan pkg.OptionPublicConfig, error) {
-	ch := make(chan pkg.OptionPublicConfig)
+	ch := make(chan pkg.OptionPublicConfig, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "PublicAddresses")
 	if err != nil {
 		return nil, err
@@ -279,7 +296,11 @@ func (s *NetworkerStub) PublicIPv4Support(ctx context.Context) (ret0 bool) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -291,8 +312,10 @@ func (s *NetworkerStub) QSFSDestroy(ctx context.Context, arg0 string) (ret0 erro
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -304,7 +327,11 @@ func (s *NetworkerStub) QSFSNamespace(ctx context.Context, arg0 string) (ret0 st
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -316,14 +343,13 @@ func (s *NetworkerStub) QSFSPrepare(ctx context.Context, arg0 string) (ret0 stri
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret2 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+		&ret1,
 	}
-	if err := result.Unmarshal(1, &ret1); err != nil {
-		panic(err)
-	}
-	ret2 = new(zbus.RemoteError)
-	if err := result.Unmarshal(2, &ret2); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -335,11 +361,12 @@ func (s *NetworkerStub) QSFSYggIP(ctx context.Context, arg0 string) (ret0 string
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -351,8 +378,10 @@ func (s *NetworkerStub) Ready(ctx context.Context) (ret0 error) {
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -364,8 +393,10 @@ func (s *NetworkerStub) RemovePubIPFilter(ctx context.Context, arg0 string) (ret
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -377,8 +408,10 @@ func (s *NetworkerStub) RemovePubTap(ctx context.Context, arg0 string) (ret0 err
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -390,8 +423,10 @@ func (s *NetworkerStub) RemoveTap(ctx context.Context, arg0 string) (ret0 error)
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -403,8 +438,10 @@ func (s *NetworkerStub) SetPublicConfig(ctx context.Context, arg0 pkg.PublicConf
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -416,11 +453,12 @@ func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 s
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -432,8 +470,10 @@ func (s *NetworkerStub) SetupPubIPFilter(ctx context.Context, arg0 string, arg1 
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -445,11 +485,12 @@ func (s *NetworkerStub) SetupPubTap(ctx context.Context, arg0 string) (ret0 stri
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -461,11 +502,12 @@ func (s *NetworkerStub) SetupYggTap(ctx context.Context, arg0 string) (ret0 pkg.
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -477,11 +519,12 @@ func (s *NetworkerStub) TapExists(ctx context.Context, arg0 string) (ret0 bool, 
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -493,18 +536,19 @@ func (s *NetworkerStub) WireguardPorts(ctx context.Context) (ret0 []uint, ret1 e
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *NetworkerStub) YggAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
-	ch := make(chan pkg.NetlinkAddresses)
+	ch := make(chan pkg.NetlinkAddresses, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "YggAddresses")
 	if err != nil {
 		return nil, err
@@ -533,8 +577,10 @@ func (s *NetworkerStub) ZDBDestroy(ctx context.Context, arg0 string) (ret0 error
 	if err != nil {
 		panic(err)
 	}
-	ret0 = new(zbus.RemoteError)
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
@@ -546,18 +592,19 @@ func (s *NetworkerStub) ZDBPrepare(ctx context.Context, arg0 string) (ret0 strin
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
-		panic(err)
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
 	}
-	ret1 = new(zbus.RemoteError)
-	if err := result.Unmarshal(1, &ret1); err != nil {
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *NetworkerStub) ZOSAddresses(ctx context.Context) (<-chan pkg.NetlinkAddresses, error) {
-	ch := make(chan pkg.NetlinkAddresses)
+	ch := make(chan pkg.NetlinkAddresses, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "ZOSAddresses")
 	if err != nil {
 		return nil, err

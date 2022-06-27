@@ -29,14 +29,18 @@ func (s *StatisticsStub) Current(ctx context.Context) (ret0 gridtypes.Capacity) 
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *StatisticsStub) ReservedStream(ctx context.Context) (<-chan gridtypes.Capacity, error) {
-	ch := make(chan gridtypes.Capacity)
+	ch := make(chan gridtypes.Capacity, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "ReservedStream")
 	if err != nil {
 		return nil, err
@@ -65,7 +69,11 @@ func (s *StatisticsStub) Total(ctx context.Context) (ret0 gridtypes.Capacity) {
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return

@@ -29,14 +29,18 @@ func (s *VersionMonitorStub) GetVersion(ctx context.Context) (ret0 semver.Versio
 	if err != nil {
 		panic(err)
 	}
-	if err := result.Unmarshal(0, &ret0); err != nil {
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
 	return
 }
 
 func (s *VersionMonitorStub) Version(ctx context.Context) (<-chan semver.Version, error) {
-	ch := make(chan semver.Version)
+	ch := make(chan semver.Version, 1)
 	recv, err := s.client.Stream(ctx, s.module, s.object, "Version")
 	if err != nil {
 		return nil, err
