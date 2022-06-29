@@ -5,13 +5,10 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"net"
 
 	"github.com/jbenet/go-base58"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
-	"github.com/threefoldtech/zos/pkg/network/latency"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
@@ -44,46 +41,14 @@ func (n *NodeConfig) Address() (net.IP, error) {
 func (n *NodeConfig) FindPeers(ctx context.Context, filter ...Filter) error {
 	// fetching a peer list goes as this
 	// - Always include the list of peers from
-	zos, err := fetchZosYggList()
+	peers, err := fetchZosYggList()
 	if err != nil {
 		return errors.Wrap(err, "failed to get zos public peer list")
 	}
 
-	zos, err = zos.Ups(filter...)
+	peers, err = peers.Ups(filter...)
 	if err != nil {
 		return errors.Wrap(err, "failed to filter out peer list")
-	}
-
-	pub := fetchPubYggList()
-	pub, err = pub.Ups(filter...)
-	if err != nil {
-		return errors.Wrap(err, "failed to get peers list")
-	}
-
-	log.Info().Int("count", len(pub)).Msg("found yggdrasil up peers")
-	endpoints := make([]string, len(pub))
-	for i, p := range pub {
-		endpoints[i] = p.Endpoint
-	}
-
-	ls := latency.NewSorter(endpoints, 5)
-	results := ls.Run(ctx)
-	if len(results) == 0 {
-		return fmt.Errorf("cannot find public yggdrasil peer to connect to")
-	}
-
-	// select the best 3 public peers
-	var peers []string
-	for _, peer := range zos {
-		peers = append(peers, peer.Endpoint)
-	}
-
-	// take max of 3 from the results list
-	to := math.Min(3, float64(len(results)))
-
-	for i := 0; i < int(to); i++ {
-		peers = append(peers, results[i].Endpoint)
-		log.Info().Str("endpoint", results[i].Endpoint).Msg("yggdrasill public peer selected")
 	}
 
 	n.Peers = peers
