@@ -2,7 +2,9 @@ package public
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
@@ -26,6 +28,8 @@ const (
 	// PublicBridge public bridge name, exists only after a call to EnsurePublicSetup
 	PublicBridge    = types.PublicBridge
 	PublicNamespace = types.PublicNamespace
+
+	// TODO: This pass need to come from
 )
 
 // EnsurePublicBridge makes sure that the public bridge exists
@@ -87,9 +91,7 @@ func IPs() ([]net.IPNet, error) {
 }
 
 func setupPublicBridge(br *netlink.Bridge) error {
-	// find possible exit interface.
-	// or fall back to zos.
-	exit, err := findPossibleExit()
+	exit, err := getExitNic()
 	if err != nil {
 		return errors.Wrap(err, "failed to find possible exit")
 	}
@@ -100,15 +102,144 @@ func setupPublicBridge(br *netlink.Bridge) error {
 		return errors.Wrapf(err, "failed to get link '%s' by name", exit)
 	}
 
-	if err := netlink.LinkSetUp(exitLink); err != nil {
-		return errors.Wrapf(err, "failed to set link '%s' up", exitLink.Attrs().Name)
+	return attachPublicToExit(br, exitLink)
+}
+
+func attachPublicToExit(br *netlink.Bridge, exit netlink.Link) error {
+	if err := netlink.LinkSetUp(exit); err != nil {
+		return errors.Wrapf(err, "failed to set link '%s' up", exit.Attrs().Name)
 	}
 
-	if err := bridge.Attach(exitLink, br, toZosVeth); err != nil {
+	if err := bridge.Attach(exit, br, toZosVeth); err != nil {
 		return errors.Wrap(err, "failed to attach exit nic to public bridge 'br-pub'")
 	}
 
-	return nil
+	// persist this value for next boot
+	return ioutil.WriteFile(
+		getPersistencePath(publicExitFile),
+		[]byte(exit.Attrs().Name),
+		0644,
+	)
+}
+
+// if no persisted exit link file found, we need
+// to make sure to persist the current exit nic
+// in case of some nodes has their public nic
+// wired correctly manually (on some dev envs)
+// so to make sure node uses the same nic on reboot
+// we need to query the current active exit, and store
+// it
+func persistExitNicIfNotFound(exit netlink.Link) error {
+	log.Debug().Msg("persisting current public bridge uplink")
+	path := getPersistencePath(publicExitFile)
+	if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
+		return err
+	}
+
+	name := types.DefaultBridge
+	if ok, _ := bootstrap.PhysicalFilter(exit); ok {
+		name = exit.Attrs().Name
+	}
+
+	// persist this value for next boot
+	return ioutil.WriteFile(
+		path,
+		[]byte(name),
+		0644,
+	)
+}
+
+func GetPublicExitLink() (netlink.Link, error) {
+	// return the upstream (exit) link for br-pub
+	br, err := bridge.Get(PublicBridge)
+	if err != nil {
+		return nil, errors.Wrap(err, "no public bridge found")
+	}
+
+	all, err := netlink.LinkList()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list node nics")
+	}
+
+	// public bridge can be wired to either
+	matches := []bootstrap.Filter{
+		// a nic
+		bootstrap.PhysicalFilter,
+		// a veth pair to another bridge (zos always)
+		bootstrap.VEthFilter,
+	}
+
+	for _, link := range all {
+		for _, match := range matches {
+			if ok, _ := match(link); !ok {
+				continue
+			}
+
+			if link.Attrs().MasterIndex == br.Index {
+				return link, nil
+			}
+		}
+	}
+
+	return nil, os.ErrNotExist
+}
+
+// SetPublicExitLink rewires the br-pub to a different exit (upstream) device.
+// this upstream device can either be a physical free device, or zos bridge.
+// the method is idempotent.
+func SetPublicExitLink(link netlink.Link) error {
+	// we can only attach to either physical nic, or zos bridge
+	log.Debug().
+		Str("type", link.Type()).
+		Str("name", link.Attrs().Name).
+		Int("master", link.Attrs().MasterIndex).
+		Msg("trying to set public exit interface")
+
+	if link.Type() != "device" && link.Attrs().Name != types.DefaultBridge {
+		return fmt.Errorf("invalid exit bridge must be a physical nic or the default bridge")
+	}
+
+	br, err := bridge.Get(PublicBridge)
+	if err != nil {
+		return err
+	}
+
+	if link.Type() == "device" {
+		// already attached
+		if link.Attrs().MasterIndex == br.Index {
+			return nil
+		} else if link.Attrs().MasterIndex != 0 {
+			return fmt.Errorf("device is '%s' already used", link.Attrs().Name)
+		}
+	}
+
+	current, err := GetPublicExitLink()
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if current != nil {
+		log.Debug().Str("type", current.Type()).Str("name", current.Attrs().Name).Msg("current attached exit is")
+
+		// disconnect br pub based on the type of the current uplink
+
+		if veth, _ := bootstrap.VEthFilter(current); veth {
+			// br pub is already connected to zos
+			if link.Attrs().Name == "zos" {
+				return nil
+			}
+
+			// otherwise we remove this link
+			if err := netlink.LinkDel(current); err != nil {
+				return errors.Wrap(err, "failed to unhook public bridge from zos bridge")
+			}
+		} else if err := netlink.LinkSetMasterByIndex(current, 0); err != nil {
+			// otherwise we try to remove the nic from br-pub
+			return errors.Wrap(err, "failed to unhook public bridge from physical nic")
+		}
+	}
+
+	return attachPublicToExit(br, link)
 }
 
 func HasPublicSetup() bool {
@@ -186,7 +317,17 @@ func GetPublicSetup() (pkg.PublicConfig, error) {
 	return cfg, err
 }
 
-// EnsurePublicSetup create the public setup, it's okay to have inf == nil
+// EnsurePublicSetup create the public setup, it's okay to have inf == nil.
+// this method need to be called at least once in the life of the node. to make bridges are created
+// and wired correctly, and initialize public name space if `inf` is found.
+// Public bridge wiring (to exit nic) is remembered from last boot. If no exit nic is set
+// the node tries to detect the exit br-pub nic based on the following criteria
+// - physical nic
+// - wired and has a signal
+// - can get public slaac IPv6
+//
+// if no nic is found zos is selected.
+// changes to the br-pub exit nic can then be done later with SetPublicExitLink
 func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.Bridge, error) {
 	log.Debug().Msg("ensure public setup")
 	br, err := ensurePublicBridge()
@@ -194,24 +335,19 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 		return nil, err
 	}
 
-	// find if we have anything attached to this bridge (so initialization)
-	// has been done before.
-	all, err := netlink.LinkList()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to list host links")
-	}
+	exit, err := GetPublicExitLink()
 
-	filtered := all[:0]
-	for _, link := range all {
-		if link.Attrs().MasterIndex == br.Index {
-			filtered = append(filtered, link)
-		}
-	}
-
-	if len(filtered) == 0 {
+	if os.IsNotExist(err) {
+		// bridge is not initialized, wire it.
+		log.Debug().Msg("no public bridge uplink found, setting up...")
 		if err := setupPublicBridge(br); err != nil {
 			return nil, err
 		}
+	} else if err != nil {
+		return nil, errors.Wrap(err, "failed to get current public bridge uplink")
+	} else if err := persistExitNicIfNotFound(exit); err != nil {
+		log.Error().Err(err).
+			Msg("failed to persist current public bridge uplink")
 	}
 
 	if inf != nil {
@@ -223,10 +359,45 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 	return br, netlink.LinkSetUp(br)
 }
 
-func findPossibleExit() (string, error) {
-	log.Debug().Msg("find possible ipv6 exit interface")
+func getPersistedExitNic() (string, error) {
+	path := getPersistencePath(publicExitFile)
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
 
-	links, err := bootstrap.AnalyseLinks(
+	name := string(data)
+	// we need to check if an actual device exits with that name or not
+	if _, err := netlink.LinkByName(name); err != nil {
+		return "", os.ErrNotExist
+	}
+
+	return name, nil
+}
+
+// getExitNic gets the possible "device" that need to used by br-pub
+// as a traffic upstream device. this can be set by the "farmer" for this
+// node, or can
+func getExitNic() (string, error) {
+	// if previous exit bridge was selected and persisted we need to use this
+	if dev, err := getPersistedExitNic(); err != nil && !os.IsNotExist(err) {
+		return "", errors.Wrap(err, "failed to load exit nic setup")
+	} else if err == nil {
+		return dev, nil
+	}
+
+	dev, err := detectExitNic()
+	if err != nil {
+		return "", err
+	}
+
+	return dev, nil
+}
+
+func detectExitNic() (string, error) {
+	log.Debug().Msg("find possible ipv6 exit interface")
+	// otherwise we try to find the right one
+	links, err := bootstrap.AnalyzeLinks(
 		bootstrap.RequiresIPv6,
 		bootstrap.PhysicalFilter,
 		bootstrap.NotAttachedFilter,
@@ -235,7 +406,7 @@ func findPossibleExit() (string, error) {
 
 	log.Debug().Int("found", len(links)).Msg("found possible links")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to analyse links")
+		return "", errors.Wrap(err, "failed to analyze links")
 	}
 
 	for _, link := range links {

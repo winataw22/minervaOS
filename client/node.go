@@ -85,6 +85,23 @@ type Version struct {
 	ZInit string `json:"zinit"`
 }
 
+type Interface struct {
+	IPs []string `json:"ips"`
+	Mac string   `json:"mac"`
+}
+
+type ExitDevice struct {
+	// IsSingle is set to true if br-pub
+	// is connected to zos bridge
+	IsSingle bool `json:"is_single"`
+	// IsDual is set to true if br-pub is
+	// connected to a physical nic
+	IsDual bool `json:"is_dual"`
+	// AsDualInterface is set to the physical
+	// interface name if IsDual is true
+	AsDualInterface string `json:"dual_interface"`
+}
+
 type args map[string]interface{}
 
 // NewNodeClient creates a new node RMB client. This client then can be used to
@@ -183,19 +200,42 @@ func (n *NodeClient) HasPublicIPv6(ctx context.Context) (bool, error) {
 	return result, nil
 }
 
-func (n *NodeClient) NetworkListInterfaces(ctx context.Context) (map[string][]net.IP, error) {
+func (n *NodeClient) NetworkListInterfaces(ctx context.Context) (result map[string][]net.IP, err error) {
 	const cmd = "zos.network.interfaces"
-	var result map[string][]net.IP
 
-	if err := n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
-		return nil, err
-	}
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result)
 
-	return result, nil
+	return
 }
 
-// NetworkListIPs list taken public IPs on the node
-func (n *NodeClient) NetworkListIPs(ctx context.Context) ([]string, error) {
+// NetworkListAllInterfaces return all physical devices on a node
+func (n *NodeClient) NetworkListAllInterfaces(ctx context.Context) (result map[string]Interface, err error) {
+	const cmd = "zos.network.admin.interfaces"
+
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result)
+
+	return
+
+}
+
+// NetworkSetPublicExitDevice select which physical interface to use as an exit device
+// setting `iface` to `zos` will then make node run in a single nic setup.
+func (n *NodeClient) NetworkSetPublicExitDevice(ctx context.Context, iface string) error {
+	const cmd = "zos.network.admin.set_public_nic"
+
+	return n.bus.Call(ctx, n.nodeTwin, cmd, iface, nil)
+}
+
+// NetworkGetPublicExitDevice gets the current dual nic setup of the node.
+func (n *NodeClient) NetworkGetPublicExitDevice(ctx context.Context) (exit ExitDevice, err error) {
+	const cmd = "zos.network.admin.get_public_nic"
+
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &exit)
+	return
+}
+
+// NetworkListPublicIPs list taken public IPs on the node
+func (n *NodeClient) NetworkListPublicIPs(ctx context.Context) ([]string, error) {
 	const cmd = "zos.network.list_public_ips"
 	var result []string
 
@@ -211,10 +251,7 @@ func (n *NodeClient) NetworkListIPs(ctx context.Context) ([]string, error) {
 func (n *NodeClient) NetworkGetPublicConfig(ctx context.Context) (cfg pkg.PublicConfig, err error) {
 	const cmd = "zos.network.public_config_get"
 
-	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &cfg); err != nil {
-		return
-	}
-
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &cfg)
 	return
 }
 

@@ -259,7 +259,7 @@ func TestCreateSubvolNoSpaceLeft(t *testing.T) {
 
 	_, err := mod.createSubvolWithQuota(20000, "sub")
 
-	require.EqualError(err, "Not enough space left in pools of this type ssd")
+	require.EqualError(err, "not enough space left in pools of this type ssd")
 }
 
 func TestVDiskFindCandidatesHasEnoughSpace(t *testing.T) {

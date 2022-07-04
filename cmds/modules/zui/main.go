@@ -71,11 +71,11 @@ func action(ctx *cli.Context) error {
 
 	netgrid := ui.NewGrid()
 	netgrid.Title = "Network"
-	netgrid.SetRect(0, 7, width, 13)
+	netgrid.SetRect(0, 7, width, 14)
 
 	provision := ui.NewGrid()
 	provision.Title = "Provision"
-	provision.SetRect(0, 13, width, 19)
+	provision.SetRect(0, 14, width, 20)
 	provision.Border = false
 
 	var flag signalFlag

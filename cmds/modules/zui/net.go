@@ -2,7 +2,7 @@ package zui
 
 import (
 	"context"
-	_ "fmt"
+	"fmt"
 	"net"
 	"strings"
 
@@ -24,6 +24,7 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 		{"DMZ", "Not configured"},
 		{"YGG", "Not configured"},
 		{"PUB", "Not configured"},
+		{"DUL", "Not configured"},
 	}
 
 	stub := stubs.NewNetworkerStub(client)
@@ -81,6 +82,14 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 				}
 				table.Rows[3][1] = str
 			}
+
+			exit, err := stub.GetPublicExitDevice(ctx)
+			dual := exit.String()
+			if err != nil {
+				dual = fmt.Sprintf("error: %s", err)
+			}
+
+			table.Rows[4][1] = dual
 
 			render.Signal()
 		}

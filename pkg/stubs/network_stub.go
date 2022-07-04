@@ -183,6 +183,23 @@ func (s *NetworkerStub) GetPublicConfig(ctx context.Context) (ret0 pkg.PublicCon
 	return
 }
 
+func (s *NetworkerStub) GetPublicExitDevice(ctx context.Context) (ret0 pkg.ExitDevice, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetPublicExitDevice", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) GetPublicIPv6Subnet(ctx context.Context) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetPublicIPv6Subnet", args...)
@@ -203,6 +220,23 @@ func (s *NetworkerStub) GetPublicIPv6Subnet(ctx context.Context) (ret0 net.IPNet
 func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net.IPNet, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetSubnet", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) Interfaces(ctx context.Context, arg0 string, arg1 string) (ret0 interface{}, ret1 error) {
+	args := []interface{}{arg0, arg1}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Interfaces", args...)
 	if err != nil {
 		panic(err)
 	}
@@ -435,6 +469,21 @@ func (s *NetworkerStub) RemoveTap(ctx context.Context, arg0 string) (ret0 error)
 func (s *NetworkerStub) SetPublicConfig(ctx context.Context, arg0 pkg.PublicConfig) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetPublicConfig", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) SetPublicExitDevice(ctx context.Context, arg0 string) (ret0 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetPublicExitDevice", args...)
 	if err != nil {
 		panic(err)
 	}

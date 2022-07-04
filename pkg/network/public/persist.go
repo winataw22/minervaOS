@@ -3,9 +3,15 @@ package public
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
+)
+
+const (
+	publicConfigFile = "public-config.json"
+	publicExitFile   = "public-exit"
 )
 
 var (
@@ -14,14 +20,19 @@ var (
 )
 
 func SetPersistence(path string) {
+	stat, err := os.Stat(path)
+	if err != nil || !stat.IsDir() {
+		panic("invalid persistence path must be an existing directory")
+	}
+
 	persistencePath = path
 }
 
-func getPersistencePath() string {
+func getPersistencePath(file string) string {
 	if persistencePath == "" {
 		panic("public config persistence path is not set")
 	}
-	return persistencePath
+	return filepath.Join(persistencePath, file)
 }
 
 // ErrNoPublicConfig is the error returns by ReadPubIface when no public
@@ -30,8 +41,7 @@ var ErrNoPublicConfig = errors.New("no public configuration")
 
 // LoadPublicConfig loads public config from file
 func LoadPublicConfig() (*pkg.PublicConfig, error) {
-
-	file, err := os.Open(getPersistencePath())
+	file, err := os.Open(getPersistencePath(publicConfigFile))
 	if os.IsNotExist(err) {
 		// it's not an error to not have config
 		// but we return a nil config
@@ -51,7 +61,7 @@ func LoadPublicConfig() (*pkg.PublicConfig, error) {
 
 // SavePublicConfig stores public config in a file
 func SavePublicConfig(cfg pkg.PublicConfig) error {
-	file, err := os.Create(getPersistencePath())
+	file, err := os.Create(getPersistencePath(publicConfigFile))
 	if err != nil {
 		return errors.Wrap(err, "failed to create configuration file")
 	}

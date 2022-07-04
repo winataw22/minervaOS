@@ -76,7 +76,7 @@ func configureZOS() error {
 
 		log.Info().Msg("Start network bootstrap")
 
-		ifaceConfigs, err := bootstrap.AnalyseLinks(
+		ifaceConfigs, err := bootstrap.AnalyzeLinks(
 			bootstrap.RequiresIPv4,
 			bootstrap.PhysicalFilter,
 			bootstrap.PluggedFilter)

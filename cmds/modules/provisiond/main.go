@@ -148,14 +148,6 @@ func action(cli *cli.Context) error {
 	)
 	prom.Instrument()
 
-	mBus, err := rmb.New(msgBrokerCon)
-	if err != nil {
-		return errors.Wrap(err, "Failed to initialize message bus")
-	}
-
-	zosRouter := mBus.Subroute("zos")
-	zosRouter.Use(rmb.LoggerMiddleware)
-
 	// the v1 endpoint will be used by all components to register endpoints
 	// that are specific for that component
 	//v1 := router.PathPrefix("/api/v1").Subrouter()
@@ -222,10 +214,6 @@ func action(cli *cli.Context) error {
 		reserved,
 		provisioners,
 	)
-
-	if err := primitives.NewStatisticsMessageBus(zosRouter, statistics); err != nil {
-		return errors.Wrap(err, "failed to create statistics api")
-	}
 
 	mgr, err := environment.GetSubstrate()
 	if err != nil {
@@ -383,10 +371,21 @@ func action(cli *cli.Context) error {
 		log.Info().Msg("zbus server stopped")
 	}()
 
-	// register message bug api
-	setupMessageBusses(zosRouter, cl, engine)
+	mBus, err := rmb.New(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "Failed to initialize message bus")
+	}
 
-	log.Info().Msg("running messagebus")
+	zosRouter := mBus.Subroute("zos")
+	zosRouter.Use(rmb.LoggerMiddleware)
+	// attach statistics module to rmb
+	if err := primitives.NewStatisticsMessageBus(zosRouter, statistics); err != nil {
+		return errors.Wrap(err, "failed to create statistics api")
+	}
+
+	_ = mbus.NewDeploymentMessageBus(zosRouter, engine)
+
+	log.Info().Msg("running rmb handler")
 
 	for _, handler := range mBus.Handlers() {
 		log.Debug().Msgf("registered handler: %s", handler)
@@ -419,15 +418,6 @@ func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter prim
 	)
 
 	return
-}
-
-func setupMessageBusses(router rmb.Router, cl zbus.Client, engine provision.Engine) error {
-
-	_ = mbus.NewDeploymentMessageBus(router, engine)
-
-	_ = mbus.NewNetworkMessagebus(router, engine, cl)
-
-	return nil
 }
 
 func storageMigration(db *storage.BoltStorage, fs *fsStorage.Fs) error {

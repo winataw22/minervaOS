@@ -21,7 +21,7 @@ type ErrNotEnoughSpace struct {
 }
 
 func (e ErrNotEnoughSpace) Error() string {
-	return fmt.Sprintf("Not enough space left in pools of this type %s", e.DeviceType)
+	return fmt.Sprintf("not enough space left in pools of this type %s", e.DeviceType)
 }
 
 // ErrInvalidDeviceType raised when trying to allocate space on unsupported device type

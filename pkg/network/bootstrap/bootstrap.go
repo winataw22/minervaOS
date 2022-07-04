@@ -5,7 +5,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
+	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,20 +58,35 @@ func (a byAddr) Len() int           { return len(a) }
 func (a byAddr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byAddr) Less(i, j int) bool { return bytes.Compare(a[i].IP, a[j].IP) < 0 }
 
-// AnalyseLinks is used to gather the IP that each interfaces would be from DHCP and SLAAC
+func filterName(filter Filter) string {
+	fn := runtime.FuncForPC(reflect.ValueOf(filter).Pointer())
+	if fn == nil {
+		return fmt.Sprintf("filter(%+v)", filter)
+	}
+	name := fn.Name()
+	parts := strings.Split(name, ".")
+	idx := len(parts) - 1
+	if idx < 0 {
+		return name
+	}
+
+	return parts[idx]
+}
+
+// AnalyzeLinks is used to gather the IP that each interfaces would be from DHCP and SLAAC
 // it returns the IPs and routes for each interfaces for both IPv4 and IPv6
 //
 // It will list all the physical interfaces that have a cable plugged in it
 // create a network namespace per interfaces
 // start a DHCP probe on each interfaces and gather the IPs and routes received
-func AnalyseLinks(requires Requires, filters ...Filter) ([]IfaceConfig, error) {
+func AnalyzeLinks(requires Requires, filters ...Filter) ([]IfaceConfig, error) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to list interfaces")
 		return nil, err
 	}
 
-	filterred := links[:0]
+	filtered := links[:0]
 filter:
 	for _, link := range links {
 		log := log.With().Str("interface", link.Attrs().Name).Str("type", link.Type()).Logger()
@@ -85,23 +103,22 @@ filter:
 			}
 
 			if !ok {
-				log.Info().Msg("link didn't match filter crateria, skip testing")
+				log.Info().Msgf("link didn't match filter criteria (%v), skip testing", filterName(filter))
 				continue filter
 			}
 		}
 		log.Info().Msg("link valid. testing link for connectivity")
-		filterred = append(filterred, link)
+		filtered = append(filtered, link)
 	}
 
 	wg := sync.WaitGroup{}
 
-	ch := make(chan IfaceConfig)
+	ch := make(chan analyzeResult)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-
-	for _, link := range filterred {
+	for _, link := range filtered {
 		wg.Add(1)
-		analyseLink(ctx, &wg, ch, requires, link)
+		analyzeLink(ctx, &wg, ch, requires, link)
 	}
 
 	go func() {
@@ -110,16 +127,19 @@ filter:
 	}()
 
 	configs := make([]IfaceConfig, 0, len(links))
-	for cfg := range ch {
-		log.Info().Str("link", cfg.Name).Str("info", fmt.Sprintf("%+v", cfg)).Msg("info")
-		configs = append(configs, cfg)
+	for res := range ch {
+		if res.err != nil {
+			log.Error().Err(res.err).Str("interface", res.cfg.Name).Msg("error analyzing interface")
+			continue
+		}
+		configs = append(configs, res.cfg)
 	}
 
 	return configs, nil
 }
 
-// AnalyseLink gets information about link
-func AnalyseLink(ctx context.Context, requires Requires, link netlink.Link) (cfg IfaceConfig, err error) {
+// AnalyzeLink gets information about link
+func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg IfaceConfig, err error) {
 	cfg.Name = link.Attrs().Name
 	if link.Attrs().MasterIndex != 0 {
 		// this is to avoid breaking setups if a link is
@@ -225,14 +245,16 @@ func AnalyseLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 	return
 }
 
-func analyseLink(ctx context.Context, wg *sync.WaitGroup, out chan<- IfaceConfig, requires Requires, link netlink.Link) {
+type analyzeResult struct {
+	cfg IfaceConfig
+	err error
+}
+
+func analyzeLink(ctx context.Context, wg *sync.WaitGroup, out chan<- analyzeResult, requires Requires, link netlink.Link) {
 	go func() {
 		defer wg.Done()
-		cfg, err := AnalyseLink(ctx, requires, link)
-		if err != nil {
-			log.Error().Err(err).Str("interface", link.Attrs().Name).Msg("error analysing interface")
-		}
-		out <- cfg
+		cfg, err := AnalyzeLink(ctx, requires, link)
+		out <- analyzeResult{cfg, err}
 	}()
 }
 
@@ -291,6 +313,10 @@ func PhysicalFilter(link netlink.Link) (bool, error) {
 	return link.Type() == "device", nil
 }
 
+func VEthFilter(link netlink.Link) (bool, error) {
+	return link.Type() == "veth", nil
+}
+
 // PluggedFilter returns true if link is plugged in
 func PluggedFilter(link netlink.Link) (bool, error) {
 	if err := netlink.LinkSetUp(link); err != nil {
@@ -304,6 +330,15 @@ func PluggedFilter(link netlink.Link) (bool, error) {
 // area attached to bridges
 func NotAttachedFilter(link netlink.Link) (bool, error) {
 	return link.Attrs().MasterIndex == 0, nil
+}
+
+func NotIpsAssignedFilter(link netlink.Link) (bool, error) {
+	adds, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return false, err
+	}
+
+	return len(adds) == 0, nil
 }
 
 func isPrivateIP(ip net.IP) bool {

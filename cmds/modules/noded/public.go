@@ -2,6 +2,7 @@ package noded
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -60,17 +61,25 @@ reapply:
 			}
 		}
 
-		for event := range events {
-			if event.Kind == pkg.EventSubscribed {
-				// the events has re-subscribed, so possible
-				// loss of events.
-				// then we-reapply
-				continue reapply
-			}
+		for {
+			select {
+			case event := <-events:
+				if event.Kind == pkg.EventSubscribed {
+					// the events has re-subscribed, so possible
+					// loss of events.
+					// then we-reapply
+					continue reapply
+				}
 
-			log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
-			if err := setPublicConfig(ctx, cl, event.PublicConfig); err != nil {
-				return errors.Wrap(err, "failed to set public config")
+				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
+				if err := setPublicConfig(ctx, cl, event.PublicConfig); err != nil {
+					return errors.Wrap(err, "failed to set public config")
+				}
+			case <-time.After(2 * time.Hour):
+				// last resort, if none of the events
+				// was received, it will be a good idea to just
+				// check every 2 hours for changes.
+				continue reapply
 			}
 		}
 	}

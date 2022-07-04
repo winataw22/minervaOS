@@ -58,12 +58,12 @@ func run(opt options) error {
 			Uint32("node-id", uint32(node.ID)).
 			Uint32("farm-id", uint32(node.FarmID)).
 			Bool("secure-boot", node.SecureBoot).
-			Bool("certified", node.CertificationType.IsCertified).
+			Bool("certified", node.Certification.IsCertified).
 			Logger()
 
 		log.Debug().Msg("node found")
 
-		if !node.SecureBoot || node.CertificationType.IsCertified {
+		if !node.SecureBoot || node.Certification.IsCertified {
 			// notthing to do anyway
 			continue
 		}
@@ -74,7 +74,7 @@ func run(opt options) error {
 			continue
 		}
 
-		if err := cl.SetNodeCertificate(sudo, uint32(node.ID), substrate.CertificationType{IsCertified: true}); err != nil {
+		if err := cl.SetNodeCertificate(sudo, uint32(node.ID), substrate.NodeCertification{IsCertified: true}); err != nil {
 			log.Error().Err(err).Msg("failed to mark node as certified")
 			continue
 		}

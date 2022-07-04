@@ -18,6 +18,7 @@ import (
 
 	"github.com/threefoldtech/zos/pkg/cache"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
@@ -131,7 +132,7 @@ func (n *networker) WireguardPorts() ([]uint, error) {
 	return n.portSet.List()
 }
 
-func (n networker) attachYgg(id string, netNs ns.NetNS) (net.IPNet, error) {
+func (n *networker) attachYgg(id string, netNs ns.NetNS) (net.IPNet, error) {
 	// new hardware address for the ygg interface
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("ygg:" + id))
 
@@ -167,7 +168,7 @@ func (n networker) attachYgg(id string, netNs ns.NetNS) (net.IPNet, error) {
 	return ip, nil
 }
 
-func (n networker) detachYgg(id string, netNs ns.NetNS) error {
+func (n *networker) detachYgg(id string, netNs ns.NetNS) error {
 	return netNs.Do(func(_ ns.NetNS) error {
 		link, err := netlink.LinkByName(ZDBYggIface)
 		if err != nil {
@@ -182,7 +183,7 @@ func (n networker) detachYgg(id string, netNs ns.NetNS) error {
 
 // prepare creates a unique namespace (based on id) with "prefix"
 // and make sure it's wired to the bridge on host namespace
-func (n networker) prepare(id, prefix, bridge string) (string, error) {
+func (n *networker) prepare(id, prefix, bridge string) (string, error) {
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("pub:" + id))
 
 	netNSName := prefix + strings.Replace(hw.String(), ":", "", -1)
@@ -204,7 +205,7 @@ func (n networker) prepare(id, prefix, bridge string) (string, error) {
 	return netNSName, err
 }
 
-func (n networker) destroy(ns string) error {
+func (n *networker) destroy(ns string) error {
 	if !namespace.Exists(ns) {
 		return nil
 	}
@@ -219,16 +220,16 @@ func (n networker) destroy(ns string) error {
 	return namespace.Delete(nSpace)
 }
 
-//func (n networker) NSPrepare(id string, )
+//func (n *networker) NSPrepare(id string, )
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
-func (n networker) ZDBPrepare(id string) (string, error) {
+func (n *networker) ZDBPrepare(id string) (string, error) {
 	return n.prepare(id, zdbNamespacePrefix, types.PublicBridge)
 }
 
 // ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
 // for zdb is rewind. ns param is the namespace return by the ZDBPrepare
-func (n networker) ZDBDestroy(ns string) error {
+func (n *networker) ZDBDestroy(ns string) error {
 	panic("not implemented")
 	// if !strings.HasPrefix(ns, zdbNamespacePrefix) {
 	// 	return fmt.Errorf("invalid zdb namespace name '%s'", ns)
@@ -237,7 +238,7 @@ func (n networker) ZDBDestroy(ns string) error {
 	// return n.destroy(ns)
 }
 
-func (n networker) createMacVlan(iface string, master string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
+func (n *networker) createMacVlan(iface string, master string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
 	var macVlan *netlink.Macvlan
 	err := netNs.Do(func(_ ns.NetNS) error {
 		var err error
@@ -587,7 +588,7 @@ func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
 
 // GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6
 // subnet respectively
-func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
+func (n *networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
@@ -597,7 +598,7 @@ func (n networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 }
 
 // GetNet of a network identified by the network ID
-func (n networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
+func (n *networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
@@ -609,7 +610,7 @@ func (n networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
 // GetDefaultGwIP returns the IPs of the default gateways inside the network
 // resource identified by the network ID on the local node, for IPv4 and IPv6
 // respectively
-func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
+func (n *networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
 	localNR, err := n.networkOf(string(networkID))
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
@@ -630,39 +631,84 @@ func (n networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
 }
 
 // GetIPv6From4 generates an IPv6 address from a given IPv4 address in a NR
-func (n networker) GetIPv6From4(networkID pkg.NetID, ip net.IP) (net.IPNet, error) {
+func (n *networker) GetIPv6From4(networkID pkg.NetID, ip net.IP) (net.IPNet, error) {
 	if ip.To4() == nil {
 		return net.IPNet{}, errors.New("invalid IPv4 address")
 	}
 	return net.IPNet{IP: nr.Convert4to6(string(networkID), ip), Mask: net.CIDRMask(64, 128)}, nil
 }
 
-// Addrs return the IP addresses of interface
-func (n networker) Addrs(iface string, netns string) (ips []net.IP, mac string, err error) {
-	f := func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(iface)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get interface %s", iface)
+func (n *networker) SetPublicExitDevice(iface string) error {
+	link, err := netlink.LinkByName(iface)
+	if err != nil {
+		return err
+	}
+
+	return public.SetPublicExitLink(link)
+}
+
+func (n *networker) Interfaces(iface string, netns string) (map[string]pkg.Interface, error) {
+	getter := func(iface string) ([]netlink.Link, error) {
+		if iface != "" {
+			l, err := netlink.LinkByName(iface)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get interface %s", iface)
+			}
+			return []netlink.Link{l}, nil
 		}
 
-		mac = link.Attrs().HardwareAddr.String()
-
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+		all, err := netlink.LinkList()
 		if err != nil {
-			return errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
+			return nil, err
 		}
-		ips = make([]net.IP, 0, len(addrs))
-		for _, addr := range addrs {
-			ip := addr.IP
-			if ip6 := ip.To16(); ip6 != nil {
-				// ipv6
-				if !ip6.IsGlobalUnicast() || ifaceutil.IsULA(ip6) {
-					// skip if not global or is ula address
-					continue
-				}
+		filtered := all[:0]
+		for _, l := range all {
+			name := l.Attrs().Name
+
+			if name == "lo" ||
+				(l.Type() != "device" && name != types.DefaultBridge) {
+
+				continue
 			}
 
-			ips = append(ips, addr.IP)
+			filtered = append(filtered, l)
+		}
+
+		return filtered, nil
+	}
+
+	interfaces := make(map[string]pkg.Interface)
+	f := func(_ ns.NetNS) error {
+		links, err := getter(iface)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get interfaces (query: '%s')", iface)
+		}
+
+		for _, link := range links {
+
+			addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+			if err != nil {
+				return errors.Wrapf(err, "failed to list addresses of interfaces %s", iface)
+			}
+			ips := make([]net.IPNet, 0, len(addrs))
+			for _, addr := range addrs {
+				ip := addr.IP
+				if ip6 := ip.To16(); ip6 != nil {
+					// ipv6
+					if !ip6.IsGlobalUnicast() || ifaceutil.IsULA(ip6) {
+						// skip if not global or is ula address
+						continue
+					}
+				}
+
+				ips = append(ips, *addr.IPNet)
+			}
+
+			interfaces[link.Attrs().Name] = pkg.Interface{
+				Name: link.Attrs().Name,
+				Mac:  link.Attrs().HardwareAddr.String(),
+				IPs:  ips,
+			}
 		}
 
 		return nil
@@ -671,20 +717,38 @@ func (n networker) Addrs(iface string, netns string) (ips []net.IP, mac string, 
 	if netns != "" {
 		netNS, err := namespace.GetByName(netns)
 		if err != nil {
-			return nil, mac, errors.Wrapf(err, "failed to get network namespace %s", netns)
+			return nil, errors.Wrapf(err, "failed to get network namespace %s", netns)
 		}
 		defer netNS.Close()
 
 		if err := netNS.Do(f); err != nil {
-			return nil, mac, err
+			return nil, err
 		}
 	} else {
 		if err := f(nil); err != nil {
-			return nil, mac, err
+			return nil, err
 		}
 	}
 
-	return ips, mac, nil
+	return interfaces, nil
+}
+
+// [obsolete] use Interfaces instead Addrs return the IP addresses of interface
+func (n *networker) Addrs(iface string, netns string) (ips []net.IP, mac string, err error) {
+	if iface == "" {
+		return ips, mac, fmt.Errorf("iface cannot be empty")
+	}
+	interfaces, err := n.Interfaces(iface, netns)
+	if err != nil {
+		return nil, "", err
+	}
+
+	inf := interfaces[iface]
+	mac = inf.Mac
+	for _, ip := range inf.IPs {
+		ips = append(ips, ip.IP)
+	}
+	return
 }
 
 // CreateNR implements pkg.Networker interface
@@ -898,6 +962,21 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	}
 
 	return nil
+}
+
+func (n *networker) GetPublicExitDevice() (pkg.ExitDevice, error) {
+	exit, err := public.GetPublicExitLink()
+	if err != nil {
+		return pkg.ExitDevice{}, err
+	}
+
+	// if exit is over veth then we going over zos bridge
+	// hence it's a single nic setup
+	if ok, _ := bootstrap.VEthFilter(exit); ok {
+		return pkg.ExitDevice{IsSingle: true}, nil
+	}
+
+	return pkg.ExitDevice{IsDual: true, AsDualInterface: exit.Attrs().Name}, nil
 }
 
 // Get node public namespace config
