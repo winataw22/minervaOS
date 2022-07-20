@@ -245,6 +245,7 @@ func action(cli *cli.Context) error {
 
 	// uptime update
 	go func() {
+		defer log.Info().Msg("uptime reporting exited permanently")
 		safeUptime := func(ctx context.Context, redis zbus.Client) (err error) {
 			defer func() {
 				if p := recover(); p != nil {
@@ -259,6 +260,7 @@ func action(cli *cli.Context) error {
 		for {
 			err := safeUptime(ctx, redis)
 			if errors.Is(err, context.Canceled) {
+				log.Info().Msg("stop uptime reporting. context cancelled")
 				return
 			} else if err != nil {
 				log.Error().Err(err).Msg("sending uptime failed")
