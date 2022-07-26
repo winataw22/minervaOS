@@ -150,6 +150,10 @@ func (c *Client) Status(service string) (result ServiceStatus, err error) {
 	return
 }
 
+func (c *Client) Reboot() error {
+	return c.cmd("shutdown", nil)
+}
+
 // Exists checks whether a service is monitored or not
 func (c *Client) Exists(service string) (bool, error) {
 	var status ServiceStatus

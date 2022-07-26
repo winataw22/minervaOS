@@ -18,6 +18,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/threefoldtech/zos/pkg/network/types"
+	"github.com/threefoldtech/zos/pkg/zinit"
 	"github.com/vishvananda/netlink"
 )
 
@@ -350,7 +351,24 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 			Msg("failed to persist current public bridge uplink")
 	}
 
-	if inf != nil {
+	if inf == nil || inf.IsEmpty() {
+		// we need to check if there is already a public config
+		// if yes! we need to make sure to delete it and also restart
+		// the node because that's the only way to properly unset public config
+		_ = DeletePublicConfig()
+		if HasPublicSetup() {
+			// full node reboot is needed unfortunately
+			// to many things depends on the public namespace
+			// and the best way to make sure all is in the right state is to
+			// reboot the node
+			// deleting the namespace alone won't be sufficient because other services
+			// live in that namespace (yggdrasile, gateway, and probably other services)
+			// also listning wireguards for user networks are inside this namespace.
+			// so restarting is the cleanest way to get things in order.
+			zi := zinit.Default()
+			return nil, zi.Reboot()
+		}
+	} else {
 		if err := setupPublicNS(nodeID, inf); err != nil {
 			return nil, errors.Wrap(err, "failed to ensure public namespace setup")
 		}
@@ -421,7 +439,7 @@ func detectExitNic() (string, error) {
 	return types.DefaultBridge, nil
 }
 
-func ensureNamespace() (ns.NetNS, error) {
+func ensurePublicNamespace() (ns.NetNS, error) {
 	if !namespace.Exists(PublicNamespace) {
 		log.Info().Str("namespace", PublicNamespace).Msg("Create network namespace")
 		return namespace.Create(PublicNamespace)
@@ -497,7 +515,7 @@ func publicConfig(iface *pkg.PublicConfig) (ips []*net.IPNet, routes []*netlink.
 
 // setupPublicNS creates a public namespace in a node
 func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
-	pubNS, err := ensureNamespace()
+	pubNS, err := ensurePublicNamespace()
 	if err != nil {
 		return err
 	}

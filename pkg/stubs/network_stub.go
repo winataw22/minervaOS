@@ -579,6 +579,21 @@ func (s *NetworkerStub) TapExists(ctx context.Context, arg0 string) (ret0 bool, 
 	return
 }
 
+func (s *NetworkerStub) UnsetPublicConfig(ctx context.Context) (ret0 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "UnsetPublicConfig", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) WireguardPorts(ctx context.Context) (ret0 []uint, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "WireguardPorts", args...)

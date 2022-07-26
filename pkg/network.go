@@ -188,8 +188,11 @@ type Networker interface {
 
 	// Public Config
 
-	// Set node public namespace config
+	// Set node public namespace config.
 	SetPublicConfig(cfg PublicConfig) error
+
+	// UnsetPublicConfig removes public config from node
+	UnsetPublicConfig() error
 
 	// Get node public namespace config
 	GetPublicConfig() (PublicConfig, error)
@@ -250,6 +253,10 @@ type PublicConfig struct {
 	// Domain is the node domain name like gent01.devnet.grid.tf
 	// or similar
 	Domain string `json:"domain"`
+}
+
+func (p *PublicConfig) IsEmpty() bool {
+	return p.IPv4.Nil() && p.IPv6.Nil()
 }
 
 func PublicConfigFrom(cfg substrate.PublicConfig) (pub PublicConfig, err error) {

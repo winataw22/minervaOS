@@ -188,7 +188,13 @@ func Exists(name string) bool {
 // GetByName return a namespace by its name
 func GetByName(name string) (ns.NetNS, error) {
 	nsPath := filepath.Join(netNSPath, name)
-	return ns.GetNS(nsPath)
+	n, err := ns.GetNS(nsPath)
+	var ne ns.NSPathNotExistErr
+	if errors.As(err, &ne) {
+		return nil, os.ErrNotExist
+	}
+
+	return n, err
 }
 
 // List returns a list of all the names of the network namespaces

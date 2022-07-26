@@ -87,7 +87,7 @@ func action(cli *cli.Context) error {
 	public.SetPersistence(root)
 
 	pub, err := public.LoadPublicConfig()
-	log.Debug().Err(err).Msgf("public interface configred: %+v", pub)
+	log.Debug().Err(err).Msgf("public interface configured: %+v", pub)
 	if err != nil && err != public.ErrNoPublicConfig {
 		return errors.Wrap(err, "failed to get node public_config")
 	}

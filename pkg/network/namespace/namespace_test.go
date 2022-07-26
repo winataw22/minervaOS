@@ -35,6 +35,11 @@ func TestCreateNetNS(t *testing.T) {
 	assert.False(t, strings.Contains(string(out), name))
 }
 
+func TestGetNotExist(t *testing.T) {
+	_, err := GetByName("notexist")
+	assert.True(t, os.IsNotExist(err))
+}
+
 func TestNamespaceIsolation(t *testing.T) {
 	ifaces, err := netlink.LinkList()
 	require.NoError(t, err)

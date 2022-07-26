@@ -13,11 +13,15 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-func setPublicConfig(ctx context.Context, cl zbus.Client, cfg substrate.PublicConfig) error {
+func setPublicConfig(ctx context.Context, cl zbus.Client, cfg *substrate.PublicConfig) error {
 	log.Info().Msg("setting node public config")
 	netMgr := stubs.NewNetworkerStub(cl)
 
-	pub, err := pkg.PublicConfigFrom(cfg)
+	if cfg == nil {
+		return netMgr.UnsetPublicConfig(ctx)
+	}
+
+	pub, err := pkg.PublicConfigFrom(*cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to create public config from setup")
 	}
@@ -48,6 +52,12 @@ func public(ctx context.Context, nodeID uint32, env environment.Environment, cl 
 		return sub.GetNode(nodeID)
 	}
 
+	// this to check if the config actually is holding any values
+	// because chain right now doesn't support setting back to None
+	isEmpty := func(cfg *substrate.PublicConfig) bool {
+		return cfg.IPv4 == "" && cfg.IPv6 == ""
+	}
+
 reapply:
 	for {
 		node, err := getNode()
@@ -55,10 +65,13 @@ reapply:
 			return errors.Wrap(err, "failed to get node public config")
 		}
 
-		if node.PublicConfig.HasValue {
-			if err := setPublicConfig(ctx, cl, node.PublicConfig.AsValue); err != nil {
-				return errors.Wrap(err, "failed to ")
-			}
+		var cfg *substrate.PublicConfig
+		if node.PublicConfig.HasValue && !isEmpty(&node.PublicConfig.AsValue) {
+			cfg = &node.PublicConfig.AsValue
+		}
+
+		if err := setPublicConfig(ctx, cl, cfg); err != nil {
+			return errors.Wrap(err, "failed to set public config (reapply)")
 		}
 
 		for {
@@ -72,7 +85,11 @@ reapply:
 				}
 
 				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
-				if err := setPublicConfig(ctx, cl, event.PublicConfig); err != nil {
+				var cfg *substrate.PublicConfig
+				if !isEmpty(&event.PublicConfig) {
+					cfg = &event.PublicConfig
+				}
+				if err := setPublicConfig(ctx, cl, cfg); err != nil {
 					return errors.Wrap(err, "failed to set public config")
 				}
 			case <-time.After(2 * time.Hour):

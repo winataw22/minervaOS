@@ -59,6 +59,10 @@ func LoadPublicConfig() (*pkg.PublicConfig, error) {
 	return &cfg, nil
 }
 
+func DeletePublicConfig() error {
+	return os.RemoveAll(getPersistencePath(publicConfigFile))
+}
+
 // SavePublicConfig stores public config in a file
 func SavePublicConfig(cfg pkg.PublicConfig) error {
 	file, err := os.Create(getPersistencePath(publicConfigFile))
