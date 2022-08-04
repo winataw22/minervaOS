@@ -33,8 +33,10 @@ type VMIface struct {
 	IP4DefaultGateway net.IP
 	// IP6DefaultGateway address for ipv6
 	IP6DefaultGateway net.IP
-	// Private or public network
-	Public bool
+	// PublicIPv4 holds a public IPv4
+	PublicIPv4 bool
+	// PublicIPv4 holds a public Ipv6
+	PublicIPv6 bool
 }
 
 // VMNetworkInfo structure

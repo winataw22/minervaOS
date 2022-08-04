@@ -2,9 +2,9 @@ package public
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
@@ -30,7 +30,10 @@ const (
 	PublicBridge    = types.PublicBridge
 	PublicNamespace = types.PublicNamespace
 
-	// TODO: This pass need to come from
+	defaultPublicResolveConf = `nameserver 8.8.8.8
+nameserver 1.1.1.1
+nameserver 2001:4860:4860::8888
+`
 )
 
 // EnsurePublicBridge makes sure that the public bridge exists
@@ -53,9 +56,9 @@ func ensurePublicBridge() (*netlink.Bridge, error) {
 	return br, nil
 }
 
-//getPublicNamespace gets the public namespace, or nil if it's
-//not setup or does not exist. the caller must be able to handle
-//this case
+// getPublicNamespace gets the public namespace, or nil if it's
+// not setup or does not exist. the caller must be able to handle
+// this case
 func getPublicNamespace() ns.NetNS {
 	ns, _ := namespace.GetByName(PublicNamespace)
 	return ns
@@ -116,7 +119,7 @@ func attachPublicToExit(br *netlink.Bridge, exit netlink.Link) error {
 	}
 
 	// persist this value for next boot
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		getPersistencePath(publicExitFile),
 		[]byte(exit.Attrs().Name),
 		0644,
@@ -143,7 +146,7 @@ func persistExitNicIfNotFound(exit netlink.Link) error {
 	}
 
 	// persist this value for next boot
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		path,
 		[]byte(name),
 		0644,
@@ -379,7 +382,7 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 
 func getPersistedExitNic() (string, error) {
 	path := getPersistencePath(publicExitFile)
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -513,6 +516,15 @@ func publicConfig(iface *pkg.PublicConfig) (ips []*net.IPNet, routes []*netlink.
 	return ips, routes, nil
 }
 
+func ensurePublicResolve() error {
+	path := filepath.Join("/etc", "netns", PublicNamespace)
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return errors.Wrap(err, "failed to create public netns directory")
+	}
+	path = filepath.Join(path, "resolv.conf")
+	return os.WriteFile(path, []byte(defaultPublicResolveConf), 0644)
+}
+
 // setupPublicNS creates a public namespace in a node
 func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	pubNS, err := ensurePublicNamespace()
@@ -521,6 +533,11 @@ func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	}
 
 	defer pubNS.Close()
+
+	// todo: this need to come later from the node config on the grid
+	if err := ensurePublicResolve(); err != nil {
+		return errors.Wrap(err, "failed to configure public namespace resolv.conf")
+	}
 
 	pubIface, err := ensurePublicMacvlan(iface, pubNS)
 	if err != nil {

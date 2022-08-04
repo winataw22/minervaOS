@@ -162,9 +162,11 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 	v4Routes := make(map[string]string)
 	v6Routes := make(map[string]string)
 
-	hasPub := false
+	hasPubIpv4 := false
+	hasPubIpv6 := false
 	for _, ifcfg := range vm.Network.Ifaces {
-		hasPub = ifcfg.Public || hasPub
+		hasPubIpv4 = ifcfg.PublicIPv4 || hasPubIpv4
+		hasPubIpv6 = ifcfg.PublicIPv6 || hasPubIpv6
 	}
 
 	nics := make([]Interface, 0, len(vm.Network.Ifaces))
@@ -186,14 +188,20 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 			cinet.Addresses = append(cinet.Addresses, ip.String())
 		}
 
-		if ifcfg.Public == hasPub {
+		// this to force usage of gateways only from public
+		// interface. so if hasPub is true, use gateways only
+		// from the public interface. but if hasPub is false
+		// we use gateways for each interface.
+		if ifcfg.PublicIPv4 == hasPubIpv4 {
 			if ifcfg.IP4DefaultGateway != nil {
 				cinet.Gateway4 = ifcfg.IP4DefaultGateway.String()
 			}
 		}
 
-		if ifcfg.IP6DefaultGateway != nil {
-			cinet.Gateway6 = ifcfg.IP6DefaultGateway.String()
+		if ifcfg.PublicIPv6 == hasPubIpv6 {
+			if ifcfg.IP6DefaultGateway != nil {
+				cinet.Gateway6 = ifcfg.IP6DefaultGateway.String()
+			}
 		}
 
 		// inserting extra routes in right places
