@@ -52,12 +52,6 @@ func public(ctx context.Context, nodeID uint32, env environment.Environment, cl 
 		return sub.GetNode(nodeID)
 	}
 
-	// this to check if the config actually is holding any values
-	// because chain right now doesn't support setting back to None
-	isEmpty := func(cfg *substrate.PublicConfig) bool {
-		return cfg.IPv4 == "" && cfg.IPv6 == ""
-	}
-
 reapply:
 	for {
 		node, err := getNode()
@@ -66,7 +60,7 @@ reapply:
 		}
 
 		var cfg *substrate.PublicConfig
-		if node.PublicConfig.HasValue && !isEmpty(&node.PublicConfig.AsValue) {
+		if node.PublicConfig.HasValue {
 			cfg = &node.PublicConfig.AsValue
 		}
 
@@ -86,8 +80,8 @@ reapply:
 
 				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
 				var cfg *substrate.PublicConfig
-				if !isEmpty(&event.PublicConfig) {
-					cfg = &event.PublicConfig
+				if event.PublicConfig.HasValue {
+					cfg = &event.PublicConfig.AsValue
 				}
 				if err := setPublicConfig(ctx, cl, cfg); err != nil {
 					return errors.Wrap(err, "failed to set public config")

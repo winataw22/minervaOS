@@ -27,7 +27,7 @@ const (
 // of the reconnection, or actual event has been received.
 type PublicConfigEvent struct {
 	Kind         EventKind
-	PublicConfig substrate.PublicConfig
+	PublicConfig substrate.OptionPublicConfig
 }
 
 // ContractCancelledEvent a contract has been cancelled, The type specify if this is just notification

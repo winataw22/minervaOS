@@ -261,17 +261,17 @@ func (p *PublicConfig) IsEmpty() bool {
 
 func PublicConfigFrom(cfg substrate.PublicConfig) (pub PublicConfig, err error) {
 	pub.Type = MacVlanIface
-	pub.IPv4, err = gridtypes.ParseIPNet(cfg.IPv4)
+	pub.IPv4, err = gridtypes.ParseIPNet(cfg.IP4.IP)
 	if err != nil {
 		return pub, err
 	}
-	pub.IPv6, err = gridtypes.ParseIPNet(cfg.IPv6)
+	pub.IPv6, err = gridtypes.ParseIPNet(cfg.IP6.AsValue.IP)
 	if err != nil {
 		return pub, err
 	}
-	pub.GW4 = net.ParseIP(cfg.GWv4)
-	pub.GW6 = net.ParseIP(cfg.GWv6)
-	pub.Domain = cfg.Domain
+	pub.GW4 = net.ParseIP(cfg.IP4.GW)
+	pub.GW6 = net.ParseIP(cfg.IP6.AsValue.GW)
+	pub.Domain = cfg.Domain.AsValue
 
 	return
 }
