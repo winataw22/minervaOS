@@ -549,9 +549,12 @@ func (c *Module) SignalDelete(ns string, id pkg.ContainerID) error {
 
 	// log.Debug().Str("id", string(id)).Msg("fetching container")
 	container, err := client.LoadContainer(ctx, string(id))
-	if err != nil {
+	if errdefs.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
+
 	// mark this container as perminant down. so the watcher
 	// does not try to restart it again
 	c.failures.Set(string(id), permanent, cache.DefaultExpiration)
