@@ -2,11 +2,11 @@ package identity
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg/crypto"
+	"github.com/threefoldtech/zos/pkg/identity/store"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg"
@@ -14,9 +14,10 @@ import (
 )
 
 type identityManager struct {
-	key KeyPair
-	sub substrate.Manager
-	env environment.Environment
+	kind string
+	key  KeyPair
+	sub  substrate.Manager
+	env  environment.Environment
 
 	farm string
 	node uint32
@@ -25,42 +26,56 @@ type identityManager struct {
 // NewManager creates an identity daemon from seed
 // The daemon will auto generate a new seed if the path does
 // not exist
-func NewManager(path string) (pkg.IdentityManager, error) {
-	env, err := environment.Get()
+// debug flag is used to change the behavior slightly when zos is running in debug
+// mode. Right now only the key store uses this flag. In case of debug migrated keys
+// to tpm are not deleted from disks. This allow switching back and forth between tpm
+// and non-tpm key stores.
+func NewManager(root string, debug bool) (pkg.IdentityManager, error) {
+	st, err := NewStore(root, !debug)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to create key store")
 	}
+	log.Info().Str("kind", st.Kind()).Msg("key store loaded")
+	key, err := st.Get()
 	var pair KeyPair
-	if seed, err := LoadSeed(path); os.IsNotExist(err) {
+	if errors.Is(err, store.ErrKeyDoesNotExist) {
 		pair, err = GenerateKeyPair()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate key pair")
 		}
-
-		if err := pair.Save(path); err != nil {
+		if err := st.Set(pair.PrivateKey); err != nil {
 			return nil, errors.Wrap(err, "failed to persist key seed")
 		}
 	} else if err != nil {
-		if err := os.Remove(path); err != nil {
-			log.Error().Err(err).Msg("failed to delete corrupt seed file")
+		log.Error().Err(err).Msg("failed to load key. to recover the key data will be deleted and regenerated")
+		if err := st.Annihilate(); err != nil {
+			log.Error().Err(err).Msg("failed to clean up key store")
 		}
 		return nil, errors.Wrap(err, "failed to load seed")
 	} else {
-		pair, err = FromSeed(seed)
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid seed file")
-		}
+		pair = KeyPairFromKey(key)
 	}
 
 	sub, err := environment.GetSubstrate()
 	if err != nil {
 		return nil, err
 	}
+	env, err := environment.Get()
+	if err != nil {
+		return nil, err
+	}
+
 	return &identityManager{
-		key: pair,
-		sub: sub,
-		env: env,
+		kind: st.Kind(),
+		key:  pair,
+		sub:  sub,
+		env:  env,
 	}, nil
+}
+
+// StoreKind returns store kind
+func (d *identityManager) StoreKind() string {
+	return d.kind
 }
 
 // NodeID returns the node identity

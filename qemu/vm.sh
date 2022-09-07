@@ -9,6 +9,7 @@ bridge=zos0
 graphics="-nographic -nodefaults"
 smp=1
 mem=3
+tpm=0
 
 usage() {
    cat <<EOF
@@ -22,14 +23,14 @@ Usage: vm -n $name [ -r ] [ -d ]
    -b: bridge for network (default zos)
    -g: open GUI
    -m: memory in Gigabytes
+   -t: tpm support (requires swtpm)
    -h: help
-
 EOF
    exit 0
 }
 
 
-while getopts "c:n:i:rdb:gs:m:" opt; do
+while getopts "c:n:i:rdtb:gs:m:" opt; do
    case $opt in
    i )  image=$OPTARG ;;
    r )  reset=1 ;;
@@ -40,6 +41,7 @@ while getopts "c:n:i:rdb:gs:m:" opt; do
    g )  graphics="" ;;
    s )  smp=$OPTARG ;;
    m )  mem=$OPTARG ;;
+   t )  tpm=1 ;;
    h )  usage ; exit 0 ;;
    \?)  usage ; exit 1 ;;
    esac
@@ -73,6 +75,32 @@ if ps -eaf | grep -v grep | grep "$uuid" > /dev/null; then
     exit 1
 fi
 
+tpmargs=""
+if [[ $tpm -eq "1" ]]; then
+   if ! command -v swtpm &> /dev/null; then
+      echo "tpm option require `swtpm` please install first"
+      exit 1
+   fi
+   pkill swtpm
+   tpm_dir="$vmdir/tpm"
+   tpm_socket="$vmdir/swtpm.sock"
+   mkdir -p $tpm_dir
+   rm $tpm_socket &> /dev/null || true
+   # runs in the backgroun
+   swtpm \
+      socket --tpm2 \
+      --tpmstate dir=$tpm_dir \
+      --ctrl type=unixio,path=$vmdir/swtpm.sock \
+      --log level=20 &> tpm.logs &
+
+   while [ ! -S "$tpm_socket" ]; do
+      echo "waiting for tpm"
+      sleep 1s
+   done
+   sleep 1s
+   tpmargs="-chardev socket,id=chrtpm,path=${tpm_socket} -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0"
+fi
+
 echo "boot $image"
 
 qemu-system-x86_64 -kernel $image \
@@ -88,4 +116,6 @@ qemu-system-x86_64 -kernel $image \
     -drive file=$vmdir/vdc.qcow2,if=virtio -drive file=$vmdir/vdd.qcow2,if=virtio \
     -drive file=$vmdir/vde.qcow2,if=virtio \
     -serial null -serial mon:stdio \
-    ${graphics}
+    ${graphics} \
+    ${tpmargs} \
+    ;

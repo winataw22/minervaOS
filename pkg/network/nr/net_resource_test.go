@@ -19,6 +19,10 @@ type testIdentityManager struct {
 
 var _ pkg.IdentityManager = (*testIdentityManager)(nil)
 
+func (t *testIdentityManager) StoreKind() string {
+	return "test"
+}
+
 // NodeID returns the node id (public key)
 func (t *testIdentityManager) NodeID() pkg.StrIdentifier {
 	return pkg.StrIdentifier(t.id)

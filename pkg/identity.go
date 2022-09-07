@@ -20,6 +20,9 @@ func (s StrIdentifier) Identity() string {
 
 // IdentityManager interface.
 type IdentityManager interface {
+	// Store returns the key store kind
+	StoreKind() string
+
 	// NodeID returns the node id (public key)
 	NodeID() StrIdentifier
 

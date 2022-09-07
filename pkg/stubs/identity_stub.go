@@ -208,6 +208,22 @@ func (s *IdentityManagerStub) Sign(ctx context.Context, arg0 []uint8) (ret0 []ui
 	return
 }
 
+func (s *IdentityManagerStub) StoreKind(ctx context.Context) (ret0 string) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "StoreKind", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *IdentityManagerStub) Verify(ctx context.Context, arg0 []uint8, arg1 []uint8) (ret0 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Verify", args...)

@@ -1,19 +1,18 @@
 package yggdrasil
 
 import (
+	"crypto/ed25519"
 	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/threefoldtech/zos/pkg/identity"
 	"gotest.tools/assert"
 )
 
 func TestAddresses(t *testing.T) {
-	kp, err := identity.FromSeed([]byte("00000000000000000000000000000000"))
-	require.NoError(t, err)
+	sk := ed25519.NewKeyFromSeed([]byte("00000000000000000000000000000000"))
 
-	cfg := GenerateConfig(kp.PrivateKey)
+	cfg := GenerateConfig(sk)
 	s := NewYggServer(&cfg)
 
 	ip, err := s.Address()
