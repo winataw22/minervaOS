@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	reportUptimeEvery = 2 * time.Hour
+	reportUptimeEvery = 40 * time.Minute
 )
 
 func uptime(ctx context.Context, cl zbus.Client) error {
