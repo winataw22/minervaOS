@@ -711,7 +711,8 @@ func (e *NativeEngine) installWorkload(ctx context.Context, wl *gridtypes.Worklo
 		// workload already exist, so no need to create a new transaction
 		return nil
 	} else if err != nil {
-		return err
+		result.State = gridtypes.StateError
+		result.Error = err.Error()
 	}
 
 	if result.State == gridtypes.StateError {

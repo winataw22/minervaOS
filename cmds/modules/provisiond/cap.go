@@ -62,7 +62,7 @@ func (c *CapacitySetter) setWithClient(cl *substrate.Substrate, deployments ...g
 				total.Add(&cap)
 			}
 		}
-		caps = append(caps, substrate.ContractResources{
+		cap := substrate.ContractResources{
 			ContractID: types.U64(deployment.ContractID),
 			Used: substrate.Resources{
 				HRU: types.U64(total.HRU),
@@ -70,7 +70,17 @@ func (c *CapacitySetter) setWithClient(cl *substrate.Substrate, deployments ...g
 				CRU: types.U64(total.CRU),
 				MRU: types.U64(total.MRU),
 			},
-		})
+		}
+
+		log.Debug().
+			Uint64("contract", deployment.ContractID).
+			Uint("sru", uint(cap.Used.SRU)).
+			Uint("hru", uint(cap.Used.HRU)).
+			Uint("mru", uint(cap.Used.MRU)).
+			Uint("cru", uint(cap.Used.CRU)).
+			Msg("reporting contract usage")
+
+		caps = append(caps, cap)
 	}
 
 	bo := backoff.WithMaxRetries(
