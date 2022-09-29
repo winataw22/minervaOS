@@ -1089,6 +1089,8 @@ github.com/threefoldtech/go-rmb v0.1.11-0.20220224131627-825c23c921d3 h1:dbkEXzJ
 github.com/threefoldtech/go-rmb v0.1.11-0.20220224131627-825c23c921d3/go.mod h1:iTDlnSja/nUsQ9XyrpOhm8hwvPMooeh80+tGC9TYCV0=
 github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20220818144159-0abbabef7232 h1:wyK6EPbIsF7SMfgITsWuYe8j5IlGYjGHzbPdjIpfz8Y=
 github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20220818144159-0abbabef7232/go.mod h1:5g1oM4Zu3BOaLpsKQ+O8PAv2kNuq+kPcA1VzFbsSqxE=
+github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20220927094755-0f0d22c73cc7 h1:X4wbo5/Wm7eYBu2oYXr/C93wvwXDSrDXBrRk+Ywuk0s=
+github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20220927094755-0f0d22c73cc7/go.mod h1:5g1oM4Zu3BOaLpsKQ+O8PAv2kNuq+kPcA1VzFbsSqxE=
 github.com/threefoldtech/substrate-client v0.0.0-20220224131248-f56a2e9fa1d4/go.mod h1:Lpsz7gVNSdbWD8erfVh1AZv2wnProc7g/QHJiYp5lP8=
 github.com/threefoldtech/substrate-client v0.0.0-20220818144851-6a557482fa7c h1:E92pMjBwkMn3HqgoxkJ8hUdOibdyoWhtNFKhD1SPnQ0=
 github.com/threefoldtech/substrate-client v0.0.0-20220818144851-6a557482fa7c/go.mod h1:XGsrSO/mdaDkP1ERv4+ccaNDsbU97u27f7p/iQpKrTA=
@@ -1098,6 +1100,8 @@ github.com/threefoldtech/substrate-client v0.0.0-20220907144740-7801e4e9d0a4 h1:
 github.com/threefoldtech/substrate-client v0.0.0-20220907144740-7801e4e9d0a4/go.mod h1:XGsrSO/mdaDkP1ERv4+ccaNDsbU97u27f7p/iQpKrTA=
 github.com/threefoldtech/substrate-client v0.0.0-20220913082457-0190bcac6cd9 h1:w28v3dGSLPhqCdhApQg+/oxmVIW8Znjs5XVtJDrS/+U=
 github.com/threefoldtech/substrate-client v0.0.0-20220913082457-0190bcac6cd9/go.mod h1:XGsrSO/mdaDkP1ERv4+ccaNDsbU97u27f7p/iQpKrTA=
+github.com/threefoldtech/substrate-client v0.0.0-20220927111941-026e0cf92661 h1:97p/xt7jRmsydqFbJ1XgpPUJKWfbHzTc5K6B3a6Lep8=
+github.com/threefoldtech/substrate-client v0.0.0-20220927111941-026e0cf92661/go.mod h1:U8sNNYpXyxEKuLUm4jTacuWu43vU0iu2l+K8GXIcbLo=
 github.com/threefoldtech/zbus v1.0.0 h1:kAc+inxStMbXuKXv46hgT4YPnpAj40kZPpCcFskuMKs=
 github.com/threefoldtech/zbus v1.0.0/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
