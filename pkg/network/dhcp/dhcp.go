@@ -30,7 +30,7 @@ func (d *Probe) Start(inf string) error {
 		"--now", // exit if lease is not obtained
 	)
 
-	log.Debug().Msgf("start udhcp: %v", d.cmd.String())
+	log.Debug().Msgf("start udhcpc for probing: %v", d.cmd.String())
 	if err := d.cmd.Start(); err != nil {
 		return err
 	}

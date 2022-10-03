@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/public"
+	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/rmb"
+	"github.com/threefoldtech/zos/pkg/zinit"
 	"github.com/urfave/cli/v2"
 
 	"github.com/cenkalti/backoff/v3"
@@ -59,6 +62,10 @@ func action(cli *cli.Context) error {
 	}
 
 	waitYggdrasilBin()
+
+	if err := migrateOlderDHCPService(); err != nil {
+		return errors.Wrap(err, "failed to migrate older dhcp service")
+	}
 
 	if err := bootstrap.DefaultBridgeValid(); err != nil {
 		return errors.Wrap(err, "invalid setup")
@@ -220,4 +227,21 @@ func waitYggdrasilBin() {
 	}, bo, func(err error, d time.Duration) {
 		log.Warn().Err(err).Msgf("yggdrasil binary not found, retying in %s", d.String())
 	})
+}
+
+func migrateOlderDHCPService() error {
+	// only migrate dhcp service if it's using the older client
+	dhcpService := dhcp.NewService(types.DefaultBridge, "", zinit.Default())
+	if dhcpService.IsUsingOlderClient() {
+		// only migrate if it's using older client
+		if err := dhcpService.Destroy(); err != nil {
+			return errors.Wrapf(err, "failed to destory older dhcp service")
+		}
+		if err := dhcpService.Create(); err != nil {
+			return errors.Wrapf(err, "failed to create newer dhcp service")
+		}
+		return dhcpService.Start()
+	}
+
+	return nil
 }

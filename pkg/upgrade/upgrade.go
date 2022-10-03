@@ -197,7 +197,7 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 	}
 
 	log.Debug().Strs("services", service).Msg("restarting services")
-	if err := u.stopMultiple(20*time.Second, service...); err != nil {
+	if err := u.zinit.StopMultiple(20*time.Second, service...); err != nil {
 		return err
 	}
 
@@ -217,132 +217,6 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 // UninstallBinary  from a single flist.
 func (u *Upgrader) UninstallBinary(flist FListInfo) error {
 	return u.uninstall(flist)
-}
-
-func (u Upgrader) startMultiple(timeout time.Duration, service ...string) error {
-	services := make(map[string]struct{})
-	for _, name := range service {
-		log.Info().Str("service", name).Msg("starting service")
-		if err := u.zinit.Monitor(name); err != nil && err != zinit.ErrAlreadyMonitored {
-			log.Error().Err(err).Str("service", name).Msg("error on zinit monitor")
-		}
-
-		if err := u.zinit.Start(name); err != nil {
-			log.Debug().Str("service", name).Msg("service undefined")
-			continue
-		}
-
-		services[name] = struct{}{}
-	}
-
-	deadline := time.After(timeout)
-
-	for len(services) > 0 {
-		var running []string
-		for service := range services {
-			log.Info().Str("service", service).Msg("check if service is started")
-			status, err := u.zinit.Status(service)
-			if err != nil {
-				return err
-			}
-
-			if status.Target != zinit.ServiceTargetUp {
-				// it means some other entity (another client or command line)
-				// has set the service back to up. I think we should immediately return
-				// with an error instead.
-				return fmt.Errorf("expected service '%s' target should be UP. found DOWN", service)
-			}
-
-			// if is running or exited successfully
-			if status.State.Any(zinit.ServiceStateRunning, zinit.ServiceStateSuccess) {
-				running = append(running, service)
-			}
-		}
-
-		for _, service := range running {
-			if _, ok := services[service]; ok {
-				log.Debug().Str("service", service).Msg("service started")
-				delete(services, service)
-			}
-		}
-
-		if len(services) == 0 {
-			break
-		}
-
-		select {
-		case <-deadline:
-			for service := range services {
-				log.Warn().Str("service", service).Msg("service didn't start in time.")
-			}
-			return nil
-		case <-time.After(1 * time.Second):
-		}
-	}
-
-	return nil
-}
-
-func (u Upgrader) stopMultiple(timeout time.Duration, service ...string) error {
-	services := make(map[string]struct{})
-	for _, name := range service {
-		log.Info().Str("service", name).Msg("stopping service")
-		if err := u.zinit.Stop(name); err != nil {
-			log.Debug().Str("service", name).Msg("service undefined")
-			continue
-		}
-
-		services[name] = struct{}{}
-	}
-
-	deadline := time.After(timeout)
-
-	for len(services) > 0 {
-		var stopped []string
-		for service := range services {
-			log.Info().Str("service", service).Msg("check if service is stopped")
-			status, err := u.zinit.Status(service)
-			if err != nil {
-				return err
-			}
-
-			if status.Target != zinit.ServiceTargetDown {
-				// it means some other entity (another client or command line)
-				// has set the service back to up. I think we should immediately return
-				// with an error instead.
-				return fmt.Errorf("expected service '%s' target should be DOWN. found UP", service)
-			}
-
-			if status.State.Exited() {
-				stopped = append(stopped, service)
-			}
-		}
-
-		for _, stop := range stopped {
-			if _, ok := services[stop]; ok {
-				log.Debug().Str("service", stop).Msg("service stopped")
-				delete(services, stop)
-			}
-		}
-
-		if len(services) == 0 {
-			break
-		}
-
-		select {
-		case <-deadline:
-			for service := range services {
-				log.Warn().Str("service", service).Msg("service didn't stop in time. use SIGKILL")
-				if err := u.zinit.Kill(service, zinit.SIGKILL); err != nil {
-					log.Error().Err(err).Msgf("failed to send SIGKILL to service %s", service)
-				}
-			}
-			return nil
-		case <-time.After(1 * time.Second):
-		}
-	}
-
-	return nil
 }
 
 // upgradeSelf will try to check if the flist has
@@ -430,7 +304,7 @@ func (u *Upgrader) uninstall(flist FListInfo) error {
 
 	log.Debug().Strs("services", names).Msg("stopping services")
 
-	if err = u.stopMultiple(20*time.Second, names...); err != nil {
+	if err = u.zinit.StopMultiple(20*time.Second, names...); err != nil {
 		return errors.Wrapf(err, "failed to stop services")
 	}
 
@@ -498,7 +372,7 @@ func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 
 	log.Debug().Msg("copying files complete")
 	log.Debug().Msg("make sure all services are monitored")
-	if err := u.startMultiple(20*time.Minute, services...); err != nil {
+	if err := u.zinit.StartMultiple(20*time.Minute, services...); err != nil {
 		return errors.Wrap(err, "failed to monitor services")
 	}
 
