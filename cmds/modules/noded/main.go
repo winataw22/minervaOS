@@ -243,6 +243,17 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
+	log.Info().Uint32("twin", twin).Msg("node has been registered")
+	idStub := stubs.NewIdentityManagerStub(redis)
+	fetchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	sk := ed25519.PrivateKey(idStub.PrivateKey(fetchCtx))
+	id, err := substrate.NewIdentityFromEd25519Key(sk)
+	log.Info().Str("address", id.Address()).Msg("node address")
+	if err != nil {
+		return err
+	}
+
 	// uptime update
 	go func() {
 		defer log.Info().Msg("uptime reporting exited permanently")
@@ -253,7 +264,7 @@ func action(cli *cli.Context) error {
 				}
 			}()
 
-			err = uptime(ctx, redis)
+			err = uptime(ctx, id)
 			return err
 		}
 
@@ -270,16 +281,7 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	log.Info().Uint32("twin", twin).Msg("node has been registered")
 	log.Debug().Msg("start message bus")
-	identityd := stubs.NewIdentityManagerStub(redis)
-	sk := ed25519.PrivateKey(identityd.PrivateKey(ctx))
-	id, err := substrate.NewIdentityFromEd25519Key(sk)
-	log.Info().Str("address", id.Address()).Msg("node address")
-	if err != nil {
-		return err
-	}
-
 	return runMsgBus(ctx, sub, id)
 }
 
