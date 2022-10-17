@@ -10,6 +10,9 @@ import (
 
 const (
 	seedName = "seed.txt"
+	// disableTpm support completely for now
+	// until all tests (PRC changes) are covered
+	disableTpm = true
 )
 
 // NewStore tries to build the best key store available
@@ -22,7 +25,7 @@ const (
 // deleted (only if delete is set to true)
 func NewStore(root string, delete bool) (store.Store, error) {
 	file := store.NewFileStore(filepath.Join(root, seedName))
-	if !store.IsTPMEnabled() {
+	if disableTpm || !store.IsTPMEnabled() {
 		return file, nil
 	}
 

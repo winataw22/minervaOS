@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqwest::{get, StatusCode};
+use reqwest::{blocking::get, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::{write, OpenOptions};
@@ -13,7 +13,7 @@ pub struct Repo {
     name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Flist {
     #[serde(rename = "type")]
     pub kind: String,
@@ -42,7 +42,7 @@ impl Repo {
     pub fn list(&self) -> Result<Vec<Flist>> {
         let url = format!("{}/api/flist/{}", self.base, self.name,);
 
-        let mut response = get(&url)?;
+        let response = get(&url)?;
         let mut info: Vec<Flist> = match response.status() {
             StatusCode::OK => response.json()?,
             s => bail!("failed to get flist info: {}", s),
@@ -65,7 +65,7 @@ impl Repo {
             flist.as_ref()
         );
 
-        let mut response = get(&url)?;
+        let response = get(&url)?;
         let mut info: Flist = match response.status() {
             StatusCode::OK => response.json()?,
             s => bail!("failed to get flist info: {}", s),
