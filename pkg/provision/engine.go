@@ -73,14 +73,14 @@ const (
 	opDeprovision
 	// deletes a deployment
 	opUpdate
-	// opProvisionNoContract is used to reinstall
+	// opProvisionNoValidation is used to reinstall
 	// a deployment on node reboot without validating
 	// against the chain again because 1) validation
 	// has already been done on first installation
 	// 2) hash is not granteed to match because of the
 	// order of the workloads doesn't have to match
 	// the one sent by the user
-	opProvisionNoContract
+	opProvisionNoValidation
 	// opPause, pauses a deployment
 	opPause
 	// opResume resumes a deployment
@@ -255,11 +255,11 @@ func withDeployment(ctx context.Context, twin uint32, deployment uint64) context
 }
 
 // GetContract of deployment. panics if engine has no substrate set.
-func GetContract(ctx context.Context) *substrate.NodeContract {
-	return ctx.Value(contractKey{}).(*substrate.NodeContract)
+func GetContract(ctx context.Context) substrate.NodeContract {
+	return ctx.Value(contractKey{}).(substrate.NodeContract)
 }
 
-func withContract(ctx context.Context, contract *substrate.NodeContract) context.Context {
+func withContract(ctx context.Context, contract substrate.NodeContract) context.Context {
 	return context.WithValue(ctx, contractKey{}, contract)
 }
 
@@ -275,17 +275,9 @@ func GetSubstrate(ctx context.Context) substrate.Manager {
 // one reservation at a time. On error, the engine will log the error. and
 // continue to next reservation.
 func New(storage Storage, provisioner Provisioner, root string, opts ...EngineOption) (*NativeEngine, error) {
-	queue, err := dque.NewOrOpen("jobs", root, 512, func() interface{} { return &engineJob{} })
-	if err != nil {
-		// if this happens it means data types has been changed in that case we need
-		// to clean up the queue and start over. unfortunately any un applied changes
-		os.RemoveAll(filepath.Join(root, "jobs"))
-		return nil, errors.Wrap(err, "failed to create job queue")
-	}
 	e := &NativeEngine{
 		storage:     storage,
 		provisioner: provisioner,
-		queue:       queue,
 		twins:       &nullKeyGetter{},
 		admins:      &nullKeyGetter{},
 		order:       gridtypes.Types(),
@@ -296,6 +288,19 @@ func New(storage Storage, provisioner Provisioner, root string, opts ...EngineOp
 		opt.apply(e)
 	}
 
+	if e.rerunAll {
+		os.RemoveAll(filepath.Join(root, "jobs"))
+	}
+
+	queue, err := dque.NewOrOpen("jobs", root, 512, func() interface{} { return &engineJob{} })
+	if err != nil {
+		// if this happens it means data types has been changed in that case we need
+		// to clean up the queue and start over. unfortunately any un applied changes
+		os.RemoveAll(filepath.Join(root, "jobs"))
+		return nil, errors.Wrap(err, "failed to create job queue")
+	}
+
+	e.queue = queue
 	return e, nil
 }
 
@@ -459,7 +464,6 @@ func (e *NativeEngine) Run(root context.Context) error {
 	}
 
 	for {
-
 		obj, err := e.queue.PeekBlock()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to check job queue")
@@ -469,28 +473,34 @@ func (e *NativeEngine) Run(root context.Context) error {
 
 		job := obj.(*engineJob)
 		ctx := withDeployment(root, job.Target.TwinID, job.Target.ContractID)
+		l := log.With().
+			Uint32("twin", job.Target.TwinID).
+			Uint64("contract", job.Target.ContractID).
+			Logger()
 
 		// contract validation
 		// this should ONLY be done on provosion and update operation
-		if job.Op == opProvision || job.Op == opUpdate {
+		if job.Op == opProvision ||
+			job.Op == opUpdate ||
+			job.Op == opProvisionNoValidation {
 			// otherwise, contract validation is needed
-			ctx, err = e.contract(ctx, &job.Target)
+			ctx, err = e.contract(ctx, &job.Target, job.Op == opProvisionNoValidation)
 			if err != nil {
-				log.Error().Err(err).Uint64("contract", job.Target.ContractID).Msg("contact validation fails")
+				l.Error().Err(err).Msg("contact validation fails")
 				//job.Target.SetError(err)
 				if err := e.storage.Error(job.Target.TwinID, job.Target.ContractID, err); err != nil {
-					log.Error().Err(err).Msg("failed to set deployment global error")
+					l.Error().Err(err).Msg("failed to set deployment global error")
 				}
 				_, _ = e.queue.Dequeue()
 
 				continue
 			}
 
-			log.Debug().Uint64("contract", job.Target.ContractID).Msg("contact validation pass")
+			l.Debug().Msg("contact validation pass")
 		}
 
 		switch job.Op {
-		case opProvisionNoContract:
+		case opProvisionNoValidation:
 			fallthrough
 		case opProvision:
 			e.installDeployment(ctx, &job.Target)
@@ -515,7 +525,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 			// and update to reflect the current result on those workloads.
 			update, err := job.Source.Upgrade(&job.Target)
 			if err != nil {
-				log.Error().Err(err).Uint32("twin", job.Target.TwinID).Uint64("id", job.Target.ContractID).Msg("failed to get update procedure")
+				l.Error().Err(err).Msg("failed to get update procedure")
 				break
 			}
 			e.updateDeployment(ctx, update)
@@ -523,7 +533,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 
 		_, err = e.queue.Dequeue()
 		if err != nil {
-			log.Error().Err(err).Msg("failed to dequeue job")
+			l.Error().Err(err).Msg("failed to dequeue job")
 		}
 
 		e.safeCallback(&job.Target, job.Op == opDeprovision)
@@ -545,10 +555,10 @@ func (e *NativeEngine) safeCallback(d *gridtypes.Deployment, delete bool) {
 }
 
 // contract validates and injects the deployment contracts is substrate is configured
-// for this instance of the provision engine.
-func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (context.Context, error) {
+// for this instance of the provision engine. If noValidation is set contracts checks is skipped
+func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment, noValidation bool) (context.Context, error) {
 	if e.sub == nil {
-		return ctx, nil
+		return ctx, fmt.Errorf("substrate is not configured in engine")
 	}
 
 	ctx = context.WithValue(ctx, substrateKey{}, e.sub)
@@ -566,7 +576,11 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment) (
 	if !contract.ContractType.IsNodeContract {
 		return nil, fmt.Errorf("invalid contract type, expecting node contract")
 	}
-	ctx = withContract(ctx, &contract.ContractType.NodeContract)
+	ctx = withContract(ctx, contract.ContractType.NodeContract)
+
+	if noValidation {
+		return ctx, nil
+	}
 
 	if uint32(contract.ContractType.NodeContract.Node) != e.nodeID {
 		return nil, fmt.Errorf("invalid node address in contract")
@@ -614,7 +628,7 @@ func (e *NativeEngine) boot(root context.Context) error {
 
 			job := engineJob{
 				Target: dl,
-				Op:     opProvisionNoContract,
+				Op:     opProvisionNoValidation,
 			}
 
 			if err := e.queue.Enqueue(&job); err != nil {

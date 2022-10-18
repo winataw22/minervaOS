@@ -329,7 +329,7 @@ func action(cli *cli.Context) error {
 		}
 	}()
 
-	if err := app.MarkBooted(provisionModule); err != nil {
+	if err := app.MarkBooted(serverName); err != nil {
 		log.Error().Err(err).Msg("failed to mark module as booted")
 	}
 
