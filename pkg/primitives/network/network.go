@@ -41,7 +41,7 @@ func (p *Manager) networkProvisionImpl(ctx context.Context, wl *gridtypes.Worklo
 	mgr := stubs.NewNetworkerStub(p.zbus)
 	log.Debug().Str("network", fmt.Sprintf("%+v", network)).Msg("provision network")
 
-	_, err := mgr.CreateNR(ctx, pkg.Network{
+	_, err := mgr.CreateNR(ctx, wl.ID, pkg.Network{
 		Network: network,
 		NetID:   zos.NetworkID(twin, wl.Name),
 	})
@@ -64,17 +64,7 @@ func (p *Manager) Update(ctx context.Context, wl *gridtypes.WorkloadWithID) (int
 func (p *Manager) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
 	mgr := stubs.NewNetworkerStub(p.zbus)
 
-	var network zos.Network
-	if err := json.Unmarshal(wl.Data, &network); err != nil {
-		return fmt.Errorf("failed to unmarshal network from reservation: %w", err)
-	}
-
-	twin, _ := provision.GetDeploymentID(ctx)
-
-	if err := mgr.DeleteNR(ctx, pkg.Network{
-		Network: network,
-		NetID:   zos.NetworkID(twin, wl.Name),
-	}); err != nil {
+	if err := mgr.DeleteNR(ctx, wl.ID); err != nil {
 		return fmt.Errorf("failed to delete network resource: %w", err)
 	}
 

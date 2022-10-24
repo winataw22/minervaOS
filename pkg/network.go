@@ -65,16 +65,18 @@ func (e *ExitDevice) String() string {
 	return "unknown"
 }
 
-//Networker is the interface for the network module
+type NetResourceMetrics map[string]NetMetric
+
+// Networker is the interface for the network module
 type Networker interface {
 	// Ready return nil is networkd is ready to operate
 	// This function is used by other deamon to test if networkd is done booting
 	Ready() error
 
 	// Create a new network resource
-	CreateNR(Network) (string, error)
+	CreateNR(wl gridtypes.WorkloadID, network Network) (string, error)
 	// Delete a network resource
-	DeleteNR(Network) error
+	DeleteNR(wl gridtypes.WorkloadID) error
 
 	// Namespace returns the namespace name for given netid.
 	// it doesn't check if network exists.
@@ -202,6 +204,7 @@ type Networker interface {
 
 	SetPublicExitDevice(iface string) error
 
+	Metrics() (NetResourceMetrics, error)
 	// Monitoring methods
 
 	// ZOSAddresses monitoring streams for ZOS bridge IPs

@@ -31,6 +31,14 @@ func NetworkID(twin uint32, network gridtypes.Name) NetID {
 	return NetID(string(b))
 }
 
+func NetworkIDFromWorkloadID(wl gridtypes.WorkloadID) (NetID, error) {
+	twin, _, name, err := wl.Parts()
+	if err != nil {
+		return "", err
+	}
+	return NetworkID(twin, name), nil
+}
+
 // Network is the description of a part of a network local to a specific node.
 // A network workload defines a wireguard network that is usually spans multiple nodes. One of the nodes must work as an access node
 // in other words, it must be reachable from other nodes, hence it needs to have a `PublicConfig`.
@@ -155,7 +163,7 @@ func (p *Peer) Valid() error {
 	return nil
 }
 
-//Challenge for peer
+// Challenge for peer
 func (p Peer) Challenge(w io.Writer) error {
 	if _, err := fmt.Fprintf(w, "%s", p.WGPublicKey); err != nil {
 		return err

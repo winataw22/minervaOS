@@ -4,6 +4,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	gridtypes "github.com/threefoldtech/zos/pkg/gridtypes"
 	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"net"
 )
@@ -43,8 +44,8 @@ func (s *NetworkerStub) Addrs(ctx context.Context, arg0 string, arg1 string) (re
 	return
 }
 
-func (s *NetworkerStub) CreateNR(ctx context.Context, arg0 pkg.Network) (ret0 string, ret1 error) {
-	args := []interface{}{arg0}
+func (s *NetworkerStub) CreateNR(ctx context.Context, arg0 gridtypes.WorkloadID, arg1 pkg.Network) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "CreateNR", args...)
 	if err != nil {
 		panic(err)
@@ -84,7 +85,7 @@ func (s *NetworkerStub) DMZAddresses(ctx context.Context) (<-chan pkg.NetlinkAdd
 	return ch, nil
 }
 
-func (s *NetworkerStub) DeleteNR(ctx context.Context, arg0 pkg.Network) (ret0 error) {
+func (s *NetworkerStub) DeleteNR(ctx context.Context, arg0 gridtypes.WorkloadID) (ret0 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "DeleteNR", args...)
 	if err != nil {
@@ -237,6 +238,23 @@ func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net
 func (s *NetworkerStub) Interfaces(ctx context.Context, arg0 string, arg1 string) (ret0 interface{}, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Interfaces", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *NetworkerStub) Metrics(ctx context.Context) (ret0 pkg.NetResourceMetrics, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "Metrics", args...)
 	if err != nil {
 		panic(err)
 	}

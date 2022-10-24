@@ -164,6 +164,29 @@ func (r *Reporter) getVmMetrics(ctx context.Context, slot rrd.Slot) error {
 	return nil
 }
 
+// getNetworkMetrics will collect network consumption for network resource and store it in the given slot
+func (r *Reporter) getNetworkMetrics(ctx context.Context, slot rrd.Slot) error {
+	log.Debug().Msg("collecting networking metrics")
+	stub := stubs.NewNetworkerStub(r.cl)
+
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+	metrics, err := stub.Metrics(ctx)
+	if err != nil {
+		return err
+	}
+
+	for wl, consumption := range metrics {
+		nu := consumption.Nu()
+		log.Debug().Str("network", wl).Uint64("computed", uint64(nu)).Msgf("consumption: %+v", consumption)
+		if err := slot.Counter(wl, float64(nu)); err != nil {
+			return errors.Wrapf(err, "failed to store metrics for '%s'", wl)
+		}
+	}
+
+	return nil
+}
+
 // getVmMetrics will collect network consumption every 5 min and store
 // it in the rrd database.
 func (r *Reporter) getGwMetrics(ctx context.Context, slot rrd.Slot) error {
@@ -205,8 +228,12 @@ func (r *Reporter) getMetrics(ctx context.Context) error {
 		return err
 	}
 
+	if err := r.getNetworkMetrics(ctx, slot); err != nil {
+		log.Error().Err(err).Msg("failed to get network resource consumption")
+	}
+
 	if err := r.getVmMetrics(ctx, slot); err != nil {
-		log.Error().Err(err).Msg("failed to get vm network consumption")
+		log.Error().Err(err).Msg("failed to get vm public ip consumption")
 	}
 
 	if err := r.getGwMetrics(ctx, slot); err != nil {
@@ -327,23 +354,23 @@ func (r *Reporter) report(ctx context.Context, since time.Time) (time.Time, erro
 			continue
 		}
 
-		_, deploment, _, err := gridtypes.WorkloadID(key).Parts()
+		_, deployment, _, err := gridtypes.WorkloadID(key).Parts()
 		if err != nil {
 			log.Error().Err(err).Msgf("failed to parse metric key '%s'", key)
 			continue
 		}
 
-		rep, ok := reports[deploment]
+		rep, ok := reports[deployment]
 		if !ok {
 			rep = substrate.NruConsumption{
-				ContractID: types.U64(deploment),
+				ContractID: types.U64(deployment),
 				Timestamp:  types.U64(now.Unix()),
 				Window:     types.U64(window / time.Second),
 			}
 		}
 
 		rep.NRU += types.U64(value)
-		reports[deploment] = rep
+		reports[deployment] = rep
 	}
 
 	var report Report

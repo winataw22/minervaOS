@@ -17,6 +17,7 @@ import (
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
@@ -54,6 +55,7 @@ const (
 	ZDBYggIface = "ygg0"
 
 	networkDir          = "networks"
+	linkDir             = "link"
 	ipamLeaseDir        = "ndmz-lease"
 	zdbNamespacePrefix  = "zdb-ns-"
 	qsfsNamespacePrefix = "qfs-ns-"
@@ -71,6 +73,7 @@ var (
 type networker struct {
 	identity     *stubs.IdentityManagerStub
 	networkDir   string
+	linkDir      string
 	ipamLeaseDir string
 	portSet      *set.UIntSet
 
@@ -88,9 +91,10 @@ func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdr
 	}
 
 	runtimeDir := filepath.Join(vd, networkDir)
+	linkDir := filepath.Join(runtimeDir, linkDir)
 	ipamLease := filepath.Join(vd, ipamLeaseDir)
 
-	for _, dir := range []string{runtimeDir, ipamLease} {
+	for _, dir := range []string{linkDir, ipamLease} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, errors.Wrapf(err, "failed to create directory: '%s'", dir)
 		}
@@ -99,6 +103,7 @@ func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdr
 	nw := &networker{
 		identity:     identity,
 		networkDir:   runtimeDir,
+		linkDir:      linkDir,
 		ipamLeaseDir: ipamLease,
 		portSet:      set.NewInt(),
 
@@ -220,7 +225,7 @@ func (n *networker) destroy(ns string) error {
 	return namespace.Delete(nSpace)
 }
 
-//func (n *networker) NSPrepare(id string, )
+// func (n *networker) NSPrepare(id string, )
 // ZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
 func (n *networker) ZDBPrepare(id string) (string, error) {
@@ -270,7 +275,7 @@ func (n *networker) createMacVlan(iface string, master string, hw net.HardwareAd
 func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (ifc string, err error) {
 	log.Info().Str("network-id", string(networkID)).Msg("Setting up tap interface")
 
-	localNR, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(networkID)
 	if err != nil {
 		return "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
@@ -589,7 +594,7 @@ func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
 // GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6
 // subnet respectively
 func (n *networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
-	localNR, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(networkID)
 	if err != nil {
 		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
@@ -599,7 +604,7 @@ func (n *networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
 
 // GetNet of a network identified by the network ID
 func (n *networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
-	localNR, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(networkID)
 	if err != nil {
 		return net.IPNet{}, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
@@ -611,7 +616,7 @@ func (n *networker) GetNet(networkID pkg.NetID) (net.IPNet, error) {
 // resource identified by the network ID on the local node, for IPv4 and IPv6
 // respectively
 func (n *networker) GetDefaultGwIP(networkID pkg.NetID) (net.IP, net.IP, error) {
-	localNR, err := n.networkOf(string(networkID))
+	localNR, err := n.networkOf(networkID)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
@@ -752,12 +757,12 @@ func (n *networker) Addrs(iface string, netns string) (ips []net.IP, mac string,
 }
 
 // CreateNR implements pkg.Networker interface
-func (n *networker) CreateNR(netNR pkg.Network) (string, error) {
+func (n *networker) CreateNR(wl gridtypes.WorkloadID, netNR pkg.Network) (string, error) {
 	log.Info().Str("network", string(netNR.NetID)).Msg("create network resource")
 
 	// check if there is a reserved wireguard port for this NR already
 	// or if we need to update it
-	storedNR, err := n.networkOf(string(netNR.NetID))
+	storedNR, err := n.networkOf(netNR.NetID)
 	if err != nil && !os.IsNotExist(err) {
 		return "", errors.Wrap(err, "failed to load previous network setup")
 	}
@@ -832,14 +837,34 @@ func (n *networker) CreateNR(netNR pkg.Network) (string, error) {
 		return "", errors.Wrap(err, "failed to configure network resource")
 	}
 
-	if err = n.storeNetwork(netNR); err != nil {
+	if err = n.storeNetwork(wl, netNR); err != nil {
 		return "", errors.Wrap(err, "failed to store network object")
 	}
 
 	return netr.Namespace()
 }
 
-func (n *networker) storeNetwork(network pkg.Network) error {
+func (n *networker) rmNetwork(wl gridtypes.WorkloadID) error {
+	netID, err := zos.NetworkIDFromWorkloadID(wl)
+	if err != nil {
+		return err
+	}
+
+	rm := []string{
+		filepath.Join(n.networkDir, netID.String()),
+		filepath.Join(n.linkDir, wl.String()),
+	}
+
+	for _, p := range rm {
+		if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+			log.Error().Err(err).Str("path", p).Msg("failed to delete file")
+		}
+	}
+
+	return nil
+}
+
+func (n *networker) storeNetwork(wl gridtypes.WorkloadID, network pkg.Network) error {
 	// map the network ID to the network namespace
 	path := filepath.Join(n.networkDir, string(network.NetID))
 	file, err := os.Create(path)
@@ -857,12 +882,24 @@ func (n *networker) storeNetwork(network pkg.Network) error {
 	if err := enc.Encode(&network); err != nil {
 		return err
 	}
-
+	link := filepath.Join(n.linkDir, wl.String())
+	if err := os.Symlink(filepath.Join("../", string(network.NetID)), link); err != nil {
+		return errors.Wrap(err, "failed to create network symlink")
+	}
 	return nil
 }
 
 // DeleteNR implements pkg.Networker interface
-func (n *networker) DeleteNR(netNR pkg.Network) error {
+func (n *networker) DeleteNR(wl gridtypes.WorkloadID) error {
+	netID, err := zos.NetworkIDFromWorkloadID(wl)
+	if err != nil {
+		return err
+	}
+	netNR, err := n.networkOf(netID)
+	if err != nil {
+		return err
+	}
+
 	nr, err := nr.New(netNR)
 	if err != nil {
 		return errors.Wrap(err, "failed to load network resource")
@@ -881,9 +918,7 @@ func (n *networker) DeleteNR(netNR pkg.Network) error {
 		log.Error().Err(err).Msg("failed to detach network from ndmz")
 	}
 
-	// map the network ID to the network namespace
-	path := filepath.Join(n.networkDir, string(netNR.NetID))
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+	if err := n.rmNetwork(wl); err != nil {
 		log.Error().Err(err).Msg("failed to remove file mapping between network ID and namespace")
 	}
 
@@ -996,7 +1031,7 @@ func (n *networker) GetPublicConfig() (pkg.PublicConfig, error) {
 	return cfg, nil
 }
 
-func (n *networker) networkOf(id string) (nr pkg.Network, err error) {
+func (n *networker) networkOf(id zos.NetID) (nr pkg.Network, err error) {
 	path := filepath.Join(n.networkDir, string(id))
 	file, err := os.OpenFile(path, os.O_RDWR, 0660)
 	if err != nil {
@@ -1068,6 +1103,53 @@ func (n *networker) DMZAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 	}()
 
 	return ch
+}
+
+func (n *networker) Metrics() (pkg.NetResourceMetrics, error) {
+	links, err := os.ReadDir(n.linkDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list networks")
+	}
+
+	metrics := make(pkg.NetResourceMetrics)
+	for _, link := range links {
+		if link.IsDir() {
+			continue
+		}
+
+		wl := link.Name()
+		logger := log.With().Str("workload", wl).Logger()
+		sym, err := os.Readlink(filepath.Join(n.linkDir, wl))
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to get network name from workload link")
+			continue
+		}
+		nsName := n.Namespace(zos.NetID(filepath.Base(sym)))
+		logger.Debug().Str("namespace", nsName).Msg("collecting namespace statistics")
+		nr, err := namespace.GetByName(nsName)
+		if err != nil {
+			logger.Error().Str("namespace", nsName).Err(err).Msg("failed to get network namespace from workload")
+			continue
+		}
+
+		defer nr.Close()
+		err = nr.Do(func(_ ns.NetNS) error {
+			// get stats of public interface.
+			m, err := metricsForNics("public")
+			if err != nil {
+				return err
+			}
+
+			metrics[wl] = m
+			return nil
+		})
+
+		if err != nil {
+			log.Error().Err(err).Msg("failed to collect metrics for network")
+		}
+	}
+
+	return metrics, nil
 }
 
 func (n *networker) YggAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
@@ -1263,4 +1345,21 @@ var yggPrefix = net.IPNet{
 
 func isYgg(ip net.IP) bool {
 	return yggPrefix.Contains(ip)
+}
+
+func metricsForNics(nics ...string) (m pkg.NetMetric, err error) {
+	for _, nic := range nics {
+		l, err := netlink.LinkByName(nic)
+		if err != nil {
+			return pkg.NetMetric{}, err
+		}
+
+		stats := l.Attrs().Statistics
+		m.NetRxBytes += stats.RxBytes
+		m.NetTxBytes += stats.TxBytes
+		m.NetRxPackets += stats.RxPackets
+		m.NetTxPackets += stats.TxPackets
+	}
+
+	return
 }
