@@ -31,6 +31,7 @@ import (
 const (
 	module          = "node"
 	registrarModule = "registrar"
+	eventsBlock     = "/tmp/events.chain"
 )
 
 // Module is entry point for module
@@ -210,7 +211,8 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	events := events.New(sub, node)
+
+	events := events.New(sub, node, eventsBlock)
 
 	system, err := monitord.NewSystemMonitor(node, 2*time.Second)
 	if err != nil {

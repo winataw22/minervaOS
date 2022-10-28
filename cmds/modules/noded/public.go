@@ -71,12 +71,6 @@ reapply:
 		for {
 			select {
 			case event := <-events:
-				if event.Kind == pkg.EventSubscribed {
-					// the events has re-subscribed, so possible
-					// loss of events.
-					// then we-reapply
-					continue reapply
-				}
 
 				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
 				var cfg *substrate.PublicConfig
