@@ -175,6 +175,10 @@ func action(cli *cli.Context) error {
 		}
 	}
 
+	if err := store.CleanDeleted(); err != nil {
+		log.Error().Err(err).Msg("failed to purge deleted deployments history")
+	}
+
 	provisioners := primitives.NewPrimitivesProvisioner(cl)
 
 	cap, err := capacity.NewResourceOracle(stubs.NewStorageModuleStub(cl)).Total()
@@ -212,7 +216,7 @@ func action(cli *cli.Context) error {
 	// also does some checks on capacity
 	statistics := primitives.NewStatistics(
 		cap,
-		current,
+		store,
 		reserved,
 		provisioners,
 	)
@@ -401,7 +405,7 @@ func action(cli *cli.Context) error {
 	return nil
 }
 
-func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter primitives.Counters, err error) {
+func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter gridtypes.Capacity, err error) {
 	// fill in reserved storage
 	storage := stubs.NewStorageModuleStub(cl)
 	fs, err := storage.Cache(context.TODO())
@@ -409,14 +413,10 @@ func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter prim
 		return counter, err
 	}
 
-	counter.SRU.Increment(fs.Usage.Size)
-
-	// we reserve 10% of memory to ZOS itself, with a min of 2G
-	counter.MRU.Increment(
-		gridtypes.Max(
-			available.MRU*10/100,
-			2*gridtypes.Gigabyte,
-		),
+	counter.SRU += fs.Usage.Size
+	counter.MRU += gridtypes.Max(
+		available.MRU*10/100,
+		2*gridtypes.Gigabyte,
 	)
 
 	return

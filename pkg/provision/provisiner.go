@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -228,7 +227,7 @@ func (p *mapProvisioner) CanUpdate(ctx context.Context, typ gridtypes.WorkloadTy
 }
 
 func setState(result *gridtypes.Result, err error) {
-	result.Created = gridtypes.Timestamp(time.Now().Unix())
+	result.Created = gridtypes.Now()
 	state := gridtypes.StateOk
 	str := ""
 

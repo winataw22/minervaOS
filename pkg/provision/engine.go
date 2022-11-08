@@ -725,6 +725,7 @@ func (e *NativeEngine) installWorkload(ctx context.Context, wl *gridtypes.Worklo
 		// workload already exist, so no need to create a new transaction
 		return nil
 	} else if err != nil {
+		result.Created = gridtypes.Now()
 		result.State = gridtypes.StateError
 		result.Error = err.Error()
 	}
@@ -817,17 +818,31 @@ func (e *NativeEngine) lockWorkload(ctx context.Context, wl *gridtypes.WorkloadW
 		wl.Workload.WithResults(result))
 }
 
-func (e *NativeEngine) uninstallDeployment(ctx context.Context, getter gridtypes.WorkloadGetter, reason string) {
+func (e *NativeEngine) uninstallDeployment(ctx context.Context, dl *gridtypes.Deployment, reason string) {
+	var errors bool
 	for i := len(e.order) - 1; i >= 0; i-- {
 		typ := e.order[i]
 
-		workloads := getter.ByType(typ)
+		workloads := dl.ByType(typ)
 		for _, wl := range workloads {
 			if err := e.uninstallWorkload(ctx, wl, reason); err != nil {
+				errors = true
 				log.Error().Err(err).Stringer("id", wl.ID).Msg("failed to un-install workload")
 			}
 		}
 	}
+
+	if errors {
+		return
+	}
+
+	if err := e.storage.Delete(dl.TwinID, dl.ContractID); err != nil {
+		log.Error().Err(err).
+			Uint32("twin", dl.TwinID).
+			Uint64("contract", dl.ContractID).
+			Msg("failed to delete deployment")
+	}
+
 }
 
 func (e *NativeEngine) installDeployment(ctx context.Context, getter gridtypes.WorkloadGetter) {

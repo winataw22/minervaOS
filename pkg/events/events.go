@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
+	rpc "github.com/centrifuge/go-substrate-rpc-client/v4/gethrpc"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -98,9 +99,17 @@ func (e *Events) eventsTo(cl *gsrpc.SubstrateAPI, meta *types.Metadata, block ty
 			return errors.Wrapf(err, "failed to get block hash '%d'", start)
 		}
 
+		//state.ErrUnknownBlock
 		changes, err := cl.RPC.State.QueryStorageAt([]types.StorageKey{key}, hash)
+		if err, ok := err.(rpc.Error); ok {
+			if err.ErrorCode() == -32000 { // block is too old not in archive anymore
+				log.Debug().Uint32("block", uint32(i)).Msg("block not available in archive anymore")
+				continue
+			}
+		}
+
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to get block with hash '%s'", hash.Hex())
 		}
 
 		e.process(changes, meta)

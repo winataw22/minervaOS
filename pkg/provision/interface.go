@@ -62,7 +62,7 @@ var (
 	// it conflicts with another deployment
 	ErrDeploymentConflict = fmt.Errorf("conflict")
 	//ErrDeploymentNotExists returned if object not exists
-	ErrDeploymentNotExists = fmt.Errorf("workload does not exist")
+	ErrDeploymentNotExists = fmt.Errorf("deployment does not exist")
 	// ErrWorkloadNotExist returned by storage if workload does not exist
 	ErrWorkloadNotExist = fmt.Errorf("workload does not exist")
 	// ErrNoActionNeeded can be returned by any provision method to indicate that
@@ -122,6 +122,8 @@ type Storage interface {
 	Twins() ([]uint32, error)
 	// ByTwin return list of deployments for a twin
 	ByTwin(twin uint32) ([]uint64, error)
+	// return total capacity and active deployments
+	Capacity() (cap gridtypes.Capacity, active []gridtypes.Deployment, err error)
 }
 
 // Janitor interface

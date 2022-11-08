@@ -40,8 +40,8 @@ var (
 type Statistics struct {
 	inner    provision.Provisioner
 	total    gridtypes.Capacity
-	counters Counters
-	reserved Counters
+	reserved gridtypes.Capacity
+	storage  provision.Storage
 	mem      gridtypes.Unit
 }
 
@@ -52,7 +52,7 @@ func roundTotalMemory(t gridtypes.Unit) gridtypes.Unit {
 
 // NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
-func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, inner provision.Provisioner) *Statistics {
+func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved gridtypes.Capacity, inner provision.Provisioner) *Statistics {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
 		panic(err)
@@ -60,36 +60,35 @@ func NewStatistics(total, initial gridtypes.Capacity, reserved Counters, inner p
 
 	total.MRU = roundTotalMemory(total.MRU)
 
-	log.Debug().Msgf("initial used capacity %+v", initial)
-	var counters Counters
-	counters.Increment(initial)
-
 	return &Statistics{
 		inner:    inner,
 		total:    total,
-		counters: counters,
 		reserved: reserved,
+		storage:  storage,
 		mem:      gridtypes.Unit(vm.Total),
 	}
 }
 
-// Current returns the current used capacity
-func (s *Statistics) Current() gridtypes.Capacity {
-	total, usable, err := s.getUsableMemoryBytes()
+func (s *Statistics) active() (gridtypes.Capacity, error) {
+	cap, _, err := s.storage.Capacity()
+	return cap, err
+}
+
+// Current returns the current used capacity including reserved capacity
+// used by the system
+func (s *Statistics) Current() (gridtypes.Capacity, error) {
+	cap, usable, err := s.getUsableMemoryBytes()
 
 	if err != nil {
-		panic("failed to get memory consumption")
+		return cap, err
 	}
 
-	used := total + s.reserved.MRU.Current() - usable
+	used := s.total.MRU - usable
 
-	return gridtypes.Capacity{
-		CRU:   uint64(s.counters.CRU.Current() + s.reserved.CRU.Current()),
-		MRU:   used,
-		HRU:   s.counters.HRU.Current() + s.reserved.HRU.Current(),
-		SRU:   s.counters.SRU.Current() + s.reserved.SRU.Current(),
-		IPV4U: uint64(s.counters.IPv4.Current()),
-	}
+	cap.Add(&s.reserved)
+	cap.MRU = used
+
+	return cap, nil
 }
 
 // Total returns the node total capacity
@@ -97,50 +96,44 @@ func (s *Statistics) Total() gridtypes.Capacity {
 	return s.total
 }
 
-// getUsableMemoryBytes returns the usable free memory. this takes
-// into account the system reserved, actual available memory and the theorytical max reserved memory
-// by the workloads
-func (s *Statistics) getUsableMemoryBytes() (gridtypes.Unit, gridtypes.Unit, error) {
+// getUsableMemoryBytes returns the used capacity by *reservations* and usable free memory. for the memory
+// it takes into account reserved memory for the system
+func (s *Statistics) getUsableMemoryBytes() (gridtypes.Capacity, gridtypes.Unit, error) {
+	// [                          ]
+	// [[R][ WL ]                 ]
+	// [[    actual    ]          ]
+
+	cap, err := s.active()
+	if err != nil {
+		return cap, 0, err
+	}
+
 	m, err := mem.VirtualMemory()
 	if err != nil {
-		return 0, 0, err
+		return cap, 0, err
 	}
 
-	reserved := s.reserved.MRU.Current()
-	// total is always the total - the reserved
-	total := s.total.MRU - reserved
+	theoreticalUsed := cap.MRU + s.reserved.MRU
+	actualUsed := m.Total - m.Available
 
-	// which means the available memory is always also
-	// is actual_available - reserved
-	var available gridtypes.Unit
-	if gridtypes.Unit(m.Available) > reserved {
-		available = gridtypes.Unit(m.Available) - reserved
-	}
+	used := gridtypes.Max(theoreticalUsed, gridtypes.Unit(actualUsed))
 
-	// get reserved memory from current deployed workloads (theoretical max)
-	theoryticalUsed := s.counters.MRU.Current()
-	var theoryticalFree gridtypes.Unit // this is the (total - workload)
-	if total > theoryticalUsed {
-		theoryticalFree = total - theoryticalUsed
-	}
-
-	// usable is the min of actual available on the system or theoryticalFree
-	usable := gridtypes.Unit(math.Min(float64(theoryticalFree), float64(available)))
-	return total, usable, nil
+	usable := gridtypes.Unit(m.Total) - used
+	return cap, usable, nil
 }
 
-func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) error {
+func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) (gridtypes.Capacity, error) {
 	// checks memory
-	_, usable, err := s.getUsableMemoryBytes()
+	used, usable, err := s.getUsableMemoryBytes()
 	if err != nil {
-		return errors.Wrap(err, "failed to get available memory")
+		return used, errors.Wrap(err, "failed to get available memory")
 	}
 	if required.MRU > usable {
-		return fmt.Errorf("cannot fulfil required memory size %d bytes out of usable %d bytes", required.MRU, usable)
+		return used, fmt.Errorf("cannot fulfil required memory size %d bytes out of usable %d bytes", required.MRU, usable)
 	}
 
 	//check other resources as well?
-	return nil
+	return used, nil
 }
 
 // Initialize implements provisioner interface
@@ -150,7 +143,6 @@ func (s *Statistics) Initialize(ctx context.Context) error {
 
 // Provision implements the provisioner interface
 func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (result gridtypes.Result, err error) {
-	current := s.Current()
 	needed, err := wl.Capacity()
 	if err != nil {
 		return result, errors.Wrap(err, "failed to calculate workload needed capacity")
@@ -162,38 +154,18 @@ func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID
 		needed.MRU += gridtypes.Min(needed.MRU*5/100, gridtypes.Gigabyte)
 	} // TODO: other types ?
 
-	if err := s.hasEnoughCapacity(&needed); err != nil {
+	current, err := s.hasEnoughCapacity(&needed)
+	if err != nil {
 		return result, errors.Wrap(err, "failed to satisfy required capacity")
 	}
 
 	ctx = context.WithValue(ctx, currentCapacityKey{}, current)
-	result, err = s.inner.Provision(ctx, wl)
-	if err != nil {
-		return result, err
-	}
-
-	if result.State.IsOkay() {
-		log.Debug().Str("type", wl.Type.String()).Str("id", wl.ID.String()).Msgf("incrmenting capacity +%+v", needed)
-		s.counters.Increment(needed)
-	}
-
-	return result, nil
+	return s.inner.Provision(ctx, wl)
 }
 
 // Decommission implements the decomission interface
 func (s *Statistics) Deprovision(ctx context.Context, wl *gridtypes.WorkloadWithID) error {
-	if err := s.inner.Deprovision(ctx, wl); err != nil {
-		return err
-	}
-	cap, err := wl.Capacity()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to decrement statistics counter")
-		return nil
-	}
-
-	s.counters.Decrement(cap)
-
-	return nil
+	return s.inner.Deprovision(ctx, wl)
 }
 
 // Update implements the provisioner interface
@@ -232,12 +204,17 @@ func (s *statisticsMessageBus) setup(router rmb.Router) error {
 }
 
 func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) (interface{}, error) {
+
+	used, err := s.stats.Current()
+	if err != nil {
+		return nil, err
+	}
 	return struct {
 		Total gridtypes.Capacity `json:"total"`
 		Used  gridtypes.Capacity `json:"used"`
 	}{
 		Total: s.stats.Total(),
-		Used:  s.stats.Current(),
+		Used:  used,
 	}, nil
 }
 
@@ -257,15 +234,19 @@ func (s *statsStream) ReservedStream(ctx context.Context) <-chan gridtypes.Capac
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(10 * time.Second):
-				ch <- s.stats.Current()
+			case <-time.After(2 * time.Minute):
+				used, err := s.stats.Current()
+				if err != nil {
+					log.Error().Err(err).Msg("failed to get used capacity")
+				}
+				ch <- used
 			}
 		}
 	}(ctx)
 	return ch
 }
 
-func (s *statsStream) Current() gridtypes.Capacity {
+func (s *statsStream) Current() (gridtypes.Capacity, error) {
 	return s.stats.Current()
 }
 

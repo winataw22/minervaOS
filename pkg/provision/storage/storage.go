@@ -182,7 +182,40 @@ func (b *MigrationStorage) Migrate(dl gridtypes.Deployment) error {
 }
 
 func (b *BoltStorage) Delete(twin uint32, deployment uint64) error {
-	panic("unimplemented")
+	return b.db.Update(func(t *bolt.Tx) error {
+		bucket := t.Bucket(b.u32(twin))
+		if bucket == nil {
+			return nil
+		}
+
+		if err := bucket.DeleteBucket(b.u64(deployment)); err != nil && !errors.Is(err, bolt.ErrBucketNotFound) {
+			return err
+		}
+		// if the twin now is empty then we can also delete the twin
+		curser := bucket.Cursor()
+		found := false
+		for k, v := curser.First(); k != nil; k, v = curser.Next() {
+			if v != nil {
+				// checking that it is a bucket
+				continue
+			}
+
+			if len(k) != 8 || string(k) == "global" {
+				// sanity check it's a valid uint32
+				continue
+			}
+
+			found = true
+			break
+		}
+
+		if !found {
+			// empty bucket
+			return t.DeleteBucket(b.u32(twin))
+		}
+
+		return nil
+	})
 }
 
 func (b *BoltStorage) Get(twin uint32, deployment uint64) (dl gridtypes.Deployment, err error) {
@@ -691,4 +724,51 @@ func (b *BoltStorage) Capacity() (cap gridtypes.Capacity, active []gridtypes.Dep
 
 func (b *BoltStorage) Close() error {
 	return b.db.Close()
+}
+
+// CleanDeletes is a cleaner method intended to clean up old "deleted" contracts
+// that has no active workloads anymore. We used to always leave the entire history
+// of all deployments that ever lived on the system. But we changed that so once
+// a deployment is deleted, it's deleted forever. Hence this code is only needed
+// temporary until it's available on all environments then can be dropped.
+func (b *BoltStorage) CleanDeleted() error {
+	twins, err := b.Twins()
+	if err != nil {
+		return err
+	}
+
+	for _, twin := range twins {
+		dls, err := b.ByTwin(twin)
+		if err != nil {
+			log.Error().Err(err).Uint32("twin", twin).Msg("failed to get twin deployments")
+			continue
+		}
+		for _, dl := range dls {
+			deployment, err := b.Get(twin, dl)
+			if err != nil {
+				log.Error().Err(err).Uint32("twin", twin).Uint64("deployment", dl).Msg("failed to get deployment")
+				continue
+			}
+
+			isActive := false
+			for _, wl := range deployment.Workloads {
+				if !wl.Result.State.IsOkay() {
+					continue
+				}
+
+				isActive = true
+				break
+			}
+
+			if isActive {
+				continue
+			}
+
+			if err := b.Delete(twin, dl); err != nil {
+				log.Error().Err(err).Uint32("twin", twin).Uint64("deployment", dl).Msg("failed to delete deployment")
+			}
+		}
+	}
+
+	return nil
 }

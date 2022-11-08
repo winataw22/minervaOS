@@ -10,6 +10,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/boltdb/bolt"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
@@ -431,4 +432,98 @@ func TestMigrateUnsafe(t *testing.T) {
 
 	require.False(db.unsafe)
 	require.True(migration.unsafe.unsafe)
+}
+
+func TestDeleteDeployment(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+		Workloads: []gridtypes.Workload{
+			{
+				Type: testType1,
+				Name: "vm1",
+			},
+			{
+				Type: testType2,
+				Name: "vm2",
+			},
+		},
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	err = db.Delete(1, 10)
+	require.NoError(err)
+
+	_, err = db.Get(1, 10)
+	require.ErrorIs(err, provision.ErrDeploymentNotExists)
+	deployments, err := db.ByTwin(1)
+	require.NoError(err)
+	require.Empty(deployments)
+
+	err = db.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(db.u32(1))
+		if bucket == nil {
+			return nil
+		}
+		return fmt.Errorf("twin bucket was not deleted")
+	})
+	require.NoError(err)
+}
+
+func TestDeleteDeploymentMultiple(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(os.TempDir(), fmt.Sprint(rand.Int63()))
+	defer os.RemoveAll(path)
+
+	db, err := New(path)
+	require.NoError(err)
+
+	dl := gridtypes.Deployment{
+		Version:     1,
+		TwinID:      1,
+		ContractID:  10,
+		Description: "description",
+		Metadata:    "some metadata",
+		Workloads: []gridtypes.Workload{
+			{
+				Type: testType1,
+				Name: "vm1",
+			},
+			{
+				Type: testType2,
+				Name: "vm2",
+			},
+		},
+	}
+
+	err = db.Create(dl)
+	require.NoError(err)
+
+	dl.ContractID = 20
+	err = db.Create(dl)
+	require.NoError(err)
+
+	err = db.Delete(1, 10)
+	require.NoError(err)
+
+	_, err = db.Get(1, 10)
+	require.ErrorIs(err, provision.ErrDeploymentNotExists)
+	deployments, err := db.ByTwin(1)
+	require.NoError(err)
+	require.Len(deployments, 1)
+
+	_, err = db.Get(1, 20)
+	require.NoError(err)
 }
