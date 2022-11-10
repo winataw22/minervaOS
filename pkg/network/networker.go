@@ -1218,8 +1218,6 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 		return result
 	}
 
-	addresses := get()
-
 	ch := make(chan pkg.NetlinkAddresses)
 	go func() {
 		defer close(ch)
@@ -1228,7 +1226,7 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 			case <-ctx.Done():
 				return
 			case <-time.After(30 * time.Second):
-				ch <- addresses
+				ch <- get()
 			}
 		}
 	}()
