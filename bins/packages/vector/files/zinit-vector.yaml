@@ -1,0 +1,14 @@
+# pkill -HUP is for older version of zinit that doesn't start process
+# in its own process group
+exec: |
+  sh -c '
+  pkill vector
+
+  export NODE=$(identityd -address)
+  export FARM=$(identityd -farm)
+  export NETWORK=$(identityd -net)
+  exec vector -c /etc/vector/vector.yaml
+  '
+log: stdout
+after:
+  - identityd

@@ -64,30 +64,53 @@ func main() {
 		interval int
 		ver      bool
 		debug    bool
-		id       bool
+
+		id      bool
+		net     bool
+		farm    bool
+		address bool
 	)
 
 	flag.StringVar(&root, "root", "/var/cache/modules/identityd", "root working directory of the module")
 	flag.StringVar(&broker, "broker", redisSocket, "connection string to broker")
 	flag.IntVar(&interval, "interval", 600, "interval in seconds between update checks, default to 600")
 	flag.BoolVar(&ver, "v", false, "show version and exit")
-	flag.BoolVar(&debug, "d", false, "when set, no self update is done before upgradeing")
-	flag.BoolVar(&id, "id", false, "prints the node ID and exits")
+	flag.BoolVar(&debug, "d", false, "when set, no self update is done before upgrading")
+	flag.BoolVar(&id, "id", false, "[deprecated] prints the node ID and exits")
+	flag.BoolVar(&net, "net", false, "prints the node network and exits")
+	flag.BoolVar(&farm, "farm", false, "prints the node farm id and exits")
+	flag.BoolVar(&address, "address", false, "prints the node ss58 address and exits")
 
 	flag.Parse()
 	if ver {
 		version.ShowAndExit(false)
 	}
 
-	if id {
+	if farm {
+		env := environment.MustGet()
+		fmt.Println(env.FarmerID)
+		os.Exit(0)
+	} else if net {
+		env := environment.MustGet()
+		fmt.Println(env.RunningMode.String())
+		os.Exit(0)
+	} else if id || address {
 		ctx := context.Background()
 		client, err := zbus.NewRedisClient(broker)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to connect to zbus")
 		}
 		stub := stubs.NewIdentityManagerStub(client)
-		nodeID := stub.NodeID(ctx)
-		fmt.Println(nodeID)
+
+		if id {
+			fmt.Println(stub.NodeID(ctx))
+		} else { // address
+			add, err := stub.Address(ctx)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to get node address")
+			}
+			fmt.Println(add)
+		}
 		os.Exit(0)
 	}
 
@@ -202,12 +225,14 @@ func installBinaries(boot *upgrade.Boot, upgrader *upgrade.Upgrader) error {
 	}
 
 	for _, pkg := range toDel {
+		log.Debug().Str("package", pkg.Target).Msg("uninstall package")
 		if err := upgrader.UninstallBinary(pkg); err != nil {
 			log.Error().Err(err).Str("flist", pkg.Fqdn()).Msg("failed to uninstall flist")
 		}
 	}
 
 	for _, pkg := range toAdd {
+		log.Debug().Str("package", pkg.Target).Msg("install package")
 		if err := upgrader.InstallBinary(pkg); err != nil {
 			log.Error().Err(err).Str("package", pkg.Fqdn()).Msg("failed to install package")
 		}
@@ -272,14 +297,6 @@ func upgradeLoop(
 			}
 
 			continue
-		}
-
-		err = installBinaries(boot, upgrader)
-		if err == upgrade.ErrRestartNeeded {
-			log.Info().Msg("restarting upgraded")
-			return
-		} else if err != nil {
-			log.Error().Err(err).Msg("failed to update runtime binaries")
 		}
 
 		// next check for update

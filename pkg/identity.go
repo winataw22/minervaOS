@@ -18,6 +18,12 @@ func (s StrIdentifier) Identity() string {
 	return string(s)
 }
 
+type Address string
+
+func (s Address) String() string {
+	return string(s)
+}
+
 // IdentityManager interface.
 type IdentityManager interface {
 	// Store returns the key store kind
@@ -26,8 +32,8 @@ type IdentityManager interface {
 	// NodeID returns the node id (public key)
 	NodeID() StrIdentifier
 
-	// NodeIDNumeric returns the node registered ID.
-	NodeIDNumeric() (uint32, error)
+	// Address return the node address (SS58Address address)
+	Address() (Address, error)
 
 	// FarmID return the farm id this node is part of. this is usually a configuration
 	// that the node is booted with. An error is returned if the farmer id is not configured

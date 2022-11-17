@@ -23,13 +23,14 @@ func NewStatisticsStub(client zbus.Client) *StatisticsStub {
 	}
 }
 
-func (s *StatisticsStub) Current(ctx context.Context) (ret0 gridtypes.Capacity) {
+func (s *StatisticsStub) Current(ctx context.Context) (ret0 gridtypes.Capacity, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Current", args...)
 	if err != nil {
 		panic(err)
 	}
 	result.PanicOnError()
+	ret1 = result.CallError()
 	loader := zbus.Loader{
 		&ret0,
 	}

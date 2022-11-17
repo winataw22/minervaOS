@@ -12,7 +12,7 @@ one kind of update is applied at a time.
 This to prevent updates to step on each other toes.
 */
 
-//FListRepo type
+// FListRepo type
 type FListRepo struct {
 	Repo    string
 	Current map[string]FListInfo
@@ -43,10 +43,10 @@ func (w *FListRepo) diff(packages map[string]FListInfo) (toAdd, toDel []FListInf
 		}
 	}
 
-	for name := range w.Current {
-		current, ok := packages[name]
+	for name, pkg := range w.Current {
+		_, ok := packages[name]
 		if !ok {
-			toDel = append(toDel, current)
+			toDel = append(toDel, pkg)
 		}
 	}
 

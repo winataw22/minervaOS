@@ -36,12 +36,6 @@ jobs:
       package: virtwhat
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  logtrunc:
-    uses: ./.github/workflows/bin-package.yaml
-    with:
-      package: logtrunc
-    secrets:
-      token: ${{ secrets.HUB_JWT }}
   yggdrasil:
     uses: ./.github/workflows/bin-package.yaml
     with:
@@ -96,10 +90,16 @@ jobs:
       package: virtiofsd
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  node-exporter:
+  # node-exporter:
+  #   uses: ./.github/workflows/bin-package.yaml
+  #   with:
+  #     package: node-exporter
+  #   secrets:
+  #     token: ${{ secrets.HUB_JWT }}
+  vector:
     uses: ./.github/workflows/bin-package.yaml
     with:
-      package: node-exporter
+      package: vector
     secrets:
       token: ${{ secrets.HUB_JWT }}
   tpm:

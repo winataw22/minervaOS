@@ -358,7 +358,7 @@ func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 	}
 
 	if err := u.uninstall(from.FListInfo); err != nil {
-		log.Error().Err(err).Msg("failed to unistall current flist. Upgraded anyway")
+		log.Error().Err(err).Msg("failed to uninstall current flist. Upgraded anyway")
 	}
 
 	log.Info().Msg("clean up complete, copying new files")

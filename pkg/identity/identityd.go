@@ -20,7 +20,6 @@ type identityManager struct {
 	env  environment.Environment
 
 	farm string
-	node uint32
 }
 
 // NewManager creates an identity daemon from seed
@@ -83,31 +82,13 @@ func (d *identityManager) NodeID() pkg.StrIdentifier {
 	return pkg.StrIdentifier(d.key.Identity())
 }
 
-func (d *identityManager) NodeIDNumeric() (uint32, error) {
-	if d.node != 0 {
-		return d.node, nil
-	}
+// NodeID returns the node identity
+func (d *identityManager) Address() (pkg.Address, error) {
 	id, err := substrate.NewIdentityFromEd25519Key(d.key.PrivateKey)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	cl, err := d.sub.Substrate()
-	if err != nil {
-		return 0, err
-	}
-	defer cl.Close()
-
-	twin, err := cl.GetTwinByPubKey(id.PublicKey())
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get node twin")
-	}
-
-	node, err := cl.GetNodeByTwinID(twin)
-	if err != nil {
-		return 0, err
-	}
-	d.node = node
-	return node, nil
+	return pkg.Address(id.Address()), nil
 }
 
 func (d *identityManager) Farm() (string, error) {

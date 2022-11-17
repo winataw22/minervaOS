@@ -28,8 +28,8 @@ func (t *testIdentityManager) NodeID() pkg.StrIdentifier {
 	return pkg.StrIdentifier(t.id)
 }
 
-func (t *testIdentityManager) NodeIDNumeric() (uint32, error) {
-	return 1, nil
+func (t *testIdentityManager) Address() (pkg.Address, error) {
+	return pkg.Address(t.id), nil
 }
 
 func (t *testIdentityManager) Farm() (string, error) {

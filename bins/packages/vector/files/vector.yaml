@@ -1,0 +1,96 @@
+---
+sources:
+  zinit:
+    type: exec
+    mode: streaming
+    command:
+      - zinit
+      - log
+  metrics:
+    type: host_metrics
+    network:
+      devices:
+        excludes:
+          - b-*
+          - br-*
+          - dumdum
+          - dummy*
+          - tozos*
+    filesystem:
+      mountpoints:
+        excludes:
+          - /var/cache
+          - /var/cache/*
+          - /var/run/*
+          - /dev
+          - /dev/*
+          - /sys
+          - /sys/*
+          - /proc
+          - /proc/*
+transforms:
+  parsed:
+    type: remap
+    inputs:
+      - zinit
+    source: |-
+      structured, err = parse_regex(.message, r'\[(?P<output>\+|\-)\] (?P<module>[^:]+):')
+      if err == null {
+        . = merge(., structured)
+      }
+
+      level, err = parse_regex(.message, r'(?P<level>debug|info|error|warn|fatal|panic)')
+      if err != null {
+        .level = "info"
+      } else {
+        . = merge(., level)
+      }
+
+      if .output == "+" {
+        .stream = "stdout"
+      } else {
+        .stream = "stderr"
+      }
+
+      .node = get_env_var("NODE") ?? "unknown"
+      .network = get_env_var("NETWORK") ?? "unknown"
+      .farm = get_env_var("FARM") ?? "unknown"
+
+      del(.output)
+      del(.command)
+      del(.host)
+      del(.source_type)
+      del(.pid)
+
+sinks:
+  # out:
+  #   inputs:
+  #     - parsed
+  #   type: console
+  #   encoding:
+  #     codec: "text"
+  # TODO: enable once we have vector installed
+  # vector:
+  #   inputs:
+  #     - metrics
+  #   type: console
+  #   encoding:
+  #     codec: "json"
+
+  loki:
+    inputs:
+      - parsed
+    type: loki
+    labels:
+      node: "{{ node }}"
+      level: "{{ level }}"
+      module: "{{ module }}"
+      network: "{{ network }}"
+      stream: "{{ stream }}"
+      farm: "{{ farm }}"
+    endpoint: http://loki.grid.tf:3100
+    encoding:
+      codec: text
+    compression: snappy
+    healthcheck:
+      enabled: false
