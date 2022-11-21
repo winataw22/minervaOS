@@ -6,7 +6,7 @@ sources:
     command:
       - zinit
       - log
-  metrics:
+  host:
     type: host_metrics
     network:
       devices:
@@ -29,7 +29,20 @@ sources:
           - /proc
           - /proc/*
 transforms:
-  parsed:
+  metrics:
+    type: remap
+    inputs:
+      - host
+    source: |-
+      tags = {
+        "node": get_env_var("NODE") ?? "unknown",
+        "network": get_env_var("NETWORK") ?? "unknown",
+        "farm": get_env_var("FARM") ?? "unknown",
+      }
+
+      .tags = merge!(.tags, tags)
+      del(.tags.host)
+  logs:
     type: remap
     inputs:
       - zinit
@@ -65,21 +78,21 @@ transforms:
 sinks:
   # out:
   #   inputs:
-  #     - parsed
-  #   type: console
-  #   encoding:
-  #     codec: "text"
-  # TODO: enable once we have vector installed
-  # vector:
-  #   inputs:
   #     - metrics
   #   type: console
   #   encoding:
   #     codec: "json"
+  # TODO: enable once we have vector installed
+  vector:
+    type: vector
+    inputs:
+      - metrics
+    address: agg.grid.tf:24901
+    compression: true
 
   loki:
     inputs:
-      - parsed
+      - logs
     type: loki
     labels:
       node: "{{ node }}"

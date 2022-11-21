@@ -3,7 +3,6 @@ package primitives
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/pkg/errors"
@@ -45,11 +44,6 @@ type Statistics struct {
 	mem      gridtypes.Unit
 }
 
-// round the given value to the lowest gigabyte
-func roundTotalMemory(t gridtypes.Unit) gridtypes.Unit {
-	return gridtypes.Unit(math.Floor(float64(t)/float64(gridtypes.Gigabyte))) * gridtypes.Gigabyte
-}
-
 // NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
 func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved gridtypes.Capacity, inner provision.Provisioner) *Statistics {
@@ -57,8 +51,6 @@ func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved
 	if err != nil {
 		panic(err)
 	}
-
-	total.MRU = roundTotalMemory(total.MRU)
 
 	return &Statistics{
 		inner:    inner,
@@ -69,26 +61,17 @@ func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved
 	}
 }
 
+// Get all used capacity from storage + reserved
 func (s *Statistics) active() (gridtypes.Capacity, error) {
 	cap, _, err := s.storage.Capacity()
+	cap.Add(&s.reserved)
 	return cap, err
 }
 
 // Current returns the current used capacity including reserved capacity
 // used by the system
 func (s *Statistics) Current() (gridtypes.Capacity, error) {
-	cap, usable, err := s.getUsableMemoryBytes()
-
-	if err != nil {
-		return cap, err
-	}
-
-	used := s.total.MRU - usable
-
-	cap.Add(&s.reserved)
-	cap.MRU = used
-
-	return cap, nil
+	return s.active()
 }
 
 // Total returns the node total capacity
@@ -113,8 +96,8 @@ func (s *Statistics) getUsableMemoryBytes() (gridtypes.Capacity, gridtypes.Unit,
 		return cap, 0, err
 	}
 
-	theoreticalUsed := cap.MRU + s.reserved.MRU
-	actualUsed := m.Total - m.Available
+	theoreticalUsed := cap.MRU
+	actualUsed := (m.Total - m.Available) + uint64(s.reserved.MRU)
 
 	used := gridtypes.Max(theoreticalUsed, gridtypes.Unit(actualUsed))
 
