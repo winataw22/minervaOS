@@ -1,5 +1,5 @@
-VIRTWHAT_VERSION="1.20"
-VIRTWHAT_CHECKSUM="881bf446bc922eb1c702cdd2302b4459"
+VIRTWHAT_VERSION="1.25"
+VIRTWHAT_CHECKSUM="2345f1ec5fa0836bff4071659730ac8f"
 VIRTWHAT_LINK="https://people.redhat.com/~rjones/virt-what/files/virt-what-${VIRTWHAT_VERSION}.tar.gz"
 
 download_virtwhat() {
