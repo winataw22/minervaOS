@@ -1,8 +1,6 @@
 package backend
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,12 +8,7 @@ import (
 )
 
 func TestReserve(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-
-	defer func() {
-		os.RemoveAll(dir)
-	}()
+	dir := t.TempDir()
 
 	ns1 := "ns"
 	ns2 := "ns2"

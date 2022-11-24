@@ -15,11 +15,8 @@ import (
 
 func TestCacheCleaner(t *testing.T) {
 
-	cache, err := ioutil.TempDir("", "clean-cache-*")
+	cache := t.TempDir()
 
-	defer os.RemoveAll(cache)
-
-	require.NoError(t, err)
 	flister := flistModule{
 		cache: cache,
 	}
@@ -54,7 +51,7 @@ func TestCacheCleaner(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	err = flister.cleanCache(now, 50*24*time.Hour) // this should delete 50 files!
+	err := flister.cleanCache(now, 50*24*time.Hour) // this should delete 50 files!
 	require.NoError(t, err)
 
 	files, err := ioutil.ReadDir(cache)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,9 +37,7 @@ func init() {
 
 func TestStorageAdd(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -69,9 +66,7 @@ func TestStorageAdd(t *testing.T) {
 
 func TestStorageAddSharable(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -110,9 +105,7 @@ func TestStorageAddSharable(t *testing.T) {
 
 func TestStorageAddConflictingSharable(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -164,9 +157,7 @@ func TestStorageAddConflictingSharable(t *testing.T) {
 
 func TestStorageSetSharable(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -261,9 +252,7 @@ func TestStorageSetSharable(t *testing.T) {
 
 func TestStorageSet(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -298,9 +287,7 @@ func TestStorageSet(t *testing.T) {
 
 func TestStorageGet(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)
@@ -332,9 +319,7 @@ func TestStorageGet(t *testing.T) {
 
 func TestStorageByTwin(t *testing.T) {
 	require := require.New(t)
-	root, err := ioutil.TempDir("", "storage-")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	store, err := NewFSStore(root)
 	require.NoError(err)

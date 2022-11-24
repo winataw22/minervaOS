@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -23,32 +24,20 @@ func NewContractEventHandler(node uint32, mgr substrate.Manager, engine provisio
 	return ContractEventHandler{node: node, pool: mgr, engine: engine, cl: cl}
 }
 
-func (r *ContractEventHandler) current() (map[uint64]uint32, error) {
+func (r *ContractEventHandler) current() (map[uint64]gridtypes.Deployment, error) {
 	// we need to build a list of all supposedly active contracts on this node
 	storage := r.engine.Storage()
-	twins, err := storage.Twins()
+	_, deployments, err := storage.Capacity()
 	if err != nil {
 		return nil, err
 	}
-	active := make(map[uint64]uint32)
-	for _, twin := range twins {
-		deployments, err := storage.ByTwin(twin)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range deployments {
-			deployment, err := storage.Get(twin, id)
-			if err != nil {
-				return nil, err
-			}
 
-			if len(deployment.Workloads) > 0 {
-				active[deployment.ContractID] = twin
-			}
-		}
+	running := make(map[uint64]gridtypes.Deployment)
+	for _, active := range deployments {
+		running[active.ContractID] = active
 	}
 
-	return active, nil
+	return running, nil
 }
 
 func (r *ContractEventHandler) sync(ctx context.Context) error {
@@ -69,23 +58,79 @@ func (r *ContractEventHandler) sync(ctx context.Context) error {
 		return errors.Wrap(err, "failed to get active node contracts")
 	}
 
+	// running will eventually contain all running contracts
+	// that also exist on the chain.
+	running := make(map[uint64]gridtypes.Deployment)
+
 	for _, contract := range onchain {
+		// if contract is in active map, move it to running
+		if dl, ok := active[uint64(contract)]; ok {
+			running[dl.ContractID] = dl
+		}
+		// clean the active contracts anyway
 		delete(active, uint64(contract))
 	}
 
-	for contract, twin := range active {
+	// the active map now contains all contracts that are active on the node
+	// but not active on the chain (don't exist on chain anymore)
+	// hence we can simply deprovision
+	for contract, dl := range active {
 		// those contracts exits on node but not on chain.
 		// need to be deleted
-		if err := r.engine.Deprovision(ctx, twin, contract, "contract not active on chain"); err != nil {
+		if err := r.engine.Deprovision(ctx, dl.TwinID, contract, "contract not active on chain"); err != nil {
 			log.Error().Err(err).
-				Uint32("twin", twin).
+				Uint32("twin", dl.TwinID).
 				Uint64("contract", contract).
 				Msg("failed to decomission contract")
 		}
 	}
 
+	// the running map now contains all contracts that are still exist on the chain.
+	// but some of those running contracts can be either locked, or unlocked.
+	// hence we need to make sure deployments here has the same state as their contracts
+
+	for id, dl := range running {
+		logger := log.With().
+			Uint32("twin", dl.TwinID).
+			Uint64("contract", id).
+			Logger()
+
+		contract, err := sub.GetContract(id)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to get contract from chain")
+			continue
+		}
+		// locked is chain state for that contract
+		locked := contract.State.IsGracePeriod
+		logger.Info().Bool("paused", locked).Msg("contract pause state")
+		if locked == r.isLocked(&dl) {
+			continue
+		}
+
+		// state is different
+		logger.Info().Bool("paused", locked).Msg("changing contract pause state")
+		action := r.engine.Resume
+		if locked {
+			action = r.engine.Pause
+		}
+
+		if err := action(ctx, dl.TwinID, dl.ContractID); err != nil {
+			log.Error().Err(err).Msg("failed to change contract state")
+		}
+	}
+
 	log.Debug().Msg("synchronization complete")
 	return nil
+}
+
+func (r *ContractEventHandler) isLocked(dl *gridtypes.Deployment) bool {
+	for _, wl := range dl.Workloads {
+		if wl.Result.State.IsAny(gridtypes.StatePaused) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Run runs the reporter

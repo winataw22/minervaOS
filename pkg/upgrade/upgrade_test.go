@@ -1,7 +1,6 @@
 package upgrade
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,10 +23,7 @@ func TestUpgraderDownload(t *testing.T) {
 
 	store, err := up.getFlist(flist)
 	require.NoError(err)
-	tmp, err := ioutil.TempDir("", "download-*")
-
-	require.NoError(err)
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	err = up.copyRecursive(store, tmp)
 	require.NoError(err)

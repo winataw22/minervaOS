@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,9 +9,7 @@ import (
 )
 
 func TestLockOperations(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// create a dummy file to lock
 	path := filepath.Join(dir, "x")
@@ -32,9 +29,7 @@ func TestLockOperations(t *testing.T) {
 }
 
 func TestLockFolderPath(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// use the folder to lock
 	m, err := NewFileLock(dir)

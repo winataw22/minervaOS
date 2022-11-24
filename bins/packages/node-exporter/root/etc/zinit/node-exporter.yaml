@@ -1,1 +1,0 @@
-exec: node_exporter '--collector.netdev.device-exclude=(b|br)-.*'

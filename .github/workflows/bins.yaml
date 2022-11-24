@@ -24,12 +24,6 @@ jobs:
       package: runc
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  promtail:
-    uses: ./.github/workflows/bin-package.yaml
-    with:
-      package: promtail
-    secrets:
-      token: ${{ secrets.HUB_JWT }}
   virtwhat:
     uses: ./.github/workflows/bin-package.yaml
     with:
@@ -90,12 +84,6 @@ jobs:
       package: virtiofsd
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  # node-exporter:
-  #   uses: ./.github/workflows/bin-package.yaml
-  #   with:
-  #     package: node-exporter
-  #   secrets:
-  #     token: ${{ secrets.HUB_JWT }}
   vector:
     uses: ./.github/workflows/bin-package.yaml
     with:

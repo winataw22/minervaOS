@@ -3,7 +3,6 @@ package flist
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -143,17 +142,12 @@ func TestMountUnmount(t *testing.T) {
 	cmder := &testCommander{T: t}
 	strg := &StorageMock{}
 
-	root, err := ioutil.TempDir("", "flist_root")
-	require.NoError(t, err)
-
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	sys := &testSystem{}
 	flister := newFlister(root, strg, cmder, sys)
 
-	backend, err := ioutil.TempDir("", "flist_backend")
-	require.NoError(t, err)
-	defer os.RemoveAll(backend)
+	backend := t.TempDir()
 
 	strg.On("VolumeLookup", mock.Anything, mock.Anything).Return(backend, nil)
 
@@ -180,17 +174,10 @@ func TestMountUnmountRO(t *testing.T) {
 	cmder := &testCommander{T: t}
 	strg := &StorageMock{}
 
-	root, err := ioutil.TempDir("", "flist_root")
-	require.NoError(t, err)
-
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	sys := &testSystem{}
 	flister := newFlister(root, strg, cmder, sys)
-
-	backend, err := ioutil.TempDir("", "flist_backend")
-	require.NoError(t, err)
-	defer os.RemoveAll(backend)
 
 	name := "test"
 
@@ -216,18 +203,13 @@ func TestIsolation(t *testing.T) {
 	cmder := &testCommander{T: t}
 	strg := &StorageMock{}
 
-	root, err := ioutil.TempDir("", "flist_root")
-	require.NoError(err)
-
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	sys := &testSystem{}
 
 	flister := newFlister(root, strg, cmder, sys)
 
-	backend, err := ioutil.TempDir("", "flist_backend")
-	require.NoError(err)
-	defer os.RemoveAll(backend)
+	backend := t.TempDir()
 	strg.On("VolumeLookup", mock.Anything, mock.Anything).Return(backend, nil)
 
 	strg.On("VolumeCreate", mock.Anything, mock.Anything, mock.Anything, uint64(256*mib)).
@@ -258,9 +240,7 @@ func TestDownloadFlist(t *testing.T) {
 	cmder := &testCommander{T: t}
 	strg := &StorageMock{}
 
-	root, err := ioutil.TempDir("", "flist_root")
-	require.NoError(err)
-	defer os.RemoveAll(root)
+	root := t.TempDir()
 
 	sys := &testSystem{}
 

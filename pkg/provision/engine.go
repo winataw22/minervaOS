@@ -367,7 +367,7 @@ func (e *NativeEngine) Resume(ctx context.Context, twin uint32, id uint64) error
 	log.Info().
 		Uint32("twin", deployment.TwinID).
 		Uint64("contract", deployment.ContractID).
-		Msg("schedule for pausing")
+		Msg("schedule for resuming")
 
 	job := engineJob{
 		Target: deployment,

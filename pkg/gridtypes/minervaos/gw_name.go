@@ -28,7 +28,7 @@ func (g GatewayNameProxy) Valid(getter gridtypes.WorkloadGetter) error {
 		return fmt.Errorf("backends list can not be empty")
 	}
 	for _, backend := range g.Backends {
-		if err := backend.Valid(); err != nil {
+		if err := backend.Valid(g.TLSPassthrough); err != nil {
 			return errors.Wrapf(err, "failed to validate backend '%s'", backend)
 		}
 	}

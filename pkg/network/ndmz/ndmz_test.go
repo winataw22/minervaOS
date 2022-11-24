@@ -2,9 +2,7 @@ package ndmz
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
 	"sync"
 	"testing"
 
@@ -39,11 +37,7 @@ func TestIpv6(t *testing.T) {
 }
 
 func TestIPv4Allocate(t *testing.T) {
-	ipamPath, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = os.RemoveAll(ipamPath)
-	})
+	ipamPath := t.TempDir()
 
 	addr, err := allocateIPv4("network1", ipamPath)
 	require.NoError(t, err)
@@ -59,11 +53,7 @@ func TestIPv4Allocate(t *testing.T) {
 }
 
 func TestIPv4AllocateConcurent(t *testing.T) {
-	ipamPath, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = os.RemoveAll(ipamPath)
-	})
+	ipamPath := t.TempDir()
 
 	wg := sync.WaitGroup{}
 	wg.Add(10)
