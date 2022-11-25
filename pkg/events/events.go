@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"os"
-	"sync"
 	"time"
 
 	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
@@ -13,55 +12,41 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
-	"github.com/threefoldtech/zos/pkg"
 )
 
-type Events struct {
-	sub   substrate.Manager
-	state string
-	last  types.BlockNumber
-
-	node           uint32
-	pubCfg         chan pkg.PublicConfigEvent
-	contractCancel chan pkg.ContractCancelledEvent
-	contractLocked chan pkg.ContractLockedEvent
-
-	o sync.Once
+// State is used to track the blocks already processed by the processor
+type State interface {
+	Set(num types.BlockNumber) error
+	Get(cl *gsrpc.SubstrateAPI) (types.BlockNumber, error)
 }
 
-var (
-	_ pkg.Events = (*Events)(nil)
-)
-
-func New(sub substrate.Manager, node uint32, state string) *Events {
-	return &Events{
-		sub:            sub,
-		state:          state,
-		node:           node,
-		pubCfg:         make(chan pkg.PublicConfigEvent),
-		contractCancel: make(chan pkg.ContractCancelledEvent),
-		contractLocked: make(chan pkg.ContractLockedEvent),
-	}
+type FileState struct {
+	last types.BlockNumber
+	path string
 }
 
-func (e *Events) setLatest(num types.BlockNumber) error {
+func NewFileState(path string) State {
+	return &FileState{path: path}
+}
+
+func (e *FileState) Set(num types.BlockNumber) error {
 	e.last = num
 	var d [4]byte
 	binary.BigEndian.PutUint32(d[:], uint32(num))
-	if err := os.WriteFile(e.state, d[:], 0644); err != nil {
+	if err := os.WriteFile(e.path, d[:], 0644); err != nil {
 		return errors.Wrap(err, "failed to commit last block state")
 	}
 	return nil
 }
 
-func (e *Events) getLatest(cl *gsrpc.SubstrateAPI) (types.BlockNumber, error) {
+func (e *FileState) Get(cl *gsrpc.SubstrateAPI) (types.BlockNumber, error) {
 	// getLatest need to
 	if e.last != 0 {
 		return e.last, nil
 	}
 
 	// last is unknown, use last key file
-	data, err := os.ReadFile(e.state)
+	data, err := os.ReadFile(e.path)
 	if err == nil {
 		// get latest from the chain
 		return types.BlockNumber(binary.BigEndian.Uint32(data)), nil
@@ -76,9 +61,45 @@ func (e *Events) getLatest(cl *gsrpc.SubstrateAPI) (types.BlockNumber, error) {
 
 }
 
-func (e *Events) eventsTo(cl *gsrpc.SubstrateAPI, meta *types.Metadata, block types.Header) error {
+type Callback func(events *substrate.EventRecords)
+
+// Events processor receives all events starting from the given state
+// and for each set of events calls callback cb
+type Processor struct {
+	sub substrate.Manager
+
+	cb    Callback
+	state State
+}
+
+func NewProcessor(sub substrate.Manager, cb Callback, state State) *Processor {
+	return &Processor{
+		sub:   sub,
+		cb:    cb,
+		state: state,
+	}
+}
+
+func (e *Processor) process(changes []types.StorageChangeSet, meta *types.Metadata) {
+	for _, set := range changes {
+		for _, change := range set.Changes {
+			if !change.HasStorageData {
+				continue
+			}
+
+			var events substrate.EventRecords
+			if err := types.EventRecordsRaw(change.StorageData).DecodeEventRecords(meta, &events); err != nil {
+				log.Error().Err(err).Msg("failed to decode events from tfchain")
+				continue
+			}
+
+			e.cb(&events)
+		}
+	}
+}
+func (e *Processor) eventsTo(cl *gsrpc.SubstrateAPI, meta *types.Metadata, block types.Header) error {
 	//
-	last, err := e.getLatest(cl)
+	last, err := e.state.Get(cl)
 	if err != nil {
 		return errors.Wrap(err, "failed to get latest processed block")
 	}
@@ -118,68 +139,7 @@ func (e *Events) eventsTo(cl *gsrpc.SubstrateAPI, meta *types.Metadata, block ty
 	return nil
 }
 
-func (e *Events) process(changes []types.StorageChangeSet, meta *types.Metadata) {
-	for _, set := range changes {
-		for _, change := range set.Changes {
-			if !change.HasStorageData {
-				continue
-			}
-
-			var events substrate.EventRecords
-			if err := types.EventRecordsRaw(change.StorageData).DecodeEventRecords(meta, &events); err != nil {
-				log.Error().Err(err).Msg("failed to decode events from tfchain")
-				continue
-			}
-
-			for _, event := range events.TfgridModule_NodePublicConfigStored {
-				if event.Node != types.U32(e.node) {
-					continue
-				}
-				log.Info().Msgf("got a public config update: %+v", event.Config)
-				e.pubCfg <- pkg.PublicConfigEvent{
-					PublicConfig: event.Config,
-				}
-			}
-
-			for _, event := range events.SmartContractModule_NodeContractCanceled {
-				if event.Node != types.U32(e.node) {
-					continue
-				}
-				log.Info().Uint64("contract", uint64(event.ContractID)).Msg("got contract cancel update")
-				e.contractCancel <- pkg.ContractCancelledEvent{
-					Contract: uint64(event.ContractID),
-					TwinId:   uint32(event.Twin),
-				}
-			}
-
-			for _, event := range events.SmartContractModule_ContractGracePeriodStarted {
-				if event.NodeID != types.U32(e.node) {
-					continue
-				}
-				log.Info().Uint64("contract", uint64(event.ContractID)).Msg("got contract grace period started")
-				e.contractLocked <- pkg.ContractLockedEvent{
-					Contract: uint64(event.ContractID),
-					TwinId:   uint32(event.TwinID),
-					Lock:     true,
-				}
-			}
-
-			for _, event := range events.SmartContractModule_ContractGracePeriodEnded {
-				if event.NodeID != types.U32(e.node) {
-					continue
-				}
-				log.Info().Uint64("contract", uint64(event.ContractID)).Msg("got contract grace period ended")
-				e.contractLocked <- pkg.ContractLockedEvent{
-					Contract: uint64(event.ContractID),
-					TwinId:   uint32(event.TwinID),
-					Lock:     false,
-				}
-			}
-		}
-	}
-}
-
-func (e *Events) subscribe(ctx context.Context) error {
+func (e *Processor) subscribe(ctx context.Context) error {
 	cl, meta, err := e.sub.Raw()
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to chain")
@@ -206,14 +166,14 @@ func (e *Events) subscribe(ctx context.Context) error {
 				continue
 			}
 
-			if err := e.setLatest(block.Number); err != nil {
+			if err := e.state.Set(block.Number); err != nil {
 				return errors.Wrap(err, "failed to commit last block number")
 			}
 		}
 	}
 }
 
-func (e *Events) start(ctx context.Context) {
+func (e *Processor) Start(ctx context.Context) {
 	for {
 		err := e.subscribe(ctx)
 		if err != nil {
@@ -222,28 +182,4 @@ func (e *Events) start(ctx context.Context) {
 		}
 		return
 	}
-}
-
-func (m *Events) PublicConfigEvent(ctx context.Context) <-chan pkg.PublicConfigEvent {
-	m.o.Do(func() {
-		go m.start(ctx)
-	})
-
-	return m.pubCfg
-}
-
-func (m *Events) ContractCancelledEvent(ctx context.Context) <-chan pkg.ContractCancelledEvent {
-	m.o.Do(func() {
-		go m.start(ctx)
-	})
-
-	return m.contractCancel
-}
-
-func (m *Events) ContractLockedEvent(ctx context.Context) <-chan pkg.ContractLockedEvent {
-	m.o.Do(func() {
-		go m.start(ctx)
-	})
-
-	return m.contractLocked
 }

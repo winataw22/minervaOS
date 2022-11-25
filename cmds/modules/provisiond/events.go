@@ -7,21 +7,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/substrate-client"
-	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
-	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 type ContractEventHandler struct {
-	node   uint32
-	pool   substrate.Manager
-	engine provision.Engine
-	cl     zbus.Client
+	node           uint32
+	pool           substrate.Manager
+	engine         provision.Engine
+	eventsConsumer *events.RedisConsumer
 }
 
-func NewContractEventHandler(node uint32, mgr substrate.Manager, engine provision.Engine, cl zbus.Client) ContractEventHandler {
-	return ContractEventHandler{node: node, pool: mgr, engine: engine, cl: cl}
+func NewContractEventHandler(node uint32, mgr substrate.Manager, engine provision.Engine, events *events.RedisConsumer) ContractEventHandler {
+	return ContractEventHandler{node: node, pool: mgr, engine: engine, eventsConsumer: events}
 }
 
 func (r *ContractEventHandler) current() (map[uint64]gridtypes.Deployment, error) {
@@ -138,13 +137,12 @@ func (r *ContractEventHandler) Run(ctx context.Context) error {
 	// go over all user reservations
 	// take into account the following:
 	// every is in seconds.
-	events := stubs.NewEventsStub(r.cl)
-	cancellation, err := events.ContractCancelledEvent(ctx)
+	cancellation, err := r.eventsConsumer.ContractCancelled(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to register to node events")
 	}
 
-	locking, err := events.ContractLockedEvent(ctx)
+	locking, err := r.eventsConsumer.ContractLocked(ctx)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -30,14 +31,13 @@ func setPublicConfig(ctx context.Context, cl zbus.Client, cfg *substrate.PublicC
 }
 
 // public sets and watches changes to public config on chain and tries to apply the provided setup
-func public(ctx context.Context, nodeID uint32, env environment.Environment, cl zbus.Client) error {
+func public(ctx context.Context, nodeID uint32, env environment.Environment, cl zbus.Client, events *events.RedisConsumer) error {
 	mgr, err := environment.GetSubstrate()
 	if err != nil {
 		return err
 	}
 
-	stub := stubs.NewEventsStub(cl)
-	events, err := stub.PublicConfigEvent(ctx)
+	ch, err := events.PublicConfig(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to subscribe to node events")
 	}
@@ -70,7 +70,7 @@ reapply:
 
 		for {
 			select {
-			case event := <-events:
+			case event := <-ch:
 
 				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
 				var cfg *substrate.PublicConfig
