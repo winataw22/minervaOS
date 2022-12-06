@@ -135,10 +135,6 @@ func (w *Wireguard) Configure(privateKey string, listentPort int, peers []*Peer)
 		return err
 	}
 
-	for _, peer := range peersConfig {
-		fmt.Printf("%+v\n", peer)
-	}
-
 	config := wgtypes.Config{
 		PrivateKey:   &key,
 		Peers:        peersConfig,
