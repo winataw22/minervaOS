@@ -42,6 +42,7 @@ require (
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lestrrat-go/jwx v1.1.7
+	github.com/machinebox/graphql v0.2.2 // indirect
 	github.com/mattn/go-sqlite3 v1.14.7 // indirect
 	github.com/mdlayher/netlink v1.4.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
