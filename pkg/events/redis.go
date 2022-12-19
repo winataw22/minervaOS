@@ -376,11 +376,17 @@ func intoPayloads(result interface{}, err error) (map[string][]payload, error) {
 	for _, streamI := range streams {
 		stream := streamI.([]interface{})
 		key := string(stream[0].([]byte))
+		if stream[1] == nil {
+			continue
+		}
 		elements := stream[1].([]interface{})
 		var messages []payload
 		for _, elementI := range elements {
 			element := elementI.([]interface{})
 			id := string(element[0].([]byte))
+			if element[1] == nil {
+				continue
+			}
 			tags := element[1].([]interface{})
 			message := payload{
 				ID:   id,

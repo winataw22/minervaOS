@@ -139,6 +139,14 @@ func (i IPNet) MarshalJSON() ([]byte, error) {
 	return []byte(v), nil
 }
 
+// MarshalJSON dumps iprange as a string
+func (i IPNet) MarshalText() ([]byte, error) {
+	if len(i.IPNet.IP) == 0 {
+		return []byte{}, nil
+	}
+	return []byte(i.String()), nil
+}
+
 func (i IPNet) String() string {
 	return i.IPNet.String()
 }

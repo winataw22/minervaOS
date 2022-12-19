@@ -26,14 +26,14 @@ type redisClient struct {
 // Default return instance of to default (local) rmb
 // shortcut for NewClient(DefaultAddress)
 func Default() (Client, error) {
-	return NewClient(DefaultAddress)
+	return NewRMBClient(DefaultAddress)
 }
 
-// NewClient creates a new rmb client. the given address should
+// NewRMBClient creates a new rmb client. the given address should
 // be to the local redis. If not provided, default redis address
 // is used
 // poolSize is optional parameter to define redis pool size (Default: 20)
-func NewClient(address string, poolSize ...uint32) (Client, error) {
+func NewRMBClient(address string, poolSize ...uint32) (Client, error) {
 
 	if len(address) == 0 {
 		address = DefaultAddress
