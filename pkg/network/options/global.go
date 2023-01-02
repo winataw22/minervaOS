@@ -15,7 +15,7 @@ func SetIPv6Forwarding(f bool) error {
 	return err
 }
 
-//RouterAdvertisements flag
+// RouterAdvertisements flag
 type RouterAdvertisements int
 
 const (
@@ -29,7 +29,11 @@ const (
 
 // SetIPv6AcceptRA enables or disables forwarding for ipv6
 func SetIPv6AcceptRA(f RouterAdvertisements) error {
-	_, err := sysctl.Sysctl("net.ipv6.conf.all.accept_ra", fmt.Sprint(int(f)))
+	if _, err := sysctl.Sysctl("net.ipv6.conf.all.accept_ra", fmt.Sprint(int(f))); err != nil {
+		return err
+	}
+
+	_, err := sysctl.Sysctl("net.ipv6.conf.default.accept_ra", fmt.Sprint(int(f)))
 	return err
 }
 

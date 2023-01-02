@@ -1006,7 +1006,7 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 }
 
 func (n *networker) GetPublicExitDevice() (pkg.ExitDevice, error) {
-	exit, err := public.GetPublicExitLink()
+	exit, err := public.GetCurrentPublicExitLink()
 	if err != nil {
 		return pkg.ExitDevice{}, err
 	}

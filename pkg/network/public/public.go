@@ -95,7 +95,7 @@ func IPs() ([]net.IPNet, error) {
 }
 
 func setupPublicBridge(br *netlink.Bridge) error {
-	exit, err := getExitNic()
+	exit, err := detectExitNic()
 	if err != nil {
 		return errors.Wrap(err, "failed to find possible exit")
 	}
@@ -118,42 +118,10 @@ func attachPublicToExit(br *netlink.Bridge, exit netlink.Link) error {
 		return errors.Wrap(err, "failed to attach exit nic to public bridge 'br-pub'")
 	}
 
-	// persist this value for next boot
-	return os.WriteFile(
-		getPersistencePath(publicExitFile),
-		[]byte(exit.Attrs().Name),
-		0644,
-	)
+	return nil
 }
 
-// if no persisted exit link file found, we need
-// to make sure to persist the current exit nic
-// in case of some nodes has their public nic
-// wired correctly manually (on some dev envs)
-// so to make sure node uses the same nic on reboot
-// we need to query the current active exit, and store
-// it
-func persistExitNicIfNotFound(exit netlink.Link) error {
-	log.Debug().Msg("persisting current public bridge uplink")
-	path := getPersistencePath(publicExitFile)
-	if _, err := os.Stat(path); err == nil || !os.IsNotExist(err) {
-		return err
-	}
-
-	name := types.DefaultBridge
-	if ok, _ := bootstrap.PhysicalFilter(exit); ok {
-		name = exit.Attrs().Name
-	}
-
-	// persist this value for next boot
-	return os.WriteFile(
-		path,
-		[]byte(name),
-		0644,
-	)
-}
-
-func GetPublicExitLink() (netlink.Link, error) {
+func GetCurrentPublicExitLink() (netlink.Link, error) {
 	// return the upstream (exit) link for br-pub
 	br, err := bridge.Get(PublicBridge)
 	if err != nil {
@@ -217,7 +185,7 @@ func SetPublicExitLink(link netlink.Link) error {
 		}
 	}
 
-	current, err := GetPublicExitLink()
+	current, err := GetCurrentPublicExitLink()
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -339,8 +307,7 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 		return nil, err
 	}
 
-	exit, err := GetPublicExitLink()
-
+	_, err = GetCurrentPublicExitLink()
 	if os.IsNotExist(err) {
 		// bridge is not initialized, wire it.
 		log.Debug().Msg("no public bridge uplink found, setting up...")
@@ -349,9 +316,6 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 		}
 	} else if err != nil {
 		return nil, errors.Wrap(err, "failed to get current public bridge uplink")
-	} else if err := persistExitNicIfNotFound(exit); err != nil {
-		log.Error().Err(err).
-			Msg("failed to persist current public bridge uplink")
 	}
 
 	if inf == nil || inf.IsEmpty() {
@@ -378,41 +342,6 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 	}
 
 	return br, netlink.LinkSetUp(br)
-}
-
-func getPersistedExitNic() (string, error) {
-	path := getPersistencePath(publicExitFile)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-
-	name := string(data)
-	// we need to check if an actual device exits with that name or not
-	if _, err := netlink.LinkByName(name); err != nil {
-		return "", os.ErrNotExist
-	}
-
-	return name, nil
-}
-
-// getExitNic gets the possible "device" that need to used by br-pub
-// as a traffic upstream device. this can be set by the "farmer" for this
-// node, or can
-func getExitNic() (string, error) {
-	// if previous exit bridge was selected and persisted we need to use this
-	if dev, err := getPersistedExitNic(); err != nil && !os.IsNotExist(err) {
-		return "", errors.Wrap(err, "failed to load exit nic setup")
-	} else if err == nil {
-		return dev, nil
-	}
-
-	dev, err := detectExitNic()
-	if err != nil {
-		return "", err
-	}
-
-	return dev, nil
 }
 
 func detectExitNic() (string, error) {

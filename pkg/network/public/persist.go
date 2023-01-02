@@ -11,7 +11,6 @@ import (
 
 const (
 	publicConfigFile = "public-config.json"
-	publicExitFile   = "public-exit"
 )
 
 var (

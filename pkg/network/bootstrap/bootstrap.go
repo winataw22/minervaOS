@@ -114,7 +114,7 @@ filter:
 	wg := sync.WaitGroup{}
 
 	ch := make(chan analyzeResult)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	for _, link := range filtered {
 		wg.Add(1)
@@ -371,7 +371,7 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-//TODO: re-implement as map
+// TODO: re-implement as map
 type addrSet map[string]netlink.Addr
 
 func newAddrSet() addrSet {
