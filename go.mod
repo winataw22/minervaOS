@@ -42,7 +42,8 @@ require (
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/lestrrat-go/jwx v1.1.7
-	github.com/machinebox/graphql v0.2.2 // indirect
+	github.com/machinebox/graphql v0.2.2
+	github.com/matryer/is v1.4.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.7 // indirect
 	github.com/mdlayher/netlink v1.4.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
@@ -63,7 +64,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
 	github.com/threefoldtech/go-rmb v0.1.11-0.20220224131627-825c23c921d3
-	github.com/threefoldtech/substrate-client v0.0.0-20221219103807-c34e68107e3c
+	github.com/threefoldtech/substrate-client v0.0.0-20230103083438-c6d86a2e6338
 	github.com/threefoldtech/zbus v1.0.0
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -89,4 +90,4 @@ require (
 
 replace github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
 
-replace github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.5 => github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20220927094755-0f0d22c73cc7
+replace github.com/centrifuge/go-substrate-rpc-client/v4 v4.0.5 => github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20230102154731-7c633b7d3c71
