@@ -1,3 +1,7 @@
+// GENERATED CODE
+// --------------
+// please do not edit manually instead use the "zbusc" to regenerate
+
 package stubs
 
 import (

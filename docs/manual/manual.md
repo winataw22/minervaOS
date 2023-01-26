@@ -156,3 +156,8 @@ type Workload struct {
 - Gateway related
   - [`gateway-name-proxy`](gateway/name-proxy.md)
   - [`gateway-fqdn-proxy`]((gateway/fqdn-proxy.md))
+
+### API
+Node is always connected to the RMB network with the node `twin`. Means the node is always reachable over RMB with the node `twin-id` as an address.
+
+The [node client](../../client/node.go) should have a complete list of all available functions. documentations of the API can be found [here](api.md)

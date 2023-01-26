@@ -47,6 +47,8 @@ For more details over the message bus please check [zbus](https://github.com/thr
 `zbus` allows auto generation of `stubs` which are generated clients against a certain module interface. Hence a module X can interact with module Y by importing the generated clients and then start making function calls.
 
 ## ZOS Processes (modules)
+Modules of zos are completely internal. There is noway an external user to talk to them directly. The idea is the node exposes a public API over rmb, while internally this API can talk to internal modules over `zbus`
+
 Here you are a list of the major ZOS modules.
 
 - [Identity](identity/readme.md)

@@ -2,7 +2,7 @@
 
 ## Zbus
 
-Flist module is available on zbus over the following channel
+Node module is available on zbus over the following channel
 
 | module | object | version |
 |--------|--------|---------|

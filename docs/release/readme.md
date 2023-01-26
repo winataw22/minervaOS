@@ -12,22 +12,19 @@ binaries are packed into an flist and uploaded to the [tf-autobuilder](https://h
 
 This flist is then promoted into the [tf-zos](https://hub.grid.tf/tf-zos) repository of the hub and a symlink to this latest build is made (`tf-autobuilder/zos:development-3:latest.flist`)
 
-## Testing build
+## Releases
+We create 3 types of releases:
+- QA release, in this release the version is suffixed by `qa<number>` for example `v3.5.0-qa1`.
+- RC release, in this release the version is suffixed by `rc<number>` for example `v3.5.0-rc2`.
+- Main release, is this release the version has no suffix, for example `v3.5.0`
 
-As soon as a version seems good to be tested using our testnet, we will produce a release within GitHub.
-This release will be tagged `vX.Y.Z-something` (eg: `v3.0.4-rc3`). Like development builds, everything is compiled
-and uploaded to `tf-autobuilder`. However the symlink is not created automatically to `tf-zos` repo. The linking has to be triggered manually to make sure an update of testnet is intended and won't happen by accident. The execution of the `Deploy` workflow github action has to be done with the right version (like `v3.0.4-rc3`)
+The release cycle goes like this:
+- As mentioned before devnet is updated the moment new code is available on `main` branch. Since the `dev` release is auto linked to the latest `flist` on the hub. Nodes on devnet will auto update to the latest available build.
+- Creating a `qa` release, will not not trigger the same behavior on `qa` net, same for both testnet and mainnet. Instead a workflow must be triggered, this is only to make sure 100% that an update is needed.
+- Once the build of the release is available, a [deploy](../../.github/workflows/grid-deploy.yaml) workflow needed to be triggered with the right version to deploy on the proper network.
+  - The work flow all what it does is linking the right version under the hub [tf-zos](https://hub.grid.tf/tf-zos) repo
 
-## Production build
-
-As soon as a build is bullet-proof tested and working fine, a new release will be made within GitHub and this
-release will be tagged `vX.Y.Z`. This is the final versioning form.
-
-Like testnet, manual step has to be done to create the link under `tf-zos` to be able to have full control of when to update mainnet
-
-# Always Up-to-date
-
-If you want to always uses the latest up-to-date build of our releases, you should uses theses files:
+> The `deploy` flow is rarely used, the on chain update is also available. By setting the right version on tfchain, the link on the hub is auto-updated and hence the deploy workflow won't be needed to be triggered. Although we have it now as a safety net in case something goes wrong (chain is broken) and we need to force a specific version on ZOS.
 
 - Development: https://playground.hub.grid.tf/tf-autobuilder/zos:development-3:latest.flist
 - Testing: https://playground.hub.grid.tf/tf-zos/zos:testing-3:latest.flist
