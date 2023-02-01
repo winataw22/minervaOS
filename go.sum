@@ -1100,6 +1100,8 @@ github.com/threefoldtech/zbus v1.0.0 h1:kAc+inxStMbXuKXv46hgT4YPnpAj40kZPpCcFsku
 github.com/threefoldtech/zbus v1.0.0/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
 github.com/threefoldtech/zbus v1.0.1-0.20230126142924-0234272d3829 h1:38ynHRm0JFs+23GtbK0Qoxz6TIbqv1rOWsivHsIuei0=
 github.com/threefoldtech/zbus v1.0.1-0.20230126142924-0234272d3829/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
+github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=
+github.com/threefoldtech/zbus v1.0.1/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
 github.com/tinylib/msgp v1.1.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
 github.com/tinylib/msgp v1.1.5 h1:2gXmtWueD2HefZHQe1QOy9HVzmFrLOVvsXwXBQ0ayy0=
