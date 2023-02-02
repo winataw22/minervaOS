@@ -26,6 +26,8 @@ var (
 	// services that can't be uninstalled with normal procedure
 	protected = []string{"identityd", "redis"}
 
+	deleteMe = []string{"promtail"}
+
 	flistIdentityPath = "/bin/identityd"
 )
 
@@ -115,7 +117,15 @@ func (u *Upgrader) flistCache() string {
 // on a successfully update, upgrade WILL NOT RETURN
 // instead the upgraded daemon will be completely stopped
 func (u *Upgrader) Upgrade(from, to FullFListInfo) error {
-	return u.applyUpgrade(from, to)
+	if err := u.applyUpgrade(from, to); err != nil {
+		return err
+	}
+
+	return u.cleanup()
+}
+
+func (u *Upgrader) cleanup() error {
+	return u.zinit.Destroy(30*time.Second, deleteMe...)
 }
 
 // getFlist accepts fqdn of flist as `<repo>/<name>.flist`
@@ -376,10 +386,10 @@ func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 		return errors.Wrap(err, "failed to monitor services")
 	}
 
-	return u.cleanup(services)
+	return u.removeDuplicates(services)
 }
 
-func (u *Upgrader) cleanup(services []string) error {
+func (u *Upgrader) removeDuplicates(services []string) error {
 	/*
 		this is a hack to clean up duplicate services duo to a bug in zinit version 0.2.6 (and earlier)
 		the issue has been fixed in next release of zinit (starting 0.2.7)

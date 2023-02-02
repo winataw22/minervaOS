@@ -40,7 +40,8 @@ var ErrNoPublicConfig = errors.New("no public configuration")
 
 // LoadPublicConfig loads public config from file
 func LoadPublicConfig() (*pkg.PublicConfig, error) {
-	file, err := os.Open(getPersistencePath(publicConfigFile))
+	path := getPersistencePath(publicConfigFile)
+	file, err := os.Open(path)
 	if os.IsNotExist(err) {
 		// it's not an error to not have config
 		// but we return a nil config
@@ -52,7 +53,8 @@ func LoadPublicConfig() (*pkg.PublicConfig, error) {
 	defer file.Close()
 	var cfg pkg.PublicConfig
 	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
-		return nil, errors.Wrap(err, "failed to decode public config")
+		_ = os.RemoveAll(path)
+		return nil, ErrNoPublicConfig
 	}
 
 	return &cfg, nil

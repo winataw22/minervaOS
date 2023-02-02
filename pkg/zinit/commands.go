@@ -65,7 +65,7 @@ func (f nameFilter) matches(name string, service *InitService) bool {
 }
 
 // matches the service name
-func WithName(name string) nameFilter {
+func WithName(name string) Filter {
 	return nameFilter{name: name}
 }
 
@@ -83,7 +83,7 @@ func (f execFilter) matches(name string, service *InitService) bool {
 }
 
 // matches the exec basename
-func WithExec(basename string) execFilter {
+func WithExec(basename string) Filter {
 	return execFilter{basename: basename}
 }
 
@@ -103,7 +103,7 @@ func (f execRegexFilter) matches(name string, service *InitService) bool {
 
 // matche the exec if it matches the given regular expression
 // note that it has to be a valid regular expression, otherwise it won't be matched
-func WithExecRegex(regex string) execRegexFilter {
+func WithExecRegex(regex string) Filter {
 	return execRegexFilter{regex: regex}
 }
 
@@ -536,7 +536,7 @@ func (c *Client) Destroy(timeout time.Duration, services ...string) error {
 
 	// all is stopped now, we need to forget and remove
 	for _, name := range services {
-		if err := c.Forget(name); err != nil {
+		if err := c.Forget(name); err != nil && !errors.Is(err, ErrUnknownService) {
 			return err
 		}
 

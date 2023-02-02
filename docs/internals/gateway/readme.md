@@ -4,16 +4,16 @@
 
 Gateway module is available on zbus over the following channel
 
-| module | object | version |
-|--------|--------|---------|
-| gateway|[gateway](#interface)| 0.0.1|
+| module  | object                | version |
+| ------- | --------------------- | ------- |
+| gateway | [gateway](#interface) | 0.0.1   |
 
 ## Home Directory
 
 gateway keeps some data in the following locations
-| directory | path|
-|----|---|
-| root| `/var/cache/modules/gateway`|
+| directory | path                         |
+| --------- | ---------------------------- |
+| root      | `/var/cache/modules/gateway` |
 
 The directory `/var/cache/modules/gateway/proxy` contains the route information used by traefik to forward traffic.
 ## Introduction
@@ -34,7 +34,7 @@ __acme-challenge.gatewaydomain.com NS    gatdwaydomain.com
 ### zinit unit
 
 ```yaml
-exec: gateway --broker unix://var/run/redis.sock --root /var/cache/modules/gateway
+exec: gateway --broker unix:///var/run/redis.sock --root /var/cache/modules/gateway
 after:
   - boot
 ```

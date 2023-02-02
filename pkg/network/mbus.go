@@ -7,10 +7,38 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/rmb-sdk-go"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
-	"github.com/threefoldtech/zos/pkg/rmb"
 )
+
+// Authorized middleware allows only admins to make these calls
+func Authorized(mgr substrate.Manager, farmID uint32) (rmb.Middleware, error) {
+	sub, err := mgr.Substrate()
+	if err != nil {
+		return nil, err
+	}
+	defer sub.Close()
+	farm, err := sub.GetFarm(farmID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get farm")
+	}
+
+	farmer, err := sub.GetTwin(uint32(farm.TwinID))
+	if err != nil {
+		return nil, err
+	}
+
+	return func(ctx context.Context, payload []byte) (context.Context, error) {
+		user := rmb.GetTwinID(ctx)
+		if user != uint32(farmer.ID) {
+			return nil, fmt.Errorf("unauthorized")
+		}
+
+		return ctx, nil
+	}, nil
+}
 
 // Network message bus api
 type Network struct {
@@ -52,7 +80,7 @@ func (n *Network) setup(router rmb.Router) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get substrate")
 	}
-	mw, err := rmb.Authorized(mgr, uint32(env.FarmerID))
+	mw, err := Authorized(mgr, uint32(env.FarmerID))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialized admin mw")
 	}

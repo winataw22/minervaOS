@@ -1,4 +1,4 @@
-exec: ip netns exec ndmz noded --broker unix://var/run/redis.sock
+exec: ip netns exec ndmz noded --broker unix:///var/run/redis.sock
 after:
   - boot
   - networkd

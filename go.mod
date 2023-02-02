@@ -30,11 +30,14 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gomodule/redigo v1.8.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gtank/merlin v0.1.1
 	github.com/hanwen/go-fuse/v2 v2.1.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
@@ -55,7 +58,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rs/zerolog v1.26.0
+	github.com/rs/zerolog v1.28.0
 	github.com/rusart/muxprom v0.0.0-20200609120753-9173fa27435a
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/safchain/ethtool v0.0.0-20201023143004-874930cb3ce0 // indirect
@@ -64,6 +67,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
 	github.com/threefoldtech/go-rmb v0.1.11-0.20220224131627-825c23c921d3
+	github.com/threefoldtech/rmb-sdk-go v0.0.0-20230120120324-7c96fec72b33 // indirect
 	github.com/threefoldtech/substrate-client v0.0.0-20230103083438-c6d86a2e6338
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tinylib/msgp v1.1.5 // indirect
@@ -84,6 +88,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210917145530-b395a37504d4 // indirect
 	google.golang.org/grpc v1.41.0 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
 )

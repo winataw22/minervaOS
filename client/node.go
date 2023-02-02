@@ -1,20 +1,22 @@
 // Package client provides a simple RMB interface to work with the node.
 //
-// Requirements
+// # Requirements
 //
 // 1. A msgbusd instance must be running on the node. this client uses RMB (message bus)
 // to send messages to nodes, and get the repspons.
 // 2. A valid ed25519 key pair. this key is used to sign deployments and MUST be the same
 // key used to configure the local twin on substrate.
 //
-// Simple deployment
+// # Simple deployment
 //
 // create an instance from the default rmb client.
 // ```
 // cl, err := rmb.Default()
-// if err != nil {
-// 	panic(err)
-// }
+//
+//	if err != nil {
+//		panic(err)
+//	}
+//
 // ```
 // then create an instance of the node client
 // ```
@@ -22,45 +24,51 @@
 // ```
 // define your deployment object
 // ```
-// dl := gridtypes.Deployment{
-// 	Version: Version,
-// 	TwinID:  Twin, //LocalTwin,
-// 	// this contract id must match the one on substrate
-// 	Workloads: []gridtypes.Workload{
-// 		network(), // network workload definition
-// 		zmount(), // zmount workload definition
-// 		publicip(), // public ip definition
-// 		zmachine(), // zmachine definition
-// 	},
-// 	SignatureRequirement: gridtypes.SignatureRequirement{
-// 		WeightRequired: 1,
-// 		Requests: []gridtypes.SignatureRequest{
-// 			{
-// 				TwinID: Twin,
-// 				Weight: 1,
-// 			},
-// 		},
-// 	},
-// }
+//
+//	dl := gridtypes.Deployment{
+//		Version: Version,
+//		TwinID:  Twin, //LocalTwin,
+//		// this contract id must match the one on substrate
+//		Workloads: []gridtypes.Workload{
+//			network(), // network workload definition
+//			zmount(), // zmount workload definition
+//			publicip(), // public ip definition
+//			zmachine(), // zmachine definition
+//		},
+//		SignatureRequirement: gridtypes.SignatureRequirement{
+//			WeightRequired: 1,
+//			Requests: []gridtypes.SignatureRequest{
+//				{
+//					TwinID: Twin,
+//					Weight: 1,
+//				},
+//			},
+//		},
+//	}
+//
 // ```
 // compute hash
 // ```
 // hash, err := dl.ChallengeHash()
-// if err != nil {
-// 	panic("failed to create hash")
-// }
+//
+//	if err != nil {
+//		panic("failed to create hash")
+//	}
+//
 // fmt.Printf("Hash: %x\n", hash)
 // ```
 // create the contract and ge the contract id
 // then
-// ``
+// “
 // dl.ContractID = 11 // from substrate
 // ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 // defer cancel()
 // err = node.DeploymentDeploy(ctx, dl)
-// if err != nil {
-// 	panic(err)
-// }
+//
+//	if err != nil {
+//		panic(err)
+//	}
+//
 // ```
 package client
 
@@ -68,10 +76,10 @@ import (
 	"context"
 	"net"
 
+	"github.com/threefoldtech/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/rmb"
 )
 
 // NodeClient struct
