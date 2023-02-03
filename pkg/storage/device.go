@@ -13,7 +13,7 @@ const (
 	zdbVolume = "zdb"
 )
 
-//Devices list all "allocated" devices
+// Devices list all "allocated" devices
 func (m *Module) Devices() ([]pkg.Device, error) {
 	var devices []pkg.Device
 	log.Debug().Int("disks", len(m.hdds)).Msg("listing zdb devices")

@@ -37,7 +37,7 @@ type MountOptions struct {
 	PersistedVolume string
 }
 
-//Flister is the interface for the flist module
+// Flister is the interface for the flist module
 type Flister interface {
 	// Mount mounts an flist located at url using the 0-db located at storage
 	// in a RO mode. note that there is no way u can unmount a ro flist because

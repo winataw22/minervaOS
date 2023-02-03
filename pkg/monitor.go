@@ -37,7 +37,7 @@ func (s *DiskIOCountersStat) String() string {
 	)
 }
 
-//TimesStat struct
+// TimesStat struct
 type TimesStat struct {
 	cpu.TimesStat
 	Percent float64
@@ -78,7 +78,7 @@ type PoolStats struct {
 // PoolsStats alias for map[string]PoolStats
 type PoolsStats map[string]PoolStats
 
-//SystemMonitor interface (provided by noded)
+// SystemMonitor interface (provided by noded)
 type SystemMonitor interface {
 	NodeID() uint32
 	Memory(ctx context.Context) <-chan VirtualMemoryStat

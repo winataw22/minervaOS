@@ -3,7 +3,7 @@ package upgrade
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -60,7 +60,7 @@ func (h *HubClient) Info(flist string) (info FullFListInfo, err error) {
 
 	defer response.Body.Close()
 	defer func() {
-		_, _ = ioutil.ReadAll(response.Body)
+		_, _ = io.ReadAll(response.Body)
 	}()
 
 	if response.StatusCode != http.StatusOK {
@@ -89,7 +89,7 @@ func (h *HubClient) List(repo string) ([]FListInfo, error) {
 
 	defer response.Body.Close()
 	defer func() {
-		_, _ = ioutil.ReadAll(response.Body)
+		_, _ = io.ReadAll(response.Body)
 	}()
 
 	if response.StatusCode != http.StatusOK {
@@ -269,7 +269,7 @@ func (b *FListInfo) Files() ([]FileInfo, error) {
 
 	defer response.Body.Close()
 	defer func() {
-		_, _ = ioutil.ReadAll(response.Body)
+		_, _ = io.ReadAll(response.Body)
 	}()
 
 	if response.StatusCode != http.StatusOK {

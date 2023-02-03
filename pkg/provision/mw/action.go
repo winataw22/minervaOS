@@ -3,7 +3,7 @@ package mw
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
@@ -27,7 +27,7 @@ type Action func(r *http.Request) (interface{}, Response)
 func AsHandlerFunc(a Action) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
-			_, _ = ioutil.ReadAll(r.Body)
+			_, _ = io.ReadAll(r.Body)
 			_ = r.Body.Close()
 		}()
 

@@ -1,4 +1,5 @@
-/**
+/*
+*
 rotate package provides a very simple tool to truncate a given file to 0 after it copies
 the last *configurable* part of this file to a new file with suffix .tail
 

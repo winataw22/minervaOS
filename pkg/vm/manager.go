@@ -3,7 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -270,7 +270,7 @@ func (m *Module) tail(path string) (string, error) {
 		return "", errors.Wrapf(err, "failed to seek file: %s", path)
 	}
 
-	logs, err := ioutil.ReadAll(f)
+	logs, err := io.ReadAll(f)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to read logs from: %s", path)
 	}
@@ -512,7 +512,7 @@ func (m *Module) waitAndAdjOom(ctx context.Context, name string) error {
 		return errors.Wrapf(err, "failed to find vm with id '%s'", name)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join("/proc/", fmt.Sprint(ps.Pid), "oom_adj"), []byte("-17"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join("/proc/", fmt.Sprint(ps.Pid), "oom_adj"), []byte("-17"), 0644); err != nil {
 		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", name, ps.Pid)
 	}
 

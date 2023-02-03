@@ -2,7 +2,7 @@ package logger
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 )
 
 // RedisType defines redis logger type name
@@ -36,14 +36,14 @@ func Serialize(path string, logs []Logs) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0644)
 }
 
 // Deserialize reads json from disks and returns []Logs
 func Deserialize(path string) ([]Logs, error) {
 	logs := []Logs{}
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return logs, err
 	}

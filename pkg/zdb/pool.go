@@ -3,7 +3,6 @@ package zdb
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -105,7 +104,7 @@ func (p *Index) Namespace(name string) (info NSInfo, err error) {
 
 // Namespaces returns a list of NSinfo of all the namespace present in the pool
 func (p *Index) Namespaces() ([]NSInfo, error) {
-	dirs, err := ioutil.ReadDir(p.index())
+	dirs, err := os.ReadDir(p.index())
 	if err != nil {
 		return nil, err
 	}

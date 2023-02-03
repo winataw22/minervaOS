@@ -3,7 +3,6 @@ package monitord
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -49,7 +48,7 @@ func (h *hostMonitor) Uptime(ctx context.Context) <-chan time.Duration {
 			case <-ctx.Done():
 				return
 			case <-time.After(h.duration):
-				data, err := ioutil.ReadFile("/proc/uptime")
+				data, err := os.ReadFile("/proc/uptime")
 				if err != nil {
 					log.Error().Err(err).Msg("failed to read data from /proc/uptime")
 					continue

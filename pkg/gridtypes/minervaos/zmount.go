@@ -13,7 +13,7 @@ type ZMount struct {
 	Size gridtypes.Unit `json:"size"`
 }
 
-//Valid implements WorkloadData
+// Valid implements WorkloadData
 func (v ZMount) Valid(getter gridtypes.WorkloadGetter) error {
 	if v.Size == 0 {
 		return fmt.Errorf("invalid size")

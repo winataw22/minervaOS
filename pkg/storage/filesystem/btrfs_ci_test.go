@@ -1,24 +1,24 @@
 /*
 NOTE:
-  This test file tries to create loop devices to work against on some
-  sparse files, to avoid causing any actual changes to permanent storage
-  on the test machine. This comes with a price that this test file
-  need to run as root to be able to run the `losetup` commands.
 
-  this can be easily done as
-  `sudo GOPATH=$GOPATH go test -v ./...`
+	  This test file tries to create loop devices to work against on some
+	  sparse files, to avoid causing any actual changes to permanent storage
+	  on the test machine. This comes with a price that this test file
+	  need to run as root to be able to run the `losetup` commands.
 
-   (
-	  we set the gopath to the current user gopath to make it use the same go cache and src from the
-	  current user
-   )
+	  this can be easily done as
+	  `sudo GOPATH=$GOPATH go test -v ./...`
+
+	   (
+		  we set the gopath to the current user gopath to make it use the same go cache and src from the
+		  current user
+	   )
 */
 package filesystem
 
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -75,7 +75,7 @@ func SetupDevices(count int) (devices TestDevices, err error) {
 
 	for i := 0; i < count; i++ {
 		var dev *os.File
-		dev, err = ioutil.TempFile("", "loop-test-")
+		dev, err = os.CreateTemp("", "loop-test-")
 		if err != nil {
 			return
 		}

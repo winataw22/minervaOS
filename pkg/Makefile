@@ -4,7 +4,7 @@ GOPATH := $(shell go env GOPATH)
 all: build
 
 getdeps:
-	@echo "Installing golint" && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.42.0
+	@echo "Installing golint" && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.0
 	@echo "Installing gocyclo" && go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
 	@echo "Installing deadcode" && go install github.com/remyoudompheng/go-misc/deadcode@latest
 	@echo "Installing misspell" && go install github.com/client9/misspell/cmd/misspell@latest

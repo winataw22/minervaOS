@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -34,14 +33,18 @@ func (s *Fs) SharedByTwin(twinID uint32) ([]gridtypes.WorkloadID, error) {
 
 func (s *Fs) sharedByTwin(twinID uint32) ([]gridtypes.WorkloadID, error) {
 	root := filepath.Join(s.root, sharedSubDir, fmt.Sprint(twinID))
-	infos, err := ioutil.ReadDir(root)
+	infos, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "failed to list shared user workloads")
 	}
 	var ids []gridtypes.WorkloadID
-	for _, info := range infos {
+	for _, entry := range infos {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
 		if info.Mode().Type() != fs.ModeSymlink {
 			log.Warn().
 				Uint32("twin", twinID).

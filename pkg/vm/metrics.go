@@ -2,7 +2,7 @@ package vm
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -95,7 +95,7 @@ func (m *Module) metrics(ps Process) (pkg.MachineMetric, error) {
 }
 
 func readFileUint64(p string) (uint64, error) {
-	bytes, err := ioutil.ReadFile(p)
+	bytes, err := os.ReadFile(p)
 	if err != nil {
 		// we do skip but may be this is not crre
 		return 0, err

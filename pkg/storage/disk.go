@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -309,7 +308,7 @@ func (s *Module) DiskList() ([]pkg.VDisk, error) {
 	var disks []pkg.VDisk
 	for _, pool := range pools {
 
-		items, err := ioutil.ReadDir(pool)
+		items, err := os.ReadDir(pool)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to list virtual disks")
 		}
@@ -319,9 +318,14 @@ func (s *Module) DiskList() ([]pkg.VDisk, error) {
 				continue
 			}
 
+			info, err := item.Info()
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get file info for '%s'", item.Name())
+			}
+
 			disks = append(disks, pkg.VDisk{
 				Path: filepath.Join(pool, item.Name()),
-				Size: item.Size(),
+				Size: info.Size(),
 			})
 		}
 

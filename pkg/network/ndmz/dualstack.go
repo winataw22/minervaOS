@@ -304,7 +304,7 @@ func (d *dmzImpl) SupportsPubIPv4() bool {
 	return true
 }
 
-//Interfaces return information about dmz interfaces
+// Interfaces return information about dmz interfaces
 func (d *dmzImpl) Interfaces() ([]types.IfaceInfo, error) {
 	var output []types.IfaceInfo
 

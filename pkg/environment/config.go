@@ -3,7 +3,7 @@ package environment
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -72,7 +72,7 @@ func getConfig(run RunningMode, url string) (ext Config, err error) {
 	}
 
 	defer func() {
-		_, _ = ioutil.ReadAll(response.Body)
+		_, _ = io.ReadAll(response.Body)
 	}()
 
 	if response.StatusCode != http.StatusOK {

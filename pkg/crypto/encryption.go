@@ -41,7 +41,8 @@ func PrivateKeyToCurve25519(sk ed25519.PrivateKey) [32]byte {
 }
 
 // PublicKeyToCurve25519 converts an Ed25519 public key into the curve25519 public
-//  key that would be generated from the same private key.
+//
+//	key that would be generated from the same private key.
 func PublicKeyToCurve25519(pk ed25519.PublicKey) [32]byte {
 	curvePub := [32]byte{}
 	edPriv := [ed25519.PublicKeySize]byte{}

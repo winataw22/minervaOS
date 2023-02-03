@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -112,7 +111,7 @@ func domainFromRule(rule string) (string, error) {
 
 // domainFromConfig returns workloadID, domain, error
 func domainFromConfig(path string) (string, string, error) {
-	buf, err := ioutil.ReadFile(path)
+	buf, err := os.ReadFile(path)
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to read file")
 	}
@@ -144,7 +143,7 @@ func domainFromConfig(path string) (string, string, error) {
 
 func loadDomains(ctx context.Context, dir string) (map[string]string, error) {
 	domains := make(map[string]string)
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read dir")
 	}

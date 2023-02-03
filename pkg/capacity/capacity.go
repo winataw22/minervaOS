@@ -1,7 +1,6 @@
 package capacity
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -83,7 +82,7 @@ func IsSecureBoot() (bool, error) {
 		}()
 	}
 
-	bytes, err := ioutil.ReadFile(secureBoot)
+	bytes, err := os.ReadFile(secureBoot)
 	if os.IsNotExist(err) {
 		return false, nil
 	} else if err != nil {
@@ -154,7 +153,7 @@ func (r *ResourceOracle) Disks() (d Disks, err error) {
 	return
 }
 
-//GetHypervisor gets the name of the hypervisor used on the node
+// GetHypervisor gets the name of the hypervisor used on the node
 func (r *ResourceOracle) GetHypervisor() (string, error) {
 	out, err := exec.Command("virt-what").CombinedOutput()
 

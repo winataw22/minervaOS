@@ -3,7 +3,6 @@ package vm
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -81,7 +80,7 @@ func (m *Module) monitor(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	// list all machines available under `{root}/firecracker`
-	items, err := ioutil.ReadDir(m.cfg)
+	items, err := os.ReadDir(m.cfg)
 	if os.IsNotExist(err) {
 		return nil
 	} else if err != nil {

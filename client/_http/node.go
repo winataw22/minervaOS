@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -39,12 +39,12 @@ func (n *NodeClient) response(r *http.Response, o interface{}, codes ...int) err
 	}
 
 	if !in(r.StatusCode, codes) {
-		msg, _ := ioutil.ReadAll(r.Body)
+		msg, _ := io.ReadAll(r.Body)
 		return fmt.Errorf("invalid response (%s): %s", r.Status, string(msg))
 	}
 
 	defer func() {
-		ioutil.ReadAll(r.Body)
+		io.ReadAll(r.Body)
 	}()
 
 	if o != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/kernel"
 )
 
-//nolint
+// nolint
 const (
 	colorBlack = iota + 30
 	colorRed

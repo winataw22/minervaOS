@@ -37,7 +37,7 @@ type ZDB struct {
 	Public   bool           `json:"public"`
 }
 
-//Valid implementation
+// Valid implementation
 func (z ZDB) Valid(getter gridtypes.WorkloadGetter) error {
 	if z.Size == 0 {
 		return fmt.Errorf("invalid size")

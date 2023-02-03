@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -266,7 +265,7 @@ func (s *Fs) ByTwin(twin uint32) ([]uint64, error) {
 func (s *Fs) byTwin(twin uint32) ([]uint64, error) {
 	base := filepath.Join(s.root, fmt.Sprint(twin))
 
-	entities, err := ioutil.ReadDir(base)
+	entities, err := os.ReadDir(base)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
@@ -299,7 +298,7 @@ func (s *Fs) Twins() ([]uint32, error) {
 }
 
 func (s *Fs) twins() ([]uint32, error) {
-	entities, err := ioutil.ReadDir(s.root)
+	entities, err := os.ReadDir(s.root)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {

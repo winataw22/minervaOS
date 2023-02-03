@@ -2,7 +2,6 @@ package zinit
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +47,7 @@ func AddService(name string, service InitService) error {
 		return err
 	}
 	path := filepath.Join("/etc/zinit", fmt.Sprintf("%s.yaml", name))
-	return ioutil.WriteFile(path, b, 0660)
+	return os.WriteFile(path, b, 0660)
 }
 
 // RemoveService delete the service file from the filesystem

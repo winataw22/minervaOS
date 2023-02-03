@@ -2,7 +2,6 @@ package wireguard
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -200,7 +199,7 @@ func newPeer(pubkey, endpoint string, allowedIPs []string) (wgtypes.PeerConfig, 
 // in that location, that key is returned instead.
 func GenerateKey(dir string) (wgtypes.Key, error) {
 	path := filepath.Join(dir, "key.priv")
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err == nil {
 		//key already exists
 		return wgtypes.ParseKey(string(data))
@@ -217,7 +216,7 @@ func GenerateKey(dir string) (wgtypes.Key, error) {
 		return wgtypes.Key{}, err
 	}
 
-	if err := ioutil.WriteFile(path, []byte(key.String()), 0400); err != nil {
+	if err := os.WriteFile(path, []byte(key.String()), 0400); err != nil {
 		return wgtypes.Key{}, err
 	}
 	return key, nil
@@ -226,7 +225,7 @@ func GenerateKey(dir string) (wgtypes.Key, error) {
 // LoadKey tries to read a private key from disk
 func LoadKey(dir string) (wgtypes.Key, error) {
 	path := filepath.Join(dir, "key.priv")
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return wgtypes.Key{}, err
 	}

@@ -434,7 +434,7 @@ func (nr *NetResource) HasWireguard() (bool, error) {
 	return exist, err
 }
 
-//SetWireguard sets wireguard of this network resource
+// SetWireguard sets wireguard of this network resource
 func (nr *NetResource) SetWireguard(wg *wireguard.Wireguard) error {
 	nsName, err := nr.Namespace()
 	if err != nil {

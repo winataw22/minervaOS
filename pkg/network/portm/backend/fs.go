@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -58,7 +57,7 @@ func (s *fsStore) Reserve(ns string, port int) (bool, error) {
 
 	// store the reserved port in lastPort file
 	lastPortFile := nsPath(s.root, ns, lastPort)
-	err = ioutil.WriteFile(lastPortFile, []byte(strconv.Itoa(port)), 0644)
+	err = os.WriteFile(lastPortFile, []byte(strconv.Itoa(port)), 0644)
 	if err != nil {
 		return false, err
 	}
@@ -73,7 +72,7 @@ func (s *fsStore) Release(ns string, port int) error {
 
 func (s *fsStore) LastReserved(ns string) (int, error) {
 	lastPortFile := nsPath(s.root, ns, lastPort)
-	data, err := ioutil.ReadFile(lastPortFile)
+	data, err := os.ReadFile(lastPortFile)
 	if os.IsNotExist(err) {
 		return -1, nil
 	}
@@ -87,7 +86,7 @@ func (s *fsStore) GetByNS(ns string) ([]int, error) {
 	var ports []int
 	dir := filepath.Join(s.root, ns)
 
-	infos, err := ioutil.ReadDir(dir)
+	infos, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}

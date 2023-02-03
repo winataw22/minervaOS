@@ -2,7 +2,6 @@ package flist
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +53,7 @@ func TestCacheCleaner(t *testing.T) {
 	err := flister.cleanCache(now, 50*24*time.Hour) // this should delete 50 files!
 	require.NoError(t, err)
 
-	files, err := ioutil.ReadDir(cache)
+	files, err := os.ReadDir(cache)
 	require.NoError(t, err)
 
 	assert.Len(t, files, 50)

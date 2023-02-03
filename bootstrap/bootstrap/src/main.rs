@@ -18,12 +18,16 @@ fn app() -> Result<()> {
     let config = Config::current()?;
 
     let level = if config.debug {
-        log::Level::Debug
+        log::LevelFilter::Debug
     } else {
-        log::Level::Info
+        log::LevelFilter::Info
     };
 
-    simple_logger::init_with_level(level).unwrap();
+    simple_logger::SimpleLogger::new()
+        .with_utc_timestamps()
+        .with_level(level)
+        .init()
+        .unwrap();
 
     // configure available stage
     let stages: Vec<fn(cfg: &Config) -> Result<()>> = vec![

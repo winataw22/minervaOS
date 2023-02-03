@@ -3,7 +3,6 @@ package store
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -17,7 +16,7 @@ func TestSerialize(t *testing.T) {
 	_, sk, err := ed25519.GenerateKey(rand.Reader)
 	assert.NoError(t, err)
 
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer func() {
 		_ = f.Close()
@@ -36,7 +35,7 @@ func TestSerialize(t *testing.T) {
 
 func TestLoadSeed110(t *testing.T) {
 	seedfilecontent := `"1.1.0"{"mnemonic":"crop orient animal script safe inquiry neglect tumble maple board degree you intact busy birth west crack cabin lizard embark seed adjust around talk"}`
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer func() {
 		_ = f.Close()
@@ -59,7 +58,7 @@ func TestLoadSeed100(t *testing.T) {
 	seedfilebytes, err := base64.StdEncoding.DecodeString(seedfilebase64)
 	require.NoError(t, err)
 
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp("", "")
 	require.NoError(t, err)
 	defer func() {
 		_ = f.Close()

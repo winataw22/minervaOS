@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -38,13 +37,14 @@ func (r *Reader) Version() Version {
 // reader. It's usually used to unify the data migration work flow
 // in case the older data file didn't have a version stamp
 // example:
-//  reader, err := NewReader(file)
-//  if IsNotVersioned(err) {
-//      file.Seek(0, 0) // this is important to make u reading from start
-//      reader = NewVersionedReader(MustParse("0.0.0"), file)
-//  } else err != nil {
-//    // probably io error
-// }
+//
+//	 reader, err := NewReader(file)
+//	 if IsNotVersioned(err) {
+//	     file.Seek(0, 0) // this is important to make u reading from start
+//	     reader = NewVersionedReader(MustParse("0.0.0"), file)
+//	 } else err != nil {
+//	   // probably io error
+//	}
 func NewVersionedReader(version Version, r io.Reader) *Reader {
 	return &Reader{Reader: r, version: version}
 }
@@ -101,7 +101,7 @@ func NewWriter(w io.Writer, version Version) (io.Writer, error) {
 
 // ReadFile content
 func ReadFile(path string) (Version, []byte, error) {
-	all, err := ioutil.ReadFile(path)
+	all, err := os.ReadFile(path)
 	if err != nil {
 		return MustParse("0.0.0"), nil, err
 	}
@@ -111,7 +111,7 @@ func ReadFile(path string) (Version, []byte, error) {
 	if err != nil {
 		return MustParse("0.0.0"), all, ErrNotVersioned
 	}
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	return reader.Version(), data, err
 }
 

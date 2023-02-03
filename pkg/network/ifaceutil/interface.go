@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -37,7 +36,7 @@ func LinkFilter(links []netlink.Link, types []string) []netlink.Link {
 
 // IsPlugged test if an interface has a cable plugged in
 func IsPlugged(inf string) bool {
-	data, err := ioutil.ReadFile(fmt.Sprintf(carrierFile, inf))
+	data, err := os.ReadFile(fmt.Sprintf(carrierFile, inf))
 	if err != nil {
 		return false
 	}

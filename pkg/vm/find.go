@@ -3,7 +3,6 @@ package vm
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -72,7 +71,7 @@ func FindAll() (map[string]Process, error) {
 			//not a number
 			return nil //continue scan
 		}
-		cmd, err := ioutil.ReadFile(filepath.Join(path, "cmdline"))
+		cmd, err := os.ReadFile(filepath.Join(path, "cmdline"))
 		if os.IsNotExist(err) {
 			return nil
 		} else if err != nil {

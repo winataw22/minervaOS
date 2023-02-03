@@ -205,38 +205,42 @@ const (
 // SignatureRequirement struct describes the signatures that are needed to be valid
 // for the node to accept the deployment
 // for example
-// SignatureRequirement{
-// 	WeightRequired: 1,
-// 	Requests: []gridtypes.SignatureRequest{
-// 		{
-// 			TwinID: twinID,
-// 			Weight: 1,
-// 		},
-// 	},
-// }
+//
+//	SignatureRequirement{
+//		WeightRequired: 1,
+//		Requests: []gridtypes.SignatureRequest{
+//			{
+//				TwinID: twinID,
+//				Weight: 1,
+//			},
+//		},
+//	}
+//
 // basically states that a total signature weight of 1 is required for the node to accept
 // the deployment.
 // the list of acceptable signatures is one from twin with `twinID` and his signature weight is 1
 // So, in this example this twin signature is enough.
 // You can build a more sophisticated signature request to allow multiple twins to sign for example
-// SignatureRequirement{
-// 	WeightRequired: 2,
-// 	Requests: []gridtypes.SignatureRequest{
-// 		{
-// 			TwinID: Twin1,
-// 			Weight: 1,
-// 		},
-// 		{
-// 			TwinID: Twin2,
-// 			Weight: 1,
-// 		},
-// 		{
-// 			TwinID: Twin3,
-// 			Required: true,
-// 			Weight: 1,
-// 		},
-// 	},
-// },
+//
+//	SignatureRequirement{
+//		WeightRequired: 2,
+//		Requests: []gridtypes.SignatureRequest{
+//			{
+//				TwinID: Twin1,
+//				Weight: 1,
+//			},
+//			{
+//				TwinID: Twin2,
+//				Weight: 1,
+//			},
+//			{
+//				TwinID: Twin3,
+//				Required: true,
+//				Weight: 1,
+//			},
+//		},
+//	},
+//
 // this means that twin3 must sign + one of either (twin1 or twin2) to have the right signature weight
 type SignatureRequirement struct {
 	Requests       []SignatureRequest `json:"requests"`
@@ -265,10 +269,10 @@ func (r *SignatureRequirement) Challenge(w io.Writer) error {
 }
 
 // ChallengeHash computes the hash of the deployment. The hash is needed for the following
-// - signing the deployment (done automatically by call to "Sign")
-// - contract creation, the contract need to be created by this hash exactly BEFORE sending the
-//   deployment to the node
-// - node verifies the hash to make sure it matches hash of the contract
+//   - signing the deployment (done automatically by call to "Sign")
+//   - contract creation, the contract need to be created by this hash exactly BEFORE sending the
+//     deployment to the node
+//   - node verifies the hash to make sure it matches hash of the contract
 func (d *Deployment) ChallengeHash() ([]byte, error) {
 	hash := md5.New()
 	if err := d.Challenge(hash); err != nil {

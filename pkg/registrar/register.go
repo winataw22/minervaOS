@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -16,7 +15,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
-	"github.com/threefoldtech/zos/pkg/network/yggdrasil"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -28,7 +26,6 @@ const (
 type RegistrationInfo struct {
 	Capacity     gridtypes.Capacity
 	Location     geoip.Location
-	Ygg          net.IP
 	SecureBoot   bool
 	Virtualized  bool
 	SerialNumber string
@@ -41,11 +38,6 @@ func (r RegistrationInfo) WithCapacity(v gridtypes.Capacity) RegistrationInfo {
 
 func (r RegistrationInfo) WithLocation(v geoip.Location) RegistrationInfo {
 	r.Location = v
-	return r
-}
-
-func (r RegistrationInfo) WithYggdrail(v net.IP) RegistrationInfo {
-	r.Ygg = v
 	return r
 }
 
@@ -65,27 +57,12 @@ func (r RegistrationInfo) WithSerialNumber(v string) RegistrationInfo {
 }
 
 func (r *Registrar) registration(ctx context.Context, cl zbus.Client, env environment.Environment, info RegistrationInfo) (nodeID, twinID uint32, err error) {
-	var (
-		netMgr = stubs.NewNetworkerStub(cl)
-	)
 	// we need to collect all node information here
 	// - we already have capacity
 	// - we get the location (will not change after initial registration)
 	loc, err := geoip.Fetch()
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "fetch location")
-	}
-
-	// - yggdrasil
-	// node always register with ndmz address
-	var ygg net.IP
-	if ips, _, err := netMgr.Addrs(ctx, yggdrasil.YggNSInf, "ndmz"); err == nil {
-		if len(ips) == 0 {
-			return 0, 0, errors.Wrap(err, "failed to get yggdrasil ip")
-		}
-		if len(ips) == 1 {
-			ygg = net.IP(ips[0])
-		}
 	}
 
 	log.Debug().
@@ -100,7 +77,7 @@ func (r *Registrar) registration(ctx context.Context, cl zbus.Client, env enviro
 		return 0, 0, errors.Wrap(err, "failed to create substrate client")
 	}
 
-	info = info.WithLocation(loc).WithYggdrail(ygg)
+	info = info.WithLocation(loc)
 
 	nodeID, twinID, err = registerNode(ctx, env, cl, sub, info)
 
@@ -108,74 +85,7 @@ func (r *Registrar) registration(ctx context.Context, cl zbus.Client, env enviro
 		return 0, 0, errors.Wrap(err, "failed to register node")
 	}
 
-	// well the node is registered. but now we need to monitor changes to networking
-	// to update the node (currently only yggdrasil ip) which will require changes
-	// to twin ip.
-	go func() {
-		for {
-			err := watch(ctx, env, cl, sub, info)
-			if errors.Is(err, context.Canceled) {
-				return
-			} else if err != nil {
-				log.Error().Err(err).Msg("watching network changes failed")
-				<-time.After(3 * time.Second)
-			}
-		}
-	}()
-
 	return nodeID, twinID, nil
-}
-
-func watch(
-	ctx context.Context,
-	env environment.Environment,
-	cl zbus.Client,
-	sub substrate.Manager,
-	info RegistrationInfo,
-) error {
-	var (
-		netMgr = stubs.NewNetworkerStub(cl)
-	)
-
-	yggCh, err := netMgr.YggAddresses(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to register on ygg ips changes")
-	}
-
-	log.Info().Msg("start watching node network changes")
-	for {
-		update := false
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case yggInput := <-yggCh:
-			var yggNew net.IP
-			if len(yggInput) > 0 {
-				yggNew = yggInput[0].IP
-			}
-			if !yggNew.Equal(info.Ygg) {
-				info = info.WithYggdrail(yggNew)
-				update = true
-			}
-		}
-
-		if !update {
-			continue
-		}
-		// some of the node config has changed. we need to try register it again
-		log.Debug().Msg("node setup seems to have been changed. re-register")
-		exp := backoff.NewExponentialBackOff()
-		exp.MaxInterval = 2 * time.Minute
-		bo := backoff.WithContext(exp, ctx)
-		err = backoff.RetryNotify(func() error {
-			_, _, err := registerNode(ctx, env, cl, sub, info)
-			return err
-		}, bo, retryNotify)
-
-		if err != nil {
-			return errors.Wrap(err, "failed to register node")
-		}
-	}
 }
 
 func retryNotify(err error, d time.Duration) {
@@ -246,7 +156,7 @@ func registerNode(
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 
-	twinID, err = ensureTwin(sub, sk, info.Ygg)
+	twinID, err = ensureTwin(sub, sk)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure twin")
 	}
@@ -299,27 +209,17 @@ func registerNode(
 	return uint32(nodeID), uint32(twinID), err
 }
 
-func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey, ip net.IP) (uint32, error) {
+func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey) (uint32, error) {
 	identity, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return 0, err
 	}
 	twinID, err := sub.GetTwinByPubKey(identity.PublicKey())
 	if errors.Is(err, substrate.ErrNotFound) {
-		return sub.CreateTwin(identity, ip)
+		return sub.CreateTwin(identity, "", nil)
 	} else if err != nil {
 		return 0, errors.Wrap(err, "failed to list twins")
 	}
 
-	twin, err := sub.GetTwin(twinID)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get twin object")
-	}
-
-	if twin.IP == ip.String() {
-		return twinID, nil
-	}
-
-	// update twin to new ip
-	return sub.UpdateTwin(identity, ip)
+	return twinID, nil
 }

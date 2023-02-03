@@ -292,7 +292,17 @@ func action(cli *cli.Context) error {
 	}()
 
 	log.Debug().Msg("start message bus")
-	return runMsgBus(ctx, sk, env.SubstrateURL, env.RelayURL, msgBrokerCon)
+	for {
+		err := runMsgBus(ctx, sk, env.SubstrateURL, env.RelayURL, msgBrokerCon)
+
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			// if context is cancelled, then it's a normal shutdown
+			return nil
+		}
+
+		log.Error().Err(err).Msg("rmb-peer exited with an error, restarting")
+		<-time.After(1 * time.Second)
+	}
 }
 
 func retryNotify(err error, d time.Duration) {

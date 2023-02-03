@@ -49,7 +49,7 @@ type Stats struct {
 	Endpoint string `bson:"endpoint" json:"endpoint"`
 }
 
-//Container creation info
+// Container creation info
 type Container struct {
 	// Name of container
 	Name string

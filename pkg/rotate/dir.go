@@ -2,7 +2,6 @@ package rotate
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +13,7 @@ import (
 // names is given only named files will be rotated, other unknown
 // files will be deleted
 func (r *Rotator) RotateAll(dir string, names ...string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	} else if err != nil {

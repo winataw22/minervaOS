@@ -12,7 +12,7 @@ import (
 // DecoderVersion is the information about the decoder in this package
 const DecoderVersion = `0-core Go dmi decoder v0.2.0`
 
-//Type (allowed types 0 -> 42)
+// Type (allowed types 0 -> 42)
 type Type int
 
 // DMI represents a map of SectionTypeStr to Section parsed from dmidecode output,
@@ -20,11 +20,12 @@ type Type int
 // Property in section is in the form of key value pairs where values are optional
 // and may include a list of items as well.
 // k: [v]
-// 	[
-// 		item1
-// 		item2
-// 		...
-// 	]
+//
+//	[
+//		item1
+//		item2
+//		...
+//	]
 type DMI struct {
 	Tooling  Tooling   `json:"tooling"`
 	Sections []Section `json:"sections"`

@@ -16,7 +16,7 @@ const (
 	fsTypeOverlay = "overlay"
 )
 
-//nolint
+// nolint
 type filter func(i *mountInfo) bool
 
 func withUnderPath(path string) filter {
@@ -26,7 +26,7 @@ func withUnderPath(path string) filter {
 	}
 }
 
-//nolint
+// nolint
 func withParentDir(path string) filter {
 	path = filepath.Clean(path)
 	return func(mnt *mountInfo) bool {

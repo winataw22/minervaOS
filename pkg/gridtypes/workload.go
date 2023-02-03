@@ -46,7 +46,7 @@ func RegisterSharableType(t WorkloadType, d WorkloadData) {
 	sharableWorkloadTypes[t] = struct{}{}
 }
 
-//Types return a list of all registered types
+// Types return a list of all registered types
 func Types() []WorkloadType {
 	types := make([]WorkloadType, 0, len(workloadTypes))
 	for typ := range workloadTypes {
@@ -74,7 +74,7 @@ func (t WorkloadType) String() string {
 	return string(t)
 }
 
-//Capacity the expected capacity of a workload
+// Capacity the expected capacity of a workload
 type Capacity struct {
 	CRU   uint64 `json:"cru"`
 	SRU   Unit   `json:"sru"`
@@ -183,7 +183,7 @@ func (w *Workload) Valid(getter WorkloadGetter) error {
 	return data.Valid(getter)
 }
 
-//Challenge implementation
+// Challenge implementation
 func (w *Workload) Challenge(i io.Writer) error {
 	data, err := w.WorkloadData()
 	if err != nil {

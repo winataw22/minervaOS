@@ -3,7 +3,6 @@ package namespace
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -199,7 +198,7 @@ func GetByName(name string) (ns.NetNS, error) {
 
 // List returns a list of all the names of the network namespaces
 func List(prefix string) ([]string, error) {
-	infos, err := ioutil.ReadDir(netNSPath)
+	infos, err := os.ReadDir(netNSPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read network namespace directory: %w", err)
 	}

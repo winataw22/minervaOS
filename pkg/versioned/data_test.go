@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -114,7 +113,7 @@ func TestLoadSaveFile(t *testing.T) {
 	_, err := rand.Read(data)
 	require.NoError(t, err)
 
-	file, err := ioutil.TempFile("", "test-")
+	file, err := os.CreateTemp("", "test-")
 	require.NoError(t, err)
 	// lazy way to get a temp file path
 	path := file.Name()
@@ -137,7 +136,7 @@ func TestLoadNotVersioned(t *testing.T) {
 	_, err := rand.Read(data)
 	require.NoError(t, err)
 
-	file, err := ioutil.TempFile("", "test-")
+	file, err := os.CreateTemp("", "test-")
 	require.NoError(t, err)
 	// lazy way to get a temp file path
 	path := file.Name()

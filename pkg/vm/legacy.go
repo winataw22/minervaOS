@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -42,7 +41,7 @@ func findAllFC() (map[string]int, error) {
 			//not a number
 			return nil //continue scan
 		}
-		cmd, err := ioutil.ReadFile(filepath.Join(path, "cmdline"))
+		cmd, err := os.ReadFile(filepath.Join(path, "cmdline"))
 		if os.IsNotExist(err) {
 			return nil
 		} else if err != nil {
@@ -76,7 +75,7 @@ func findAllFC() (map[string]int, error) {
 	return found, err
 }
 
-//findFC find legacy fc procsses
+// findFC find legacy fc procsses
 func findFC(name string) (int, error) {
 	machines, err := findAllFC()
 	if err != nil {
@@ -122,7 +121,7 @@ func (m *LegacyMonitor) machineRoot(id string) string {
 func (m *LegacyMonitor) cleanFsFirecracker(id string) error {
 	root := filepath.Join(m.machineRoot(id), "root")
 
-	files, err := ioutil.ReadDir(root)
+	files, err := os.ReadDir(root)
 	if os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -160,7 +159,7 @@ func (m *LegacyMonitor) monitor(ctx context.Context) error {
 
 	// list all machines available under `{root}/firecracker`
 	root := filepath.Join(m.root, "firecracker")
-	items, err := ioutil.ReadDir(root)
+	items, err := os.ReadDir(root)
 	if os.IsNotExist(err) || len(items) == 0 {
 		for _, pid := range running {
 			_ = syscall.Kill(pid, syscall.SIGKILL)

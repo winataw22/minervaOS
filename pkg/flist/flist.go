@@ -6,7 +6,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -467,7 +466,7 @@ func (f *flistModule) isMountpoint(path string) error {
 }
 
 func (f *flistModule) getMountOptionsForPID(pid int64) (options, error) {
-	cmdline, err := ioutil.ReadFile(path.Join("/proc", fmt.Sprint(pid), "cmdline"))
+	cmdline, err := os.ReadFile(path.Join("/proc", fmt.Sprint(pid), "cmdline"))
 	if os.IsNotExist(err) {
 		return nil, ErrZFSProcessNotFound
 	} else if err != nil {
@@ -558,7 +557,7 @@ func (f *flistModule) FlistHash(url string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		hash, err := ioutil.ReadAll(resp.Body)
+		hash, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return "", err
 		}
@@ -624,7 +623,7 @@ func (f *flistModule) downloadFlist(url string) (string, error) {
 // it uses a MultiWriter to write the flist in a temporary file and fill up
 // the md5 hash then it rename the file to the hash
 func (f *flistModule) saveFlist(r io.Reader) (string, error) {
-	tmp, err := ioutil.TempFile(f.flist, "*_flist_temp")
+	tmp, err := os.CreateTemp(f.flist, "*_flist_temp")
 	if err != nil {
 		return "", err
 	}
