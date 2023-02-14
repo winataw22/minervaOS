@@ -24,8 +24,8 @@ type Environment struct {
 	FlistURL string
 	BinRepo  string
 
-	FarmerID pkg.FarmID
-	Orphan   bool
+	FarmID pkg.FarmID
+	Orphan bool
 
 	FarmSecret    string
 	SubstrateURL  []string
@@ -219,11 +219,11 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 
 		switch env.RunningMode {
 		case RunningDev:
-			env.FarmerID = OrphanageDev
+			env.FarmID = OrphanageDev
 		case RunningTest:
-			env.FarmerID = OrphanageTest
+			env.FarmID = OrphanageTest
 		case RunningMain:
-			env.FarmerID = OrphanageMain
+			env.FarmID = OrphanageMain
 		}
 
 	} else {
@@ -232,7 +232,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		if err != nil {
 			return env, errors.Wrap(err, "wrong format for farm ID")
 		}
-		env.FarmerID = pkg.FarmID(id)
+		env.FarmID = pkg.FarmID(id)
 	}
 
 	// Checking if there environment variable

@@ -88,7 +88,7 @@ func main() {
 
 	if farm {
 		env := environment.MustGet()
-		fmt.Println(env.FarmerID)
+		fmt.Println(env.FarmID)
 		os.Exit(0)
 	} else if net {
 		env := environment.MustGet()
@@ -355,7 +355,7 @@ func getIdentityMgr(root string, debug bool) (pkg.IdentityManager, error) {
 
 	log.Info().
 		Bool("orphan", env.Orphan).
-		Uint64("farmer_id", uint64(env.FarmerID)).
+		Uint64("farmer_id", uint64(env.FarmID)).
 		Msg("farmer identified")
 
 	return manager, nil

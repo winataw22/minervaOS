@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
@@ -23,16 +24,18 @@ const (
 	streamPublicConfig        = "stream:public-config"
 	streamContractCancelled   = "stream:contract-cancelled"
 	streamContractGracePeriod = "stream:contract-lock"
+	streamPowerTargetChange   = "stream:power-target"
 )
 
 type RedisStream struct {
 	sub   substrate.Manager
 	state string
+	farm  pkg.FarmID
 	node  uint32
 	pool  *redis.Pool
 }
 
-func NewRedisStream(sub substrate.Manager, address string, node uint32, state string) (*RedisStream, error) {
+func NewRedisStream(sub substrate.Manager, address string, farm pkg.FarmID, node uint32, state string) (*RedisStream, error) {
 	pool, err := utils.NewRedisPool(address, 2)
 	if err != nil {
 		return nil, err
@@ -41,6 +44,7 @@ func NewRedisStream(sub substrate.Manager, address string, node uint32, state st
 	return &RedisStream{
 		sub:   sub,
 		state: state,
+		farm:  farm,
 		node:  node,
 		pool:  pool,
 	}, nil
@@ -120,6 +124,21 @@ func (r *RedisStream) process(events *substrate.EventRecords) {
 		}
 	}
 
+	for _, event := range events.TfgridModule_PowerTargetChanged {
+		if event.Farm != types.U32(r.farm) {
+			continue
+		}
+
+		log.Info().Uint32("node", uint32(event.Node)).Msg("got power target change event")
+		if err := r.push(con, streamPowerTargetChange, pkg.PowerTargetChangeEvent{
+			FarmID: pkg.FarmID(event.Farm),
+			NodeID: uint32(event.Node),
+			Target: event.PowerTarget,
+		}); err != nil {
+			log.Error().Err(err).Msg("failed to push event")
+		}
+	}
+
 }
 
 func (r *RedisStream) Start(ctx context.Context) {
@@ -194,15 +213,22 @@ func (r *RedisConsumer) ack(ctx context.Context, con redis.Conn, group, stream, 
 	return err
 }
 
-func (r *RedisConsumer) PublicConfig(ctx context.Context) (<-chan pkg.PublicConfigEvent, error) {
-	con := r.pool.Get()
-	ch := make(chan pkg.PublicConfigEvent)
+func (r *RedisConsumer) consumer(ctx context.Context, stream string, ch reflect.Value) error {
+	chType := ch.Type()
+	if chType.Kind() != reflect.Chan {
+		panic("ch must be of a channel type")
+	}
 
-	const stream = streamPublicConfig
+	elem := chType.Elem()
+	if elem.Kind() != reflect.Struct {
+		panic("channel element must be a structure")
+	}
+
+	con := r.pool.Get()
 	group, err := r.ensureGroup(con, stream)
 
 	if err != nil && !isBusyGroup(err) {
-		return nil, err
+		return err
 	}
 
 	logger := log.With().Str("stream", stream).Logger()
@@ -216,11 +242,17 @@ func (r *RedisConsumer) PublicConfig(ctx context.Context) (<-chan pkg.PublicConf
 			}
 
 			for _, message := range messages {
-				var event pkg.PublicConfigEvent
-				if err := message.Decode(&event); err == nil {
-					select {
-					case ch <- event:
-					case <-ctx.Done():
+				event := reflect.New(elem)
+				ptr := event.Interface()
+				if err := message.Decode(ptr); err == nil {
+					// since we don't know the type of the event nor the channel
+					// type we need to do this in runtime as follows
+					chosen, _, _ := reflect.Select([]reflect.SelectCase{
+						{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())},
+						{Dir: reflect.SelectSend, Chan: ch, Send: event.Elem()},
+					})
+
+					if chosen == 0 {
 						return
 					}
 				} else if err != nil {
@@ -240,105 +272,27 @@ func (r *RedisConsumer) PublicConfig(ctx context.Context) (<-chan pkg.PublicConf
 		}
 	}()
 
-	return ch, nil
+	return nil
+}
+
+func (r *RedisConsumer) PublicConfig(ctx context.Context) (<-chan pkg.PublicConfigEvent, error) {
+	ch := make(chan pkg.PublicConfigEvent)
+	return ch, r.consumer(ctx, streamPublicConfig, reflect.ValueOf(ch))
 }
 
 func (r *RedisConsumer) ContractCancelled(ctx context.Context) (<-chan pkg.ContractCancelledEvent, error) {
-	con := r.pool.Get()
 	ch := make(chan pkg.ContractCancelledEvent)
-
-	const stream = streamContractCancelled
-	group, err := r.ensureGroup(con, stream)
-
-	if err != nil && !isBusyGroup(err) {
-		return nil, err
-	}
-
-	logger := log.With().Str("stream", stream).Logger()
-	go func() {
-		defer con.Close()
-
-		for {
-			messages, err := r.pop(con, group, stream)
-			if err != nil {
-				logger.Error().Err(err).Msg("failed to get events from")
-			}
-
-			for _, message := range messages {
-				var event pkg.ContractCancelledEvent
-				if err := message.Decode(&event); err == nil {
-					select {
-					case ch <- event:
-					case <-ctx.Done():
-						return
-					}
-				} else if err != nil {
-					logger.Error().Err(err).Str("id", message.ID).Msg("failed to handle message")
-				}
-
-				if err := r.ack(ctx, con, group, stream, message.ID); err != nil {
-					logger.Error().Err(err).Str("id", message.ID).Msg("failed to ack message")
-				}
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-		}
-	}()
-
-	return ch, nil
+	return ch, r.consumer(ctx, streamContractCancelled, reflect.ValueOf(ch))
 }
 
 func (r *RedisConsumer) ContractLocked(ctx context.Context) (<-chan pkg.ContractLockedEvent, error) {
-	con := r.pool.Get()
 	ch := make(chan pkg.ContractLockedEvent)
+	return ch, r.consumer(ctx, streamContractGracePeriod, reflect.ValueOf(ch))
+}
 
-	const stream = streamContractGracePeriod
-	group, err := r.ensureGroup(con, stream)
-
-	if err != nil && !isBusyGroup(err) {
-		return nil, err
-	}
-
-	logger := log.With().Str("stream", stream).Logger()
-	go func() {
-		defer con.Close()
-
-		for {
-			messages, err := r.pop(con, group, stream)
-			if err != nil {
-				logger.Error().Err(err).Msg("failed to get events from")
-			}
-
-			for _, message := range messages {
-				var event pkg.ContractLockedEvent
-				if err := message.Decode(&event); err == nil {
-					select {
-					case <-ctx.Done():
-						return
-					case ch <- event:
-					}
-				} else if err != nil {
-					logger.Error().Err(err).Str("id", message.ID).Msg("failed to handle message")
-				}
-
-				if err := r.ack(ctx, con, group, stream, message.ID); err != nil {
-					logger.Error().Err(err).Str("id", message.ID).Msg("failed to ack message")
-				}
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-		}
-	}()
-
-	return ch, nil
+func (r *RedisConsumer) PowerTargetChange(ctx context.Context) (<-chan pkg.PowerTargetChangeEvent, error) {
+	ch := make(chan pkg.PowerTargetChangeEvent)
+	return ch, r.consumer(ctx, streamPowerTargetChange, reflect.ValueOf(ch))
 }
 
 type payload struct {

@@ -231,7 +231,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create substrate users database")
 	}
 
-	admins, err := provision.NewSubstrateAdmins(mgr, uint32(env.FarmerID))
+	admins, err := provision.NewSubstrateAdmins(mgr, uint32(env.FarmID))
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}

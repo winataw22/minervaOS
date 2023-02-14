@@ -80,7 +80,7 @@ func (n *Network) setup(router rmb.Router) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get substrate")
 	}
-	mw, err := Authorized(mgr, uint32(env.FarmerID))
+	mw, err := Authorized(mgr, uint32(env.FarmID))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialized admin mw")
 	}

@@ -102,7 +102,7 @@ func (d *identityManager) Farm() (string, error) {
 	}
 	defer cl.Close()
 
-	farm, err := cl.GetFarm(uint32(d.env.FarmerID))
+	farm, err := cl.GetFarm(uint32(d.env.FarmID))
 	if errors.Is(err, substrate.ErrNotFound) {
 		return "", fmt.Errorf("wrong farm id")
 	} else if err != nil {
@@ -119,7 +119,7 @@ func (d *identityManager) FarmID() (pkg.FarmID, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to parse node environment")
 	}
-	return env.FarmerID, nil
+	return env.FarmID, nil
 }
 
 // FarmSecret returns farm secret from kernel params

@@ -1,0 +1,4 @@
+exec: powerd --broker unix://var/run/redis.sock
+after:
+  - boot
+  - noded

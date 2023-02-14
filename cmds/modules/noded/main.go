@@ -217,7 +217,7 @@ func action(cli *cli.Context) error {
 		return err
 	}
 
-	events, err := events.NewRedisStream(sub, msgBrokerCon, node, eventsBlock)
+	events, err := events.NewRedisStream(sub, msgBrokerCon, env.FarmID, node, eventsBlock)
 	if err != nil {
 		return err
 	}
@@ -263,33 +263,6 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	// uptime update
-	go func() {
-		defer log.Info().Msg("uptime reporting exited permanently")
-		safeUptime := func(ctx context.Context, redis zbus.Client) (err error) {
-			defer func() {
-				if p := recover(); p != nil {
-					err = fmt.Errorf("uptime reporting has panicked: %+v", p)
-				}
-			}()
-
-			err = uptime(ctx, id)
-			return err
-		}
-
-		for {
-			err := safeUptime(ctx, redis)
-			if errors.Is(err, context.Canceled) {
-				log.Info().Msg("stop uptime reporting. context cancelled")
-				return
-			} else if err != nil {
-				log.Error().Err(err).Msg("sending uptime failed")
-			}
-			// even there is no error we try again until ctx is cancelled
-			<-time.After(10 * time.Second)
-		}
-	}()
 
 	log.Debug().Msg("start message bus")
 	for {
