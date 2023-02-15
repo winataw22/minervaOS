@@ -49,7 +49,7 @@ This will happen for each workload in the deployment.
 # Statistics
 | command |body| return|
 |---|---|---|
-| `zos.statistics.get` | - |`{total: Capacity, used: Capacity}`|
+| `zos.statistics.get` | - |`{total: Capacity, used: Capacity, system: Capacity}`|
 
 Where:
 
@@ -63,6 +63,8 @@ Capacity {
 }
 ```
 
+> Note that, `used` capacity equal the full workload reserved capacity PLUS the system reserved capacity
+so `used = user_used + system`, while `system` is only the amount of resourced reserved by `zos` itself
 # Network
 ## List Wireguard Ports
 | command |body| return|

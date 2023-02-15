@@ -186,11 +186,16 @@ func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) 
 		return nil, err
 	}
 	return struct {
+		// Total system capacity
 		Total gridtypes.Capacity `json:"total"`
-		Used  gridtypes.Capacity `json:"used"`
+		// Used capacity this include user + system resources
+		Used gridtypes.Capacity `json:"used"`
+		// System resource reserved by zos
+		System gridtypes.Capacity `json:"system"`
 	}{
-		Total: s.stats.Total(),
-		Used:  used,
+		Total:  s.stats.Total(),
+		Used:   used,
+		System: s.stats.reserved,
 	}, nil
 }
 

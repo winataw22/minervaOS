@@ -171,17 +171,19 @@ func (n *NodeClient) DeploymentDelete(ctx context.Context, contractID uint64) er
 }
 
 // Counters returns some node statistics. Including total and available cpu, memory, storage, etc...
-func (n *NodeClient) Counters(ctx context.Context) (total gridtypes.Capacity, used gridtypes.Capacity, err error) {
+func (n *NodeClient) Counters(ctx context.Context) (total gridtypes.Capacity, used gridtypes.Capacity, system gridtypes.Capacity, err error) {
 	const cmd = "zos.statistics.get"
 	var result struct {
-		Total gridtypes.Capacity `json:"total"`
-		Used  gridtypes.Capacity `json:"used"`
+		Total  gridtypes.Capacity `json:"total"`
+		Used   gridtypes.Capacity `json:"used"`
+		System gridtypes.Capacity `json:"system"`
 	}
+
 	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
 		return
 	}
 
-	return result.Total, result.Used, nil
+	return result.Total, result.Used, result.System, nil
 }
 
 // NetworkListWGPorts return a list of all "taken" ports on the node. A new deployment
