@@ -1,6 +1,6 @@
-CONTAINERD_VERSION="ae2f3fdfd1a435fe83fb083e4db9fa63a9e0a13e"
-CONTAINERD_CHECKSUM="73e6d4bad082e69e530c8ab5a9ee5118"
-CONTAINERD_LINK="https://github.com/containerd/containerd/archive/${CONTAINERD_VERSION}.tar.gz"
+CONTAINERD_VERSION="1.6.18"
+CONTAINERD_CHECKSUM="1ac525600fe7ba6ef76cf8a833153768"
+CONTAINERD_LINK="https://github.com/containerd/containerd/archive/refs/tags/v${CONTAINERD_VERSION}.tar.gz"
 
 dependencies_containerd() {
     apt-get install -y btrfs-progs libbtrfs-dev libseccomp-dev build-essential pkg-config
@@ -9,16 +9,15 @@ dependencies_containerd() {
         if command -v go > /dev/null && [ ! -z $CI ]; then
             export GOPATH=$(go env GOPATH)
         else
-            curl -L https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz > /tmp/go1.13.1.linux-amd64.tar.gz
-            tar -C /usr/local -xzf /tmp/go1.13.1.linux-amd64.tar.gz
+            curl -L https://go.dev/dl/go1.20.1.linux-amd64.tar.gz > /tmp/go1.20.1.linux-amd64.tar.gz
+            tar -C /usr/local -xzf /tmp/go1.20.1.linux-amd64.tar.gz
             mkdir -p /gopath
 
             export PATH=/usr/local/go/bin:$PATH
-            export GOPATH=/gopath
         fi
     fi
 
-    CONTAINERD_HOME="${GOPATH}/src/github.com/containerd"
+    CONTAINERD_HOME="/src/github.com/containerd"
 }
 
 download_containerd() {

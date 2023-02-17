@@ -1,6 +1,6 @@
-RUNC_VERSION="1.0.0-rc9"
-RUNC_CHECKSUM="e88bcb1a33e7ff0bfea495f7263826c2"
-RUNC_LINK="https://github.com/opencontainers/runc/archive/v${RUNC_VERSION}.tar.gz"
+RUNC_VERSION="1.1.4"
+RUNC_CHECKSUM="ae8e2ac9335b8606eeccd2e7c031350a"
+RUNC_LINK="https://github.com/opencontainers/runc/archive/refs/tags/v${RUNC_VERSION}.tar.gz"
 
 dependencies_runc() {
     apt-get install -y btrfs-progs libbtrfs-dev libseccomp-dev build-essential pkg-config
@@ -9,16 +9,15 @@ dependencies_runc() {
         if command -v go > /dev/null && [ ! -z $CI ]; then
             export GOPATH=$(go env GOPATH)
         else
-            curl -L https://dl.google.com/go/go1.13.1.linux-amd64.tar.gz > /tmp/go1.13.1.linux-amd64.tar.gz
-            tar -C /usr/local -xzf /tmp/go1.13.1.linux-amd64.tar.gz
+            curl -L https://go.dev/dl/go1.20.1.linux-amd64.tar.gz > /tmp/go1.20.1.linux-amd64.tar.gz
+            tar -C /usr/local -xzf /tmp/go1.20.1.linux-amd64.tar.gz
             mkdir -p /gopath
 
             export PATH=/usr/local/go/bin:$PATH
-            export GOPATH=/gopath
         fi
     fi
 
-    RUNC_HOME="${GOPATH}/src/github.com/opencontainers"
+    RUNC_HOME="/src/github.com/opencontainers"
 }
 
 download_runc() {
