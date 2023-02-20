@@ -96,8 +96,7 @@ func (s *Statistics) getUsableMemoryBytes() (gridtypes.Capacity, gridtypes.Unit,
 	}
 
 	theoreticalUsed := cap.MRU
-	actualUsed := (m.Total - m.Available) + uint64(s.reserved.MRU)
-
+	actualUsed := m.Total - m.Available
 	used := gridtypes.Max(theoreticalUsed, gridtypes.Unit(actualUsed))
 
 	usable := gridtypes.Unit(m.Total) - used
