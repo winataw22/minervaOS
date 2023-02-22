@@ -186,6 +186,13 @@ func (n *NodeClient) Counters(ctx context.Context) (total gridtypes.Capacity, us
 	return result.Total, result.Used, result.System, nil
 }
 
+// Pools returns statistics of separate pools
+func (n *NodeClient) Pools(ctx context.Context) (pools []pkg.PoolMetrics, err error) {
+	const cmd = "zos.storage.pools"
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &pools)
+	return
+}
+
 // NetworkListWGPorts return a list of all "taken" ports on the node. A new deployment
 // should be careful to use a free port for its network setup.
 func (n *NodeClient) NetworkListWGPorts(ctx context.Context) ([]uint16, error) {

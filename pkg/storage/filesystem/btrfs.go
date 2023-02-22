@@ -367,7 +367,8 @@ func (v *btrfsVolume) Usage() (usage Usage, err error) {
 	if used == 0 {
 		// in case no limit is set on the subvolume, we assume
 		// it's size is the size of the files on that volumes
-		used, err = FilesUsage(v.Path())
+		// or a special case when the volume is a zdb volume
+		used, err = volumeUsage(v.Path())
 		if err != nil {
 			return usage, errors.Wrap(err, "failed to get subvolume usage")
 		}

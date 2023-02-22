@@ -296,6 +296,54 @@ func (s *Module) initialize() error {
 	return nil
 }
 
+func (s *Module) poolUsage(pool filesystem.Pool) (uint64, error) {
+	_, err := pool.Mounted()
+	if errors.Is(err, filesystem.ErrDeviceNotMounted) {
+		return 0, nil
+	} else if err != nil {
+		return 0, errors.Wrap(err, "failed to check pool mount status")
+	}
+
+	usage, err := pool.Usage()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to check pool usage")
+	}
+
+	return usage.Used, nil
+}
+
+func (s *Module) Metrics() ([]pkg.PoolMetrics, error) {
+	var metrics []pkg.PoolMetrics
+
+	for i, pools := range [][]filesystem.Pool{s.ssds, s.hdds} {
+		// this is just to avoid writing the same loop twice
+		typ := zos.SSDDevice
+		if i == 1 {
+			typ = zos.HDDDevice
+		}
+
+		for _, pool := range pools {
+			size := pool.Device().Size
+			used, err := s.poolUsage(pool)
+
+			if err != nil {
+				log.Error().Err(err).Msg("failed to check pool usage")
+				continue
+			}
+
+			metrics = append(metrics, pkg.PoolMetrics{
+				Type: typ,
+				Name: pool.Name(),
+				Size: gridtypes.Unit(size),
+				Used: gridtypes.Unit(used),
+			})
+		}
+
+	}
+
+	return metrics, nil
+}
+
 func (s *Module) shutdownUnusedPools(vm bool) error {
 	log.Debug().Msg("shutting down unused disks")
 	for _, sets := range [][]filesystem.Pool{s.ssds, s.hdds} {

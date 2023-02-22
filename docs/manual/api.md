@@ -65,6 +65,23 @@ Capacity {
 
 > Note that, `used` capacity equal the full workload reserved capacity PLUS the system reserved capacity
 so `used = user_used + system`, while `system` is only the amount of resourced reserved by `zos` itself
+
+# Storage
+## List separate pools with capacity
+| command |body| return|
+|---|---|---|
+| `zos.storage.pools` | - |`[]Pool`|
+
+List all node pools with their types, size and used space
+where
+```json
+Pool {
+    "name": "pool-id",
+    "type": "(ssd|hdd)",
+    "size": <size in bytes>,
+    "used": <used in bytes>
+}
+```
 # Network
 ## List Wireguard Ports
 | command |body| return|

@@ -12,6 +12,12 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/zdb"
+)
+
+const (
+	ZdbVolume = "zdb"
 )
 
 func getMountTarget(f io.Reader, device string) (string, bool) {
@@ -52,6 +58,25 @@ func FilesUsage(path string) (uint64, error) {
 	})
 
 	return total, err
+}
+
+func volumeUsage(path string) (uint64, error) {
+	name := filepath.Base(path)
+	if name != ZdbVolume {
+		return FilesUsage(path)
+	}
+
+	// if this is zdb volume we try something else
+	index := zdb.NewIndex(path)
+	usage, err := index.Reserved()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to open zdb index")
+		// if the used size by zdb was not
+		// possible to calculate
+		return FilesUsage(path)
+	}
+
+	return usage, nil
 }
 
 // GetMountTarget returns the mount target of a device or false if the

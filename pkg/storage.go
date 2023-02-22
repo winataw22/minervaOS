@@ -153,6 +153,16 @@ type StorageModule interface {
 
 	// DeviceLookup inspects a previously allocated device
 	DeviceLookup(name string) (Device, error)
+
+	// Capacity
+	Metrics() ([]PoolMetrics, error)
+}
+
+type PoolMetrics struct {
+	Name string         `json:"name"`
+	Type DeviceType     `json:"type"`
+	Size gridtypes.Unit `json:"size"`
+	Used gridtypes.Unit `json:"used"`
 }
 
 // VDisk info returned by a call to inspect

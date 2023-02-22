@@ -3,9 +3,11 @@ package zos
 import (
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -17,26 +19,43 @@ var (
 
 type Backend string
 
-// check if valid http://ip:port, http://ip or ip:port
-func (b Backend) Valid(tls bool) error {
-	u, err := url.Parse(string(b))
-	if err != nil {
-		return errors.Wrap(err, "failed to parse backend")
-	}
-	if tls {
-		if u.Scheme != "" {
-			return fmt.Errorf("scheme expected to be empty")
+// Parse accepts http://ip:port, http://ip or ip:port
+// checks if backend string is a valid string based on the tlsPassthrough parameter
+// ip:port is only valid in case of tlsPassthrough is true
+// http://ip:port or http://ip is valid in case of tlsPassthrough is false
+func (b Backend) Valid(tlsPassthrough bool) error {
+	var hostName string
+	if tlsPassthrough {
+		host, port, err := net.SplitHostPort(string(b))
+		if err != nil {
+			return fmt.Errorf("failed to parse backend %s with error: %w", b, err)
 		}
-		if u.Port() == "" {
-			return fmt.Errorf("missing port in backend address")
+
+		parsedPort, err := strconv.ParseUint(port, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid port in backend: %s", port)
 		}
-	} else if u.Scheme != "http" {
-		return fmt.Errorf("scheme expected to be http")
+
+		if parsedPort > math.MaxUint16 {
+			return fmt.Errorf("port '%s' must be <= 65535", port)
+		}
+
+		hostName = host
+	} else {
+		u, err := url.Parse(string(b))
+		if err != nil {
+			return fmt.Errorf("failed to parse backend with error: %w", err)
+		}
+
+		if u.Scheme != "http" {
+			return fmt.Errorf("scheme expected to be http")
+		}
+		hostName = u.Hostname()
 	}
 
-	ip := net.ParseIP(u.Hostname())
+	ip := net.ParseIP(hostName)
 	if len(ip) == 0 || ip.IsLoopback() {
-		return fmt.Errorf("invalid ip address in backend: %s", u.Hostname())
+		return fmt.Errorf("invalid ip address in backend: %s", hostName)
 	}
 	return nil
 }

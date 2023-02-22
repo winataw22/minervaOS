@@ -172,20 +172,13 @@ func (p *Manager) zdbProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWi
 			}, nil
 		}
 
-		// we did not find the namespace, but is this container
-		// a possible candidate to hold the new namespace?
-		reserved, err := index.Reserved()
-		if err != nil {
-			return zos.ZDBResult{}, errors.Wrap(err, "failed to check total reserved size")
-		}
-
 		device, err := storage.DeviceLookup(ctx, container.Name)
 		if err != nil {
 			log.Error().Err(err).Str("container", string(id)).Msg("failed to inspect zdb device")
 			continue
 		}
 
-		if reserved+uint64(config.Size) <= uint64(device.Usage.Size) {
+		if uint64(device.Usage.Used)+uint64(config.Size) <= uint64(device.Usage.Size) {
 			candidates = append(candidates, container)
 		}
 	}

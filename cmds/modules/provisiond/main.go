@@ -395,6 +395,8 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create statistics api")
 	}
 
+	setupStorageRmb(zosRouter, cl)
+
 	_ = mbus.NewDeploymentMessageBus(zosRouter, engine)
 
 	log.Info().Msg("running rmb handler")
@@ -426,4 +428,12 @@ func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter grid
 	)
 
 	return
+}
+
+func setupStorageRmb(router rmb.Router, cl zbus.Client) {
+	storage := router.Subroute("storage")
+	storage.WithHandler("pools", func(ctx context.Context, payload []byte) (interface{}, error) {
+		stub := stubs.NewStorageModuleStub(cl)
+		return stub.Metrics(ctx)
+	})
 }
