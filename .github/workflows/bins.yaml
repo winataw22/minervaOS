@@ -96,3 +96,9 @@ jobs:
       package: tpm
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  qsfs:
+    uses: ./.github/workflows/bin-no-publish.yaml
+    with:
+      package: qsfs
+    secrets:
+      token: ${{ secrets.HUB_JWT }}

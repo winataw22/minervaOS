@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	qsfsFlist             = "https://hub.grid.tf/omar0.3bot/qsfs-v0.0.1.flist"
+	qsfsFlist             = "https://hub.grid.tf/tf-autobuilder/qsfs-0.2.0-rc2.flist"
 	qsfsContainerNS       = "qsfs"
 	qsfsRootFsPropagation = pkg.RootFSPropagationSlave
 	zstorSocket           = "/var/run/zstor.sock"

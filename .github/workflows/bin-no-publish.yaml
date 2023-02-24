@@ -1,0 +1,37 @@
+name: Build Extra Binary
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: "package to build"
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+jobs:
+  builder:
+    name: builder
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code into the Go module directory
+        uses: actions/checkout@v1
+      - name: Setup basesystem
+        run: |
+          cd bins
+          sudo ./bins-extra.sh --package basesystem
+      - name: Build package (${{ inputs.package }})
+        id: package
+        run: |
+          cd bins
+          sudo ./bins-extra.sh --package ${{ inputs.package }}
+      - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
+        if: success()
+        uses: threefoldtech/publish-flist@master
+        with:
+          token: ${{ secrets.token }}
+          action: publish
+          user: tf-autobuilder
+          root: bins/releases/${{ inputs.package }}
+          name: ${{ steps.package.outputs.name }}.flist
