@@ -69,8 +69,7 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) erro
 		}
 	}()
 
-	memoryMonitor := stubs.NewSystemMonitorStub(client)
-	memStream, err := memoryMonitor.Memory(context.Background())
+	memStream, err := sysMonitor.Memory(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "failed to start mem monitor stream")
 	}
