@@ -228,9 +228,14 @@ func (r *Reporter) getMetrics(ctx context.Context) error {
 		return err
 	}
 
-	if err := r.getNetworkMetrics(ctx, slot); err != nil {
-		log.Error().Err(err).Msg("failed to get network resource consumption")
-	}
+	// NOTICE: disable collecting traffic consumption
+	// for network resources. So ygg and wg traffic
+	// will not counter.
+	// To enable, uncomment the following section
+	//
+	// if err := r.getNetworkMetrics(ctx, slot); err != nil {
+	// 	log.Error().Err(err).Msg("failed to get network resource consumption")
+	// }
 
 	if err := r.getVmMetrics(ctx, slot); err != nil {
 		log.Error().Err(err).Msg("failed to get vm public ip consumption")
