@@ -91,7 +91,7 @@ var (
 		SubstrateURL: []string{
 			"wss://tfchain.test.grid.tf/",
 		},
-		RelayURL:      "wss://relay.dev.grid.tf", // TODO: replace with proper relay url
+		RelayURL:      "wss://relay.test.grid.tf",
 		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
@@ -102,13 +102,12 @@ var (
 		SubstrateURL: []string{
 			"wss://tfchain.qa.grid.tf/",
 		},
-		RelayURL:      "wss://relay.dev.grid.tf", // TODO: replace with proper relay url
+		RelayURL:      "wss://relay.qa.grid.tf",
 		ActivationURL: "https://activation.qa.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.qanet",
 	}
 
-	// same as testnet for now. will be updated the day of the launch of production network
 	envProd = Environment{
 		RunningMode: RunningMain,
 		SubstrateURL: []string{
@@ -117,7 +116,7 @@ var (
 			"wss://03.tfchain.grid.tf/",
 			"wss://04.tfchain.grid.tf/",
 		},
-		RelayURL:      "wss://relay.dev.grid.tf", // TODO: replace with proper relay url
+		RelayURL:      "wss://relay.grid.tf",
 		ActivationURL: "https://activation.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",

@@ -170,20 +170,32 @@ func (n *NodeClient) DeploymentDelete(ctx context.Context, contractID uint64) er
 	return n.bus.Call(ctx, n.nodeTwin, cmd, in, nil)
 }
 
+// Counters (statistics) of the node
+type Counters struct {
+	// Total system capacity
+	Total gridtypes.Capacity `json:"total"`
+	// Used capacity this include user + system resources
+	Used gridtypes.Capacity `json:"used"`
+	// System resource reserved by zos
+	System gridtypes.Capacity `json:"system"`
+	// Users statistics by zos
+	Users UsersCounters `json:"users"`
+}
+
+// UsersCounters the expected counters for deployments and workloads
+type UsersCounters struct {
+	// Total deployments count
+	Deployments int `json:"deployments"`
+	// Total workloads count
+	Workloads int `json:"workloads"`
+}
+
 // Counters returns some node statistics. Including total and available cpu, memory, storage, etc...
-func (n *NodeClient) Counters(ctx context.Context) (total gridtypes.Capacity, used gridtypes.Capacity, system gridtypes.Capacity, err error) {
+func (n *NodeClient) Counters(ctx context.Context) (counters Counters, err error) {
 	const cmd = "zos.statistics.get"
-	var result struct {
-		Total  gridtypes.Capacity `json:"total"`
-		Used   gridtypes.Capacity `json:"used"`
-		System gridtypes.Capacity `json:"system"`
-	}
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &counters)
+	return
 
-	if err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
-		return
-	}
-
-	return result.Total, result.Used, result.System, nil
 }
 
 // Pools returns statistics of separate pools

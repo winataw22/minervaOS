@@ -26,13 +26,13 @@ func NewContractEventHandler(node uint32, mgr substrate.Manager, engine provisio
 func (r *ContractEventHandler) current() (map[uint64]gridtypes.Deployment, error) {
 	// we need to build a list of all supposedly active contracts on this node
 	storage := r.engine.Storage()
-	_, deployments, err := storage.Capacity()
+	storageCap, err := storage.Capacity()
 	if err != nil {
 		return nil, err
 	}
 
 	running := make(map[uint64]gridtypes.Deployment)
-	for _, active := range deployments {
+	for _, active := range storageCap.Deployments {
 		running[active.ContractID] = active
 	}
 

@@ -95,6 +95,15 @@ type SignatureRequirementField struct {
 	SignatureRequirement gridtypes.SignatureRequirement
 }
 
+type StorageCapacity struct {
+	// Cap is total reserved capacity as per all active workloads
+	Cap gridtypes.Capacity
+	// Deployments is a list with all deployments that are active
+	Deployments []gridtypes.Deployment
+	// Workloads the total number of all workloads
+	Workloads int
+}
+
 // Storage interface
 type Storage interface {
 	// Create a new deployment in storage, it sets the initial transactions
@@ -123,7 +132,7 @@ type Storage interface {
 	// ByTwin return list of deployments for a twin
 	ByTwin(twin uint32) ([]uint64, error)
 	// return total capacity and active deployments
-	Capacity() (cap gridtypes.Capacity, active []gridtypes.Deployment, err error)
+	Capacity() (StorageCapacity, error)
 }
 
 // Janitor interface

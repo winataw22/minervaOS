@@ -202,7 +202,9 @@ func action(cli *cli.Context) error {
 		// since the counters will get populated anyway.
 		// but if not, we need to set the current counters
 		// from store.
-		current, active, err = store.Capacity()
+		storageCap, err := store.Capacity()
+		current = storageCap.Cap
+		active = storageCap.Deployments
 		if err != nil {
 			log.Error().Err(err).Msg("failed to compute current consumed capacity")
 		}
@@ -270,7 +272,7 @@ func action(cli *cli.Context) error {
 		log.Error().Err(err).Msg("failed to set capacity for active contracts")
 	}
 
-	log.Info().Msg("setting contracts used cpacity done")
+	log.Info().Msg("setting contracts used capacity done")
 
 	go func() {
 		if err := setter.Run(ctx); err != nil {
@@ -332,7 +334,7 @@ func action(cli *cli.Context) error {
 	// spawn the engine
 	go func() {
 		if err := engine.Run(ctx); err != nil && err != context.Canceled {
-			log.Fatal().Err(err).Msg("provision engine exited unexpectedely")
+			log.Fatal().Err(err).Msg("provision engine exited unexpectedly")
 		}
 	}()
 
@@ -368,7 +370,7 @@ func action(cli *cli.Context) error {
 			if err == context.Canceled {
 				return
 			} else if err != nil {
-				log.Error().Err(err).Msg("capacity reported stopped unexpectedely")
+				log.Error().Err(err).Msg("capacity reported stopped unexpectedly")
 			}
 
 			<-time.After(10 * time.Second)
@@ -378,7 +380,7 @@ func action(cli *cli.Context) error {
 	// and start the zbus server in the background
 	go func() {
 		if err := server.Run(ctx); err != nil && err != context.Canceled {
-			log.Fatal().Err(err).Msg("zbus provision engine api exited unexpectedely")
+			log.Fatal().Err(err).Msg("zbus provision engine api exited unexpectedly")
 		}
 		log.Info().Msg("zbus server stopped")
 	}()
