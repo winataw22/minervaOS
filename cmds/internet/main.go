@@ -53,8 +53,10 @@ func main() {
 }
 
 func check() error {
+	retries := 0
 	f := func() error {
-		cmd := exec.Command("wget", "google.com", "-O", "/dev/null", "-T", "5")
+		retries += 1
+		cmd := exec.Command("wget", "bootstrap.grid.tf", "-O", "/dev/null", "-T", "5")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
@@ -63,7 +65,10 @@ func check() error {
 
 	errHandler := func(err error, t time.Duration) {
 		if err != nil {
-			log.Error().Err(err).Msg("error while trying to test internet connectivity")
+			log.Info().Msg("internet connection is not ready yet")
+			if retries%10 == 0 {
+				log.Error().Err(err).Msgf("error while trying to test internet connectivity. %d retries attempted", retries)
+			}
 		}
 	}
 
