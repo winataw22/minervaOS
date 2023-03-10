@@ -23,6 +23,9 @@ type RRD interface {
 	// Last returns the last reported value for a metric given the metric
 	// name
 	Last(key string) (value float64, ok bool, err error)
+
+	// Close the db
+	Close() error
 }
 
 type Printer interface {
@@ -84,6 +87,10 @@ func newRRDBolt(path string, window time.Duration, retention time.Duration) (*rr
 		window:    uint64(window / time.Second),
 		retention: uint64(retention / time.Second),
 	}, nil
+}
+
+func (r *rrdBolt) Close() error {
+	return r.db.Close()
 }
 
 func (r *rrdBolt) printBucket(bucket *bolt.Bucket, out io.Writer) error {

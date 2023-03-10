@@ -1,9 +1,12 @@
 package provisiond
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -66,26 +69,77 @@ var Module cli.Command = cli.Command{
 			Usage: "connection string to the message `BROKER`",
 			Value: "unix:///var/run/redis.sock",
 		},
-		&cli.StringFlag{
-			Name:  "http",
-			Usage: "http listen address",
-			Value: ":2021",
+		&cli.BoolFlag{
+			Name:  "integrity",
+			Usage: "run some integrity checks on some files",
 		},
 	},
 	Action: action,
+}
+
+// integrityChecks are started in a separate process because
+// we found out that some weird db corruption causing the process
+// to receive a SIGBUS error
+// while we can catch the sigbus and handle it ourselves i thought
+// it's better to do it in a separate process to always have a clean
+// state
+func integrityChecks(ctx context.Context, rootDir string) error {
+	err := ReportChecks(filepath.Join(rootDir, metricsStorageDB))
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+
+	return err
+}
+
+// runChecks starts provisiond with the special flag `--integrity` which runs some
+// checks and return an error if checks did not pass.
+// if an error is received the db files are cleaned
+func runChecks(ctx context.Context, rootDir string) error {
+	log.Info().Msg("run integrity checks")
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, os.Args[0], "--root", rootDir, "--integrity")
+	var buf bytes.Buffer
+	cmd.Stderr = &buf
+
+	cmd.CombinedOutput()
+	err := cmd.Run()
+	if err == context.Canceled {
+		return err
+	} else if err == nil {
+		return nil
+	}
+
+	log.Error().Str("stderr", buf.String()).Err(err).Msg("integrity check failed, resetting rrd db")
+
+	// other error, we can try to clean up and continue
+	return os.RemoveAll(filepath.Join(rootDir, metricsStorageDB))
 }
 
 func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
 		rootDir      string = cli.String("root")
+		integrity    bool   = cli.Bool("integrity")
 	)
 
 	ctx, _ := utils.WithSignal(context.Background())
 
+	if integrity {
+		return integrityChecks(ctx, rootDir)
+	}
+
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
+
+	// run integrityChecks
+	if err := runChecks(ctx, rootDir); err != nil {
+		return errors.Wrap(err, "error running integrity checks")
+	}
 
 	// keep checking if limited-cache flag is set
 	if app.CheckFlag(app.LimitedCache) {
@@ -365,6 +419,8 @@ func action(cli *cli.Context) error {
 
 	// also spawn the capacity reporter
 	go func() {
+		defer reporter.Close()
+
 		for {
 			err := reporter.Run(ctx)
 			if err == context.Canceled {
