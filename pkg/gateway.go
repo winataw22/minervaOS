@@ -1,5 +1,7 @@
 package pkg
 
+import "github.com/threefoldtech/zos/pkg/gridtypes/zos"
+
 //go:generate mkdir -p stubs
 
 //go:generate zbusc -module gateway -version 0.0.1 -name manager -package stubs github.com/threefoldtech/zos/pkg+Gateway stubs/gateway_stub.go
@@ -22,8 +24,8 @@ func (m *GatewayMetrics) Nu(service string) (result uint64) {
 }
 
 type Gateway interface {
-	SetNamedProxy(wlID string, prefix string, backends []string, TLSPassthrough bool, twinID uint32) (string, error)
-	SetFQDNProxy(wlID string, fqdn string, backends []string, TLSPassthrough bool) error
+	SetNamedProxy(wlID string, config zos.GatewayNameProxy) (string, error)
+	SetFQDNProxy(wlID string, config zos.GatewayFQDNProxy) error
 	DeleteNamedProxy(wlID string) error
 	Metrics() (GatewayMetrics, error)
 }

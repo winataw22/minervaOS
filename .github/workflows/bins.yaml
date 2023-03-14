@@ -90,6 +90,12 @@ jobs:
       package: vector
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  nnc:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: nnc
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
   tpm:
     uses: ./.github/workflows/bin-package-18.04.yaml
     with:

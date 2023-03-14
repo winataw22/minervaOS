@@ -68,6 +68,52 @@ func TestValidBackend(t *testing.T) {
 	})
 }
 
+func TestAsAddress(t *testing.T) {
+
+	cases := []struct {
+		Backend Backend
+		Address string
+		Err     bool
+	}{
+		{
+			Backend: Backend("http://10.20.30.40"),
+			Address: "10.20.30.40:80",
+		},
+		{
+			Backend: Backend("[2001:db8:3333:4444:CCCC:DDDD:EEEE:FFFF]:200"),
+			Address: "[2001:db8:3333:4444:CCCC:DDDD:EEEE:FFFF]:200",
+		},
+		{
+			Backend: Backend("2001:db8:3333:4444:CCCC:DDDD:EEEE:FFFF:200"),
+			Err:     true,
+		},
+		{
+			Backend: Backend("http://[2001:db8:3333:4444:CCCC:DDDD:EEEE:FFFF]:200"),
+			Address: "[2001:db8:3333:4444:CCCC:DDDD:EEEE:FFFF]:200",
+		},
+		{
+			Backend: Backend("http://10.20.30.40:500"),
+			Address: "10.20.30.40:500",
+		},
+		{
+			Backend: Backend("10.20.30.40:500"),
+			Address: "10.20.30.40:500",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(string(c.Backend), func(t *testing.T) {
+			addr, err := c.Backend.AsAddress()
+			if c.Err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, c.Address, addr)
+			}
+		})
+	}
+}
+
 func TestValidBackendIP6(t *testing.T) {
 	require := require.New(t)
 

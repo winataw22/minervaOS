@@ -19,8 +19,8 @@ var dConfig string
 var certScript string
 
 // staticConfig write static config to file
-func staticConfig(p, root, email string) (bool, error) {
-	config := fmt.Sprintf(config, root, email)
+func staticConfig(p, root, volatile, email string) (bool, error) {
+	config := fmt.Sprintf(config, root, email, volatile)
 
 	var update bool
 	if oldConfig, err := os.ReadFile(p); os.IsNotExist(err) {

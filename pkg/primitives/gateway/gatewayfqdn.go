@@ -31,12 +31,9 @@ func (p *FQDNManager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithI
 	if err := json.Unmarshal(wl.Data, &proxy); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal gateway proxy from reservation: %w", err)
 	}
-	backends := make([]string, len(proxy.Backends))
-	for idx, backend := range proxy.Backends {
-		backends[idx] = string(backend)
-	}
+
 	gateway := stubs.NewGatewayStub(p.zbus)
-	err := gateway.SetFQDNProxy(ctx, wl.ID.String(), proxy.FQDN, backends, proxy.TLSPassthrough)
+	err := gateway.SetFQDNProxy(ctx, wl.ID.String(), proxy)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup fqdn proxy")
 	}

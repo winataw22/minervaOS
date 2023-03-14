@@ -16,7 +16,7 @@ metrics:
     entryPoint: metrics
 providers:
   file:
-    directory: "%[1]s/proxy"
+    directory: "%[3]s/proxy"
     watch: true
 certificatesResolvers:
   resolver:

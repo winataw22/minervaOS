@@ -4,36 +4,22 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
 // GatewayNameProxy definition. this will proxy name.<zos.domain> to backends
 type GatewayNameProxy struct {
+	GatewayBase
 	// Name the fully qualified domain name to use (cannot be present with Name)
 	Name string `json:"name"`
-
-	// Passthrough whether to pass tls traffic or not
-	TLSPassthrough bool `json:"tls_passthrough"`
-
-	// Backends are list of backend ips
-	Backends []Backend `json:"backends"`
 }
 
 func (g GatewayNameProxy) Valid(getter gridtypes.WorkloadGetter) error {
 	if !gwNameRegex.MatchString(g.Name) {
 		return fmt.Errorf("invalid name")
 	}
-	if len(g.Backends) == 0 {
-		return fmt.Errorf("backends list can not be empty")
-	}
-	for _, backend := range g.Backends {
-		if err := backend.Valid(g.TLSPassthrough); err != nil {
-			return errors.Wrapf(err, "failed to validate backend '%s'", backend)
-		}
-	}
 
-	return nil
+	return g.GatewayBase.Valid(getter)
 }
 
 func (g GatewayNameProxy) Challenge(w io.Writer) error {
@@ -41,17 +27,7 @@ func (g GatewayNameProxy) Challenge(w io.Writer) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(w, "%t", g.TLSPassthrough); err != nil {
-		return err
-	}
-
-	for _, backend := range g.Backends {
-		if _, err := fmt.Fprintf(w, "%s", string(backend)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return g.GatewayBase.Challenge(w)
 }
 
 func (g GatewayNameProxy) Capacity() (gridtypes.Capacity, error) {
@@ -62,5 +38,6 @@ func (g GatewayNameProxy) Capacity() (gridtypes.Capacity, error) {
 }
 
 // GatewayProxyResult results
-type GatewayFQDNResult struct {
+type GatewayProxyResult struct {
+	FQDN string `json:"fqdn"`
 }

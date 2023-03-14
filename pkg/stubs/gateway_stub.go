@@ -8,6 +8,7 @@ import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	zos "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 type GatewayStub struct {
@@ -59,8 +60,8 @@ func (s *GatewayStub) Metrics(ctx context.Context) (ret0 pkg.GatewayMetrics, ret
 	return
 }
 
-func (s *GatewayStub) SetFQDNProxy(ctx context.Context, arg0 string, arg1 string, arg2 []string, arg3 bool) (ret0 error) {
-	args := []interface{}{arg0, arg1, arg2, arg3}
+func (s *GatewayStub) SetFQDNProxy(ctx context.Context, arg0 string, arg1 zos.GatewayFQDNProxy) (ret0 error) {
+	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetFQDNProxy", args...)
 	if err != nil {
 		panic(err)
@@ -74,8 +75,8 @@ func (s *GatewayStub) SetFQDNProxy(ctx context.Context, arg0 string, arg1 string
 	return
 }
 
-func (s *GatewayStub) SetNamedProxy(ctx context.Context, arg0 string, arg1 string, arg2 []string, arg3 bool, arg4 uint32) (ret0 string, ret1 error) {
-	args := []interface{}{arg0, arg1, arg2, arg3, arg4}
+func (s *GatewayStub) SetNamedProxy(ctx context.Context, arg0 string, arg1 zos.GatewayNameProxy) (ret0 string, ret1 error) {
+	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetNamedProxy", args...)
 	if err != nil {
 		panic(err)

@@ -33,13 +33,9 @@ func (p *NameManager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithI
 	if err := json.Unmarshal(wl.Data, &proxy); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal gateway proxy from reservation: %w", err)
 	}
-	backends := make([]string, len(proxy.Backends))
-	for idx, backend := range proxy.Backends {
-		backends[idx] = string(backend)
-	}
-	twinID, _ := provision.GetDeploymentID(ctx)
+
 	gateway := stubs.NewGatewayStub(p.zbus)
-	fqdn, err := gateway.SetNamedProxy(ctx, wl.ID.String(), proxy.Name, backends, proxy.TLSPassthrough, twinID)
+	fqdn, err := gateway.SetNamedProxy(ctx, wl.ID.String(), proxy)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup name proxy")
 	}
