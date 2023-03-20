@@ -352,12 +352,13 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 	machine.Environment = config.Env
 	machine.Hostname = wl.Name.String()
 
-	if err = vm.Run(ctx, machine); err != nil {
+	machineInfo, err := vm.Run(ctx, machine)
+	if err != nil {
 		// attempt to delete the vm, should the process still be lingering
 		log.Error().Err(err).Msg("cleaning up vm deployment duo to an error")
 		_ = vm.Delete(ctx, wl.ID.String())
 	}
-
+	result.ConsoleURL = machineInfo.ConsoleURL
 	return result, err
 }
 func (p *Manager) copyFile(srcPath string, destPath string, permissions os.FileMode) error {

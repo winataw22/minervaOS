@@ -42,7 +42,7 @@ func action(cli *cli.Context) error {
 		workerNr     uint   = cli.Uint("workers")
 	)
 
-	storageModule, err := storage.New()
+	storageModule, err := storage.New(cli.Context)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize storage module")
 	}

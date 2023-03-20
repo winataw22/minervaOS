@@ -115,6 +115,7 @@ func (p *Manager) newPrivNetworkInterface(ctx context.Context, dl gridtypes.Depl
 		IP6DefaultGateway: gw6,
 		PublicIPv4:        false,
 		PublicIPv6:        false,
+		NetID:             netID,
 	}
 
 	return out, nil

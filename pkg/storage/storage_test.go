@@ -399,3 +399,71 @@ func TestVDiskFindCandidatesOverProvision(t *testing.T) {
 	require.Error(err)
 
 }
+
+func TestCacheResize(t *testing.T) {
+	// resize down
+	var m Module
+	cacheSize := uint64(5)
+
+	vol := testVolume{
+		usage: filesystem.Usage{
+			Size: 100,
+			Used: 100,
+			Excl: 1,
+		},
+	}
+	vol.On("Limit", uint64(cacheSize)).Return(nil)
+	err := m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+
+	vol = testVolume{
+		usage: filesystem.Usage{
+			Size: 100,
+			Used: 100,
+			Excl: 19,
+		},
+	}
+	// the limit is then set to double the 19
+	// = 19 * 2 = 38
+	// this then is ceiled to multiple of cacheSize
+	// so  (38/5)* 5 = 35
+	// then 35 + 5 = 40
+	vol.On("Limit", uint64(40)).Return(nil)
+	err = m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+
+	// resize down
+	vol = testVolume{
+		usage: filesystem.Usage{
+			Size: 100,
+			Used: 100,
+			Excl: 0, // no files
+		},
+	}
+	vol.On("Limit", uint64(cacheSize)).Return(nil)
+	err = m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+
+	// resize up
+	vol = testVolume{
+		usage: filesystem.Usage{
+			Size: 100,
+			Used: 100,
+			Excl: 91,
+		},
+	}
+	vol.On("Limit", uint64(100+cacheSize)).Return(nil)
+	err = m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+
+	// leave as is
+	vol = testVolume{
+		usage: filesystem.Usage{
+			Size: 100,
+			Used: 100,
+			Excl: 50,
+		},
+	}
+	err = m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+}

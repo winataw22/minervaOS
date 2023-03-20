@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/pkg/errors"
@@ -50,11 +51,18 @@ const (
 	InterfaceTAP InterfaceType = "tuntap"
 )
 
+type Console struct {
+	Namespace   string    `json:"namespace"`
+	NetworkAddr net.IPNet `json:"network_addr"`
+	IP          net.IPNet `json:"ip"`
+}
+
 // Interface nic struct
 type Interface struct {
-	ID  string `json:"iface_id"`
-	Tap string `json:"host_dev_name"`
-	Mac string `json:"guest_mac,omitempty"`
+	ID      string   `json:"iface_id"`
+	Tap     string   `json:"host_dev_name"`
+	Mac     string   `json:"guest_mac,omitempty"`
+	Console *Console `json:"console,omitempty"`
 }
 
 // asTap returns the command line argument for this interface as a tap device

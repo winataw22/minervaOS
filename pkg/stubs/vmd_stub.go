@@ -141,15 +141,17 @@ func (s *VMModuleStub) Metrics(ctx context.Context) (ret0 pkg.MachineMetrics, re
 	return
 }
 
-func (s *VMModuleStub) Run(ctx context.Context, arg0 pkg.VM) (ret0 error) {
+func (s *VMModuleStub) Run(ctx context.Context, arg0 pkg.VM) (ret0 pkg.MachineInfo, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Run", args...)
 	if err != nil {
 		panic(err)
 	}
 	result.PanicOnError()
-	ret0 = result.CallError()
-	loader := zbus.Loader{}
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
 	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}

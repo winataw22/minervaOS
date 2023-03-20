@@ -249,17 +249,19 @@ func (p *btrfsPool) Usage() (usage Usage, err error) {
 		return usage, errors.Wrapf(err, "failed to list pool '%s' volumes", mnt)
 	}
 
-	var used uint64
+	usage.Size = p.device.Size
+
 	for _, volume := range volumes {
-		usage, err := volume.Usage()
+		vol, err := volume.Usage()
 		if err != nil {
 			return Usage{}, errors.Wrapf(err, "failed to calculate volume '%s' usage", volume.Path())
 		}
 
-		used += usage.Used
+		usage.Used += vol.Used
+		usage.Excl += vol.Excl
 	}
 
-	return Usage{Size: p.device.Size, Used: used}, nil
+	return
 }
 
 func (p *btrfsPool) maintenance() error {
@@ -374,7 +376,7 @@ func (v *btrfsVolume) Usage() (usage Usage, err error) {
 		}
 	}
 
-	return Usage{Used: used, Size: group.MaxRfer}, nil
+	return Usage{Used: used, Size: group.MaxRfer, Excl: group.Excl}, nil
 }
 
 // Limit size of volume, setting size to 0 means unlimited

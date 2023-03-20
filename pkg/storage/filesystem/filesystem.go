@@ -8,8 +8,32 @@ import (
 
 // Usage struct (in bytes)
 type Usage struct {
+	// Size is allocated space for this Volume
+	// if 0 it means it has no limit.
+	// if it has no-limit, the Used attribute
+	// will be the total size of actual files
+	// inside the volume. It also means the Used
+	// can keep growing to the max possible which
+	// is the size of the pool
 	Size uint64
+	// Used can be one of 2 things:
+	// - If Size is not zero (so size is limited), Used will always equal to size
+	//   because that's the total reserved space for that volume.
+	// - If Size is zero, (no limit) Used will be the total actual size of all
+	//   files in that volume.
+	// The reason Used is done this way, it will make it easier to compute
+	// all allocated space in a pool by going over all volumes and add the
+	// used on each. It does not matter if this space is reserved but not used
+	// because it means we can't allocate over that.
+	//
+	// NOTE: Special case, if this is a `zdb` volume the Used is instead
+	// have the total size of reserved namespaces in that volume
 	Used uint64
+
+	// In case of `limited` volume (with quota) Excl will have a "guessed"
+	// value of the total used space by files. This value is not accurate
+	// and Used should be used instead for all capacity planning.
+	Excl uint64
 }
 
 // Volume represents a logical volume in the pool. Volumes can be nested

@@ -30,9 +30,12 @@ const (
 	// CacheTarget is the path where the cache disk is mounted
 	CacheTarget = "/var/cache"
 	// cacheLabel is the name of the cache
-	cacheLabel = "zos-cache"
-	gib        = 1024 * 1024 * 1024
-	cacheSize  = 100 * gib
+	cacheLabel         = "zos-cache"
+	gib                = 1024 * 1024 * 1024
+	cacheSize          = 5 * gib
+	cacheGrowPercent   = 80
+	cacheShrinkPercent = 20
+	cacheCheckDuration = 30 * time.Minute
 )
 
 var (
@@ -84,7 +87,7 @@ func (t *TypeCache) Get(name string) (pkg.DeviceType, bool) {
 }
 
 // New create a new storage module service
-func New() (*Module, error) {
+func New(ctx context.Context) (*Module, error) {
 	m := filesystem.DefaultDeviceManager()
 	cache, err := cache.VolatileDir("storage", 1*cache.Megabyte)
 	if err != nil && !os.IsExist(err) {
@@ -99,7 +102,7 @@ func New() (*Module, error) {
 	}
 
 	// go for a simple linear setup right now
-	return s, s.initialize()
+	return s, s.initialize(ctx)
 }
 
 // Total gives the total amount of storage available for a device type
@@ -164,7 +167,7 @@ What Initialize will do is the following:
 
 *
 */
-func (s *Module) initialize() error {
+func (s *Module) initialize(ctx context.Context) error {
 	// lock for the entire initialization method, so other code which relies
 	// on this observes this as an atomic operation
 	s.mu.Lock()
@@ -175,10 +178,10 @@ func (s *Module) initialize() error {
 	log.Debug().Bool("is-vm", vm).Msg("debugging virtualization detection")
 
 	// Make sure we finish in 1 minute
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
+	subCtx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
 	defer cancel()
 
-	devices, err := s.devices.Devices(ctx)
+	devices, err := s.devices.Devices(subCtx)
 	if err != nil {
 		return err
 	}
@@ -278,11 +281,11 @@ func (s *Module) initialize() error {
 	s.dump()
 
 	// just in case
-	if err := filesystem.Partprobe(ctx); err != nil {
+	if err := filesystem.Partprobe(subCtx); err != nil {
 		return err
 	}
 
-	if err := s.ensureCache(); err != nil {
+	if err := s.ensureCache(ctx); err != nil {
 		log.Error().Err(err).Msg("Error ensuring cache")
 		return err
 	}
@@ -561,7 +564,7 @@ func (s *Module) Cache() (pkg.Volume, error) {
 }
 
 // ensureCache creates a "cache" subvolume and mounts it in /var
-func (s *Module) ensureCache() error {
+func (s *Module) ensureCache(ctx context.Context) error {
 	log.Info().Msgf("Setting up cache")
 
 	log.Debug().Msgf("Checking pools for existing cache")
@@ -620,10 +623,7 @@ func (s *Module) ensureCache() error {
 
 	_ = app.DeleteFlag(app.LimitedCache)
 
-	log.Info().Msgf("set cache quota to %d GiB", cacheSize/gib)
-	if err := cacheFs.Limit(cacheSize); err != nil {
-		log.Error().Err(err).Msg("failed to set cache quota")
-	}
+	go s.watchCache(ctx, cacheFs)
 
 	if !filesystem.IsMountPoint(CacheTarget) {
 		log.Debug().Msgf("Mounting cache partition in %s", CacheTarget)
@@ -632,6 +632,51 @@ func (s *Module) ensureCache() error {
 
 	log.Debug().Msgf("Cache partition already mounted in %s", CacheTarget)
 	return nil
+}
+
+func (s *Module) checkAndResizeCache(cache filesystem.Volume, sizeMultiplier uint64) error {
+	usage, err := cache.Usage()
+	if err != nil {
+		return errors.Wrap(err, "failed to check cache usage")
+	}
+	log.Debug().Msgf("cache usage %+v", usage)
+	percent := usage.Excl * 100 / usage.Size
+	size := usage.Size
+	if percent >= cacheGrowPercent {
+		size += sizeMultiplier
+	} else if percent < cacheShrinkPercent && size > sizeMultiplier {
+		// if we go below 20% of the size of the cache
+		// we can assume the cache size can set comfortably
+		// around double the needed space
+		size = usage.Excl * 2
+		// then ceiled it to number of cache sizes (multipleOf)
+		size = ((size / sizeMultiplier) * sizeMultiplier) + sizeMultiplier
+	}
+
+	if size < sizeMultiplier {
+		size = sizeMultiplier
+	}
+	if usage.Size == size {
+		return nil
+	}
+
+	log.Info().Uint64("size", size).Msg("setting cache size")
+	return cache.Limit(size)
+}
+
+// watchCache will watch the system cache and increase (or decrease)
+// it's size as needed
+func (s *Module) watchCache(ctx context.Context, cache filesystem.Volume) {
+	for {
+		if err := s.checkAndResizeCache(cache, cacheSize); err != nil {
+			log.Error().Err(err).Msg("error while checking cache size")
+		}
+		select {
+		case <-time.After(cacheCheckDuration):
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // createSubvolWithQuota creates a subvolume with the given name and limits it to the given size

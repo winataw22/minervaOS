@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
 //go:generate zbusc -module vmd -version 0.0.1 -name manager -package stubs github.com/threefoldtech/zos/pkg+VMModule stubs/vmd_stub.go
@@ -37,6 +38,8 @@ type VMIface struct {
 	PublicIPv4 bool
 	// PublicIPv4 holds a public Ipv6
 	PublicIPv6 bool
+	// NetId holds network id (for private network only)
+	NetID zos.NetID
 }
 
 // VMNetworkInfo structure
@@ -230,6 +233,9 @@ type MachineMetric struct {
 	Private NetMetric
 	Public  NetMetric
 }
+type MachineInfo struct {
+	ConsoleURL string
+}
 
 // MachineMetrics container for metrics from multiple machines
 type MachineMetrics map[string]MachineMetric
@@ -254,7 +260,7 @@ func (s *Stream) Valid() error {
 
 // VMModule defines the virtual machine module interface
 type VMModule interface {
-	Run(vm VM) error
+	Run(vm VM) (MachineInfo, error)
 	Inspect(name string) (VMInfo, error)
 	Delete(name string) error
 	Exists(name string) bool

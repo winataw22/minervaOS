@@ -5,23 +5,65 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/google/shlex"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg"
 )
 
 const (
-	chBin = "cloud-hypervisor"
+	chBin           = "cloud-hypervisor"
+	cloudConsoleBin = "cloud-console"
 )
 
+// startCloudConsole Starts the cloud console for the vm on it's private network ip
+func (m *Machine) startCloudConsole(ctx context.Context, namespace string, networkAddr net.IPNet, machineIP net.IPNet, ptyPath string) (string, error) {
+	ipv4 := machineIP.IP.To4()
+	if ipv4 == nil {
+		return "", fmt.Errorf("invalid vm ip address (%s) not ipv4", machineIP.IP.String())
+	}
+	port := 20000 + uint16(ipv4[3])
+	if port == math.MaxUint16 {
+		// this should be impossible since a byte max value is 512 hence 20_000 + 512 can never be over
+		// max of uint16
+		return "", fmt.Errorf("couldn't start cloud console port number exceeds %d", port)
+	}
+	args := []string{
+		"setsid",
+		"ip",
+		"netns",
+		"exec", namespace,
+		cloudConsoleBin,
+		ptyPath,
+		networkAddr.IP.String(),
+		fmt.Sprint(port),
+	}
+
+	log.Debug().Msgf("running cloud-console : %+v", args)
+
+	cmd := exec.CommandContext(ctx, "busybox", args...)
+	if err := cmd.Start(); err != nil {
+		return "", errors.Wrap(err, "failed to start cloud-hypervisor")
+	}
+	if err := m.release(cmd.Process); err != nil {
+		return "", err
+	}
+	consoleURL := fmt.Sprintf("%s:%d", networkAddr.IP.String(), port)
+	return consoleURL, nil
+}
+
 // Run run the machine with cloud-hypervisor
-func (m *Machine) Run(ctx context.Context, socket, logs string) error {
+func (m *Machine) Run(ctx context.Context, socket, logs string) (pkg.MachineInfo, error) {
 	_ = os.Remove(socket)
 
 	// build command line
@@ -33,7 +75,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 		"--memory": {fmt.Sprintf("%s,shared=on", m.Config.Mem.String())},
 
 		"--console":    {"off"},
-		"--serial":     {"tty"},
+		"--serial":     {"pty"}, // we use pty here for the cloud console to be able to read the vm console, in case of debuging or we need stdout logging we use tty
 		"--api-socket": {socket},
 	}
 	var err error
@@ -52,7 +94,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 		var pid int
 		pid, err = m.startFs(socket, fs.Path)
 		if err != nil {
-			return err
+			return pkg.MachineInfo{}, err
 		}
 		pids = append(pids, pid)
 		filesystems = append(filesystems, fmt.Sprintf("tag=%s,socket=%s", fs.Tag, socket))
@@ -62,7 +104,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 		args["--fs"] = filesystems
 	}
 	if err := m.buildZosRC(); err != nil {
-		return errors.Wrap(err, "couldn't build zosrc")
+		return pkg.MachineInfo{}, errors.Wrap(err, "couldn't build zosrc")
 	}
 	if m.Boot.Initrd != "" {
 		args["--initramfs"] = []string{m.Boot.Initrd}
@@ -84,13 +126,13 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 			var typ InterfaceType
 			typ, _, err = nic.getType()
 			if err != nil {
-				return errors.Wrapf(err, "failed to detect interface type '%s'", nic.Tap)
+				return pkg.MachineInfo{}, errors.Wrapf(err, "failed to detect interface type '%s'", nic.Tap)
 			}
 			if typ == InterfaceTAP {
 				interfaces = append(interfaces, nic.asTap())
 			} else {
 				err = fmt.Errorf("unsupported tap device type '%s'", nic.Tap)
-				return err
+				return pkg.MachineInfo{}, err
 			}
 		}
 		args["--net"] = interfaces
@@ -114,7 +156,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	// to save up storage.
 	logFd, err := os.OpenFile(logs, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return pkg.MachineInfo{}, err
 	}
 	defer logFd.Close()
 
@@ -132,7 +174,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	cmd.Stdout = logFd
 	cmd.Stderr = logFd
 
-	// TODO: always get permission denied when setting
+	// TODO: alMachineInfo{}, ways get permission denied when setting
 	// sid with sys proc attr
 	// cmd.SysProcAttr = &syscall.SysProcAttr{
 	// 	Setsid:     true,
@@ -148,7 +190,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 		var tap *os.File
 		tap, err = os.OpenFile(filepath.Join("/dev", fmt.Sprintf("tap%d", tapindex)), os.O_RDWR, 0600)
 		if err != nil {
-			return err
+			return pkg.MachineInfo{}, err
 		}
 		toClose = append(toClose, tap)
 		cmd.ExtraFiles = append(cmd.ExtraFiles, tap)
@@ -161,11 +203,73 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) error {
 	}()
 
 	if err = cmd.Start(); err != nil {
-		return errors.Wrap(err, "failed to start cloud-hypervisor")
+		return pkg.MachineInfo{}, errors.Wrap(err, "failed to start cloud-hypervisor")
 	}
 
 	if err = m.release(cmd.Process); err != nil {
+		return pkg.MachineInfo{}, err
+	}
+
+	if err := m.waitAndAdjOom(ctx, m.ID, socket); err != nil {
+		return pkg.MachineInfo{}, err
+	}
+	client := NewClient(socket)
+	vmData, err := client.Inspect(ctx)
+
+	if err != nil {
+		return pkg.MachineInfo{}, errors.Wrapf(err, "failed to Inspect vm with id: '%s'", m.ID)
+	}
+	consoleURL := ""
+	for _, ifc := range m.Interfaces {
+		if ifc.Console != nil {
+			consoleURL, err = m.startCloudConsole(ctx, ifc.Console.Namespace, ifc.Console.NetworkAddr, ifc.Console.IP, vmData.PTYPath)
+			if err != nil {
+				log.Error().Err(err).Str("vm", m.ID).Msg("failed to start cloud-console for vm")
+			}
+		}
+	}
+
+	return pkg.MachineInfo{ConsoleURL: consoleURL}, nil
+}
+
+func (m *Machine) waitAndAdjOom(ctx context.Context, name string, socket string) error {
+	check := func() error {
+		if _, err := Find(name); err != nil {
+			return fmt.Errorf("failed to spawn vm machine process '%s'", name)
+		}
+
+		con, err := net.Dial("unix", socket)
+		if err != nil {
+			return err
+		}
+
+		con.Close()
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := backoff.RetryNotify(
+		check,
+		backoff.WithContext(
+			backoff.NewConstantBackOff(2*time.Second),
+			ctx,
+		),
+		func(err error, d time.Duration) {
+			log.Debug().Err(err).Str("id", name).Msg("vm is not up yet")
+		}); err != nil {
+
 		return err
+	}
+
+	ps, err := Find(name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to find vm with id '%s'", name)
+	}
+
+	if err := os.WriteFile(filepath.Join("/proc/", fmt.Sprint(ps.Pid), "oom_adj"), []byte("-17"), 0644); err != nil {
+		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", name, ps.Pid)
 	}
 
 	return nil

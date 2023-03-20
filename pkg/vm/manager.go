@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,13 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/vm/cloudinit"
 )
 
@@ -147,7 +146,18 @@ func (m *Module) Exists(id string) bool {
 	return err == nil
 }
 
-func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interface, error) {
+func (m *Module) getConsoleConfig(ctx context.Context, vmName string, ifc pkg.VMIface) (*Console, error) {
+	stub := stubs.NewNetworkerStub(m.client)
+	namespace := stub.Namespace(ctx, ifc.NetID)
+
+	networkAddr, err := stub.GetSubnet(ctx, ifc.NetID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get network '%s'", ifc.NetID)
+	}
+	return &Console{Namespace: namespace, NetworkAddr: networkAddr, IP: ifc.IPs[0]}, nil
+
+}
+func (m *Module) makeNetwork(ctx context.Context, vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interface, error) {
 	// assume there is always at least 1 iface present
 
 	// we do 2 things here:
@@ -175,6 +185,14 @@ func (m *Module) makeNetwork(vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interf
 			ID:  fmt.Sprintf("eth%d", i),
 			Tap: ifcfg.Tap,
 			Mac: ifcfg.MAC,
+		}
+		if ifcfg.NetID != "" && len(ifcfg.IPs) > 0 {
+			// if NetID is set on this interface means it is a private network so we add console config to it.
+			console, err := m.getConsoleConfig(ctx, vm.Name, ifcfg)
+			if err != nil {
+				return nil, errors.Wrapf(err, "could not get console config for vm %s", vm.Name)
+			}
+			nic.Console = console
 		}
 		nics = append(nics, nic)
 
@@ -317,18 +335,18 @@ func (m *Module) List() ([]string, error) {
 }
 
 // Run vm
-func (m *Module) Run(vm pkg.VM) error {
+func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	if err := vm.Validate(); err != nil {
-		return errors.Wrap(err, "machine configuration validation failed")
+		return pkg.MachineInfo{}, errors.Wrap(err, "machine configuration validation failed")
 	}
 
 	ctx := context.Background()
 
 	if m.Exists(vm.Name) {
-		return fmt.Errorf("a vm with same name already exists")
+		return pkg.MachineInfo{}, fmt.Errorf("a vm with same name already exists")
 	}
 
 	cfg := cloudinit.Configuration{
@@ -364,11 +382,11 @@ func (m *Module) Run(vm pkg.VM) error {
 
 	devices, err := m.makeDevices(&vm)
 	if err != nil {
-		return err
+		return pkg.MachineInfo{}, err
 	}
 	fs, err := m.makeVirtioFilesystems(&vm)
 	if err != nil {
-		return errors.Wrap(err, "failed while constructing qsfs filesystems")
+		return pkg.MachineInfo{}, errors.Wrap(err, "failed while constructing qsfs filesystems")
 	}
 
 	cmdline := vm.KernelArgs
@@ -411,15 +429,15 @@ func (m *Module) Run(vm pkg.VM) error {
 		}
 	}
 
-	nics, err := m.makeNetwork(&vm, &cfg)
+	nics, err := m.makeNetwork(ctx, &vm, &cfg)
 	if err != nil {
-		return err
+		return pkg.MachineInfo{}, err
 	}
 
 	ciImage := m.cloudInitImage(vm.Name)
 
 	if err := cloudinit.CreateImage(ciImage, cfg); err != nil {
-		return errors.Wrap(err, "failed to create cloud-init image")
+		return pkg.MachineInfo{}, errors.Wrap(err, "failed to create cloud-init image")
 	}
 
 	devices = append(devices, Disk{
@@ -450,7 +468,7 @@ func (m *Module) Run(vm pkg.VM) error {
 
 	log.Debug().Str("name", vm.Name).Msg("saving machine")
 	if err := machine.Save(m.configPath(vm.Name)); err != nil {
-		return err
+		return pkg.MachineInfo{}, err
 	}
 
 	defer func() {
@@ -464,59 +482,12 @@ func (m *Module) Run(vm pkg.VM) error {
 		m.failures.Set(vm.Name, permanent, cache.NoExpiration)
 	}
 
-	if err = machine.Run(ctx, m.socketPath(vm.Name), m.logsPath(vm.Name)); err != nil {
-		return m.withLogs(m.logsPath(vm.Name), err)
-	}
-
-	if err := m.waitAndAdjOom(ctx, vm.Name); err != nil {
-		return m.withLogs(m.logsPath(vm.Name), err)
-	}
-
-	return nil
-}
-
-func (m *Module) waitAndAdjOom(ctx context.Context, name string) error {
-	check := func() error {
-		if !m.Exists(name) {
-			return fmt.Errorf("failed to spawn vm machine process '%s'", name)
-		}
-		//TODO: check unix connection
-		socket := m.socketPath(name)
-		con, err := net.Dial("unix", socket)
-		if err != nil {
-			return err
-		}
-
-		con.Close()
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	if err := backoff.RetryNotify(
-		check,
-		backoff.WithContext(
-			backoff.NewConstantBackOff(2*time.Second),
-			ctx,
-		),
-		func(err error, d time.Duration) {
-			log.Debug().Err(err).Str("id", name).Msg("vm is not up yet")
-		}); err != nil {
-
-		return err
-	}
-
-	ps, err := Find(name)
+	machineInfo, err := machine.Run(ctx, m.socketPath(vm.Name), m.logsPath(vm.Name))
 	if err != nil {
-		return errors.Wrapf(err, "failed to find vm with id '%s'", name)
+		return pkg.MachineInfo{}, m.withLogs(m.logsPath(vm.Name), err)
 	}
 
-	if err := os.WriteFile(filepath.Join("/proc/", fmt.Sprint(ps.Pid), "oom_adj"), []byte("-17"), 0644); err != nil {
-		return errors.Wrapf(err, "failed to update oom priority for machine '%s' (PID: %d)", name, ps.Pid)
-	}
-
-	return nil
+	return machineInfo, nil
 }
 
 // Logs returns machine logs for give machine name
@@ -531,14 +502,14 @@ func (m *Module) Inspect(name string) (pkg.VMInfo, error) {
 		return pkg.VMInfo{}, fmt.Errorf("machine '%s' does not exist", name)
 	}
 	client := NewClient(m.socketPath(name))
-	cpu, mem, err := client.Inspect(context.Background())
+	vmdata, err := client.Inspect(context.Background())
 	if err != nil {
 		return pkg.VMInfo{}, errors.Wrap(err, "failed to get machine configuration")
 	}
 
 	return pkg.VMInfo{
-		CPU:       int64(cpu),
-		Memory:    int64(mem),
+		CPU:       int64(vmdata.CPU),
+		Memory:    int64(vmdata.Memory),
 		HtEnabled: false,
 	}, nil
 }

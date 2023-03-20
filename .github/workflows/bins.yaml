@@ -108,3 +108,9 @@ jobs:
       package: qsfs
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  cloudconsole:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: cloudconsole
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
