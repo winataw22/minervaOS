@@ -241,11 +241,6 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get node capacity")
 	}
 
-	// update initial capacity with
-	reserved, err := getNodeReserved(cl, cap)
-	if err != nil {
-		return errors.Wrap(err, "failed to get node reserved capacity")
-	}
 	var current gridtypes.Capacity
 	var active []gridtypes.Deployment
 	if !app.IsFirstBoot(serverName) {
@@ -274,7 +269,7 @@ func action(cli *cli.Context) error {
 	statistics := primitives.NewStatistics(
 		cap,
 		store,
-		reserved,
+		getNodeReserved(cl, cap),
 		provisioners,
 	)
 
@@ -471,21 +466,22 @@ func action(cli *cli.Context) error {
 	return nil
 }
 
-func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) (counter gridtypes.Capacity, err error) {
-	// fill in reserved storage
-	storage := stubs.NewStorageModuleStub(cl)
-	fs, err := storage.Cache(context.TODO())
-	if err != nil {
-		return counter, err
+func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) primitives.Reserved {
+	return func() (counter gridtypes.Capacity, err error) {
+		storage := stubs.NewStorageModuleStub(cl)
+		fs, err := storage.Cache(context.TODO())
+		if err != nil {
+			return counter, err
+		}
+
+		counter.SRU += fs.Usage.Size
+		counter.MRU += gridtypes.Max(
+			available.MRU*10/100,
+			2*gridtypes.Gigabyte,
+		)
+
+		return
 	}
-
-	counter.SRU += fs.Usage.Size
-	counter.MRU += gridtypes.Max(
-		available.MRU*10/100,
-		2*gridtypes.Gigabyte,
-	)
-
-	return
 }
 
 func setupStorageRmb(router rmb.Router, cl zbus.Client) {

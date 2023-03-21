@@ -1,4 +1,4 @@
-# 1. Record architecture decisions
+# 1. No overhead for VM memory
 
 Date: 2022-11-24
 
@@ -12,7 +12,6 @@ ZOS was adding an overhead of 5% for each VM it creates. So on creation of a VM 
 This was wrong because the calculated used memory on the system (comes from active deployments) does not take into account this overhead nor the system. Hence it was impossible for clients to request all available memory on the node.
 
 Note that the node already reserved 10% of the machine memory for the system, this will account for the workload overhead (cloud-hypervisor memory + helper processes) anyway.
-
 
 ## Decision
 

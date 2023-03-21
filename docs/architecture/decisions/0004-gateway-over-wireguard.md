@@ -1,4 +1,4 @@
-# 1. Record architecture decisions
+# 1. Gateway to user NR
 
 Date: 2023-03-14
 

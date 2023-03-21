@@ -444,6 +444,18 @@ func TestCacheResize(t *testing.T) {
 	err = m.checkAndResizeCache(&vol, cacheSize)
 	require.NoError(t, err)
 
+	// resize down
+	vol = testVolume{
+		usage: filesystem.Usage{
+			Size: 1000,
+			Used: 1000,
+			Excl: 16,
+		},
+	}
+	vol.On("Limit", uint64(35)).Return(nil)
+	err = m.checkAndResizeCache(&vol, cacheSize)
+	require.NoError(t, err)
+
 	// resize up
 	vol = testVolume{
 		usage: filesystem.Usage{

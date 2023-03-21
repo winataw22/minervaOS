@@ -32,23 +32,31 @@ var (
 	_ provision.Provisioner = (*Statistics)(nil)
 )
 
+type Reserved func() (gridtypes.Capacity, error)
+
 // Statistics a provisioner interceptor that keeps track
 // of consumed capacity. It also does validate of required
 // capacity and then can report that this capacity can not be fulfilled
 type Statistics struct {
 	inner    provision.Provisioner
 	total    gridtypes.Capacity
-	reserved gridtypes.Capacity
+	reserved Reserved
 	storage  provision.Storage
 	mem      gridtypes.Unit
 }
 
 // NewStatistics creates a new statistics provisioner interceptor.
 // Statistics provisioner keeps track of used capacity and update explorer when it changes
-func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved gridtypes.Capacity, inner provision.Provisioner) *Statistics {
+func NewStatistics(total gridtypes.Capacity, storage provision.Storage, reserved Reserved, inner provision.Provisioner) *Statistics {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
 		panic(err)
+	}
+
+	if reserved == nil {
+		reserved = func() (gridtypes.Capacity, error) {
+			return gridtypes.Capacity{}, nil
+		}
 	}
 
 	return &Statistics{
@@ -72,7 +80,14 @@ type activeCounters struct {
 // Get all used capacity from storage + reserved / deployments count and workloads count
 func (s *Statistics) active() (activeCounters, error) {
 	storageCap, err := s.storage.Capacity()
-	storageCap.Cap.Add(&s.reserved)
+	if err != nil {
+		return activeCounters{}, err
+	}
+	reserved, err := s.reserved()
+	if err != nil {
+		return activeCounters{}, err
+	}
+	storageCap.Cap.Add(&reserved)
 	return activeCounters{
 		storageCap.Cap,
 		len(storageCap.Deployments),
@@ -201,6 +216,11 @@ func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) 
 		return nil, err
 	}
 
+	reserved, err := s.stats.reserved()
+	if err != nil {
+		return nil, err
+	}
+
 	return struct {
 		// Total system capacity
 		Total gridtypes.Capacity `json:"total"`
@@ -213,7 +233,7 @@ func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) 
 	}{
 		Total:  s.stats.Total(),
 		Used:   activeCounters.cap,
-		System: s.stats.reserved,
+		System: reserved,
 		Users: UsersCounters{
 			Deployments: activeCounters.deployments,
 			Workloads:   activeCounters.workloads,

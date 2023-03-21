@@ -1,4 +1,4 @@
-# 1. Record architecture decisions
+# 1. NU reporting of private traffic
 
 Date: 2023-02-28
 
@@ -7,6 +7,7 @@ Date: 2023-02-28
 Accepted
 
 ## Context
+
 Disable (rollback) decision done by [0001-nu-reporting-for-priv-traffic](0001-nu-reporting-for-priv-traffic.md)
 
 ## Decision

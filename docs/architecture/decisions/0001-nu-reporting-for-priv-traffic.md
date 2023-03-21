@@ -1,4 +1,4 @@
-# 1. Record architecture decisions
+# 1. NU reporting for private traffic
 
 Date: 2022-10-24
 
