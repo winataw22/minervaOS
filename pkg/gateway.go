@@ -7,16 +7,16 @@ import "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 //go:generate zbusc -module gateway -version 0.0.1 -name manager -package stubs github.com/threefoldtech/zos/pkg+Gateway stubs/gateway_stub.go
 
 type GatewayMetrics struct {
-	Sent     map[string]float64
-	Received map[string]float64
+	Request  map[string]float64
+	Response map[string]float64
 }
 
 func (m *GatewayMetrics) Nu(service string) (result uint64) {
-	if v, ok := m.Sent[service]; ok {
+	if v, ok := m.Request[service]; ok {
 		result += uint64(v)
 	}
 
-	if v, ok := m.Received[service]; ok {
+	if v, ok := m.Response[service]; ok {
 		result += uint64(v)
 	}
 

@@ -208,16 +208,16 @@ func (r *Reporter) getGwMetrics(ctx context.Context, slot rrd.Slot) error {
 	if err != nil {
 		return err
 	}
-	sent := metrics.Sent
-	recv := metrics.Received
+	requests := metrics.Request
+	responses := metrics.Response
 
 	sums := make(map[string]float64)
-	for wl, v := range sent {
-		sums[wl] = v + recv[wl]
-		delete(recv, wl)
+	for wl, v := range requests {
+		sums[wl] = v + responses[wl]
+		delete(responses, wl)
 	}
 
-	for wl, v := range recv {
+	for wl, v := range responses {
 		sums[wl] = v
 	}
 

@@ -108,6 +108,12 @@ jobs:
       package: qsfs
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  traefik:
+    uses: ./.github/workflows/bin-no-publish.yaml
+    with:
+      package: traefik
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
   cloudconsole:
     uses: ./.github/workflows/bin-package.yaml
     with:

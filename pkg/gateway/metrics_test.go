@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,6 +64,15 @@ traefik_service_requests_total{code="502",method="POST",protocol="http",service=
 	bigNumber = `
 traefik_service_bytes_sent_total{service="50-715-gw@file"} 8.95470206e+08
 `
+	testValues = `
+# TYPE traefik_service_requests_bytes_total counter
+traefik_service_requests_bytes_total{code="200",method="GET",protocol="http",service="10-123-gateway@file"} 100
+traefik_service_requests_bytes_total{code="404",method="GET",protocol="http",service="10-123-gateway@file"} 120
+traefik_service_requests_bytes_total{code="502",method="GET",protocol="http",service="10-123-gateway@file"} 10
+traefik_service_responses_bytes_total{code="200",method="GET",protocol="http",service="10-123-gateway@file"} 1307
+traefik_service_responses_bytes_total{code="404",method="GET",protocol="http",service="10-123-gateway@file"} 469
+traefik_service_responses_bytes_total{code="502",method="GET",protocol="http",service="10-123-gateway@file"} 22
+	`
 )
 
 func TestParseMetrics(t *testing.T) {
@@ -111,4 +121,29 @@ func TestParseBigMetrics(t *testing.T) {
 	require.Equal(t, "traefik_service_bytes_sent_total", m.key)
 	require.Len(t, m.values, 1)
 	require.EqualValues(t, float64(8.95470206e+08), m.values[0].value)
+}
+
+func TestMetrics(t *testing.T) {
+
+	buf := bytes.NewBuffer([]byte(testValues))
+
+	results, err := parseMetrics(buf)
+	require.NoError(t, err)
+
+	request := results[metricRequest]
+	responses := results[metricResponse]
+
+	servicesRequests := request.group("service", func(s string) string {
+		return strings.TrimSuffix(s, "@file")
+	})
+
+	servicesResponses := responses.group("service", func(s string) string {
+		return strings.TrimSuffix(s, "@file")
+	})
+
+	require.Len(t, servicesRequests, 1)
+	require.Len(t, servicesResponses, 1)
+
+	require.EqualValues(t, 230, servicesRequests["10-123-gateway"])
+	require.EqualValues(t, 1798, servicesResponses["10-123-gateway"])
 }

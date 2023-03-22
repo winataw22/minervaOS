@@ -22,8 +22,8 @@ const (
 	publicNS   = "public"
 	metricsURL = "http://127.0.0.1:8082/metrics"
 
-	metricReceived = "traefik_service_bytes_received_total"
-	metricSent     = "traefik_service_bytes_sent_total"
+	metricRequest  = "traefik_service_requests_bytes_total"
+	metricResponse = "traefik_service_responses_bytes_total"
 )
 
 var (
@@ -194,13 +194,13 @@ func (g *gatewayModule) Metrics() (result pkg.GatewayMetrics, err error) {
 	mapping := func(s string) string {
 		return strings.TrimSuffix(s, "@file")
 	}
-	if m, ok := values[metricSent]; ok {
+	if m, ok := values[metricRequest]; ok {
 		// sent metrics.
-		result.Sent = m.group("service", mapping)
+		result.Request = m.group("service", mapping)
 	}
 
-	if m, ok := values[metricReceived]; ok {
-		result.Received = m.group("service", mapping)
+	if m, ok := values[metricResponse]; ok {
+		result.Response = m.group("service", mapping)
 	}
 
 	return

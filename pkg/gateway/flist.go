@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	flist = "https://hub.grid.tf/omar0.3bot/traefik.flist"
+	flist = "https://hub.grid.tf/tf-autobuilder/traefik-2.9.9.flist"
 )
 
 // ensureTraefikBin makes sure traefik flist is mounted.
