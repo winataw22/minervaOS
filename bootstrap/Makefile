@@ -12,4 +12,5 @@ install: build
 
 	# install bootstrap
 	cp -a etc ${ROOT}
+	cp -a usr ${ROOT}
 	cp bootstrap/target/x86_64-unknown-linux-musl/release/bootstrap ${ROOT}/sbin/
