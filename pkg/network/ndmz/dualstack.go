@@ -112,6 +112,10 @@ func (d *dmzImpl) Create(ctx context.Context) error {
 	}
 
 	err = netNS.Do(func(_ ns.NetNS) error {
+		if err := ifaceutil.SetLoUp(); err != nil {
+			return errors.Wrapf(err, "ndmz: couldn't bring lo up in ndmz namespace")
+		}
+
 		if err := options.SetIPv6Forwarding(true); err != nil {
 			return errors.Wrapf(err, "failed to enable forwarding in ndmz")
 		}
@@ -358,44 +362,22 @@ func (d *dmzImpl) Interfaces() ([]types.IfaceInfo, error) {
 // waitIP4 waits to receives some IPv4 from DHCP
 // it returns the pid of the dhcp process or an error
 func waitIP4() error {
-	// run DHCP to interface public in ndmz
-	probe := dhcp.NewProbe()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	if err := probe.Start(dmzPub4); err != nil {
-		return err
-	}
-	defer func() {
-		_ = probe.Stop()
-	}()
+	probe, err := dhcp.Probe(ctx, dmzPub4)
 
-	link, err := netlink.LinkByName(dmzPub4)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error while proping interface '%s'", dmzPub4)
+	}
+	if len(probe.IP) != 0 && len(probe.Router) != 0 {
+		return nil
 	}
 
-	cTimeout := time.After(time.Second * 30)
-	for {
-		select {
-		case <-cTimeout:
-			return errors.Errorf("public interface in ndmz did not received an IP. make sure DHCP is working")
-		default:
-			hasGW, _, err := ifaceutil.HasDefaultGW(link, netlink.FAMILY_V4)
-			if err != nil {
-				return err
-			}
-			if !hasGW {
-				time.Sleep(time.Second)
-				continue
-			}
-			return nil
-		}
-	}
+	return errors.Errorf("public interface in ndmz did not received an IP. make sure DHCP is working")
 }
 
 func waitIP6() error {
-	if err := ifaceutil.SetLoUp(); err != nil {
-		return errors.Wrapf(err, "ndmz: couldn't bring lo up in ndmz namespace")
-	}
 	// also, set kernel parameter that public always accepts an ra even when forwarding
 	if err := options.Set(dmzPub6,
 		options.AcceptRA(options.RAAcceptIfForwardingIsEnabled),

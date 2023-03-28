@@ -25,11 +25,10 @@ import (
 
 // IfaceConfig contains all the IP address and routes of an interface
 type IfaceConfig struct {
-	Name    string
-	Addrs4  []netlink.Addr
-	Addrs6  []netlink.Addr
-	Routes4 []netlink.Route
-	Routes6 []netlink.Route
+	Name      string
+	Addrs4    []netlink.Addr
+	Addrs6    []netlink.Addr
+	DefaultGW net.IP
 }
 
 // Requires tesll the analyser to wait for ip type
@@ -47,6 +46,7 @@ type byIP4 []IfaceConfig
 func (a byIP4) Len() int      { return len(a) }
 func (a byIP4) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a byIP4) Less(i, j int) bool {
+
 	sort.Sort(byAddr(a[i].Addrs4))
 	sort.Sort(byAddr(a[j].Addrs4))
 	return bytes.Compare(a[i].Addrs4[0].IP, a[j].Addrs4[0].IP) < 0
@@ -170,6 +170,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 		}()
 
 		name := link.Attrs().Name
+		cfg.Name = name
 
 		if err := options.Set(name, options.IPv6Disable(false)); err != nil {
 			return errors.Wrapf(err, "failed to enable ip6 on %s", name)
@@ -177,17 +178,22 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 
 		log.Info().Str("interface", name).Msg("start DHCP probe")
 
-		probe := dhcp.NewProbe()
-		if err := probe.Start(name); err != nil {
-			return errors.Wrap(err, "error duging DHCP probe")
-		}
-		defer func() {
-			if err := probe.Stop(); err != nil {
-				log.Error().Err(err).Msg("could not stop DHCP probe properly")
+		if requires&RequiresIPv4 != 0 {
+			// requires IPv4
+			probe, err := dhcp.Probe(ctx, name)
+			if err != nil {
+				return errors.Wrapf(err, "no ip v4 on interface '%s'", name)
 			}
-		}()
+			ip, err := probe.IPNet()
+			if err != nil {
+				return errors.Wrap(err, "invalid ip address returned by dhcp")
+			}
+			cfg.Addrs4 = append(cfg.Addrs4, netlink.Addr{IPNet: ip})
+			if len(probe.Router) != 0 {
+				cfg.DefaultGW = net.ParseIP(probe.Router).To4()
+			}
+		}
 
-		var addrs4 = newAddrSet()
 		var addrs6 = newAddrSet()
 
 	loop:
@@ -196,13 +202,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
-				if err != nil {
-					return errors.Wrapf(err, "could not read address from interface %s", name)
-				}
-				addrs4.AddSlice(addrs)
-
-				addrs, err = netlink.AddrList(link, netlink.FAMILY_V6)
+				addrs, err := netlink.AddrList(link, netlink.FAMILY_V6)
 				if err != nil {
 					return errors.Wrapf(err, "could not read address from interface %s", name)
 				}
@@ -213,8 +213,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 					}
 				}
 
-				if ((requires&RequiresIPv6 == 0) || addrs6.Len() != 0) &&
-					((requires&RequiresIPv4 == 0) || addrs4.Len() != 0) {
+				if (requires&RequiresIPv6 == 0) || addrs6.Len() != 0 {
 					break loop
 				}
 
@@ -222,23 +221,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 			}
 		}
 
-		routes4, err := netlink.RouteList(link, netlink.FAMILY_V4)
-		if err != nil {
-			return errors.Wrapf(err, "could not read routes from interface %s", name)
-		}
-		routes6, err := netlink.RouteList(link, netlink.FAMILY_V6)
-		if err != nil {
-			return errors.Wrapf(err, "could not read routes from interface %s", name)
-		}
-
-		cfg = IfaceConfig{
-			Name:    name,
-			Addrs4:  addrs4.ToSlice(),
-			Addrs6:  addrs6.ToSlice(),
-			Routes4: routes4,
-			Routes6: routes6,
-		}
-
+		cfg.Addrs6 = addrs6.ToSlice()
 		return nil
 	})
 
@@ -265,38 +248,21 @@ func analyzeLink(ctx context.Context, wg *sync.WaitGroup, out chan<- analyzeResu
 func SelectZOS(cfgs []IfaceConfig) (string, error) {
 
 	selected4 := cfgs[:0]
-	// selected6 := cfgs[:0]
 	for _, cfg := range cfgs {
-		for _, route := range cfg.Routes4 {
-			if route.Gw != nil && isPrivateIP(route.Gw) {
+		if cfg.DefaultGW != nil && isPrivateIP(cfg.DefaultGW) {
+			selected4 = append(selected4, cfg)
+		}
+	}
+
+	if len(selected4) == 0 {
+		for _, cfg := range cfgs {
+			if cfg.DefaultGW != nil {
 				selected4 = append(selected4, cfg)
 			}
 		}
 
-		// for _, route := range cfg.Routes4 {
-		// 	if route.Gw != nil && isPrivateIP(route.Gw) {
-		// 		selected6 = append(selected6, cfg)
-		// 	}
-		// }
 	}
-
-	if len(selected4) < 1 {
-		for _, cfg := range cfgs {
-			for _, route := range cfg.Routes4 {
-				if route.Gw != nil {
-					selected4 = append(selected4, cfg)
-				}
-			}
-
-			// for _, route := range cfg.Routes6 {
-			// 	if route.Gw != nil {
-			// 		selected6 = append(selected6, cfg)
-			// 	}
-			// }
-		}
-	}
-
-	if len(selected4) < 1 {
+	if len(selected4) == 0 {
 		return "", fmt.Errorf("no route with default gateway found")
 	}
 

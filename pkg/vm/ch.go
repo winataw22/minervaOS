@@ -27,7 +27,7 @@ const (
 )
 
 // startCloudConsole Starts the cloud console for the vm on it's private network ip
-func (m *Machine) startCloudConsole(ctx context.Context, namespace string, networkAddr net.IPNet, machineIP net.IPNet, ptyPath string) (string, error) {
+func (m *Machine) startCloudConsole(ctx context.Context, namespace string, networkAddr net.IPNet, machineIP net.IPNet, ptyPath string, logs string) (string, error) {
 	ipv4 := machineIP.IP.To4()
 	if ipv4 == nil {
 		return "", fmt.Errorf("invalid vm ip address (%s) not ipv4", machineIP.IP.String())
@@ -47,6 +47,7 @@ func (m *Machine) startCloudConsole(ctx context.Context, namespace string, netwo
 		ptyPath,
 		networkAddr.IP.String(),
 		fmt.Sprint(port),
+		logs,
 	}
 
 	log.Debug().Msgf("running cloud-console : %+v", args)
@@ -174,7 +175,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) (pkg.MachineInfo
 	cmd.Stdout = logFd
 	cmd.Stderr = logFd
 
-	// TODO: alMachineInfo{}, ways get permission denied when setting
+	// TODO: always get permission denied when setting
 	// sid with sys proc attr
 	// cmd.SysProcAttr = &syscall.SysProcAttr{
 	// 	Setsid:     true,
@@ -222,7 +223,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) (pkg.MachineInfo
 	consoleURL := ""
 	for _, ifc := range m.Interfaces {
 		if ifc.Console != nil {
-			consoleURL, err = m.startCloudConsole(ctx, ifc.Console.Namespace, ifc.Console.NetworkAddr, ifc.Console.IP, vmData.PTYPath)
+			consoleURL, err = m.startCloudConsole(ctx, ifc.Console.Namespace, ifc.Console.NetworkAddr, ifc.Console.IP, vmData.PTYPath, logs)
 			if err != nil {
 				log.Error().Err(err).Str("vm", m.ID).Msg("failed to start cloud-console for vm")
 			}

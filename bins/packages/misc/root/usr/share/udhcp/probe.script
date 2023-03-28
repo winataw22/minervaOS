@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# this prope script can work as a udhcpc script
+# that does not configure the interface but instead
+# prints out the result from the bound operation
+# in a json object.
+# this is usually used as
+# udhcpc -qf --now -s <this script> -i inf
+
+stage=$1
+
+# we only handle bound process
+if [ $stage != "bound" ]; then
+    exit 0
+fi
+
+# the idea is that we print out
+# all config received in a json
+# object so others can read that
+# out
+cat <<EOF
+{
+    "subnet": "$subnet",
+    "router": "$router",
+    "ip": "$ip",
+    "siaddr": "$siaddr",
+    "dns": "$dns",
+    "serverid": "$serverid",
+    "broadcast": "$broadcast",
+    "lease": "$lease"
+}
+EOF

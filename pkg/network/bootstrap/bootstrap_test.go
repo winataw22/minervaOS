@@ -20,45 +20,7 @@ var _testIfaceCfgs = []IfaceConfig{
 			mustParseAddr("2001:b:a:0:5645:46ff:fef6:261/64"),
 			mustParseAddr("fe80::5645:46ff:fef6:261/64"),
 		},
-		Routes4: []netlink.Route{
-			{
-				LinkIndex: 2,
-				Dst:       nil,
-				Src:       nil,
-				Gw:        net.ParseIP("172.20.0.1"),
-				Table:     254,
-			},
-			{
-				LinkIndex: 2,
-				Dst:       mustParseIPNet("172.20.0.0/24"),
-				Src:       net.ParseIP("172.20.0.96"),
-				Gw:        net.ParseIP("172.20.0.1"),
-				Table:     254,
-			},
-		},
-		Routes6: []netlink.Route{
-			{
-				LinkIndex: 2,
-				Dst:       mustParseIPNet("2001:b:a::/64"),
-				Src:       nil,
-				Gw:        nil,
-				Table:     254,
-			},
-			{
-				LinkIndex: 2,
-				Dst:       mustParseIPNet("fe80::/64"),
-				Src:       nil,
-				Gw:        nil,
-				Table:     254,
-			},
-			{
-				LinkIndex: 2,
-				Dst:       nil,
-				Src:       nil,
-				Gw:        net.ParseIP("fe80::c084:66ff:fe93:42aa"),
-				Table:     254,
-			},
-		},
+		DefaultGW: net.ParseIP("172.20.0.1"),
 	},
 	{
 		Name: "eth1",
@@ -69,45 +31,7 @@ var _testIfaceCfgs = []IfaceConfig{
 			mustParseAddr("2001:b:a:0:5645:46ff:fef6:262/64"),
 			mustParseAddr("fe80::5645:46ff:fef6:262/64"),
 		},
-		Routes4: []netlink.Route{
-			{
-				LinkIndex: 3,
-				Dst:       nil,
-				Src:       nil,
-				Gw:        net.ParseIP("172.20.0.1"),
-				Table:     254,
-			},
-			{
-				LinkIndex: 3,
-				Dst:       mustParseIPNet("172.20.0.0/24"),
-				Src:       net.ParseIP("172.20.0.97"),
-				Gw:        net.ParseIP("172.20.0.1"),
-				Table:     254,
-			},
-		},
-		Routes6: []netlink.Route{
-			{
-				LinkIndex: 3,
-				Dst:       mustParseIPNet("2001:b:a::/64"),
-				Src:       nil,
-				Gw:        nil,
-				Table:     254,
-			},
-			{
-				LinkIndex: 3,
-				Dst:       mustParseIPNet("fe80::/64"),
-				Src:       nil,
-				Gw:        nil,
-				Table:     254,
-			},
-			{
-				LinkIndex: 3,
-				Dst:       nil,
-				Src:       nil,
-				Gw:        net.ParseIP("fe80::c084:66ff:fe93:42aa"),
-				Table:     254,
-			},
-		},
+		DefaultGW: net.ParseIP("172.20.0.1"),
 	},
 }
 
@@ -145,13 +69,4 @@ func mustParseAddr(s string) netlink.Addr {
 		panic(err)
 	}
 	return *addr
-}
-
-func mustParseIPNet(addr string) *net.IPNet {
-	ip, ipnet, err := net.ParseCIDR(addr)
-	if err != nil {
-		panic(err)
-	}
-	ipnet.IP = ip
-	return ipnet
 }

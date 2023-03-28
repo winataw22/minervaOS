@@ -25,7 +25,7 @@ cat <<EOF
     "ip": "$ip",
     "siaddr": "$siaddr",
     "dns": "$dns",
-    "servierid": "$serverid",
+    "serverid": "$serverid",
     "broadcast": "$broadcast",
     "lease": "$lease"
 }

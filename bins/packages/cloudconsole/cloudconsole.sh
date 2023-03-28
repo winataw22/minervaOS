@@ -1,7 +1,6 @@
-CLOUDCONSOLE_VERSION="v0.1.1"
-CLOUDCONSOLE_CHECKSUM="c018c335ea67424ebd00165b69c42fe2"
+CLOUDCONSOLE_VERSION="v0.1.2"
+CLOUDCONSOLE_CHECKSUM="ae22f069ec74d74b25ebbbddbc390fa2"
 CLOUDCONSOLE_LINK="https://github.com/threefoldtech/cloud-console/releases/download/${CLOUDCONSOLE_VERSION}/cloud-console"
-
 
 download_cloudconsole() {
     echo "downloading cloud-console"

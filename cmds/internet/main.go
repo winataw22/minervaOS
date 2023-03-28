@@ -88,6 +88,8 @@ func configureZOS() error {
 			return err
 		}
 
+		log.Info().Int("count", len(ifaceConfigs)).Msg("found interfaces with internet access")
+		log.Debug().Msgf("found interfaces: %+v", ifaceConfigs)
 		zosChild, err := bootstrap.SelectZOS(ifaceConfigs)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to select a valid interface for zos bridge")
