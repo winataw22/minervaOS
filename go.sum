@@ -751,6 +751,8 @@ github.com/threefoldtech/rmb-sdk-go v0.0.0-20230214123537-4833a4e157e6 h1:TCWsrR
 github.com/threefoldtech/rmb-sdk-go v0.0.0-20230214123537-4833a4e157e6/go.mod h1:ddt04wNV0lkrfijSa1x2nbEoyBO41WO0B0BFLIeP6Mg=
 github.com/threefoldtech/substrate-client v0.1.2 h1:9Xl13AYaspViKSjII18NgJWdA/9c0aLKuaWR38RpP7I=
 github.com/threefoldtech/substrate-client v0.1.2/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
+github.com/threefoldtech/substrate-client v0.1.5 h1:yYmWaJCMoJO0ieaO6eu3vIK0agehSw4OhSXlGydmv/E=
+github.com/threefoldtech/substrate-client v0.1.5/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
 github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=
 github.com/threefoldtech/zbus v1.0.1/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=

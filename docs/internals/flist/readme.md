@@ -2,14 +2,14 @@
 
 ## Zbus
 
-Flist module is available on zbus over the following channel
+Flist module is available on zbus over the following channel:
 
 | module | object | version |
 |--------|--------|---------|
 |flist   |[flist](#public-interface)| 0.0.1
 
 ## Home Directory
-flist keeps some data in the following locations
+flist keeps some data in the following locations:
 | directory | path|
 |----|---|
 | root| `/var/cache/modules/containerd`|
@@ -18,11 +18,11 @@ flist keeps some data in the following locations
 
 This module is responsible to "mount an flist" in the filesystem of the node. The mounted directory contains all the files required by containers or (in the future) VMs.
 
-The flist module interface is very simple. It does not expose any way to choose where to mount the flist or have any reference to containers or VM. The only functionality is to mount a given flist and received the location where it is mounted. It is up to the above layer to do something useful with this information
+The flist module interface is very simple. It does not expose any way to choose where to mount the flist or have any reference to containers or VM. The only functionality is to mount a given flist and receive the location where it is mounted. It is up to the above layer to do something useful with this information.
 
-The flist module itself doesn't contain the logic to understand the flist format or to run the fuse filesystem. It is just a wrapper that manged [0-fs](https://github.com/threefoldtech/0-fs) processes.
+The flist module itself doesn't contain the logic to understand the flist format or to run the fuse filesystem. It is just a wrapper that manages [0-fs](https://github.com/threefoldtech/0-fs) processes.
 
-Its only job is to download the flist, prepare the isolation of all the data and then starts 0-fs with the proper arguments
+Its only job is to download the flist, prepare the isolation of all the data and then start 0-fs with the proper arguments.
 
 ## Public interface [![GoDoc](https://godoc.org/github.com/threefoldtech/zos/pkg/flist?status.svg)](https://godoc.org/github.com/threefoldtech/zos/pkg/flist)
 
@@ -56,9 +56,9 @@ type Flister interface {
 
 ## zinit unit
 
-The zinit unit file of the module specify the command line,  test command, and the order where the services need to be booted.
+The zinit unit file of the module specifies the command line, test command, and the order in which the services need to be booted.
 
 Flist module depends on the storage and network pkg.
-This is because he needs connectivity to download flist and data and he needs storage to be able to cache the data once downloaded.
+This is because it needs connectivity to download flist and data and it needs storage to be able to cache the data once downloaded.
 
-Flist doesn't do anything special on the system except creating a bunch of directory it will use during its lifetime
+Flist doesn't do anything special on the system except creating a bunch of directories it will use during its lifetime.

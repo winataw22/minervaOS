@@ -2,15 +2,19 @@ package registrar
 
 import (
 	"context"
+	"crypto/ed25519"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/substrate-client"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 // should any of this be moved to pkg?
@@ -20,6 +24,8 @@ const (
 	Failed     RegistrationState = "Failed"
 	InProgress RegistrationState = "InProgress"
 	Done       RegistrationState = "Done"
+
+	monitorAccountEvery = 30 * time.Minute
 )
 
 var (
@@ -92,6 +98,8 @@ func (r *Registrar) getState() State {
 	return r.state
 }
 
+// register a node and then blocks forever watching the node account. It tries to re-activate the
+// account if needed
 func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environment.Environment, info RegistrationInfo) {
 	if app.CheckFlag(app.LimitedCache) {
 		r.setState(FailedState(errors.New("no disks")))
@@ -105,7 +113,7 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 	exp.MaxInterval = 2 * time.Minute
 	exp.MaxElapsedTime = 0 // retry indefinitely
 	bo := backoff.WithContext(exp, ctx)
-	_ = backoff.RetryNotify(func() error {
+	err := backoff.RetryNotify(func() error {
 		nodeID, twinID, err := r.registration(ctx, cl, env, info)
 		if err != nil {
 			r.setState(FailedState(err))
@@ -115,6 +123,44 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 		}
 		return nil
 	}, bo, retryNotify)
+
+	if err != nil {
+		// this should never happen because we retry indefinitely
+		log.Error().Err(err).Msg("registration failed")
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+		case <-time.After(monitorAccountEvery):
+			if err := r.reActivate(ctx, cl, env); err != nil {
+				log.Error().Err(err).Msg("failed to reactivate account")
+			}
+		}
+	}
+}
+
+func (r *Registrar) reActivate(ctx context.Context, cl zbus.Client, env environment.Environment) error {
+	mgr, err := environment.GetSubstrate()
+	if err != nil {
+		return err
+	}
+
+	sub, err := mgr.Substrate()
+	if err != nil {
+		return err
+	}
+
+	sk := ed25519.PrivateKey(stubs.NewIdentityManagerStub(cl).PrivateKey(ctx))
+	id, err := substrate.NewIdentityFromEd25519Key(sk)
+	if err != nil {
+		return err
+	}
+
+	_, err = sub.EnsureAccount(id, env.ActivationURL, tcUrl, tcHash)
+
+	return err
 }
 
 func (r *Registrar) NodeID() (uint32, error) {
