@@ -8,9 +8,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
-var (
-	gwNameRegex = regexp.MustCompile(`^[a-zA-Z0-9-.]+$`)
-)
+var fqdnRegex = regexp.MustCompile(`^([a-zA-Z0-9-_]+\.)+[a-zA-Z0-9-_]{2,}$`)
 
 // GatewayFQDNProxy definition. this will proxy name.<zos.domain> to backends
 type GatewayFQDNProxy struct {
@@ -21,11 +19,8 @@ type GatewayFQDNProxy struct {
 }
 
 func (g GatewayFQDNProxy) Valid(getter gridtypes.WorkloadGetter) error {
-	if !gwNameRegex.MatchString(g.FQDN) {
-		return fmt.Errorf("invalid name")
-	}
-	if g.FQDN[len(g.FQDN)-1] == '.' {
-		return fmt.Errorf("fqdn can't end with a dot")
+	if !fqdnRegex.MatchString(g.FQDN) {
+		return fmt.Errorf("fqdn %s is invalid", g.FQDN)
 	}
 
 	return g.GatewayBase.Valid(getter)
