@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
+	"net"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -52,15 +52,52 @@ func main() {
 	log.Info().Msg("network bootstrapped successfully")
 }
 
+func debugZos() error {
+	br, err := bridge.Get(types.DefaultBridge)
+	if err != nil {
+		return errors.Wrap(err, "failed to get default bridge")
+	}
+
+	addrs, err := netlink.AddrList(br, netlink.FAMILY_ALL)
+	if err != nil {
+		return errors.Wrap(err, "failed to list bridge addresses")
+	}
+
+	for _, addr := range addrs {
+		log.Info().Str("address", addr.String()).Msg("default bridge has address")
+	}
+
+	routes, err := netlink.RouteList(br, netlink.FAMILY_ALL)
+	if err != nil {
+		return errors.Wrap(err, "failed to list bridge routes")
+	}
+
+	for _, route := range routes {
+		log.Info().Str("route", route.String()).Msg("default bridge has routes")
+	}
+
+	return nil
+}
+
 func check() error {
 	retries := 0
 	f := func() error {
 		retries += 1
-		cmd := exec.Command("wget", "bootstrap.grid.tf", "-O", "/dev/null", "-T", "5")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
 
-		return cmd.Run()
+		log.Info().Msg("testing internet connection. trying out bootstrap.grid.tf:80")
+		// print some helpful debugging information to help with debugging issues
+		// if internet connection wasn't established
+		if err := debugZos(); err != nil {
+			log.Error().Err(err).Msg("failed to list default bridge debug information")
+		}
+
+		// we only care about possibility of establishing a connection
+		// so just establishing a connection then close it is good enough
+		con, err := net.Dial("tcp", "bootstrap.grid.tf:http")
+		if err != nil {
+			return errors.Wrap(err, "failed to reach bootstrap.grid.tf")
+		}
+		return con.Close()
 	}
 
 	errHandler := func(err error, t time.Duration) {
@@ -89,13 +126,14 @@ func configureZOS() error {
 		}
 
 		log.Info().Int("count", len(ifaceConfigs)).Msg("found interfaces with internet access")
-		log.Debug().Msgf("found interfaces: %+v", ifaceConfigs)
+		log.Info().Msgf("found interfaces: %+v", ifaceConfigs)
 		zosChild, err := bootstrap.SelectZOS(ifaceConfigs)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to select a valid interface for zos bridge")
 			return err
 		}
 
+		log.Info().Str("interface", zosChild).Msg("selecting interface")
 		br, err := bootstrap.CreateDefaultBridge(types.DefaultBridge)
 		if err != nil {
 			return err
