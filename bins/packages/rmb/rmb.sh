@@ -1,5 +1,5 @@
-RMB_VERSION="1.0.2-rc2"
-RMB_CHECKSUM="5f84be841a143efc9ead09b9142f0c64"
+RMB_VERSION="1.0.3"
+RMB_CHECKSUM="7b3a62b449ccb0133e98f0c10c0b8c29"
 RMB_LINK="https://github.com/threefoldtech/rmb-rs/releases/download/v${RMB_VERSION}/rmb-peer"
 
 download_rmb() {
