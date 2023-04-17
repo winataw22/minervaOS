@@ -134,7 +134,7 @@ func metrics(rawUrl string) (map[string]*metric, error) {
 
 	con, err := net.Dial("tcp", u.Host)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to url")
+		return nil, errors.Wrap(ErrMetricsNotAvailable, err.Error())
 	}
 
 	defer con.Close()
@@ -181,16 +181,18 @@ func (g *gatewayModule) Metrics() (result pkg.GatewayMetrics, err error) {
 	err = pubNS.Do(func(_ ns.NetNS) error {
 		log.Debug().Str("namespace", publicNS).Str("url", metricsURL).Msg("requesting metrics from traefik")
 		values, err = metrics(metricsURL)
-		if err != nil {
-			return errors.Wrap(ErrMetricsNotAvailable, err.Error())
-		}
 
-		return nil
+		return err
 	})
 
-	if err != nil {
+	if errors.Is(err, ErrMetricsNotAvailable) {
+		// traefik is not running because there
+		// are no gateway configured
+		return result, nil
+	} else if err != nil {
 		return result, err
 	}
+
 	mapping := func(s string) string {
 		return strings.TrimSuffix(s, "@file")
 	}
