@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"github.com/threefoldtech/substrate-client"
+	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 )
 
 // PublicConfigEvent pubic config event received. The type specify if this is just notification

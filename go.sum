@@ -753,6 +753,10 @@ github.com/threefoldtech/substrate-client v0.1.2 h1:9Xl13AYaspViKSjII18NgJWdA/9c
 github.com/threefoldtech/substrate-client v0.1.2/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
 github.com/threefoldtech/substrate-client v0.1.5 h1:yYmWaJCMoJO0ieaO6eu3vIK0agehSw4OhSXlGydmv/E=
 github.com/threefoldtech/substrate-client v0.1.5/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230417112020-958303130d16 h1:WfuWTGBoZfo/RqELGu02Gz+E593QCCw9PdMhA3UQZgk=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230417112020-958303130d16/go.mod h1:8lQl+GDNxfXBwDYCTRdww2Ca5HH1Tc3Lv8AWwxPS7ak=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230425112357-f35e342c2193 h1:ejksDW2ZrffCrOpyyy4/DJyTsCdHgG1xxufW2P1IP3M=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230425112357-f35e342c2193/go.mod h1:8lQl+GDNxfXBwDYCTRdww2Ca5HH1Tc3Lv8AWwxPS7ak=
 github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=
 github.com/threefoldtech/zbus v1.0.1/go.mod h1:E/v/xEvG/l6z/Oj0aDkuSUXFm/1RVJkhKBwDTAIdsHo=
 github.com/tinylib/msgp v1.0.2/go.mod h1:+d+yLhGm8mzTaHzB+wgMYrodPfmZrzkirds8fDWklFE=
