@@ -37,35 +37,33 @@ func NewUptime(sub substrate.Manager, id substrate.Identity) (*Uptime, error) {
 }
 
 func (u *Uptime) SendNow() (types.Hash, error) {
-	uptime, err := host.Uptime()
-	if err != nil {
-		return types.Hash{}, errors.Wrap(err, "failed to get uptime")
-	}
-	return u.send(uptime)
-}
-
-func (u *Uptime) send(uptime uint64) (types.Hash, error) {
 	// the mutex is to avoid race when SendNow is called
 	// while the times reporting is working
 	u.m.Lock()
 	defer u.m.Unlock()
 
+	// this can take sometime in case of connection problems
+	// hence we first establish a connection THEN get the node
+	// uptime.
+	// to make sure the uptime is correct at the time of reporting
 	sub, err := u.sub.Substrate()
 	if err != nil {
 		return types.Hash{}, err
 	}
 	defer sub.Close()
+
+	uptime, err := host.Uptime()
+	if err != nil {
+		return types.Hash{}, errors.Wrap(err, "failed to get uptime")
+	}
+
 	return sub.UpdateNodeUptime(u.id, uptime)
 }
 
 func (u *Uptime) uptime(ctx context.Context) error {
 	for {
-		uptime, err := host.Uptime()
-		if err != nil {
-			return errors.Wrap(err, "failed to get uptime")
-		}
 		log.Debug().Msg("updating node uptime")
-		hash, err := u.send(uptime)
+		hash, err := u.SendNow()
 		if err != nil {
 			return errors.Wrap(err, "failed to report uptime")
 		}
