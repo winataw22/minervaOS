@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/mem"
-	"github.com/threefoldtech/rmb-sdk-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"

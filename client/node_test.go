@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/threefoldtech/rmb-sdk-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 )
 
 func ExampleClient() {

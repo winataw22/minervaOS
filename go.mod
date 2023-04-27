@@ -42,8 +42,8 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.7.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/rmb-sdk-go v1.0.1
 	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230425112357-f35e342c2193
+	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.2.0
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.3.0
@@ -73,7 +73,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/ethereum/go-ethereum v1.10.17 // indirect
 	github.com/garyburd/redigo v1.6.2 // indirect
@@ -83,7 +82,6 @@ require (
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

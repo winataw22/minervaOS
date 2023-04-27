@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/rmb-sdk-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/types"
