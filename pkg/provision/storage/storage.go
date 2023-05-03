@@ -680,7 +680,7 @@ func (b *BoltStorage) ByTwin(twin uint32) ([]uint64, error) {
 	return deployments, err
 }
 
-func (b *BoltStorage) Capacity() (storageCap provision.StorageCapacity, err error) {
+func (b *BoltStorage) Capacity(exclude ...provision.Exclude) (storageCap provision.StorageCapacity, err error) {
 	twins, err := b.Twins()
 	if err != nil {
 		return provision.StorageCapacity{}, err
@@ -700,11 +700,16 @@ func (b *BoltStorage) Capacity() (storageCap provision.StorageCapacity, err erro
 			}
 
 			isActive := false
+		next:
 			for _, wl := range deployment.Workloads {
 				if !wl.Result.State.IsOkay() {
 					continue
 				}
-
+				for _, exc := range exclude {
+					if exc(&deployment, &wl) {
+						continue next
+					}
+				}
 				c, err := wl.Capacity()
 				if err != nil {
 					return provision.StorageCapacity{}, err

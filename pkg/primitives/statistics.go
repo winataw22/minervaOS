@@ -78,8 +78,8 @@ type activeCounters struct {
 }
 
 // Get all used capacity from storage + reserved / deployments count and workloads count
-func (s *Statistics) active() (activeCounters, error) {
-	storageCap, err := s.storage.Capacity()
+func (s *Statistics) active(exclude ...provision.Exclude) (activeCounters, error) {
+	storageCap, err := s.storage.Capacity(exclude...)
 	if err != nil {
 		return activeCounters{}, err
 	}
@@ -102,12 +102,13 @@ func (s *Statistics) Total() gridtypes.Capacity {
 
 // getUsableMemoryBytes returns the used capacity by *reservations* and usable free memory. for the memory
 // it takes into account reserved memory for the system
-func (s *Statistics) getUsableMemoryBytes() (gridtypes.Capacity, gridtypes.Unit, error) {
+// excluding (not including it as 'used' any workload or deployment that matches the exclusion list)
+func (s *Statistics) getUsableMemoryBytes(exclude ...provision.Exclude) (gridtypes.Capacity, gridtypes.Unit, error) {
 	// [                          ]
 	// [[R][ WL ]                 ]
 	// [[    actual    ]          ]
 
-	activeCounters, err := s.active()
+	activeCounters, err := s.active(exclude...)
 	cap := activeCounters.cap
 	if err != nil {
 		return cap, 0, err
@@ -126,12 +127,23 @@ func (s *Statistics) getUsableMemoryBytes() (gridtypes.Capacity, gridtypes.Unit,
 	return cap, usable, nil
 }
 
-func (s *Statistics) hasEnoughCapacity(required *gridtypes.Capacity) (gridtypes.Capacity, error) {
-	// checks memory
-	used, usable, err := s.getUsableMemoryBytes()
+func (s *Statistics) hasEnoughCapacity(wl *gridtypes.WorkloadWithID) (gridtypes.Capacity, error) {
+	required, err := wl.Capacity()
+	if err != nil {
+		return gridtypes.Capacity{}, errors.Wrap(err, "failed to calculate workload needed capacity")
+	}
+
+	// get used capacity by ALL workloads excluding this workload
+	// we do that by providing an exclusion list
+	used, usable, err := s.getUsableMemoryBytes(func(dl_ *gridtypes.Deployment, wl_ *gridtypes.Workload) bool {
+		id, _ := gridtypes.NewWorkloadID(dl_.TwinID, dl_.ContractID, wl_.Name)
+		return id == wl.ID
+	})
+
 	if err != nil {
 		return used, errors.Wrap(err, "failed to get available memory")
 	}
+
 	if required.MRU > usable {
 		return used, fmt.Errorf("cannot fulfil required memory size %d bytes out of usable %d bytes", required.MRU, usable)
 	}
@@ -147,12 +159,7 @@ func (s *Statistics) Initialize(ctx context.Context) error {
 
 // Provision implements the provisioner interface
 func (s *Statistics) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (result gridtypes.Result, err error) {
-	needed, err := wl.Capacity()
-	if err != nil {
-		return result, errors.Wrap(err, "failed to calculate workload needed capacity")
-	}
-
-	current, err := s.hasEnoughCapacity(&needed)
+	current, err := s.hasEnoughCapacity(wl)
 	if err != nil {
 		return result, errors.Wrap(err, "failed to satisfy required capacity")
 	}

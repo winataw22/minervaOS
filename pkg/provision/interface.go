@@ -104,6 +104,10 @@ type StorageCapacity struct {
 	Workloads int
 }
 
+// Used with Storage interface to compute capacity, exclude any deployment
+// and or workload that returns true from the capacity calculation.
+type Exclude = func(dl *gridtypes.Deployment, wl *gridtypes.Workload) bool
+
 // Storage interface
 type Storage interface {
 	// Create a new deployment in storage, it sets the initial transactions
@@ -132,7 +136,7 @@ type Storage interface {
 	// ByTwin return list of deployments for a twin
 	ByTwin(twin uint32) ([]uint64, error)
 	// return total capacity and active deployments
-	Capacity() (StorageCapacity, error)
+	Capacity(exclude ...Exclude) (StorageCapacity, error)
 }
 
 // Janitor interface
