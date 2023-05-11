@@ -246,7 +246,7 @@ func fListStartup(data *zos.ZMachine, path string) error {
 
 	log.Info().Msg("startup file found")
 	startup := startup{}
-	if _, err := toml.DecodeReader(f, &startup); err != nil {
+	if _, err := toml.NewDecoder(f).Decode(&startup); err != nil {
 		return err
 	}
 
