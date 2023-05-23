@@ -12,6 +12,8 @@ import (
 // Provision interface
 type Provision interface {
 	DecommissionCached(id string, reason string) error
+	// GetWorkloadStatus: returns status, bool(true if workload exits otherwise it is false), error
+	GetWorkloadStatus(id string) (gridtypes.ResultState, bool, error)
 }
 
 type Statistics interface {

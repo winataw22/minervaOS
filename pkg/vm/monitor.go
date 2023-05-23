@@ -11,6 +11,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/rotate"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -118,9 +119,19 @@ func (m *Module) monitor(ctx context.Context) error {
 }
 
 func (m *Module) monitorID(ctx context.Context, running map[string]Process, id string) error {
+	stub := stubs.NewProvisionStub(m.client)
 	log := log.With().Str("id", id).Logger()
 
-	if _, ok := running[id]; ok {
+	if ps, ok := running[id]; ok {
+		state, exists, err := stub.GetWorkloadStatus(ctx, id)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get workload status for vm:%s ", id)
+		}
+		if !exists || state.IsAny(gridtypes.StateDeleted, gridtypes.StateError) {
+			log.Debug().Str("name", id).Msg("deleting running vm with no active workload")
+			m.removeConfig(id)
+			_ = syscall.Kill(ps.Pid, syscall.SIGKILL)
+		}
 		return nil
 	}
 
@@ -176,7 +187,6 @@ func (m *Module) monitorID(ctx context.Context, running map[string]Process, id s
 		log.Debug().Err(reason).Msg("deleting vm due to restart error")
 		m.removeConfig(id)
 
-		stub := stubs.NewProvisionStub(m.client)
 		if err := stub.DecommissionCached(ctx, id, reason.Error()); err != nil {
 			return errors.Wrapf(err, "failed to decommission reservation '%s'", id)
 		}
