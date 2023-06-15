@@ -57,7 +57,7 @@ func (u *Uptime) SendNow() (types.Hash, error) {
 		return types.Hash{}, errors.Wrap(err, "failed to get uptime")
 	}
 
-	return sub.UpdateNodeUptime(u.id, uptime)
+	return sub.UpdateNodeUptimeV2(u.id, uptime, uint64(time.Now().Unix()))
 }
 
 func (u *Uptime) uptime(ctx context.Context) error {

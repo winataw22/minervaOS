@@ -535,6 +535,8 @@ github.com/threefoldtech/substrate-client v0.1.5 h1:yYmWaJCMoJO0ieaO6eu3vIK0ageh
 github.com/threefoldtech/substrate-client v0.1.5/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230509101146-8e43c43597cd h1:aermHEtCwO/gzn8OiwDzhvsBHOuxHFgHymcoFsRVNvQ=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230509101146-8e43c43597cd/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230614080449-33e2dc5b38f2 h1:WZUNb8xu/Zxs9gwNDXL3FG2gwox1rgJudMCpsHCksJM=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230614080449-33e2dc5b38f2/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.2.0 h1:dUPLbUFYBTfsM31UpIyPVyv18kDMLczHYIINPK/mFKI=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.2.0/go.mod h1:DDQ6ktnCli7z1+zpSR/j2twWwe6FUGxPO+WnEkRsnxw=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.4.0 h1:fmCYshC+u0/1nqlu10TnZjZeywioXOSWpm6n8zPKgkI=
