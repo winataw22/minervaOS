@@ -41,7 +41,8 @@ func (t *FListInfo) IsContainer() bool {
 }
 
 var (
-	_ provision.Manager = (*Manager)(nil)
+	_ provision.Manager     = (*Manager)(nil)
+	_ provision.Initializer = (*Manager)(nil)
 )
 
 type Manager struct {
@@ -50,6 +51,10 @@ type Manager struct {
 
 func NewManager(zbus zbus.Client) *Manager {
 	return &Manager{zbus}
+}
+
+func (m *Manager) Initialize(ctx context.Context) error {
+	return m.initGPUs()
 }
 
 func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (interface{}, error) {
@@ -127,12 +132,27 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 	if err := json.Unmarshal(wl.Data, &config); err != nil {
 		return result, errors.Wrap(err, "failed to decode reservation schema")
 	}
+
+	if len(config.GPU) != 0 && !provision.IsRentedNode(ctx) {
+		// you cannot use GPU unless this is a rented node
+		return result, fmt.Errorf("usage of GPU is not allowed unless node is rented")
+	}
+
 	machine := pkg.VM{
 		Name:   wl.ID.String(),
 		CPU:    config.ComputeCapacity.CPU,
 		Memory: config.ComputeCapacity.Memory,
 	}
-	// Should config.Vaid() be called here?
+
+	// expand GPUs
+	devices, err := p.expandGPUs(config.GPU)
+	if err != nil {
+		return result, errors.Wrap(err, "failed to prepare requested gpu device(s)")
+	}
+
+	for _, device := range devices {
+		machine.Devices = append(machine.Devices, device.Slot)
+	}
 
 	// the config is validated by the engine. we now only support only one
 	// private network

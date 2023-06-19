@@ -29,6 +29,17 @@ type RegistrationInfo struct {
 	SecureBoot   bool
 	Virtualized  bool
 	SerialNumber string
+	// List of gpus short name
+	GPUs map[string]interface{}
+}
+
+func (r RegistrationInfo) WithGPU(short string) RegistrationInfo {
+	if r.GPUs == nil {
+		r.GPUs = make(map[string]interface{})
+	}
+
+	r.GPUs[short] = nil
+	return r
 }
 
 func (r RegistrationInfo) WithCapacity(v gridtypes.Capacity) RegistrationInfo {
@@ -168,7 +179,7 @@ func registerNode(
 		serial = substrate.OptionBoardSerial{HasValue: true, AsValue: info.SerialNumber}
 	}
 
-	create := substrate.Node{
+	real := substrate.Node{
 		FarmID:      types.U32(env.FarmID),
 		TwinID:      types.U32(twinID),
 		Resources:   resources,
@@ -179,34 +190,51 @@ func registerNode(
 		BoardSerial: serial,
 	}
 
+	var onChain *substrate.Node
 	if errors.Is(err, substrate.ErrNotFound) {
-		// create node
-		nodeID, err = sub.CreateNode(id, create)
+		// node not found, create node
+		nodeID, err = sub.CreateNode(id, real)
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "failed to create node on chain")
+		}
 
-		return nodeID, twinID, err
 	} else if err != nil {
+		// other error occurred
 		return 0, 0, errors.Wrapf(err, "failed to get node information for twin id: %d", twinID)
+	} else {
+		// node exists
+		onChain, err = sub.GetNode(nodeID)
+		if err != nil {
+			return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
+		}
 	}
 
-	create.ID = types.U32(nodeID)
+	real.ID = types.U32(nodeID)
 
 	// node exists. we validate everything is good
 	// otherwise we update the node
 	log.Debug().Uint32("node", nodeID).Msg("node already found on blockchain")
-	current, err := sub.GetNode(nodeID)
-	if err != nil {
-		return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
-	}
 
-	if !create.Eq(current) {
-		log.Debug().Msgf("node data have changing, issuing an update node: %+v", create)
-		_, err := sub.UpdateNode(id, create)
+	if !real.Eq(onChain) {
+		log.Debug().Msgf("node data have changing, issuing an update node: %+v", real)
+		_, err := sub.UpdateNode(id, real)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to update node data with id: %d", nodeID)
 		}
 	}
 
-	return uint32(nodeID), uint32(twinID), err
+	gpu, err := sub.GetNodeGpuStatus(nodeID)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to get node gpu status")
+	}
+
+	if len(info.GPUs) > 0 != gpu {
+		if _, err := sub.SetNodeGpuStatus(id, len(info.GPUs) > 0); err != nil {
+			return 0, 0, errors.Wrap(err, "failed to set node gpu status")
+		}
+	}
+
+	return nodeID, twinID, err
 }
 
 func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey) (uint32, error) {

@@ -79,6 +79,16 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) (pkg.MachineInfo
 		"--serial":     {"pty"}, // we use pty here for the cloud console to be able to read the vm console, in case of debuging or we need stdout logging we use tty
 		"--api-socket": {socket},
 	}
+
+	var devices []string
+	for _, dev := range m.Devices {
+		devices = append(devices, fmt.Sprintf("path=/sys/bus/pci/devices/%s/", dev))
+	}
+
+	if len(devices) > 0 {
+		args["--device"] = devices
+	}
+
 	var err error
 	var pids []int
 	defer func() {
@@ -175,6 +185,7 @@ func (m *Machine) Run(ctx context.Context, socket, logs string) (pkg.MachineInfo
 	cmd.Stdout = logFd
 	cmd.Stderr = logFd
 
+	log.Debug().Strs("args", fullArgs).Msg("cloud-hypervisor command")
 	// TODO: always get permission denied when setting
 	// sid with sys proc attr
 	// cmd.SysProcAttr = &syscall.SysProcAttr{

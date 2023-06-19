@@ -30,6 +30,7 @@ jobs:
 
       - name: Build binaries
         run: |
+          go generate ./pkg/capacity/...
           cd cmds
           make
         env:

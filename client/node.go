@@ -190,6 +190,13 @@ type UsersCounters struct {
 	Workloads int `json:"workloads"`
 }
 
+// GPU information
+type GPU struct {
+	ID     string `json:"id"`
+	Vendor string `json:"vendor"`
+	Device string `json:"device"`
+}
+
 // Counters returns some node statistics. Including total and available cpu, memory, storage, etc...
 func (n *NodeClient) Counters(ctx context.Context) (counters Counters, err error) {
 	const cmd = "zos.statistics.get"
@@ -202,6 +209,12 @@ func (n *NodeClient) Counters(ctx context.Context) (counters Counters, err error
 func (n *NodeClient) Pools(ctx context.Context) (pools []pkg.PoolMetrics, err error) {
 	const cmd = "zos.storage.pools"
 	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &pools)
+	return
+}
+
+func (n *NodeClient) GPUs(ctx context.Context) (gpus []GPU, err error) {
+	const cmd = "zos.gpu.list"
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &gpus)
 	return
 }
 

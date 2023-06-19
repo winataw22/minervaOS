@@ -205,6 +205,7 @@ type deploymentValue struct {
 }
 type contractKey struct{}
 type substrateKey struct{}
+type rentKey struct{}
 
 // GetEngine gets engine from context
 func GetEngine(ctx context.Context) Engine {
@@ -260,6 +261,21 @@ func GetContract(ctx context.Context) substrate.NodeContract {
 
 func withContract(ctx context.Context, contract substrate.NodeContract) context.Context {
 	return context.WithValue(ctx, contractKey{}, contract)
+}
+
+// IsRentedNode returns true if current node is rented
+func IsRentedNode(ctx context.Context) bool {
+	v := ctx.Value(rentKey{})
+	if v == nil {
+		return false
+	}
+
+	return v.(bool)
+}
+
+// sets node rented flag on the ctx
+func withRented(ctx context.Context, rent bool) context.Context {
+	return context.WithValue(ctx, rentKey{}, rent)
 }
 
 // GetSubstrate if engine has substrate set, panics otherwise
@@ -483,7 +499,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 			job.Op == opUpdate ||
 			job.Op == opProvisionNoValidation {
 			// otherwise, contract validation is needed
-			ctx, err = e.contract(ctx, &job.Target, job.Op == opProvisionNoValidation)
+			ctx, err = e.validate(ctx, &job.Target, job.Op == opProvisionNoValidation)
 			if err != nil {
 				l.Error().Err(err).Msg("contact validation fails")
 				//job.Target.SetError(err)
@@ -553,9 +569,9 @@ func (e *NativeEngine) safeCallback(d *gridtypes.Deployment, delete bool) {
 	e.callback(d.TwinID, d.ContractID, delete)
 }
 
-// contract validates and injects the deployment contracts is substrate is configured
+// validate validates and injects the deployment contracts is substrate is configured
 // for this instance of the provision engine. If noValidation is set contracts checks is skipped
-func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment, noValidation bool) (context.Context, error) {
+func (e *NativeEngine) validate(ctx context.Context, dl *gridtypes.Deployment, noValidation bool) (context.Context, error) {
 	if e.sub == nil {
 		return ctx, fmt.Errorf("substrate is not configured in engine")
 	}
@@ -576,6 +592,13 @@ func (e *NativeEngine) contract(ctx context.Context, dl *gridtypes.Deployment, n
 		return nil, fmt.Errorf("invalid contract type, expecting node contract")
 	}
 	ctx = withContract(ctx, contract.ContractType.NodeContract)
+
+	rent, err := sub.GetNodeRentContract(e.nodeID)
+	if err != nil && !errors.Is(err, substrate.ErrNotFound) {
+		return nil, fmt.Errorf("failed to check node rent state")
+	}
+
+	ctx = withRented(ctx, err == nil && rent != 0)
 
 	if noValidation {
 		return ctx, nil

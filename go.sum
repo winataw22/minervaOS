@@ -222,7 +222,6 @@ github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEW
 github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb h1:PBC98N2aIaM3XXiurYmW7fx4GZkL8feAMVq7nEjURHk=
 github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/gologme/log v1.2.0/go.mod h1:gq31gQ8wEHkR+WekdWsqDuf8pXTUZA9BnnzTuPz1Y9U=
-github.com/gomodule/redigo v1.8.9 h1:Sl3u+2BI/kk+VEatbj0scLdrFhjPmbxOc1myhDP41ws=
 github.com/gomodule/redigo v1.8.9/go.mod h1:7ArFNvsTjH8GMMzB4uy1snslv2BwmginuMs06a1uzZE=
 github.com/gomodule/redigo v2.0.0+incompatible h1:K/R+8tc58AaqLkqG2Ol3Qk+DR/TlNuhuh457pBFPtt0=
 github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
@@ -531,14 +530,12 @@ github.com/stripe/safesql v0.2.0/go.mod h1:q7b2n0JmzM1mVGfcYpanfVb2j23cXZeWFxcIL
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7 h1:64QIPSO1Acx7ENdMwQ0Q4tnE94By1BljA/2R2NbY51Y=
 github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7/go.mod h1:OPPZiE/GthPR2IepjKSc8wa+t/7wl3dtHQyEdUcftZI=
-github.com/threefoldtech/substrate-client v0.1.5 h1:yYmWaJCMoJO0ieaO6eu3vIK0agehSw4OhSXlGydmv/E=
-github.com/threefoldtech/substrate-client v0.1.5/go.mod h1:ys/GJLeLmNX8E36UFMeR0yZC5Lo4PufYtfwsVX8H/AM=
-github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230509101146-8e43c43597cd h1:aermHEtCwO/gzn8OiwDzhvsBHOuxHFgHymcoFsRVNvQ=
-github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230509101146-8e43c43597cd/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230614080449-33e2dc5b38f2 h1:WZUNb8xu/Zxs9gwNDXL3FG2gwox1rgJudMCpsHCksJM=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230614080449-33e2dc5b38f2/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
-github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.2.0 h1:dUPLbUFYBTfsM31UpIyPVyv18kDMLczHYIINPK/mFKI=
-github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.2.0/go.mod h1:DDQ6ktnCli7z1+zpSR/j2twWwe6FUGxPO+WnEkRsnxw=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230615114630-b98807b623e2 h1:6yESej3aqBdGvynqJ4yarhyMlr65ck122JnRfNi3qcs=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230615114630-b98807b623e2/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230616110830-e0aae0ad6d60 h1:HIKhyBKgXbDU9QmkcpZp2lk8A2U2zjFUtfh7Tc93ka0=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230616110830-e0aae0ad6d60/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.4.0 h1:fmCYshC+u0/1nqlu10TnZjZeywioXOSWpm6n8zPKgkI=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.4.0/go.mod h1:tttnc/l4F2lx1SyETTiLrMaiQEgMeGCvlVEIW6nUeJA=
 github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=

@@ -135,8 +135,24 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get hypervisors")
 	}
+	gpus, err := oracle.GPUs()
+	if err != nil {
+		return errors.Wrap(err, "failed to list gpus")
+	}
 
 	var info registrar.RegistrationInfo
+	for _, gpu := range gpus {
+		// log info about the GPU here ?
+		vendor, device, ok := gpu.GetDevice()
+		if ok {
+			log.Info().Str("vendor", vendor.Name).Str("device", device.Name).Msg("found GPU")
+		} else {
+			log.Info().Uint16("vendor", gpu.Vendor).Uint16("device", device.ID).Msg("found GPU (can't look up device name)")
+		}
+
+		info = info.WithGPU(gpu.ShortID())
+	}
+
 	info = info.WithCapacity(cap).
 		WithSerialNumber(dmi.BoardVersion()).
 		WithSecureBoot(secureBoot).

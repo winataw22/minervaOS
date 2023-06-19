@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -100,6 +101,23 @@ func (m *MachineMount) Challenge(w io.Writer) error {
 	return nil
 }
 
+// GPU ID
+// Used by a VM, a GPU id is in the format <slot>/<vendor>/<device>
+// This can be queried either from the node features on the chain
+// or listed via the node rmb API.
+// example of a valid gpu definition `0000:28:00.0/1002/731f“
+type GPU string
+
+func (g GPU) Parts() (slot, vendor, device string, err error) {
+	parts := strings.Split(string(g), "/")
+	if len(parts) != 3 {
+		err = fmt.Errorf("invalid GPU id format '%s'", g)
+		return
+	}
+
+	return parts[0], parts[1], parts[2], nil
+}
+
 // ZMachine reservation data
 type ZMachine struct {
 	// Flist of the zmachine, must be a valid url to an flist.
@@ -124,6 +142,13 @@ type ZMachine struct {
 	// Corex works in container mode which forces replace the
 	// entrypoing of the container to use `corex`
 	Corex bool `json:"corex"`
+
+	// GPU attached to the VM
+	// the list of the GPUs ids must:
+	// - Exist, obviously
+	// - Not used by other VMs
+	// - Only possible on `dedicated` nodes
+	GPU []GPU `json:"gpu,omitempty"`
 }
 
 func (m *ZMachine) MinRootSize() gridtypes.Unit {

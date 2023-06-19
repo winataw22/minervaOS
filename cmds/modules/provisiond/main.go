@@ -449,6 +449,7 @@ func action(cli *cli.Context) error {
 	}
 
 	setupStorageRmb(zosRouter, cl)
+	setupGPURmb(zosRouter, cl)
 
 	_ = mbus.NewDeploymentMessageBus(zosRouter, engine)
 
@@ -489,5 +490,39 @@ func setupStorageRmb(router rmb.Router, cl zbus.Client) {
 	storage.WithHandler("pools", func(ctx context.Context, payload []byte) (interface{}, error) {
 		stub := stubs.NewStorageModuleStub(cl)
 		return stub.Metrics(ctx)
+	})
+}
+
+func setupGPURmb(router rmb.Router, cl zbus.Client) {
+	type Info struct {
+		ID     string `json:"id"`
+		Vendor string `json:"vendor"`
+		Device string `json:"device"`
+	}
+	gpus := router.Subroute("gpu")
+	gpus.WithHandler("list", func(ctx context.Context, payload []byte) (interface{}, error) {
+		devices, err := capacity.ListPCI(capacity.GPU)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list available devices")
+		}
+
+		var list []Info
+		for _, device := range devices {
+			info := Info{
+				ID:     device.ShortID(),
+				Vendor: "unknown",
+				Device: "unknown",
+			}
+
+			vendor, device, ok := device.GetDevice()
+			if ok {
+				info.Vendor = vendor.Name
+				info.Device = device.Name
+			}
+
+			list = append(list, info)
+		}
+
+		return list, nil
 	})
 }

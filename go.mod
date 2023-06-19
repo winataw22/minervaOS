@@ -42,7 +42,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.8.2
 	github.com/threefoldtech/0-fs v1.3.1-0.20201203163303-d963de9adea7
-	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230614080449-33e2dc5b38f2
+	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20230616110830-e0aae0ad6d60
 	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.4.0
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tyler-smith/go-bip39 v1.1.0
@@ -133,7 +133,6 @@ require (
 	github.com/safchain/ethtool v0.0.0-20201023143004-874930cb3ce0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/threefoldtech/substrate-client v0.1.5 // indirect
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect

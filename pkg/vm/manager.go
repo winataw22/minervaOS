@@ -88,7 +88,7 @@ func NewVMModule(cl zbus.Client, root, config string) (*Module, error) {
 	return mod, nil
 }
 
-func (m *Module) makeDevices(vm *pkg.VM) ([]Disk, error) {
+func (m *Module) makeDiskDevices(vm *pkg.VM) ([]Disk, error) {
 	var drives []Disk
 	if vm.Boot.Type == pkg.BootDisk {
 		drives = append(drives, Disk{
@@ -309,6 +309,37 @@ func (m *Module) withLogs(path string, err error) error {
 	return errors.Wrapf(err, string(logs))
 }
 
+func (m *Module) checkDevicesUsed(devices []string) error {
+	if len(devices) == 0 {
+		return nil
+	}
+
+	mapped := make(map[string]struct{})
+	for _, d := range devices {
+		mapped[d] = struct{}{}
+	}
+
+	// if we are attaching extra devices to a VM
+	// we need to make sure that NO other vm is using them
+	vms, err := FindAll()
+	if err != nil {
+		return errors.Wrap(err, "failed to list running machines")
+	}
+
+	for _, running := range vms {
+		attached, _ := running.GetParam("--device")
+		for _, att := range attached {
+			//this is in the format `path=/path/to/device/`
+			id := filepath.Base(att)
+			if _, ok := mapped[id]; ok {
+				return fmt.Errorf("device '%s' is already used by another workload", id)
+			}
+		}
+	}
+
+	return nil
+}
+
 // List all running vms names
 func (m *Module) List() ([]string, error) {
 	machines, err := FindAll()
@@ -380,7 +411,11 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 		})
 	}
 
-	devices, err := m.makeDevices(&vm)
+	if err := m.checkDevicesUsed(vm.Devices); err != nil {
+		return pkg.MachineInfo{}, err
+	}
+
+	disks, err := m.makeDiskDevices(&vm)
 	if err != nil {
 		return pkg.MachineInfo{}, err
 	}
@@ -440,8 +475,8 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 		return pkg.MachineInfo{}, errors.Wrap(err, "failed to create cloud-init image")
 	}
 
-	devices = append(devices, Disk{
-		ID:       fmt.Sprintf("%d", len(devices)+1),
+	disks = append(disks, Disk{
+		ID:       fmt.Sprintf("%d", len(disks)+1),
 		Path:     ciImage,
 		ReadOnly: true,
 	})
@@ -461,8 +496,9 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 		Entrypoint:  vm.Entrypoint,
 		FS:          fs,
 		Interfaces:  nics,
-		Disks:       devices,
+		Disks:       disks,
 		Environment: env,
+		Devices:     vm.Devices,
 		NoKeepAlive: vm.NoKeepAlive,
 	}
 

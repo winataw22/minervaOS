@@ -132,6 +132,8 @@ type Machine struct {
 	Config      Config            `json:"machine-config"`
 	Environment map[string]string `json:"environment"`
 	Entrypoint  string            `json:"entrypoint"`
+	// devices to attack directly to VMd
+	Devices []string `json:"devices"`
 	// NoKeepAlive is not used by firecracker, but instead a marker
 	// for the vm  mananger to not restart the machine when it stops
 	NoKeepAlive bool `json:"no-keep-alive"`

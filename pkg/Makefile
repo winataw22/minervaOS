@@ -38,7 +38,7 @@ deadcode:
 	@${GOPATH}/bin/deadcode -test $(shell go list ./...) || true
 
 spelling:
-	@${GOPATH}/bin/misspell -i monitord -error `find .`
+	@${GOPATH}/bin/misspell -i "monitord,forumla,etherent" -error `find .`
 
 static:
 	@${GOPATH}/bin/staticcheck -- ./...

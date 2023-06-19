@@ -149,6 +149,12 @@ type VM struct {
 	NoKeepAlive bool
 	// Hostname for the vm
 	Hostname string
+
+	// extra PCI devices to be attached to
+	// the virtual machine the strings
+	// has to be a valid pci bus ids
+	// in the format 0000:01:00.0
+	Devices []string
 }
 
 // Validate vm data

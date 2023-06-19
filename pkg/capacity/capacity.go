@@ -173,3 +173,8 @@ func (r *ResourceOracle) GetHypervisor() (string, error) {
 
 	return "", nil
 }
+
+// GPUs returns the list of available GPUs as PCI devices
+func (r *ResourceOracle) GPUs() ([]PCI, error) {
+	return ListPCI(GPU)
+}
