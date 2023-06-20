@@ -291,6 +291,12 @@ func (v ZMachine) Challenge(b io.Writer) error {
 		return err
 	}
 
+	for _, gpu := range v.GPU {
+		if _, err := fmt.Fprintf(b, "%s", gpu); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
