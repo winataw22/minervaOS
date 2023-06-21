@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -111,8 +110,8 @@ func (p *Manager) mountQsfs(wl *gridtypes.WorkloadWithID, mount zos.MachineMount
 	if err := wl.Result.Unmarshal(&info); err != nil {
 		return fmt.Errorf("invalid qsfs result '%s': %w", mount.Name, err)
 	}
-	wlID := wl.ID.String()
-	vm.Shared = append(vm.Shared, pkg.SharedDir{ID: strings.ReplaceAll(wlID, "-", ""), Path: info.Path, Target: mount.Mountpoint})
+
+	vm.Shared = append(vm.Shared, pkg.SharedDir{ID: wl.Name.String(), Path: info.Path, Target: mount.Mountpoint})
 	return nil
 }
 

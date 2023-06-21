@@ -11,9 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/rusart/muxprom"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
@@ -24,7 +22,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/primitives"
-	"github.com/threefoldtech/zos/pkg/provision/mbus"
 	"github.com/threefoldtech/zos/pkg/provision/storage"
 	fsStorage "github.com/threefoldtech/zos/pkg/provision/storage.fs"
 	"github.com/urfave/cli/v2"
@@ -193,14 +190,6 @@ func action(cli *cli.Context) error {
 		log.Error().Err(err).Msg("networkd is not ready yet")
 	})
 
-	router := mux.NewRouter().StrictSlash(true)
-
-	prom := muxprom.New(
-		muxprom.Router(router),
-		muxprom.Namespace("provision"),
-	)
-	prom.Instrument()
-
 	// the v1 endpoint will be used by all components to register endpoints
 	// that are specific for that component
 	//v1 := router.PathPrefix("/api/v1").Subrouter()
@@ -212,6 +201,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create local reservation store")
 	}
 	defer store.Close()
+
 	// we check if the old fs storage still exists
 	fsStoragePath := filepath.Join(rootDir, fsStorageDB)
 	if _, err := os.Stat(fsStoragePath); err == nil {
@@ -241,7 +231,6 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get node capacity")
 	}
 
-	var current gridtypes.Capacity
 	var active []gridtypes.Deployment
 	if !app.IsFirstBoot(serverName) {
 		// if this is the first boot of this module.
@@ -252,18 +241,16 @@ func action(cli *cli.Context) error {
 		// but if not, we need to set the current counters
 		// from store.
 		storageCap, err := store.Capacity()
-		current = storageCap.Cap
 		active = storageCap.Deployments
 		if err != nil {
 			log.Error().Err(err).Msg("failed to compute current consumed capacity")
 		}
+
+		if err := netResourceMigration(active); err != nil {
+			log.Error().Err(err).Msg("failed to migrate network resources")
+		}
 	}
 
-	if err := netResourceMigration(active); err != nil {
-		log.Error().Err(err).Msg("failed to migrate network resources")
-	}
-
-	log.Debug().Msgf("current used capacity: %+v", current)
 	// statistics collects information about workload statistics
 	// also does some checks on capacity
 	statistics := primitives.NewStatistics(
@@ -443,15 +430,10 @@ func action(cli *cli.Context) error {
 
 	zosRouter := mBus.Subroute("zos")
 	zosRouter.Use(rmb.LoggerMiddleware)
-	// attach statistics module to rmb
-	if err := primitives.NewStatisticsMessageBus(zosRouter, statistics); err != nil {
-		return errors.Wrap(err, "failed to create statistics api")
+
+	if err := setupApi(zosRouter, cl, engine, store, statistics); err != nil {
+		return err
 	}
-
-	setupStorageRmb(zosRouter, cl)
-	setupGPURmb(zosRouter, cl)
-
-	_ = mbus.NewDeploymentMessageBus(zosRouter, engine)
 
 	log.Info().Msg("running rmb handler")
 
@@ -483,46 +465,4 @@ func getNodeReserved(cl zbus.Client, available gridtypes.Capacity) primitives.Re
 
 		return
 	}
-}
-
-func setupStorageRmb(router rmb.Router, cl zbus.Client) {
-	storage := router.Subroute("storage")
-	storage.WithHandler("pools", func(ctx context.Context, payload []byte) (interface{}, error) {
-		stub := stubs.NewStorageModuleStub(cl)
-		return stub.Metrics(ctx)
-	})
-}
-
-func setupGPURmb(router rmb.Router, cl zbus.Client) {
-	type Info struct {
-		ID     string `json:"id"`
-		Vendor string `json:"vendor"`
-		Device string `json:"device"`
-	}
-	gpus := router.Subroute("gpu")
-	gpus.WithHandler("list", func(ctx context.Context, payload []byte) (interface{}, error) {
-		devices, err := capacity.ListPCI(capacity.GPU)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to list available devices")
-		}
-
-		var list []Info
-		for _, device := range devices {
-			info := Info{
-				ID:     device.ShortID(),
-				Vendor: "unknown",
-				Device: "unknown",
-			}
-
-			vendor, device, ok := device.GetDevice()
-			if ok {
-				info.Vendor = vendor.Name
-				info.Device = device.Name
-			}
-
-			list = append(list, info)
-		}
-
-		return list, nil
-	})
 }

@@ -151,6 +151,8 @@ type RedisConsumer struct {
 	pool *redis.Pool
 }
 
+// NewConsumer creates a new event consumer on given redis address, and
+// consumer id, consumer id has to be unique
 func NewConsumer(address, id string) (*RedisConsumer, error) {
 	pool, err := utils.NewRedisPool(address)
 	if err != nil {

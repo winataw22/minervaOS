@@ -192,9 +192,10 @@ type UsersCounters struct {
 
 // GPU information
 type GPU struct {
-	ID     string `json:"id"`
-	Vendor string `json:"vendor"`
-	Device string `json:"device"`
+	ID       string `json:"id"`
+	Vendor   string `json:"vendor"`
+	Device   string `json:"device"`
+	Contract uint64 `json:"contract"`
 }
 
 // Counters returns some node statistics. Including total and available cpu, memory, storage, etc...
