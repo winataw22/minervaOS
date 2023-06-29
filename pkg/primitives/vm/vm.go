@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -30,15 +29,6 @@ type ZMachine = zos.ZMachine
 // ZMachineResult type
 type ZMachineResult = zos.ZMachineResult
 
-// FListInfo virtual machine details
-type FListInfo struct {
-	ImagePath string
-}
-
-func (t *FListInfo) IsContainer() bool {
-	return len(t.ImagePath) == 0
-}
-
 var (
 	_ provision.Manager     = (*Manager)(nil)
 	_ provision.Initializer = (*Manager)(nil)
@@ -60,7 +50,7 @@ func (p *Manager) Provision(ctx context.Context, wl *gridtypes.WorkloadWithID) (
 	return p.virtualMachineProvisionImpl(ctx, wl)
 }
 
-func (p *Manager) vmMounts(ctx context.Context, deployment gridtypes.Deployment, mounts []zos.MachineMount, format bool, vm *pkg.VM) error {
+func (p *Manager) vmMounts(ctx context.Context, deployment *gridtypes.Deployment, mounts []zos.MachineMount, format bool, vm *pkg.VM) error {
 	for _, mount := range mounts {
 		wl, err := deployment.Get(mount.Name)
 		if err != nil {
@@ -117,7 +107,6 @@ func (p *Manager) mountQsfs(wl *gridtypes.WorkloadWithID, mount zos.MachineMount
 
 func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes.WorkloadWithID) (result zos.ZMachineResult, err error) {
 	var (
-		storage = stubs.NewStorageModuleStub(p.zbus)
 		network = stubs.NewNetworkerStub(p.zbus)
 		flist   = stubs.NewFlisterStub(p.zbus)
 		vm      = stubs.NewVMModuleStub(p.zbus)
@@ -238,13 +227,6 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 
 	log.Debug().Msgf("detected flist type: %+v", imageInfo)
 
-	var (
-		boot       pkg.Boot
-		entrypoint string
-		kernel     string
-		initrd     string
-	)
-
 	// mount cloud-container flist (or reuse) which has kernel, initrd and also firmware
 	hash, err := flist.FlistHash(ctx, cloudContainerFlist)
 	if err != nil {
@@ -260,113 +242,19 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 	}
 
 	if imageInfo.IsContainer() {
-		// - if Container, remount RW
-		// prepare for container
-		if err := flist.Unmount(ctx, wl.ID.String()); err != nil {
-			return result, errors.Wrapf(err, "failed to unmount flist: %s", wl.ID.String())
-		}
-		rootfsSize := config.RootSize()
-		// create a persisted volume for the vm. we don't do it automatically
-		// via the flist, so we have control over when to decomission this volume.
-		// remounting in RW mode
-		volName := fmt.Sprintf("rootfs:%s", wl.ID.String())
-		volume, err := storage.VolumeCreate(ctx, volName, rootfsSize)
-		if err != nil {
-			return zos.ZMachineResult{}, errors.Wrap(err, "failed to create vm rootfs")
-		}
-
-		defer func() {
-			if err != nil {
-				// vm creation failed,
-				if err := storage.VolumeDelete(ctx, volName); err != nil {
-					log.Error().Err(err).Str("volume", volName).Msg("failed to delete persisted volume")
-				}
-			}
-		}()
-
-		mnt, err = flist.Mount(ctx, wl.ID.String(), config.FList, pkg.MountOptions{
-			ReadOnly:        false,
-			PersistedVolume: volume.Path,
-		})
-
-		if err != nil {
-			return result, errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
-		}
-
-		// inject container kernel and init
-		kernel = filepath.Join(cloudImage, "kernel")
-		initrd = filepath.Join(cloudImage, "initramfs-linux.img")
-
-		boot = pkg.Boot{
-			Type: pkg.BootVirtioFS,
-			Path: mnt,
-		}
-
-		if err := fListStartup(&config, filepath.Join(mnt, ".startup.toml")); err != nil {
-			return result, errors.Wrap(err, "failed to apply startup config from flist")
-		}
-
-		entrypoint = config.Entrypoint
-		if err := p.vmMounts(ctx, deployment, config.Mounts, true, &machine); err != nil {
+		if err = p.prepContainer(ctx, cloudImage, imageInfo, &machine, &config, &deployment, wl); err != nil {
 			return result, err
-		}
-		if config.Corex {
-			if err := p.copyFile("/usr/bin/corex", filepath.Join(mnt, "corex"), 0755); err != nil {
-				return result, errors.Wrap(err, "failed to inject corex binary")
-			}
-			entrypoint = "/corex --ipv6 -d 7 --interface eth0"
 		}
 	} else {
-		// if a VM the vm has to have at least one mount
-		if len(config.Mounts) == 0 {
-			err = fmt.Errorf("at least one mount has to be attached for Vm mode")
+		if err = p.prepVirtualMachine(ctx, cloudImage, imageInfo, &machine, &config, &deployment, wl); err != nil {
 			return result, err
 		}
 
-		kernel = filepath.Join(cloudImage, "hypervisor-fw")
-		var disk *gridtypes.WorkloadWithID
-		disk, err = deployment.Get(config.Mounts[0].Name)
-		if err != nil {
-			return result, err
-		}
-
-		if disk.Type != zos.ZMountType {
-			return result, fmt.Errorf("mount is not not a valid disk workload")
-		}
-
-		if disk.Result.State != gridtypes.StateOk {
-			return result, fmt.Errorf("boot disk was not deployed correctly")
-		}
-		var info pkg.VDisk
-		info, err = storage.DiskLookup(ctx, disk.ID.String())
-		if err != nil {
-			return result, errors.Wrap(err, "disk does not exist")
-		}
-
-		//TODO: DiskWrite will not override the disk if it already has a partition table
-		// or a filesystem. this means that if later the disk is assigned to a new VM with
-		// a different flist it will have the same old operating system copied from previous
-		// setup.
-		if err = storage.DiskWrite(ctx, disk.ID.String(), imageInfo.ImagePath); err != nil {
-			return result, errors.Wrap(err, "failed to write image to disk")
-		}
-
-		boot = pkg.Boot{
-			Type: pkg.BootDisk,
-			Path: info.Path,
-		}
-		if err := p.vmMounts(ctx, deployment, config.Mounts[1:], false, &machine); err != nil {
-			return result, err
-		}
 	}
 
 	// - Attach mounts
 	// - boot
 	machine.Network = networkInfo
-	machine.KernelImage = kernel
-	machine.InitrdImage = initrd
-	machine.Boot = boot
-	machine.Entrypoint = entrypoint
 	machine.Environment = config.Env
 	machine.Hostname = wl.Name.String()
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -24,6 +25,139 @@ var (
 		Mask: net.IPv4Mask(0xff, 0xff, 0, 0),
 	}
 )
+
+// fill up the VM (machine) object with write boot config for a full virtual machine (with a disk image)
+func (p *Manager) prepVirtualMachine(
+	ctx context.Context,
+	cloudImage string,
+	imageInfo FListInfo,
+	machine *pkg.VM,
+	config *zos.ZMachine,
+	deployment *gridtypes.Deployment,
+	wl *gridtypes.WorkloadWithID,
+) error {
+
+	var storage = stubs.NewStorageModuleStub(p.zbus)
+	// if a VM the vm has to have at least one mount
+	if len(config.Mounts) == 0 {
+		return fmt.Errorf("at least one mount has to be attached for Vm mode")
+	}
+
+	machine.KernelImage = filepath.Join(cloudImage, "hypervisor-fw")
+	disk, err := deployment.Get(config.Mounts[0].Name)
+	if err != nil {
+		return err
+	}
+
+	if disk.Type != zos.ZMountType {
+		return fmt.Errorf("mount is not a valid disk workload")
+	}
+
+	if disk.Result.State != gridtypes.StateOk {
+		return fmt.Errorf("boot disk was not deployed correctly")
+	}
+
+	info, err := storage.DiskLookup(ctx, disk.ID.String())
+	if err != nil {
+		return errors.Wrap(err, "disk does not exist")
+	}
+
+	//TODO: DiskWrite will not override the disk if it already has a partition table
+	// or a filesystem. this means that if later the disk is assigned to a new VM with
+	// a different flist it will have the same old operating system copied from previous
+	// setup.
+	if err = storage.DiskWrite(ctx, disk.ID.String(), imageInfo.ImagePath); err != nil {
+		return errors.Wrap(err, "failed to write image to disk")
+	}
+
+	machine.Boot = pkg.Boot{
+		Type: pkg.BootDisk,
+		Path: info.Path,
+	}
+
+	return p.vmMounts(ctx, deployment, config.Mounts[1:], false, machine)
+}
+
+// prepare the machine and fill it up with proper boot flags for a container VM
+func (p *Manager) prepContainer(
+	ctx context.Context,
+	cloudImage string,
+	imageInfo FListInfo,
+	machine *pkg.VM,
+	config *zos.ZMachine,
+	deployment *gridtypes.Deployment,
+	wl *gridtypes.WorkloadWithID,
+) error {
+	// - if Container, remount RW
+	// prepare for container
+	var (
+		storage = stubs.NewStorageModuleStub(p.zbus)
+		flist   = stubs.NewFlisterStub(p.zbus)
+	)
+
+	if err := flist.Unmount(ctx, wl.ID.String()); err != nil {
+		return errors.Wrapf(err, "failed to unmount flist: %s", wl.ID.String())
+	}
+	rootfsSize := config.RootSize()
+	// create a persisted volume for the vm. we don't do it automatically
+	// via the flist, so we have control over when to decomission this volume.
+	// remounting in RW mode
+	volName := fmt.Sprintf("rootfs:%s", wl.ID.String())
+	volume, err := storage.VolumeCreate(ctx, volName, rootfsSize)
+	if err != nil {
+		return errors.Wrap(err, "failed to create vm rootfs")
+	}
+
+	defer func() {
+		if err != nil {
+			// vm creation failed,
+			if err := storage.VolumeDelete(ctx, volName); err != nil {
+				log.Error().Err(err).Str("volume", volName).Msg("failed to delete persisted volume")
+			}
+		}
+	}()
+
+	mnt, err := flist.Mount(ctx, wl.ID.String(), config.FList, pkg.MountOptions{
+		ReadOnly:        false,
+		PersistedVolume: volume.Path,
+	})
+
+	if err != nil {
+		return errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
+	}
+
+	// inject container kernel and init
+	machine.KernelImage = filepath.Join(cloudImage, "kernel")
+	machine.InitrdImage = filepath.Join(cloudImage, "initramfs-linux.img")
+
+	// can be overridden from the flist itself if exists
+	if len(imageInfo.KernelPath) != 0 {
+		machine.KernelImage = imageInfo.KernelPath
+		machine.InitrdImage = imageInfo.InitrdPath
+	}
+
+	machine.Boot = pkg.Boot{
+		Type: pkg.BootVirtioFS,
+		Path: mnt,
+	}
+
+	if err := fListStartup(config, filepath.Join(mnt, ".startup.toml")); err != nil {
+		return errors.Wrap(err, "failed to apply startup config from flist")
+	}
+
+	machine.Entrypoint = config.Entrypoint
+	if err := p.vmMounts(ctx, deployment, config.Mounts, true, machine); err != nil {
+		return err
+	}
+	if config.Corex {
+		if err := p.copyFile("/usr/bin/corex", filepath.Join(mnt, "corex"), 0755); err != nil {
+			return errors.Wrap(err, "failed to inject corex binary")
+		}
+		machine.Entrypoint = "/corex --ipv6 -d 7 --interface eth0"
+	}
+
+	return nil
+}
 
 func (p *Manager) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
@@ -171,18 +305,68 @@ func (p *Manager) newPubNetworkInterface(ctx context.Context, deployment gridtyp
 	}, nil
 }
 
-func getFlistInfo(imagePath string) (FListInfo, error) {
-	image := imagePath + "/image.raw"
-	log.Debug().Str("file", image).Msg("checking image")
-	_, err := os.Stat(image)
+// FListInfo virtual machine details
+type FListInfo struct {
+	ImagePath  string
+	KernelPath string
+	InitrdPath string
+}
 
-	if os.IsNotExist(err) {
-		return FListInfo{}, nil
-	} else if err != nil {
-		return FListInfo{}, errors.Wrap(err, "couldn't stat /image.raw")
+func (t *FListInfo) IsContainer() bool {
+	return len(t.ImagePath) == 0
+}
+
+func getFlistInfo(flistPath string) (flist FListInfo, err error) {
+	files := map[string]*string{
+		"/image.raw":       &flist.ImagePath,
+		"/boot/vmlinuz":    &flist.KernelPath,
+		"/boot/initrd.img": &flist.InitrdPath,
 	}
 
-	return FListInfo{ImagePath: image}, nil
+	for rel, ptr := range files {
+		path := filepath.Join(flistPath, rel)
+		// this path can be a symlink so we need to make sure
+		// the symlink is pointing to only files inside the
+		// flist.
+
+		// but we need to validate
+		stat, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return flist, errors.Wrapf(err, "couldn't stat %s", rel)
+		}
+
+		if stat.IsDir() {
+			return flist, fmt.Errorf("path '%s' cannot be a directory", rel)
+		}
+		mod := stat.Mode()
+		switch mod.Type() {
+		case 0:
+			// regular file, do nothing
+		case os.ModeSymlink:
+			// this is a symlink. we
+			// need to make sure it's a safe link
+			// to a location inside the flist
+			link, err := os.Readlink(path)
+			if err != nil {
+				return flist, errors.Wrapf(err, "failed to read link at '%s", rel)
+			}
+			// now the link if joined with path, (and cleaned) need to also point
+			// to somewhere under flistPath
+			abs := filepath.Clean(filepath.Join(flistPath, link))
+			if !strings.HasPrefix(abs, flistPath) {
+				return flist, fmt.Errorf("path '%s' points to invalid location", rel)
+			}
+		default:
+			return flist, fmt.Errorf("path '%s' is of invalid type: %s", rel, mod.Type().String())
+		}
+
+		// set the value
+		*ptr = path
+	}
+
+	return flist, nil
 }
 
 type startup struct {

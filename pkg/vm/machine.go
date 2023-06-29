@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	virtioRootFsTag = "/dev/root"
+	virtioRootFsTag = "vroot"
 )
 
 // Boot config struct

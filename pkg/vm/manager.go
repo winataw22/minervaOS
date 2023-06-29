@@ -436,6 +436,7 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 		// arguments
 		cmdline["root"] = virtioRootFsTag
 		cmdline["rootfstype"] = "virtiofs"
+		cmdline["rootdelay"] = "30"
 
 		// we add the fs for booting.
 		fs = append(fs, VirtioFS{
