@@ -50,8 +50,7 @@ nft 'flush chain inet filter forward'
 nft 'flush chain inet filter prerouting'
 
 # drop smtp traffic for hidden nodes
-nft 'add rule inet filter prerouting iifname "b-*" tcp dport 25 reject with icmp type admin-prohibited'
-
+nft 'add rule inet filter prerouting iifname "b-*" tcp dport {25, 587, 465} reject with icmp type admin-prohibited'
 `)
 
 	if err := cmd.Run(); err != nil {
