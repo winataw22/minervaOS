@@ -87,14 +87,14 @@ Next just remove this link and re-create the file with a valid name to be able t
 export PATH=/usr/local/sbin/:/usr/local/bin/:/usr/sbin/:/usr/bin/:/sbin:/bin
 
 rm /etc/resolv.conf
-echo 'nameserver 1.1.1.1' > /etc/resolv.conf`
+echo 'nameserver 1.1.1.1' > /etc/resolv.conf
 ```
 
 Install cloud-init
 
 ```bash
 apt-get update
-apt-get cloud-init openssh-server curl
+apt-get install cloud-init openssh-server curl
 # to make sure we have clean setup
 cloud-init clean
 ```
@@ -129,7 +129,7 @@ you should be out of the arch-chroot now
 
 ```bash
 curl -O https://raw.githubusercontent.com/torvalds/linux/master/scripts/extract-vmlinux
-chmox +x extract-vmlinux
+chmod +x extract-vmlinux
 
 sudo ./extract-vmlinux ubuntu:jammy/boot/vmlinuz | sudo tee ubuntu:jammy/boot/vmlinuz-5.15.0-25-generic.elf > /dev/null
 # then replace original kernel

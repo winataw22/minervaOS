@@ -152,6 +152,8 @@ func (r *Registrar) reActivate(ctx context.Context, cl zbus.Client, env environm
 		return err
 	}
 
+	defer sub.Close()
+
 	sk := ed25519.PrivateKey(stubs.NewIdentityManagerStub(cl).PrivateKey(ctx))
 	id, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
