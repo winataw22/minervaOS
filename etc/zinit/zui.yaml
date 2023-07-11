@@ -11,4 +11,5 @@ exec: |
     fi
   '
 after:
+  - node-ready
   - quiet

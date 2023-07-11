@@ -191,24 +191,28 @@ fn install_package(flist: &hub::Flist) -> Result<()> {
 
         // the entire point of this match is the
         // logging of the error.
-        match flist.download(&flist.name) {
-            Ok(ok) => Ok(ok),
-            Err(err) => {
-                error!("failed to download flist '{}': {}", flist.url, err);
-                bail!("failed to download flist '{}': {}", flist.url, err);
-            }
-        }
+        flist
+            .download(&flist.name)
+            .with_context(|| format!("failed to download flist: {}", flist.url))
     });
 
-    // I can't use the ? because error from retry
-    // is not compatible with failure::Error for
-    // some reason.
     match result {
-        Err(err) => bail!("{:?}", err),
+        Err(retry::Error::Operation { error, .. }) => return Err(error),
+        Err(retry::Error::Internal(msg)) => bail!("failed retrying to download flist: {}", msg),
         _ => (),
     };
 
-    let fs = Zfs::mount("backend", &flist.name, "root")?;
+    let fs = retry::retry(retry::delay::Exponential::from_millis(500).take(10), || {
+        Zfs::mount("backend", &flist.name, "root")
+            .with_context(|| format!("failed to mount flist: {}", flist.url))
+    });
+
+    let fs = match fs {
+        Ok(fs) => fs,
+        Err(retry::Error::Operation { error, .. }) => return Err(error),
+        Err(retry::Error::Internal(msg)) => bail!("failed retrying to mount flist: {}", msg),
+    };
+
     debug!("zfs started, now copying all files");
 
     fs.copy("/").context("failed to copy files")?;

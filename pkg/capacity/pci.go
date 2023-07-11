@@ -16,12 +16,24 @@ const (
 	pciDir = "/sys/bus/pci/devices"
 )
 
+// Subdevice is subdevice information to a PCI device
+type Subdevice struct {
+	// SubsystemVendorID is device subsystem vendor ID according to PCI database
+	SubsystemVendorID uint16
+	// SubsystemVendorID is device subsystem ID according to PCI database
+	SubsystemDeviceID uint16
+	// Name is subdevice name according to PCI database
+	Name string
+}
+
 // Device is a PCI device
 type Device struct {
 	// ID is device id according to PCI database
 	ID uint16
 	// Name is device name according to PCI database
 	Name string
+	// Subdevices is a slice of all subdevices according to PCI database
+	Subdevices []Subdevice
 }
 
 // Vendor is Vendor information
@@ -41,7 +53,7 @@ var (
 	//go:embed pci/pci.ids
 	src []byte
 
-	pattern = regexp.MustCompile(`^(\t*)([\d|a-f]{4})(.+)$`)
+	pattern = regexp.MustCompile(`^(\t*)([\d|a-f]{4}) ([\d|a-f]{4}){0,1}(.+)$`)
 	data    map[uint16]Vendor
 
 	gpuVendorsWhitelist = []uint16{
@@ -63,6 +75,7 @@ func loadVendors(src []byte) (map[uint16]Vendor, error) {
 
 	scanner := bufio.NewScanner(bytes.NewBuffer(src))
 	var current *Vendor
+	var deviceID uint16
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#") {
@@ -73,13 +86,13 @@ func loadVendors(src []byte) (map[uint16]Vendor, error) {
 		if matches == nil {
 			continue
 		}
-		// this should have `4 parts`
+		// this should have `5 parts`
 		tabs := matches[1]
 		id64, err := strconv.ParseUint(matches[2], 16, 16)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse vendor or device id: %w", err)
 		}
-		rest := strings.TrimSpace(matches[3])
+		rest := strings.TrimSpace(matches[4])
 
 		id := uint16(id64)
 		// the line has no leading tabs. this is a new vendor
@@ -99,9 +112,32 @@ func loadVendors(src []byte) (map[uint16]Vendor, error) {
 			}
 
 			current.Devices[id] = Device{
-				ID:   id,
-				Name: rest,
+				ID:         id,
+				Name:       rest,
+				Subdevices: make([]Subdevice, 0),
 			}
+			deviceID = id
+		} else if len(tabs) == 2 {
+			if current == nil {
+				return nil, fmt.Errorf("subsystem appeared before a vendor: %s", line)
+			}
+			if len(current.Devices) == 0 {
+				return nil, fmt.Errorf("subsystem appeared before a device: %s", line)
+			}
+			ssid64, err := strconv.ParseUint(matches[3], 16, 16)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse subsystem id: %w", err)
+			}
+			ssid := uint16(ssid64)
+
+			device := current.Devices[deviceID]
+			device.Subdevices = append(device.Subdevices, Subdevice{
+				SubsystemVendorID: id,
+				SubsystemDeviceID: ssid,
+				Name:              rest,
+			})
+			current.Devices[deviceID] = device
+
 		}
 	}
 
@@ -125,6 +161,20 @@ func GetDevice(vendor uint16, device uint16) (v Vendor, d Device, ok bool) {
 	return
 }
 
+// GetSubdevice looks up the subdevice using devices db
+func GetSubdevice(vendor uint16, device uint16, subsystemVendorID uint16, subsystemDeviceID uint16) (Subdevice, bool) {
+	_, d, ok := GetDevice(vendor, device)
+	if !ok {
+		return Subdevice{}, false
+	}
+	for _, subdevice := range d.Subdevices {
+		if subdevice.SubsystemDeviceID == subsystemDeviceID && subdevice.SubsystemVendorID == subsystemVendorID {
+			return subdevice, true
+		}
+	}
+	return Subdevice{}, false
+}
+
 // Filter over the PCI for listing
 type Filter func(pci *PCI) bool
 
@@ -138,11 +188,20 @@ type PCI struct {
 	Device uint16
 	// Class of the device
 	Class uint32
+	// Subsystem Vendor of the device
+	SubsystemVendor uint16
+	// Subsystem ID of the device
+	SubsystemDevice uint16
 }
 
 // GetDevice gets the attached PCI device information (vendor and device)
 func (p *PCI) GetDevice() (Vendor, Device, bool) {
 	return GetDevice(p.Vendor, p.Device)
+}
+
+// GetSubdevice gets the attached PCI subdevice information
+func (p *PCI) GetSubdevice() (Subdevice, bool) {
+	return GetSubdevice(p.Vendor, p.Device, p.SubsystemVendor, p.SubsystemDevice)
 }
 
 // ShortID returns a short identification string
@@ -162,9 +221,11 @@ func (p *PCI) Flag(name string) (uint64, error) {
 
 func pciDeviceFromSlot(slot string) (PCI, error) {
 	const (
-		classFile  = "class"
-		vendorFile = "vendor"
-		deviceFile = "device"
+		classFile           = "class"
+		vendorFile          = "vendor"
+		deviceFile          = "device"
+		subsystemVendorFile = "subsystem_vendor"
+		subsystemDeviceFile = "subsystem_device"
 	)
 	class, err := readUint64(filepath.Join(pciDir, slot, classFile), 32)
 	if err != nil {
@@ -172,19 +233,29 @@ func pciDeviceFromSlot(slot string) (PCI, error) {
 	}
 	vendor, err := readUint64(filepath.Join(pciDir, slot, vendorFile), 16)
 	if err != nil {
-		return PCI{}, fmt.Errorf("failed to get device '%s' class: %w", slot, err)
+		return PCI{}, fmt.Errorf("failed to get device '%s' vendor: %w", slot, err)
 	}
 
 	device, err := readUint64(filepath.Join(pciDir, slot, deviceFile), 16)
 	if err != nil {
-		return PCI{}, fmt.Errorf("failed to get device '%s' class: %w", slot, err)
+		return PCI{}, fmt.Errorf("failed to get device '%s' device: %w", slot, err)
+	}
+	subsystemVendor, err := readUint64(filepath.Join(pciDir, slot, subsystemVendorFile), 16)
+	if err != nil {
+		return PCI{}, fmt.Errorf("failed to get device '%s' subsystem vendor: %w", slot, err)
+	}
+	subsystemDevice, err := readUint64(filepath.Join(pciDir, slot, subsystemDeviceFile), 16)
+	if err != nil {
+		return PCI{}, fmt.Errorf("failed to get device '%s' subsystem device: %w", slot, err)
 	}
 
 	pci := PCI{
-		Slot:   slot,
-		Class:  uint32(class),
-		Vendor: uint16(vendor),
-		Device: uint16(device),
+		Slot:            slot,
+		Class:           uint32(class),
+		Vendor:          uint16(vendor),
+		Device:          uint16(device),
+		SubsystemVendor: uint16(subsystemVendor),
+		SubsystemDevice: uint16(subsystemDevice),
 	}
 
 	return pci, err

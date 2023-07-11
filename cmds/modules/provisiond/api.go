@@ -86,8 +86,8 @@ func setupGPURmb(router rmb.Router, store provision.Storage) {
 		}
 
 		var list []Info
-		for _, device := range devices {
-			id := device.ShortID()
+		for _, pciDevice := range devices {
+			id := pciDevice.ShortID()
 			info := Info{
 				ID:       id,
 				Vendor:   "unknown",
@@ -95,10 +95,15 @@ func setupGPURmb(router rmb.Router, store provision.Storage) {
 				Contract: used[id],
 			}
 
-			vendor, device, ok := device.GetDevice()
+			vendor, device, ok := pciDevice.GetDevice()
 			if ok {
 				info.Vendor = vendor.Name
 				info.Device = device.Name
+			}
+
+			subdevice, ok := pciDevice.GetSubdevice()
+			if ok {
+				info.Device = subdevice.Name
 			}
 
 			list = append(list, info)
