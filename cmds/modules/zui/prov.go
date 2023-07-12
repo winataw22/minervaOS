@@ -8,64 +8,97 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
 	gig = 1024 * 1024 * 1024.0
+	mb  = 1024 * 1024.0
 )
 
-func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) error {
+func resourcesRender(client zbus.Client, grid *ui.Grid, render *signalFlag) error {
 	prov := widgets.NewTable()
-	prov.Title = "System Used Capacity"
-	prov.RowSeparator = false
-
-	prov.Rows = [][]string{
-		{"CPU Usage", "", "Memory Usage", ""},
-		{"CRU Reserved", "", "MRU Reserved", ""},
-		{"SSD Reserved", "", "HDD Reserved", ""},
-		{"IPv4 Reserved", ""},
-	}
+	usage := widgets.NewTable()
 
 	grid.Set(
 		ui.NewRow(1.0,
-			ui.NewCol(1, prov),
+			ui.NewCol(.6, prov),
+			ui.NewCol(.4, usage),
 		),
 	)
 
-	ctx := context.Background()
+	if err := provRender(client, render, prov); err != nil {
+		return errors.Wrap(err, "failed to render system provisioned resources")
+	}
+
+	if err := usageRender(client, render, usage); err != nil {
+		return errors.Wrap(err, "failed to render system resources usage")
+	}
+
+	return nil
+}
+
+func provRender(client zbus.Client, render *signalFlag, prov *widgets.Table) error {
+	prov.Title = "System Resources"
+	prov.RowSeparator = false
+
+	prov.Rows = [][]string{
+		{"", "Total", "Reserved"},
+		{"CRU", "", ""},
+		{"Memory", "", ""},
+		{"SSD", "", ""},
+		{"HDD", "", ""},
+		{"IPv4", "", ""},
+	}
 
 	monitor := stubs.NewStatisticsStub(client)
-	counters, err := monitor.ReservedStream(ctx)
+
+	total := monitor.Total(context.Background())
+	assignTotalResources(prov, total)
+	render.Signal()
+
+	reserved, err := monitor.ReservedStream(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "failed to start net monitor stream")
 	}
 
 	go func() {
-		for counter := range counters {
+		for counter := range reserved {
 			rows := prov.Rows
-			rows[1][1] = fmt.Sprint(counter.CRU)
-			rows[1][3] = fmt.Sprintf("%0.00f GB", float64(counter.MRU)/gig)
-			rows[2][1] = fmt.Sprintf("%0.00f GB", float64(counter.SRU)/gig)
-			rows[2][3] = fmt.Sprintf("%0.00f GB", float64(counter.HRU)/gig)
-			rows[3][1] = fmt.Sprint(counter.IPV4U)
+			rows[1][2] = fmt.Sprint(counter.CRU)
+			rows[2][2] = fmt.Sprintf("%0.00f GB", float64(counter.MRU)/gig)
+			rows[3][2] = fmt.Sprintf("%0.00f GB", float64(counter.SRU)/gig)
+			rows[4][2] = fmt.Sprintf("%0.00f GB", float64(counter.HRU)/gig)
+			rows[5][2] = fmt.Sprint(counter.IPV4U)
 
 			render.Signal()
 		}
 	}()
 
+	return nil
+}
+
+func usageRender(client zbus.Client, render *signalFlag, usage *widgets.Table) error {
+	usage.Title = "Usage"
+	usage.RowSeparator = false
+	usage.FillRow = true
+
+	usage.Rows = [][]string{
+		{"CPU", ""},
+		{"Memory", ""},
+	}
+
 	sysMonitor := stubs.NewSystemMonitorStub(client)
-	stream, err := sysMonitor.CPU(context.Background())
+	cpuStream, err := sysMonitor.CPU(context.Background())
 	if err != nil {
 		return errors.Wrap(err, "failed to start cpu monitor stream")
 	}
 
 	go func() {
-		for point := range stream {
-			prov.Mutex.Lock()
-			prov.Rows[0][1] = fmt.Sprintf("%0.00f%%", point.Percent)
+		for point := range cpuStream {
+			usage.Rows[0][1] = fmt.Sprintf("%0.00f%%", point.Percent)
 			render.Signal()
-			prov.Mutex.Unlock()
 		}
 	}()
 
@@ -76,10 +109,19 @@ func provisionRender(client zbus.Client, grid *ui.Grid, render *signalFlag) erro
 
 	go func() {
 		for point := range memStream {
-			prov.Rows[0][3] = fmt.Sprintf("%0.00f%%", point.UsedPercent)
+			usage.Rows[1][1] = fmt.Sprintf("%0.00f MB", float64(point.Used/mb))
 			render.Signal()
 		}
 	}()
 
 	return nil
+}
+
+func assignTotalResources(prov *widgets.Table, total gridtypes.Capacity) {
+	rows := prov.Rows
+	rows[1][1] = fmt.Sprint(total.CRU)
+	rows[2][1] = fmt.Sprintf("%0.00f GB", float64(total.MRU)/gig)
+	rows[3][1] = fmt.Sprintf("%0.00f GB", float64(total.SRU)/gig)
+	rows[4][1] = fmt.Sprintf("%0.00f GB", float64(total.HRU)/gig)
+	rows[5][1] = fmt.Sprint(total.IPV4U)
 }

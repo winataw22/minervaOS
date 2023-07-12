@@ -27,7 +27,7 @@ func (f *signalFlag) Signal() {
 	atomic.SwapInt32((*int32)(f), 1)
 }
 
-//Signaled checks if flag was raised, and lowers the flag
+// Signaled checks if flag was raised, and lowers the flag
 func (f *signalFlag) Signaled() bool {
 	return atomic.SwapInt32((*int32)(f), 0) == 1
 }
@@ -73,10 +73,10 @@ func action(ctx *cli.Context) error {
 	netgrid.Title = "Network"
 	netgrid.SetRect(0, 7, width, 14)
 
-	provision := ui.NewGrid()
-	provision.Title = "Provision"
-	provision.SetRect(0, 14, width, 20)
-	provision.Border = false
+	resources := ui.NewGrid()
+	resources.Title = "Provision"
+	resources.SetRect(0, 14, width, 22)
+	resources.Border = false
 
 	var flag signalFlag
 
@@ -88,12 +88,12 @@ func action(ctx *cli.Context) error {
 		log.Error().Err(err).Msg("failed to start net renderer")
 	}
 
-	if err := provisionRender(client, provision, &flag); err != nil {
-		log.Error().Err(err).Msg("failed to start net renderer")
+	if err := resourcesRender(client, resources, &flag); err != nil {
+		log.Error().Err(err).Msg("failed to start resources renderer")
 	}
 
 	render := func() {
-		ui.Render(header, netgrid, provision)
+		ui.Render(header, netgrid, resources)
 	}
 
 	render()

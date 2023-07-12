@@ -8,7 +8,7 @@ zinit:
 
 kernel:
 	@echo "Download 0-OS kernel"
-	wget https://bootstrap.grid.tf/kernel/zero-os-development-zos-v3-generic-7e587e499a.efi
+	wget https://bootstrap.grid.tf/kernel/zero-os-development-zos-v3-generic-0ad6c11534.efi
 
 start:
 	bash vm.sh -n node1 -c "runmode=dev farmer_id=$(FARMERID)"
