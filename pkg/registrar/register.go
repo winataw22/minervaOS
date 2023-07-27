@@ -223,17 +223,6 @@ func registerNode(
 		}
 	}
 
-	gpu, err := sub.GetNodeGpuStatus(nodeID)
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get node gpu status")
-	}
-
-	if len(info.GPUs) > 0 != gpu {
-		if _, err := sub.SetNodeGpuStatus(id, len(info.GPUs) > 0); err != nil {
-			return 0, 0, errors.Wrap(err, "failed to set node gpu status")
-		}
-	}
-
 	return nodeID, twinID, err
 }
 
