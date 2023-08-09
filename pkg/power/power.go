@@ -126,8 +126,7 @@ func (p *PowerServer) syncSelf() error {
 	// if target is down, we make sure state is down, then shutdown
 
 	if power.Target.IsUp {
-		if power.State.IsDown {
-			_, err = cl.SetNodePowerState(p.identity, true)
+		if err := p.setNodePowerState(cl, true); err != nil {
 			return errors.Wrap(err, "failed to set state to up")
 		}
 
@@ -137,9 +136,8 @@ func (p *PowerServer) syncSelf() error {
 	// now the target must be down.
 	// we need to shutdown
 
-	if power.State.IsUp {
-		_, err = cl.SetNodePowerState(p.identity, false)
-		return errors.Wrap(err, "failed to set state to up")
+	if err := p.setNodePowerState(cl, false); err != nil {
+		return errors.Wrap(err, "failed to set state to down")
 	}
 
 	// otherwise node need to get back to sleep.
@@ -220,7 +218,7 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 
 	if event.NodeID == p.node && event.Target.IsDown {
 		// we need to shutdown!
-		if _, err := cl.SetNodePowerState(p.identity, false); err != nil {
+		if err := p.setNodePowerState(cl, false); err != nil {
 			return errors.Wrap(err, "failed to set node power state to down")
 		}
 
@@ -235,6 +233,43 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 	}
 
 	return nil
+}
+
+// setNodePowerState sets the node power state as provided or to up if power mgmt is
+// not enabled on this node.
+// this function makes sure to compare the state with on chain state to not do
+// un-necessary transactions.
+func (p *PowerServer) setNodePowerState(cl *substrate.Substrate, up bool) error {
+
+	/*
+		if power is not enabled, the node state should always be up
+		otherwise update the state to the correct value
+
+		| enabled | up | result|
+		| 0       | 0  | 1     |
+		| 0       | 1  | 1     |
+		| 1       | 0  | 0     |
+		| 1       | 1  | 1     |
+
+		this simplifies as below:
+	*/
+
+	up = !p.enabled || up
+	power, err := cl.GetPowerTarget(p.node)
+
+	if err != nil {
+		return errors.Wrap(err, "failed to check power state")
+	}
+
+	// only update the chain if it's different from actual value.
+	if power.State.IsUp == up {
+		return nil
+	}
+
+	log.Info().Bool("state", up).Msg("setting node power state")
+	// this to make sure node state is fixed also for nodes
+	_, err = cl.SetNodePowerState(p.identity, up)
+	return err
 }
 
 func (p *PowerServer) recv(ctx context.Context) error {

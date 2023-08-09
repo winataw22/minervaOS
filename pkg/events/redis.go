@@ -236,6 +236,7 @@ func (r *RedisConsumer) consumer(ctx context.Context, stream string, ch reflect.
 	logger := log.With().Str("stream", stream).Logger()
 	go func() {
 		defer con.Close()
+		defer ch.Close()
 
 		for {
 			messages, err := r.pop(con, group, stream)
