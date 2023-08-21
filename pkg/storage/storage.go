@@ -58,19 +58,13 @@ type Module struct {
 	mu sync.RWMutex
 
 	// cache is a cache directory can be used with some files
+	// NOTED: this is deprecated, now type is stored on the device
+	// itself not in temp cache
 	cache TypeCache
 }
 
 type TypeCache struct {
 	base string
-}
-
-func (t *TypeCache) Set(name string, typ pkg.DeviceType) error {
-	if err := os.WriteFile(filepath.Join(t.base, name), []byte(typ), 0644); err != nil {
-		return errors.Wrapf(err, "failed to store device type for '%s'", name)
-	}
-
-	return nil
 }
 
 func (t *TypeCache) Get(name string) (pkg.DeviceType, bool) {
@@ -157,6 +151,50 @@ func (s *Module) dump() {
 
 }
 
+// poolType gets the device type of a disk
+func (s *Module) poolType(pool filesystem.Pool, vm bool) (zos.DeviceType, error) {
+	var typ zos.DeviceType
+	device := pool.Device()
+	// for development purposes only
+	if vm {
+		// force ssd device for vms
+		typ = zos.SSDDevice
+
+		if device.Path == "/dev/vdd" || device.Path == "/dev/vde" {
+			typ = zos.HDDDevice
+		}
+		return typ, nil
+	}
+
+	log.Debug().Str("device", device.Path).Msg("checking device type in disk")
+	typ, ok, err := pool.Type()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get device type")
+	}
+
+	if ok {
+		log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("device type loaded from disk")
+		return typ, nil
+	}
+
+	log.Debug().Str("device", device.Path).Msg("checking device type in cache")
+	typ, ok = s.cache.Get(device.Name())
+	if !ok {
+		log.Debug().Str("device", device.Path).Msg("detecting device type")
+		typ, err = device.DetectType()
+		if err != nil {
+			return "", errors.Wrap(err, "failed to detect device type")
+		}
+	}
+
+	log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("setting device type")
+	if err := pool.SetType(typ); err != nil {
+		return "", errors.Wrap(err, "failed to set device type")
+	}
+
+	return typ, nil
+}
+
 /*
 *
 initialize, must be called at least onetime each boot.
@@ -206,31 +244,11 @@ func (s *Module) initialize(ctx context.Context) error {
 			log.Error().Err(err).Str("pool", pool.Name()).Str("device", device.Path).Msg("failed to get usage of pool")
 		}
 
-		typ, ok := s.cache.Get(device.Name())
-		if !ok {
-			log.Debug().Str("device", device.Path).Msg("detecting device type")
-			typ, err = device.Type()
-			if err != nil {
-				log.Error().Str("device", device.Path).Err(err).Msg("failed to check device type")
-				continue
-			}
-
-			// for development purposes only
-			if vm {
-				// force ssd device for vms
-				typ = zos.SSDDevice
-
-				if device.Path == "/dev/vdd" || device.Path == "/dev/vde" {
-					typ = zos.HDDDevice
-				}
-			}
-
-			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("caching device type")
-			if err := s.cache.Set(device.Name(), typ); err != nil {
-				log.Error().Str("device", device.Path).Err(err).Msg("failed to cache device type")
-			}
-		} else {
-			log.Debug().Str("device", device.Path).Str("type", typ.String()).Msg("device type loaded from cache")
+		typ, err := s.poolType(pool, vm)
+		if err != nil {
+			log.Error().Str("device", device.Path).Err(err).Msg("failed to get device type")
+			s.brokenDevices = append(s.brokenDevices, pkg.BrokenDevice{Path: device.Path, Err: err})
+			continue
 		}
 
 		switch typ {

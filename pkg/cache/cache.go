@@ -13,7 +13,7 @@ const (
 
 // VolatileDir creates a new cache directory that is stored on a tmpfs.
 // This means data stored in this directory will NOT survive a reboot.
-// Use this when you need to store data that needs to survice deamon reboot but not between reboots
+// Use this when you need to store data that needs to survive deamon reboot but not between reboots
 // It is the caller's responsibility to remove the directory when no longer needed.
 // If the directory already exist error of type os.IsExist will be returned
 func VolatileDir(name string, size uint64) (string, error) {

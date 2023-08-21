@@ -68,7 +68,8 @@ func (i *DeviceInfo) Used() bool {
 	return len(i.Label) != 0 || len(i.Filesystem) != 0
 }
 
-func (d *DeviceInfo) Type() (zos.DeviceType, error) {
+// DetectType returns the device type according to seektime
+func (d *DeviceInfo) DetectType() (zos.DeviceType, error) {
 	return d.mgr.Seektime(context.Background(), d.Path)
 }
 

@@ -76,7 +76,7 @@ func TestDeviceManagerScan(t *testing.T) {
 	// make sure all types are set.
 	expected := []zos.DeviceType{zos.SSDDevice, zos.HDDDevice}
 	for i, dev := range cached {
-		typ, err := dev.Type()
+		typ, err := dev.DetectType()
 		require.NoError(err)
 		require.Equal(expected[i], typ)
 	}
