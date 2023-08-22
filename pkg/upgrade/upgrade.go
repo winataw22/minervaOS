@@ -226,7 +226,12 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 
 // UninstallBinary  from a single flist.
 func (u *Upgrader) UninstallBinary(flist FListInfo) error {
-	return u.uninstall(flist)
+	// we never delete those files from the system
+	// since there is no `package manager` for zos (yet)
+	// deleting the files from the flist blindly can cause
+	// issues if some deleted files were shared between
+	// multiple packages.
+	return u.uninstall(flist, false)
 }
 
 // upgradeSelf will try to check if the flist has
@@ -284,7 +289,9 @@ func (u *Upgrader) upgradeSelf(store meta.Walker) error {
 	return ErrRestartNeeded
 }
 
-func (u *Upgrader) uninstall(flist FListInfo) error {
+// uninstall a package, if del is true, also delete the files in that package
+// from the system filesystem
+func (u *Upgrader) uninstall(flist FListInfo, del bool) error {
 	files, err := flist.Files()
 	if err != nil {
 		return errors.Wrapf(err, "failed to get list of current installed files for '%s'", flist.Absolute())
@@ -324,6 +331,10 @@ func (u *Upgrader) uninstall(flist FListInfo) error {
 		if err := u.zinit.Forget(name); err != nil {
 			log.Error().Err(err).Str("service", name).Msg("error on zinit forget")
 		}
+	}
+
+	if !del {
+		return nil
 	}
 
 	// now delete ALL files, ignore what doesn't delete
@@ -367,7 +378,7 @@ func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
 		return err
 	}
 
-	if err := u.uninstall(from.FListInfo); err != nil {
+	if err := u.uninstall(from.FListInfo, true); err != nil {
 		log.Error().Err(err).Msg("failed to uninstall current flist. Upgraded anyway")
 	}
 
