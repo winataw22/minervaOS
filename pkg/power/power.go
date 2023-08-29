@@ -60,10 +60,6 @@ const (
 	PowerServerPort  = 8039
 )
 
-var (
-	errConnectionError = fmt.Errorf("connection error")
-)
-
 func EnsureWakeOnLan(ctx context.Context) (bool, error) {
 	inf, err := bridge.Get(DefaultWolBridge)
 	if err != nil {
@@ -274,17 +270,28 @@ func (p *PowerServer) setNodePowerState(cl *substrate.Substrate, up bool) error 
 
 func (p *PowerServer) recv(ctx context.Context) error {
 	log.Info().Msg("listening for power events")
-	stream, err := p.consumer.PowerTargetChange(ctx)
+
+	if err := p.syncSelf(); err != nil {
+		return errors.Wrap(err, "failed to synchronize power status")
+	}
+
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	stream, err := p.consumer.PowerTargetChange(subCtx)
 	if err != nil {
-		return errors.Wrapf(errConnectionError, "failed to connect to zbus events: %s", err)
+		return errors.Wrap(err, "failed to connect to zbus events")
 	}
 
 	for event := range stream {
 		if err := p.event(&event); err != nil {
-			log.Error().Err(err).Msg("failed to process power event")
+			return errors.Wrap(err, "failed to process power event")
 		}
 	}
 
+	// if we reach here it means stream was ended. this can only happen
+	// if and only if the steam was over and that can only be via a ctx
+	// cancel.
 	return nil
 }
 
@@ -292,25 +299,21 @@ func (p *PowerServer) recv(ctx context.Context) error {
 func (p *PowerServer) events(ctx context.Context) error {
 	// first thing we need to make sure we are not suppose to be powered
 	// off, so we need to sync with grid
-	// 1) make sure at least one uptime was already sent
+	// make sure at least one uptime was already sent
 	_ = p.ut.Mark.Done(ctx)
-	// 2) do we need to power off
-	if err := p.syncSelf(); err != nil {
-		return errors.Wrap(err, "failed to synchronize power status")
-	}
 
 	// if the stream loop fails for any reason retry
 	// unless context was cancelled
 	for {
 		err := p.recv(ctx)
-		if err == nil {
-			return err
+		if err != nil {
+			log.Error().Err(err).Msg("failed to process power events")
 		}
 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(10 * time.Second):
+		case <-time.After(5 * time.Second):
 		}
 	}
 }

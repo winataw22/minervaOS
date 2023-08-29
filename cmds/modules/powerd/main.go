@@ -1,6 +1,7 @@
 package powerd
 
 import (
+	"context"
 	"crypto/ed25519"
 
 	"github.com/pkg/errors"
@@ -108,5 +109,9 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to initialize power manager")
 	}
 
-	return power.Start(ctx)
+	if err := power.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	return nil
 }
