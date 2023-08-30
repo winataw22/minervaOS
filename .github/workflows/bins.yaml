@@ -126,3 +126,9 @@ jobs:
       package: misc
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  iperf:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: iperf
+    secrets:
+      token: ${{ secrets.HUB_JWT }}

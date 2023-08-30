@@ -12,7 +12,7 @@ like the initramfs build script. This can be used inside Github Actions Steps.
 
 ## Package system
 
-The build system use a simple mechanism which build differents « packages ». Each packages
+The build system use a simple mechanism which build different « packages ». Each packages
 are defined on the package directory. A package is a directory, the directory name is the package name.
 Inside this directory, you need a bash script called with the package name.
 
@@ -24,7 +24,8 @@ you need during build phase.
 To build your package, you can invoke the build script like this: `bash bins-extra.sh --package mysoftware`.
 
 The build script takes care to set up an environment easy to use inside your package script.
-You have differents variables setup you can use:
+You have different variables setup you can use:
+
 - `FILESDIR`: the path where your files next to your build script are located
 - `WORKDIR`: a temporary directory you can use to build your software
 - `ROOTDIR`: root directory you can use to put your final files to packages

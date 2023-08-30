@@ -6,10 +6,10 @@ jobs:
     name: Running Daemon Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.19
+      - name: Set up Go 1.21
         uses: actions/setup-go@v1
         with:
-          go-version: 1.19
+          go-version: 1.21
         id: go
 
       - name: Prepare dependencies

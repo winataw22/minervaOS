@@ -13,7 +13,7 @@ func TestUpgraderDownload(t *testing.T) {
 	require := require.New(t)
 
 	up := &Upgrader{
-		cache: "/tmp/zfs-test-cache",
+		root: "/tmp/zfs-test-cache",
 	}
 
 	err := Storage(defaultHubStorage)(up)
