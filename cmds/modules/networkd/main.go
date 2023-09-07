@@ -122,7 +122,7 @@ func action(cli *cli.Context) error {
 
 	ygg, err := yggdrasil.EnsureYggdrasil(ctx, identity.PrivateKey(cli.Context), yggNs)
 	if err != nil {
-		return errors.Wrap(err, "fail to start yggdrasil")
+		return errors.Wrap(err, "failed to start yggdrasil")
 	}
 
 	if public.HasPublicSetup() {
