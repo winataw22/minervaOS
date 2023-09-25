@@ -184,7 +184,7 @@ func (v ZMachine) Valid(getter gridtypes.WorkloadGetter) error {
 		}
 	}
 	if v.ComputeCapacity.CPU == 0 {
-		return fmt.Errorf("cpu capcity can't be 0")
+		return fmt.Errorf("cpu capacity can't be 0")
 	}
 	if v.ComputeCapacity.Memory < 250*gridtypes.Megabyte {
 		return fmt.Errorf("mem capacity can't be less that 250M")

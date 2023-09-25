@@ -6,6 +6,7 @@ import (
 	"net"
 	"path/filepath"
 
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -126,7 +127,7 @@ type VM struct {
 	Network VMNetworkInfo
 	// KernelImage path to uncompressed linux kernel ELF
 	KernelImage string
-	// InitrdImage (optiona) path to initrd disk
+	// InitrdImage (optional) path to initrd disk
 	InitrdImage string
 	// KernelArgs to override the default kernel arguments. (default: "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules")
 	KernelArgs KernelArgs
@@ -175,8 +176,16 @@ func (vm *VM) Validate() error {
 		return fmt.Errorf("invalid memory must not be less than 250M")
 	}
 
-	if vm.CPU == 0 || vm.CPU > 32 {
-		return fmt.Errorf("invalid cpu must be between 1 and 32")
+	cpus, err := cpu.Counts(true)
+	if err != nil {
+		return fmt.Errorf("failed to get count of cpus")
+	}
+
+	if vm.CPU == 0 || vm.CPU > uint8(cpus) {
+		if cpus == 1 {
+			return fmt.Errorf("invalid cpu must be 1")
+		}
+		return fmt.Errorf("invalid cpu must be between 1 and %d", cpus)
 	}
 
 	for _, shared := range vm.Shared {
@@ -234,7 +243,7 @@ func (n *NetMetric) Nu() float64 {
 }
 
 // MachineMetric is a container for metrics from multiple networks
-// currently only groped as private (wiregaurd + yggdrasil), and public (public Ips)
+// currently only grouped as private (wireguard + yggdrasil), and public (public Ips)
 type MachineMetric struct {
 	Private NetMetric
 	Public  NetMetric

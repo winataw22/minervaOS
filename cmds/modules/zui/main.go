@@ -67,11 +67,11 @@ func action(ctx *cli.Context) error {
 
 	header := widgets.NewParagraph()
 	header.Border = true
-	header.SetRect(0, 0, width, 7)
+	header.SetRect(0, 0, width, 8)
 
 	netgrid := ui.NewGrid()
 	netgrid.Title = "Network"
-	netgrid.SetRect(0, 7, width, 14)
+	netgrid.SetRect(0, 8, width, 14)
 
 	resources := ui.NewGrid()
 	resources.Title = "Provision"
