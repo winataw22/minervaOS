@@ -304,8 +304,9 @@ func readUint64(path string, bitSize int) (uint64, error) {
 
 // GPU Filter only devices with GPU capabilities
 // NOTE: we only also now white list NVIDIA and AMD
+// we skip integrated GPU  normally on slots `0000:00:XX.X` and allow only discrete ones normally on slot `0000:XX:YY.ZZ`
 func GPU(p *PCI) bool {
-	return p.Class == 0x030000 && in(p.Vendor, gpuVendorsWhitelist)
+	return p.Class == 0x030000 && in(p.Vendor, gpuVendorsWhitelist) && !strings.HasPrefix(p.Slot, "0000:00:")
 }
 
 // PCIBridge returns true if p is a PCI bridge

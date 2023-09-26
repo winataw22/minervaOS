@@ -3,6 +3,7 @@ package noded
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/monitord"
+	"github.com/threefoldtech/zos/pkg/perf"
 	"github.com/threefoldtech/zos/pkg/registrar"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
@@ -191,6 +193,29 @@ func action(cli *cli.Context) error {
 
 	bus.WithHandler("zos.system.hypervisor", func(ctx context.Context, payload []byte) (interface{}, error) {
 		return hypervisor, nil
+	})
+
+	log.Info().Msg("start perf scheduler")
+
+	perfMon, err := perf.NewPerformanceMonitor(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "failed to create a new perfMon")
+	}
+
+	if err = perfMon.Run(ctx); err != nil {
+		return errors.Wrap(err, "failed to run the scheduler")
+	}
+	bus.WithHandler("zos.perf.get", func(ctx context.Context, payload []byte) (interface{}, error) {
+		var taskName string
+		err := json.Unmarshal(payload, &taskName)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to unmarshal payload: %v", payload)
+		}
+
+		return perfMon.Get(taskName)
+	})
+	bus.WithHandler("zos.perf.get_all", func(ctx context.Context, payload []byte) (interface{}, error) {
+		return perfMon.GetAll()
 	})
 
 	// answer calls for dmi

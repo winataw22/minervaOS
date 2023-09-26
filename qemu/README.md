@@ -1,4 +1,5 @@
 # Run 0-OS in a VM using qemu
+| For a quick development docs check [here](../docs/development/README.md)
 
 This folder contains a script that you can use to run 0-OS in a VM using qemu.
 
@@ -111,7 +112,7 @@ sudo dnsmasq --strict-order \
 1. Now run your vm
 
 ```bash
-sudo ./vm.sh -n myzos-01 -c "farmer_id=47 printk.devmsg=on runmode=dev"
+sudo ./vm.sh -n node-01 -c "farmer_id=47 printk.devmsg=on runmode=dev"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 
@@ -145,7 +146,7 @@ sudo ip link set forzos up
 1. Now run your vm
 
 ```bash
-./vm.sh -n myzos-01 -c "farmer_id=47 version=v3 printk.devmsg=on runmode=dev"
+./vm.sh -n node-01 -c "farmer_id=47 version=v3 printk.devmsg=on runmode=dev"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 

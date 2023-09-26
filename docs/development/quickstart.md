@@ -4,6 +4,7 @@
   - [Starting a local zos node](#starting-a-local-zos-node)
   - [Accessing node](#accessing-node)
   - [Development](#development)
+- [Qemu docs](../../qemu/README.md)
 
 ## Starting a local zos node
 
@@ -19,7 +20,7 @@ Then, inside zos repository
 make -C cmds
 cd qemu
 mv <downloaded image path> ./zos.efi
-sudo ./vm.sh -n myzos-01 -c "farmer_id=<your farm id here> printk.devmsg=on runmode=dev"
+sudo ./vm.sh -n node-01 -c "farmer_id=<your farm id here> printk.devmsg=on runmode=dev"
 ```
 
 You should see the qemu console and boot logs, wait for awhile and you can [browse farms](https://dashboard.dev.grid.tf/explorer/farms) to see your node is added/detected automatically.
