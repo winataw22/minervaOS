@@ -27,10 +27,14 @@ type Environment struct {
 	FarmID pkg.FarmID
 	Orphan bool
 
-	FarmSecret    string
-	SubstrateURL  []string
-	RelayURL      string
+	FarmSecret   string
+	SubstrateURL []string
+	// IMPORTANT NOTICE:
+	//   SINCE RELAYS FOR A NODE IS STORED ON THE CHAIN IN A LIMITED SPACE
+	//   PLEASE MAKE SURE THAT ANY ENV HAS NO MORE THAN FOUR RELAYS CONFIGURED
+	RelayURL      []string
 	ActivationURL string
+	GraphQL       string
 
 	ExtendedConfigURL string
 }
@@ -80,10 +84,13 @@ var (
 		SubstrateURL: []string{
 			"wss://tfchain.dev.grid.tf/",
 		},
-		RelayURL:      "wss://relay.dev.grid.tf",
+		RelayURL: []string{
+			"wss://relay.dev.grid.tf",
+		},
 		ActivationURL: "https://activation.dev.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.dev",
+		GraphQL:       "https://graphql.dev.grid.tf/graphql",
 	}
 
 	envTest = Environment{
@@ -91,10 +98,13 @@ var (
 		SubstrateURL: []string{
 			"wss://tfchain.test.grid.tf/",
 		},
-		RelayURL:      "wss://relay.test.grid.tf",
+		RelayURL: []string{
+			"wss://relay.test.grid.tf",
+		},
 		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
+		GraphQL:       "https://graphql.test.grid.tf/graphql",
 	}
 
 	envQA = Environment{
@@ -102,10 +112,13 @@ var (
 		SubstrateURL: []string{
 			"wss://tfchain.qa.grid.tf/",
 		},
-		RelayURL:      "wss://relay.qa.grid.tf",
+		RelayURL: []string{
+			"wss://relay.qa.grid.tf",
+		},
 		ActivationURL: "https://activation.qa.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.qanet",
+		GraphQL:       "https://graphql.qa.grid.tf/graphql",
 	}
 
 	envProd = Environment{
@@ -116,10 +129,13 @@ var (
 			"wss://03.tfchain.grid.tf/",
 			"wss://04.tfchain.grid.tf/",
 		},
-		RelayURL:      "wss://relay.grid.tf",
+		RelayURL: []string{
+			"wss://relay.grid.tf",
+		},
 		ActivationURL: "https://activation.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
+		GraphQL:       "https://graphql.grid.tf/graphql",
 	}
 )
 
@@ -195,7 +211,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 
 	if relay, ok := params.Get("relay"); ok {
 		if len(relay) > 0 {
-			env.RelayURL = relay[len(relay)-1]
+			env.RelayURL = relay
 		}
 	}
 

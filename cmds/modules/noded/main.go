@@ -202,6 +202,9 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create a new perfMon")
 	}
 
+	iperfTest := perf.NewIperfTest()
+	perfMon.AddTask(&iperfTest)
+
 	if err = perfMon.Run(ctx); err != nil {
 		return errors.Wrap(err, "failed to run the scheduler")
 	}
