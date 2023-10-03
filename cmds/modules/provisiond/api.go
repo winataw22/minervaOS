@@ -9,6 +9,7 @@ import (
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/kernel"
 	"github.com/threefoldtech/zos/pkg/primitives"
 	"github.com/threefoldtech/zos/pkg/provision"
 	"github.com/threefoldtech/zos/pkg/provision/mbus"
@@ -71,6 +72,10 @@ func setupGPURmb(router rmb.Router, store provision.Storage) {
 		return gpus, nil
 	}
 	gpus.WithHandler("list", func(ctx context.Context, payload []byte) (interface{}, error) {
+		var list []Info
+		if kernel.GetParams().IsGPUDisabled() {
+			return list, nil
+		}
 		devices, err := capacity.ListPCI(capacity.GPU)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to list available devices")
@@ -85,7 +90,6 @@ func setupGPURmb(router rmb.Router, store provision.Storage) {
 			return nil, errors.Wrap(err, "failed to list used gpus")
 		}
 
-		var list []Info
 		for _, pciDevice := range devices {
 			id := pciDevice.ShortID()
 			info := Info{

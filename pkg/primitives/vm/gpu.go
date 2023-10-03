@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/kernel"
 )
 
 const (
@@ -59,6 +60,9 @@ func (m *Manager) unbindBootVga() error {
 
 // this function will make sure ALL gpus are bind to the right driver
 func (m *Manager) initGPUs() error {
+	if kernel.GetParams().IsGPUDisabled() {
+		return nil
+	}
 	if err := m.initGPUVfioModules(); err != nil {
 		return err
 	}
@@ -127,6 +131,9 @@ func (m *Manager) initGPUs() error {
 // hence we need that for each GPU in the list add all the devices from each device
 // IOMMU group
 func (m *Manager) expandGPUs(gpus []zos.GPU) ([]capacity.PCI, error) {
+	if kernel.GetParams().IsGPUDisabled() {
+		return nil, fmt.Errorf("GPU is disabled on this node")
+	}
 	all, err := capacity.ListPCI(capacity.GPU)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list available GPUs")

@@ -12,6 +12,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
 	"github.com/threefoldtech/zos/pkg/capacity/smartctl"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/kernel"
 	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -176,5 +177,8 @@ func (r *ResourceOracle) GetHypervisor() (string, error) {
 
 // GPUs returns the list of available GPUs as PCI devices
 func (r *ResourceOracle) GPUs() ([]PCI, error) {
+	if kernel.GetParams().IsGPUDisabled() {
+		return []PCI{}, nil
+	}
 	return ListPCI(GPU)
 }
