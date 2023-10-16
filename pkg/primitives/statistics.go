@@ -284,3 +284,11 @@ func (s *statsStream) Current() (gridtypes.Capacity, error) {
 func (s *statsStream) Total() gridtypes.Capacity {
 	return s.stats.Total()
 }
+
+func (s *statsStream) Workloads() (int, error) {
+	capacity, err := s.stats.storage.Capacity()
+	if err != nil {
+		return 0, err
+	}
+	return capacity.Workloads, nil
+}

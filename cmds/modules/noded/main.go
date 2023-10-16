@@ -205,6 +205,9 @@ func action(cli *cli.Context) error {
 	iperfTest := perf.NewIperfTest()
 	perfMon.AddTask(&iperfTest)
 
+	cpuBenchmarkTask := perf.NewCPUBenchmarkTask()
+	perfMon.AddTask(&cpuBenchmarkTask)
+
 	if err = perfMon.Run(ctx); err != nil {
 		return errors.Wrap(err, "failed to run the scheduler")
 	}
