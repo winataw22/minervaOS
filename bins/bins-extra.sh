@@ -269,7 +269,7 @@ exclude_libs() {
 
 github_name() {
     # force github print
-    echo "name=${1}" >> $env:GITHUB_OUTPUT
+    echo "name=${1}" >> $GITHUB_OUTPUT
     echo "[+] github exported name: ${1}"
 }
 

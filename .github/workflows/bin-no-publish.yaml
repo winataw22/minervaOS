@@ -20,12 +20,12 @@ jobs:
       - name: Setup basesystem
         run: |
           cd bins
-          sudo ./bins-extra.sh --package basesystem
+          sudo -E ./bins-extra.sh --package basesystem
       - name: Build package (${{ inputs.package }})
         id: package
         run: |
           cd bins
-          sudo ./bins-extra.sh --package ${{ inputs.package }}
+          sudo -E ./bins-extra.sh --package ${{ inputs.package }}
       - name: Publish flist (tf-autobuilder, ${{ steps.package.outputs.name }})
         if: success()
         uses: threefoldtech/publish-flist@master
