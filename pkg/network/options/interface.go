@@ -22,7 +22,7 @@ func (s *sysOption) apply(inf string) error {
 // IPv6Disable disabled Ipv6 on interface
 func IPv6Disable(f bool) Option {
 	return &sysOption{
-		key: "net.ipv6.conf.%s.disable_ipv6",
+		key: "net/ipv6/conf/%s/disable_ipv6",
 		val: flag(f),
 	}
 }
@@ -30,7 +30,7 @@ func IPv6Disable(f bool) Option {
 // ProxyArp sets proxy arp on interface
 func ProxyArp(f bool) Option {
 	return &sysOption{
-		key: "net.ipv4.conf.%s.proxy_arp",
+		key: "net/ipv4/conf/%s/proxy_arp",
 		val: flag(f),
 	}
 }
@@ -38,7 +38,7 @@ func ProxyArp(f bool) Option {
 // AcceptRA enables or disables forwarding for ipv6
 func AcceptRA(f RouterAdvertisements) Option {
 	return &sysOption{
-		key: "net.ipv6.conf.%s.accept_ra",
+		key: "net/ipv6/conf/%s/accept_ra",
 		val: fmt.Sprintf("%d", f),
 	}
 }
@@ -46,7 +46,7 @@ func AcceptRA(f RouterAdvertisements) Option {
 // LearnDefaultRouteInRA Learn default router in Router Advertisement.
 func LearnDefaultRouteInRA(f bool) Option {
 	return &sysOption{
-		key: "net.ipv6.conf.%s.accept_ra_defrtr",
+		key: "net/ipv6/conf/%s/accept_ra_defrtr",
 		val: flag(f),
 	}
 }

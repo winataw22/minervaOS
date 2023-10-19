@@ -15,3 +15,7 @@ both `node-ready` and `boot` are not actual services, but instead they are there
 - `zos-debug`: means zos is running in debug mode
 - `zos-debug-vm`: forces zos to think it's running on a virtual machine. used mainly for development
 - `disable-gpu`: if provided GPU feature will be disabled on that node
+- `vlan:pub`: set the vlan tag of the node private subnet.
+- `vlan:priv`: sets the vlan tag of the node public subnet.
+
+For more details of `VLAN` support in zos please read more [here](network/vlans.md)

@@ -67,7 +67,7 @@ func TestAttachBridge(t *testing.T) {
 		_ = netlink.LinkDel(dummy)
 	}()
 
-	err = AttachNic(dummy, br)
+	err = attachNic(dummy, br, nil)
 	assert.NoError(t, err)
 }
 

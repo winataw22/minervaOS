@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 
+	"slices"
+
 	"github.com/pkg/errors"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zos/pkg"
@@ -37,6 +39,15 @@ type Environment struct {
 	GraphQL       string
 
 	ExtendedConfigURL string
+
+	// private vlan to join
+	// if set, zos will use this as its priv vlan
+	PrivVlan *uint16
+
+	// pub vlan to join
+	// if set, zos will use this as it's pub vlan
+	// only in a single nic setup
+	PubVlan *uint16
 }
 
 // RunningMode type
@@ -248,6 +259,28 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 			return env, errors.Wrap(err, "wrong format for farm ID")
 		}
 		env.FarmID = pkg.FarmID(id)
+	}
+
+	if vlan, found := params.GetOne("vlan:priv"); found {
+		if !slices.Contains([]string{"none", "untagged", "un"}, vlan) {
+			tag, err := strconv.ParseUint(vlan, 10, 16)
+			if err != nil {
+				return env, errors.Wrap(err, "failed to parse priv vlan value")
+			}
+			tagU16 := uint16(tag)
+			env.PrivVlan = &tagU16
+		}
+	}
+
+	if vlan, found := params.GetOne("vlan:pub"); found {
+		if !slices.Contains([]string{"none", "untagged", "un"}, vlan) {
+			tag, err := strconv.ParseUint(vlan, 10, 16)
+			if err != nil {
+				return env, errors.Wrap(err, "failed to parse pub vlan value")
+			}
+			tagU16 := uint16(tag)
+			env.PubVlan = &tagU16
+		}
 	}
 
 	// Checking if there environment variable

@@ -17,6 +17,7 @@ import (
 	"github.com/blang/semver"
 
 	"github.com/threefoldtech/zos/pkg/cache"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
@@ -932,7 +933,7 @@ func (n *networker) Namespace(id zos.NetID) string {
 
 func (n *networker) UnsetPublicConfig() error {
 	id := n.identity.NodeID(context.Background())
-	_, err := public.EnsurePublicSetup(id, nil)
+	_, err := public.EnsurePublicSetup(id, environment.MustGet().PubVlan, nil)
 	return err
 }
 
@@ -953,7 +954,7 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	}
 
 	id := n.identity.NodeID(context.Background())
-	_, err = public.EnsurePublicSetup(id, &cfg)
+	_, err = public.EnsurePublicSetup(id, environment.MustGet().PubVlan, &cfg)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply public config")
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
@@ -95,7 +96,7 @@ func IPs() ([]net.IPNet, error) {
 	return ips, err
 }
 
-func setupPublicBridge(br *netlink.Bridge) error {
+func setupPublicBridge(br *netlink.Bridge, vlan *uint16) error {
 	exit, err := detectExitNic()
 	if err != nil {
 		return errors.Wrap(err, "failed to find possible exit")
@@ -107,15 +108,15 @@ func setupPublicBridge(br *netlink.Bridge) error {
 		return errors.Wrapf(err, "failed to get link '%s' by name", exit)
 	}
 
-	return attachPublicToExit(br, exitLink)
+	return attachPublicToExit(br, exitLink, vlan)
 }
 
-func attachPublicToExit(br *netlink.Bridge, exit netlink.Link) error {
+func attachPublicToExit(br *netlink.Bridge, exit netlink.Link, vlan *uint16) error {
 	if err := netlink.LinkSetUp(exit); err != nil {
 		return errors.Wrapf(err, "failed to set link '%s' up", exit.Attrs().Name)
 	}
 
-	if err := bridge.Attach(exit, br, toZosVeth); err != nil {
+	if err := bridge.Attach(exit, br, vlan, toZosVeth); err != nil {
 		return errors.Wrap(err, "failed to attach exit nic to public bridge 'br-pub'")
 	}
 
@@ -212,7 +213,7 @@ func SetPublicExitLink(link netlink.Link) error {
 		}
 	}
 
-	return attachPublicToExit(br, link)
+	return attachPublicToExit(br, link, environment.MustGet().PubVlan)
 }
 
 func HasPublicSetup() bool {
@@ -301,7 +302,7 @@ func GetPublicSetup() (pkg.PublicConfig, error) {
 //
 // if no nic is found zos is selected.
 // changes to the br-pub exit nic can then be done later with SetPublicExitLink
-func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.Bridge, error) {
+func EnsurePublicSetup(nodeID pkg.Identifier, vlan *uint16, inf *pkg.PublicConfig) (*netlink.Bridge, error) {
 	log.Debug().Msg("ensure public setup")
 	br, err := ensurePublicBridge()
 	if err != nil {
@@ -312,7 +313,7 @@ func EnsurePublicSetup(nodeID pkg.Identifier, inf *pkg.PublicConfig) (*netlink.B
 	if os.IsNotExist(err) {
 		// bridge is not initialized, wire it.
 		log.Debug().Msg("no public bridge uplink found, setting up...")
-		if err := setupPublicBridge(br); err != nil {
+		if err := setupPublicBridge(br, vlan); err != nil {
 			return nil, err
 		}
 	} else if err != nil {

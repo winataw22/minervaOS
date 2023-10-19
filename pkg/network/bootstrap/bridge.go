@@ -52,7 +52,7 @@ func DefaultBridgeValid() error {
 
 // CreateDefaultBridge creates the default bridge of the node that will received
 // the management interface
-func CreateDefaultBridge(name string) (*netlink.Bridge, error) {
+func CreateDefaultBridge(name string, vlan *uint16) (*netlink.Bridge, error) {
 	log.Info().Msg("Create default bridge")
 	br, err := bridge.New(name)
 	if err != nil {
@@ -65,6 +65,18 @@ func CreateDefaultBridge(name string) (*netlink.Bridge, error) {
 
 	if err := options.SetIPv6Forwarding(false); err != nil {
 		return nil, errors.Wrapf(err, "failed to disable ipv6 forwarding")
+	}
+
+	if vlan == nil {
+		return br, nil
+	}
+
+	if err := netlink.BridgeVlanDel(br, 1, true, true, true, false); err != nil {
+		return nil, errors.Wrap(err, "failed to delete default vlan tag")
+	}
+
+	if err := netlink.BridgeVlanAdd(br, *vlan, true, true, true, false); err != nil {
+		return nil, errors.Wrap(err, "failed to set vlan for priv network")
 	}
 
 	return br, nil

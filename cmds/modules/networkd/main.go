@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/types"
@@ -98,8 +99,9 @@ func action(cli *cli.Context) error {
 	if err != nil && err != public.ErrNoPublicConfig {
 		return errors.Wrap(err, "failed to get node public_config")
 	}
+
 	// EnsurePublicSetup knows how to handle a nil pub (in case of ErrNoPublicConfig)
-	master, err := public.EnsurePublicSetup(nodeID, pub)
+	master, err := public.EnsurePublicSetup(nodeID, environment.MustGet().PubVlan, pub)
 	if err != nil {
 		return errors.Wrap(err, "failed to setup public bridge")
 	}

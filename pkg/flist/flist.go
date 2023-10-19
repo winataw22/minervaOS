@@ -207,25 +207,35 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 	}
 
 	logPath := filepath.Join(f.log, hash) + ".log"
-	var args []string
-
-	args = append(args,
+	flistExt := filepath.Ext(url)
+	args := []string{
 		"--cache", f.cache,
 		"--meta", flistPath,
-		"--storage-url", storage,
 		"--daemon",
 		"--log", logPath,
-		// this is always read-only
-		"--ro",
-		mountpoint,
-	)
+	}
 
-	sublog.Info().Strs("args", args).Msg("starting 0-fs daemon")
-	cmd := f.commander.Command("g8ufs", args...)
+	var cmd *exec.Cmd
+	if flistExt == ".flist" {
+		sublog.Info().Strs("args", args).Msg("starting g8ufs daemon")
+		args = append(args,
+			"--storage-url", storage,
+			// this is always read-only
+			"--ro",
+			mountpoint,
+		)
+		cmd = f.commander.Command("g8ufs", args...)
+	} else if flistExt == ".fl" {
+		sublog.Info().Strs("args", args).Msg("starting rfs daemon")
+		args = append([]string{"mount"}, append(args, mountpoint)...)
+		cmd = f.commander.Command("rfs", args...)
+	} else {
+		return "", errors.Errorf("unknown extension: '%s'", flistExt)
+	}
 
 	var out []byte
 	if out, err = cmd.CombinedOutput(); err != nil {
-		sublog.Err(err).Str("out", string(out)).Msg("fail to start 0-fs daemon")
+		sublog.Err(err).Str("out", string(out)).Msg("failed to start 0-fs daemon")
 		return "", err
 	}
 

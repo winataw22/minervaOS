@@ -31,15 +31,34 @@ type IfaceConfig struct {
 	DefaultGW net.IP
 }
 
-// Requires tesll the analyser to wait for ip type
-type Requires int
+// Requires tells the analyzer to wait for ip type
+type Requires struct {
+	ipv4 bool
+	ipv6 bool
+	vlan *uint16
+}
 
-const (
+var (
 	// RequiresIPv4 requires ipv4
-	RequiresIPv4 Requires = 1 << iota
+	RequiresIPv4 = Requires{ipv4: true}
 	// RequiresIPv6 requires ipv6
-	RequiresIPv6
+	RequiresIPv6 = Requires{ipv6: true}
 )
+
+func (r Requires) WithIPv4(b bool) Requires {
+	r.ipv4 = b
+	return r
+}
+
+func (r Requires) WithIPv6(b bool) Requires {
+	r.ipv6 = b
+	return r
+}
+
+func (r Requires) WithVlan(b *uint16) Requires {
+	r.vlan = b
+	return r
+}
 
 type byIP4 []IfaceConfig
 
@@ -118,7 +137,7 @@ filter:
 	defer cancel()
 	for _, link := range filtered {
 		wg.Add(1)
-		analyzeLink(ctx, &wg, ch, requires, link)
+		analyzeLinkAsync(ctx, &wg, ch, requires, link)
 	}
 
 	go func() {
@@ -138,8 +157,8 @@ filter:
 	return configs, nil
 }
 
-// AnalyzeLink gets information about link
-func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg IfaceConfig, err error) {
+// analyzeLink gets information about link
+func analyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg IfaceConfig, err error) {
 	cfg.Name = link.Attrs().Name
 	if link.Attrs().MasterIndex != 0 {
 		// this is to avoid breaking setups if a link is
@@ -170,7 +189,43 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 		}()
 
 		name := link.Attrs().Name
+
+		if err := options.Set(name, options.IPv6Disable(false)); err != nil {
+			return errors.Wrapf(err, "failed to enable ip6 on %s", name)
+		}
+
 		cfg.Name = name
+
+		if requires.vlan != nil {
+			vlanID := *requires.vlan
+			log.Debug().Uint32("vlan", uint32(vlanID)).Msg("setting up vlan interface for probing")
+			name = fmt.Sprintf("%s.%d", name, vlanID)
+			vl := netlink.Vlan{
+				LinkAttrs: netlink.LinkAttrs{
+					Name:        name,
+					ParentIndex: link.Attrs().Index,
+				},
+				VlanId:       int(vlanID),
+				VlanProtocol: netlink.VLAN_PROTOCOL_8021Q,
+			}
+
+			if err := netlink.LinkAdd(&vl); err != nil {
+				return errors.Wrap(err, "failed to create vlan link for probing")
+			}
+
+			link, err = netlink.LinkByName(name)
+			if err != nil {
+				return errors.Wrap(err, "failed to get vlan link for probing")
+			}
+
+			if err := netlink.LinkSetUp(link); err != nil {
+				return errors.Wrap(err, "failed to set up vlan link for probing")
+			}
+
+			defer func() {
+				_ = netlink.LinkDel(link)
+			}()
+		}
 
 		if err := options.Set(name, options.IPv6Disable(false)); err != nil {
 			return errors.Wrapf(err, "failed to enable ip6 on %s", name)
@@ -178,7 +233,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 
 		log.Info().Str("interface", name).Msg("start DHCP probe")
 
-		if requires&RequiresIPv4 != 0 {
+		if requires.ipv4 {
 			// requires IPv4
 			probe, err := dhcp.Probe(ctx, name)
 			if err != nil {
@@ -213,7 +268,7 @@ func AnalyzeLink(ctx context.Context, requires Requires, link netlink.Link) (cfg
 					}
 				}
 
-				if (requires&RequiresIPv6 == 0) || addrs6.Len() != 0 {
+				if !requires.ipv6 || addrs6.Len() != 0 {
 					break loop
 				}
 
@@ -233,10 +288,10 @@ type analyzeResult struct {
 	err error
 }
 
-func analyzeLink(ctx context.Context, wg *sync.WaitGroup, out chan<- analyzeResult, requires Requires, link netlink.Link) {
+func analyzeLinkAsync(ctx context.Context, wg *sync.WaitGroup, out chan<- analyzeResult, requires Requires, link netlink.Link) {
 	go func() {
 		defer wg.Done()
-		cfg, err := AnalyzeLink(ctx, requires, link)
+		cfg, err := analyzeLink(ctx, requires, link)
 		out <- analyzeResult{cfg, err}
 	}()
 }

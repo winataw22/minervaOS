@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/vishvananda/netlink"
@@ -15,7 +16,11 @@ func New(name string) (*netlink.Bridge, error) {
 	attrs := netlink.NewLinkAttrs()
 	attrs.Name = name
 	attrs.MTU = 1500
-	bridge := &netlink.Bridge{LinkAttrs: attrs}
+	enable := true
+	bridge := &netlink.Bridge{
+		LinkAttrs:     attrs,
+		VlanFiltering: &enable,
+	}
 
 	if err := netlink.LinkAdd(bridge); err != nil && !os.IsExist(err) {
 		return bridge, err
@@ -97,9 +102,13 @@ func vethName(from, to string) string {
 // can be directly plugged or crossed over with a veth pair
 // if name is provided, the name will be used in case of veth pair instead of
 // a generated name
-func Attach(link netlink.Link, bridge *netlink.Bridge, name ...string) error {
+func Attach(link netlink.Link, bridge *netlink.Bridge, vlan *uint16, name ...string) error {
 	if link.Type() == "device" {
-		return AttachNic(link, bridge)
+		if vlan != nil {
+			log.Warn().Msg("vlan is not supported in dual nic setup")
+		}
+
+		return attachNic(link, bridge, nil)
 	} else if link.Type() == "bridge" {
 		linkBr := link.(*netlink.Bridge)
 		n := vethName(link.Attrs().Name, bridge.Name)
@@ -112,14 +121,14 @@ func Attach(link netlink.Link, bridge *netlink.Bridge, name ...string) error {
 			return err
 		}
 
-		return AttachNic(veth, linkBr)
+		return attachNic(veth, linkBr, vlan)
 	}
 
 	return fmt.Errorf("unsupported link type '%s'", link.Type())
 }
 
-// AttachNic attaches an interface to a bridge
-func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
+// attachNic attaches an interface to a bridge
+func attachNic(link netlink.Link, bridge *netlink.Bridge, vlan *uint16) error {
 	// Jan said this was fine
 	if err := netlink.LinkSetUp(link); err != nil {
 		return errors.Wrap(err, "could not set veth peer up")
@@ -129,7 +138,23 @@ func AttachNic(link netlink.Link, bridge *netlink.Bridge) error {
 	if err := options.Set(link.Attrs().Name, options.IPv6Disable(true)); err != nil {
 		return errors.Wrap(err, "failed to disable ipv6 on link interface")
 	}
-	return netlink.LinkSetMaster(link, bridge)
+	if err := netlink.LinkSetMaster(link, bridge); err != nil {
+		return errors.Wrapf(err, "failed to attach link %s to bridge %s", link.Attrs().Name, bridge.Name)
+	}
+
+	if vlan == nil {
+		return nil
+	}
+
+	if err := netlink.BridgeVlanDel(link, 1, true, true, false, false); err != nil {
+		return errors.Wrapf(err, "failed to delete default vlan tag on device '%s'", link.Attrs().Name)
+	}
+
+	if err := netlink.BridgeVlanAdd(link, *vlan, true, true, false, false); err != nil {
+		return errors.Wrapf(err, "failed to set vlan on device '%s'", link.Attrs().Name)
+	}
+
+	return nil
 }
 
 // List all nics attached to a bridge

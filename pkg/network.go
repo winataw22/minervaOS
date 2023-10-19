@@ -14,14 +14,6 @@ import (
 //go:generate mkdir -p stubs
 //go:generate zbusc -module network -version 0.0.1 -name network -package stubs github.com/threefoldtech/zos/pkg+Networker stubs/network_stub.go
 
-// Member holds information about a the network namespace of a container
-type Member struct {
-	Namespace   string
-	IPv6        net.IP
-	IPv4        net.IP
-	YggdrasilIP net.IP
-}
-
 // ContainerNetworkConfig defines how to construct the network namespace of a container
 type ContainerNetworkConfig struct {
 	IPs         []string
