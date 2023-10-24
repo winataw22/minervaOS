@@ -1,4 +1,4 @@
-package perf
+package iperf
 
 import (
 	"context"

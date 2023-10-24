@@ -18,6 +18,20 @@ const (
 	baseExtendedURL = "https://raw.githubusercontent.com/threefoldtech/zos-config/main/"
 )
 
+// PubMac specify how the mac address of the public nic
+// (in case of public-config) is calculated
+type PubMac string
+
+const (
+	// PubMacRandom means the mac of the public nic will be chosen by the system
+	// the value won't change across reboots, but is based on the node id
+	// (default)
+	PubMacRandom PubMac = "random"
+	// PubMacSwap means the value of the mac is swapped with the physical nic
+	// where the public traffic is eventually going through
+	PubMacSwap PubMac = "swap"
+)
+
 // Environment holds information about running environment of a node
 // it defines the different constant based on the running mode (dev, test, prod)
 type Environment struct {
@@ -48,6 +62,9 @@ type Environment struct {
 	// if set, zos will use this as it's pub vlan
 	// only in a single nic setup
 	PubVlan *uint16
+
+	// PubMac value from environment
+	PubMac PubMac
 }
 
 // RunningMode type
@@ -281,6 +298,17 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 			tagU16 := uint16(tag)
 			env.PubVlan = &tagU16
 		}
+	}
+
+	if mac, found := params.GetOne("pub:mac"); found {
+		v := PubMac(mac)
+		if slices.Contains([]PubMac{PubMacRandom, PubMacSwap}, v) {
+			env.PubMac = v
+		} else {
+			env.PubMac = PubMacRandom
+		}
+	} else {
+		env.PubMac = PubMacRandom
 	}
 
 	// Checking if there environment variable

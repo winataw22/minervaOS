@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -30,6 +31,7 @@ const (
 
 	// PublicBridge public bridge name, exists only after a call to EnsurePublicSetup
 	PublicBridge    = types.PublicBridge
+	DefaultBridge   = types.DefaultBridge
 	PublicNamespace = types.PublicNamespace
 
 	defaultPublicResolveConf = `nameserver 8.8.8.8
@@ -123,24 +125,12 @@ func attachPublicToExit(br *netlink.Bridge, exit netlink.Link, vlan *uint16) err
 	return nil
 }
 
-func GetCurrentPublicExitLink() (netlink.Link, error) {
-	// return the upstream (exit) link for br-pub
-	br, err := bridge.Get(PublicBridge)
-	if err != nil {
-		return nil, errors.Wrap(err, "no public bridge found")
-	}
-
+// finds a link that is connected to that bridge that matches specific filter criteria
+// the first link that matches is returned
+func getUplink(br *netlink.Bridge, matches ...bootstrap.Filter) (netlink.Link, error) {
 	all, err := netlink.LinkList()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list node nics")
-	}
-
-	// public bridge can be wired to either
-	matches := []bootstrap.Filter{
-		// a nic
-		bootstrap.PhysicalFilter,
-		// a veth pair to another bridge (zos always)
-		bootstrap.VEthFilter,
 	}
 
 	for _, link := range all {
@@ -156,6 +146,48 @@ func GetCurrentPublicExitLink() (netlink.Link, error) {
 	}
 
 	return nil, os.ErrNotExist
+}
+
+// GetCurrentPublicExitLink basically find how the public bridge (br-pub)
+// is wired to the outside world. This can be either directly to a physical nic device
+// or over zos bridge via a veth pair.
+// in either way, that link is returned
+// if a veth link is returned this means that the node is running
+// in a single nic setup, if a physical device is returned then it means
+// the node is running in a multi-mode setup
+func GetCurrentPublicExitLink() (netlink.Link, error) {
+	// return the upstream (exit) link for br-pub
+	br, err := bridge.Get(PublicBridge)
+	if err != nil {
+		return nil, errors.Wrap(err, "no public bridge found")
+	}
+
+	// since public `br-pub` exit can either be directly to a
+	// physical nic or to zos via an Veth pair then
+	// this tries to match over these 2 kinds
+
+	return getUplink(
+		br,
+		// a nic
+		bootstrap.PhysicalFilter,
+		// a veth pair to another bridge (zos always)
+		bootstrap.VEthFilter)
+}
+
+// GetPrivateExitLink returns the physical link zos is wired to
+func GetPrivateExitLink() (netlink.Link, error) {
+	// return the upstream (exit) link for br-pub
+	br, err := bridge.Get(DefaultBridge)
+	if err != nil {
+		return nil, errors.Wrap(err, "no default bridge found")
+	}
+
+	// zos bridge can only be connected to the outside world
+	// over a physical nic.
+
+	return getUplink(
+		br,
+		bootstrap.PhysicalFilter)
 }
 
 // SetPublicExitLink rewires the br-pub to a different exit (upstream) device.
@@ -489,6 +521,52 @@ func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	}
 
 	mac := ifaceutil.HardwareAddrFromInputBytes([]byte(nodeID.Identity() + publicNsMACDerivationSuffix))
+
+	env, err := environment.Get()
+	if err != nil {
+		return errors.Wrap(err, "failed to get environment")
+	}
+
+	if env.PubMac == environment.PubMacSwap {
+		// this logic can be tricky. the idea is we need to
+		// swap the mac address of the uplink (where public traffic is eventually going out)
+		// with thee pubIface calculated above!
+		// but this swapping of course need to happen once.
+		// so first:
+		// - find the nic
+		// - find if the nic has already the predicted mac above
+		// - if not we take that one here and use it and replace
+		//   the one of the nic with `mac`
+		// - if it already matches, then the swap was done already
+		log.Info().Msg("public mac should be swapped with upstream nic")
+		up, err := getPublicUpstream()
+		if err != nil {
+			return errors.Wrap(err, "failed to detect the public upstream device")
+		}
+
+		if bytes.Equal(up.Attrs().HardwareAddr, mac) {
+			//the swap was done!
+			// we set mac to nil so the macvlan.Install does not change
+			// it
+			log.Info().Msg("public mac already swapped")
+			mac = nil
+		} else {
+			// if not, we then need to set the mac of the nic to that mac
+			// and then use the nic mac for the public interface
+			newMac := up.Attrs().HardwareAddr
+
+			log.Info().
+				Str("nic", mac.String()).
+				Str("bridge", newMac.String()).
+				Msg("swapping public interface with nic mac")
+
+			if err := netlink.LinkSetHardwareAddr(up, mac); err != nil {
+				return errors.Wrap(err, "failed to set public uplink mac address")
+			}
+			mac = newMac
+		}
+	}
+
 	if err := macvlan.Install(pubIface, mac, ips, routes, pubNS); err != nil {
 		return err
 	}
@@ -523,4 +601,21 @@ func setupPublicNS(nodeID pkg.Identifier, iface *pkg.PublicConfig) error {
 	}
 
 	return nil
+}
+
+func getPublicUpstream() (netlink.Link, error) {
+	link, err := GetCurrentPublicExitLink()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get current public link")
+	}
+
+	// this link above can be a physical (device) link
+	// then we return that
+	if physical, _ := bootstrap.PhysicalFilter(link); physical {
+		return link, nil
+	}
+
+	// otherwise, it must be the veth to zos bridge!
+	// so we do
+	return GetPrivateExitLink()
 }
