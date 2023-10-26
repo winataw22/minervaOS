@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,7 +11,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/upgrade"
 
-	"github.com/cenkalti/backoff/v3"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/identity"
@@ -34,19 +30,6 @@ const (
 const (
 	module = "identityd"
 )
-
-// Safe makes sure function call not interrupted
-// with a signal while exection
-func Safe(fn func() error) error {
-	ch := make(chan os.Signal, 4)
-	defer close(ch)
-	defer signal.Stop(ch)
-
-	// try to upgraded to latest
-	// but mean while also make sure the daemon can not be killed by a signal
-	signal.Notify(ch)
-	return fn()
-}
 
 // This daemon startup has the follow flow:
 // 1. Do upgrade to latest version (this might means it needs to restart itself)
@@ -118,10 +101,6 @@ func main() {
 		log.Fatal().Err(err).Str("root", root).Msg("failed to create root directory")
 	}
 
-	var boot upgrade.Boot
-
-	bootMethod := boot.DetectBootMethod()
-
 	// 2. Register the node to BCDB
 	// at this point we are running latest version
 	idMgr, err := getIdentityMgr(root, debug)
@@ -129,7 +108,12 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create identity manager")
 	}
 
-	monitor := newVersionMonitor(10 * time.Second)
+	upgrader, err := upgrade.NewUpgrader(root, upgrade.NoZosUpgrade(debug))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize upgrader")
+	}
+
+	monitor := newVersionMonitor(10*time.Second, upgrader.Version())
 	// 3. start zbus server to serve identity interface
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {
@@ -143,18 +127,6 @@ func main() {
 	// register the cancel function with defer if the process stops because of a update
 	defer cancel()
 
-	upgrader, err := upgrade.NewUpgrader(root, upgrade.NoSelfUpgrade(debug))
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to initialize upgrader")
-	}
-
-	err = installBinaries(&boot, upgrader)
-	if err == upgrade.ErrRestartNeeded {
-		return
-	} else if err != nil {
-		log.Error().Err(err).Msg("failed to install binaries")
-	}
-
 	go func() {
 		if err := server.Run(ctx); err != nil && err != context.Canceled {
 			log.Error().Err(err).Msg("unexpected error")
@@ -165,176 +137,14 @@ func main() {
 		log.Info().Msg("received a termination signal")
 	})
 
-	if bootMethod != upgrade.BootMethodFList {
-		log.Info().Msg("node is not booted from an flist. upgrade is not supported")
-		<-ctx.Done()
+	err = upgrader.Run(ctx)
+	if errors.Is(err, upgrade.ErrRestartNeeded) {
 		return
+	} else if err != nil {
+		log.Error().Err(err).Msg("error during update")
+		os.Exit(1)
 	}
 
-	//NOTE: code after this commit will only
-	//run if the system is booted from an flist
-
-	// 4. Start watcher for new version
-	log.Info().Msg("start upgrade daemon")
-
-	// TODO: do we need to update farmer on node upgrade?
-	upgradeLoop(ctx, &boot, upgrader, debug, monitor, func(string) error { return nil })
-}
-
-// allow reinstall if receive signal USR1
-// only allowed in debug mode
-func debugReinstall(boot *upgrade.Boot, up *upgrade.Upgrader) {
-	c := make(chan os.Signal)
-	signal.Notify(c, syscall.SIGUSR1)
-
-	go func() {
-		for range c {
-			current, err := boot.Current()
-			if err != nil {
-				log.Error().Err(err).Msg("couldn't get current flist info")
-				continue
-			}
-
-			if err := Safe(func() error {
-				return up.Upgrade(current, current)
-			}); err != nil {
-				log.Error().Err(err).Msg("reinstall failed")
-			} else {
-				log.Info().Msg("reinstall completed successfully")
-			}
-		}
-	}()
-}
-
-func installBinaries(boot *upgrade.Boot, upgrader *upgrade.Upgrader) error {
-	bins, _ := boot.CurrentBins()
-	env, _ := environment.Get()
-
-	repoWatcher := upgrade.FListRepo{
-		Repo:    env.BinRepo,
-		Current: bins,
-	}
-
-	current, toAdd, toDel, err := repoWatcher.Diff()
-	if err != nil {
-		return errors.Wrap(err, "failed to list latest binaries to install")
-	}
-
-	if len(toAdd) == 0 && len(toDel) == 0 {
-		return nil
-	}
-
-	for _, pkg := range toDel {
-		log.Debug().Str("package", pkg.Target).Msg("uninstall package")
-		if err := upgrader.UninstallBinary(pkg); err != nil {
-			log.Error().Err(err).Str("flist", pkg.Fqdn()).Msg("failed to uninstall flist")
-		}
-	}
-
-	for _, pkg := range toAdd {
-		log.Debug().Str("package", pkg.Target).Msg("install package")
-		if err := upgrader.InstallBinary(pkg); err != nil {
-			log.Error().Err(err).Str("package", pkg.Fqdn()).Msg("failed to install package")
-		}
-	}
-
-	if err := boot.SetBins(current); err != nil {
-		return errors.Wrap(err, "failed to commit pkg status")
-	}
-
-	return upgrade.ErrRestartNeeded
-}
-
-func upgradeLoop(
-	ctx context.Context,
-	boot *upgrade.Boot,
-	upgrader *upgrade.Upgrader,
-	debug bool,
-	monitor *monitorStream,
-	register func(string) error) {
-
-	if debug {
-		debugReinstall(boot, upgrader)
-	}
-
-	monitor.C <- boot.MustVersion()
-	var hub upgrade.HubClient
-
-	flist := boot.Name()
-	//current := boot.MustVersion()
-	for {
-		// delay in case of error
-		select {
-		case <-time.After(5 * time.Second):
-		case <-ctx.Done():
-			return
-		}
-
-		current, err := boot.Current()
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot get current boot flist information")
-		}
-
-		latest, err := hub.Info(flist)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to get flist info")
-			continue
-		}
-		log.Info().
-			Str("current", current.TryVersion().String()).
-			Str("latest", current.TryVersion().String()).
-			Msg("checking if update is required")
-
-		if !latest.TryVersion().GT(current.TryVersion()) {
-			// We wanted to use the node id to actually calculate the delay to wait but it's not
-			// possible to get the numeric node id from the identityd
-			next := time.Duration(60+rand.Intn(60)) * time.Minute
-			log.Info().Dur("wait", next).Msg("checking for update after milliseconds")
-			select {
-			case <-time.After(next):
-			case <-ctx.Done():
-				return
-			}
-
-			continue
-		}
-
-		// next check for update
-		exp := backoff.NewExponentialBackOff()
-		exp.MaxInterval = 3 * time.Minute
-		exp.MaxElapsedTime = 60 * time.Minute
-		err = backoff.Retry(func() error {
-			log.Debug().Str("version", latest.TryVersion().String()).Msg("trying to update")
-
-			err := Safe(func() error {
-				return upgrader.Upgrade(current, latest)
-			})
-
-			if err == upgrade.ErrRestartNeeded {
-				return backoff.Permanent(err)
-			} else if err != nil {
-				log.Error().Err(err).Msg("update failure. retrying")
-			}
-
-			return nil
-		}, exp)
-
-		if err == upgrade.ErrRestartNeeded {
-			log.Info().Msg("restarting upgraded")
-			return
-		} else if err != nil {
-			//TODO: crash or continue!
-			log.Error().Err(err).Msg("upgrade failed")
-			continue
-		} else {
-			log.Info().Str("version", latest.TryVersion().String()).Msg("update completed")
-		}
-		if err := boot.Set(latest); err != nil {
-			log.Fatal().Err(err).Msg("failed to update boot information")
-		}
-
-		monitor.C <- latest.TryVersion()
-	}
 }
 
 func getIdentityMgr(root string, debug bool) (pkg.IdentityManager, error) {

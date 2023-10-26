@@ -60,7 +60,7 @@ func uniqueStr(slice []string) []string {
 	return list
 }
 
-func getConfig(run RunningMode, url string) (ext Config, err error) {
+func getConfig(run RunMode, url string) (ext Config, err error) {
 	if !strings.HasSuffix(url, "/") {
 		url += "/"
 	}

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::kparams;
 use anyhow::Result;
 use clap::{App, Arg};
@@ -10,9 +12,21 @@ pub enum RunMode {
     QA,
 }
 
+impl Display for RunMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let d = match self {
+            Self::Prod => "production",
+            Self::QA => "qa",
+            Self::Test => "testing",
+            Self::Dev => "development",
+        };
+
+        f.write_str(d)
+    }
+}
+
 #[derive(Debug)]
 pub enum Version {
-    V2,
     V3,
 }
 
@@ -21,9 +35,9 @@ fn runmode() -> Result<RunMode> {
     let mode = match params.get("runmode") {
         Some(mode) => match mode {
             Some(mode) => match mode.as_ref() {
-                "prod" => RunMode::Prod,
-                "dev" => RunMode::Dev,
-                "test" => RunMode::Test,
+                "prod" | "production" => RunMode::Prod,
+                "dev" | "development" => RunMode::Dev,
+                "test" | "testing" => RunMode::Test,
                 "qa" => RunMode::QA,
                 m => {
                     bail!("unknown runmode: {}", m);
@@ -49,17 +63,16 @@ fn version() -> Result<Version> {
     let ver = match params.get("version") {
         Some(input) => match input {
             Some(input) => match input.as_ref() {
-                "v2" => Version::V2,
                 "v3" => Version::V3,
                 m => {
                     bail!("unknown version: {}", m);
                 }
             },
-            None => Version::V2,
+            None => Version::V3,
         },
         // version was not provided in cmdline
-        // so default is v2
-        None => Version::V2,
+        // so default is v3
+        None => Version::V3,
     };
 
     Ok(ver)

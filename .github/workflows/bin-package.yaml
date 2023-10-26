@@ -1,28 +1,16 @@
+# Builds a single runtime package, this
+# workflow is only invoked from the `bins.yaml` file
+# to build the configured packages
+#
+# the built binary is ALWAYS published to tf-autobuilder
+# and then tagged with a certain tag. this can be the version
+# of the release or the `short sha` of the head, if on main
+# branch
 name: Build Extra Binary
 
 on:
   workflow_call:
     inputs:
-      development:
-        description: "development hub repo"
-        required: false
-        default: tf-zos-v3-bins.dev
-        type: string
-      quality:
-        description: "qa hub repo"
-        required: false
-        default: tf-zos-v3-bins.qanet
-        type: string
-      testing:
-        description: "testing hub repo"
-        required: false
-        default: tf-zos-v3-bins.test
-        type: string
-      production:
-        description: "main hub repo"
-        required: false
-        default: tf-zos-v3-bins
-        type: string
       package:
         description: "package to build"
         required: true
@@ -37,6 +25,21 @@ jobs:
     steps:
       - name: Checkout code into the Go module directory
         uses: actions/checkout@v1
+      # the tag step only extract the correct version
+      # tag to use. this is the short sha in case of
+      # a branch, or the tag name in case of "release"
+      # the value is then stored as `reference`
+      # and then accessed later in the workflow
+      - name: Set tag of build
+        id: tag
+        run: |
+          ref="${{ github.ref }}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "reference=${ref#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            reference="${{ github.sha }}"
+            echo "reference=${reference:0:7}" >> $GITHUB_OUTPUT
+          fi
       - name: Setup basesystem
         run: |
           cd bins
@@ -55,39 +58,12 @@ jobs:
           user: tf-autobuilder
           root: bins/releases/${{ inputs.package }}
           name: ${{ steps.package.outputs.name }}.flist
-      - name: Publishing (development)
+      - name: Tagging
         uses: threefoldtech/publish-flist@master
-        if: success() && github.ref == 'refs/heads/main'
+        if: success() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         with:
           token: ${{ secrets.token }}
-          action: crosslink
-          user: ${{ inputs.development }}
-          name: ${{ inputs.package }}.flist
-          target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-      - name: Publishing (quality)
-        uses: threefoldtech/publish-flist@master
-        if: success() && startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-qa')
-        with:
-          token: ${{ secrets.token }}
-          action: crosslink
-          user: ${{ inputs.quality }}
-          name: ${{ inputs.package }}.flist
-          target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-      - name: Publishing (testing)
-        uses: threefoldtech/publish-flist@master
-        if: success() && startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '-rc')
-        with:
-          token: ${{ secrets.token }}
-          action: crosslink
-          user: ${{ inputs.testing }}
-          name: ${{ inputs.package }}.flist
-          target: tf-autobuilder/${{ steps.package.outputs.name }}.flist
-      - name: Publishing (production)
-        uses: threefoldtech/publish-flist@master
-        if: success() && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-rc') && !contains(github.ref, '-qa')
-        with:
-          token: ${{ secrets.token }}
-          action: crosslink
-          user: ${{ inputs.production }}
-          name: ${{ inputs.package }}.flist
+          action: tag
+          user: tf-autobuilder
+          name: ${{ steps.tag.outputs.reference }}/${{ inputs.package }}.flist
           target: tf-autobuilder/${{ steps.package.outputs.name }}.flist

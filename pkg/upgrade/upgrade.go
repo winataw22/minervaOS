@@ -1,20 +1,25 @@
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
-	"github.com/shirou/gopsutil/process"
 
 	"github.com/threefoldtech/0-fs/meta"
 	"github.com/threefoldtech/0-fs/rofs"
 	"github.com/threefoldtech/0-fs/storage"
+	"github.com/threefoldtech/zos/pkg/app"
+	"github.com/threefoldtech/zos/pkg/upgrade/hub"
 	"github.com/threefoldtech/zos/pkg/zinit"
 
 	"github.com/rs/zerolog/log"
@@ -26,40 +31,48 @@ var (
 
 	// services that can't be uninstalled with normal procedure
 	protected = []string{"identityd", "redis"}
-
-	deleteMe = []string{"promtail"}
-
-	flistIdentityPath = "/bin/identityd"
 )
 
 const (
+	service = "upgrader"
+
 	defaultHubStorage  = "zdb://hub.grid.tf:9900"
 	defaultZinitSocket = "/var/run/zinit.sock"
+
+	checkForUpdateEvery = 60 * time.Minute
+	checkJitter         = 10 // minutes
+
+	ZosRepo    = "tf-zos"
+	ZosPackage = "zos.flist"
 )
 
 // Upgrader is the component that is responsible
 // to keep 0-OS up to date
 type Upgrader struct {
+	boot         Boot
 	zinit        *zinit.Client
 	root         string
-	noSelfUpdate bool
-	hub          HubClient
+	noZosUpgrade bool
+	hub          hub.HubClient
 	storage      storage.Storage
 }
 
 // UpgraderOption interface
 type UpgraderOption func(u *Upgrader) error
 
-// NoSelfUpgrade option
-func NoSelfUpgrade(o bool) UpgraderOption {
+// NoZosUpgrade option, enable or disable
+// the update of zos binaries.
+// enabled by default
+func NoZosUpgrade(o bool) UpgraderOption {
 	return func(u *Upgrader) error {
-		u.noSelfUpdate = o
+		u.noZosUpgrade = o
 
 		return nil
 	}
 }
 
 // Storage option overrides the default hub storage url
+// default value is hub.grid.tf
 func Storage(url string) func(u *Upgrader) error {
 	return func(u *Upgrader) error {
 		storage, err := storage.NewSimpleStorage(url)
@@ -114,6 +127,161 @@ func NewUpgrader(root string, opts ...UpgraderOption) (*Upgrader, error) {
 	return u, nil
 }
 
+func (u *Upgrader) Run(ctx context.Context) error {
+	method := u.boot.DetectBootMethod()
+	if method == BootMethodOther {
+		// we need to do an update one time to fetch all
+		// binaries required by the system except for the zos
+		// binaries
+		// then we should block forever
+		log.Info().Msg("system is not booted from the hub")
+		if app.IsFirstBoot(service) {
+			remote, err := u.remote()
+			if err != nil {
+				return errors.Wrap(err, "failed to get remote tag")
+			}
+
+			if err := u.updateTo(remote); err != nil {
+				return errors.Wrap(err, "failed to run update")
+			}
+		}
+		// to avoid redoing the binary installation
+		// when service is restarted
+		if err := app.MarkBooted(service); err != nil {
+			return errors.Wrap(err, "failed to mark system as booted")
+		}
+
+		log.Info().Msg("update is disabled")
+		<-ctx.Done()
+		return nil
+	}
+
+	for {
+		err := u.update()
+		if errors.Is(err, ErrRestartNeeded) {
+			return err
+		} else if err != nil {
+			log.Error().Err(err).Msg("failed while checking for updates")
+			<-time.After(10 * time.Second)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(u.nextUpdate()):
+		}
+
+	}
+}
+
+func (u *Upgrader) Version() semver.Version {
+	return u.boot.Version()
+}
+
+func (u *Upgrader) nextUpdate() time.Duration {
+	jitter := rand.Intn(checkJitter)
+	next := checkForUpdateEvery + (time.Duration(jitter) * time.Minute)
+	log.Info().Str("after", next.String()).Msg("checking for update after")
+	return next
+}
+
+func (u *Upgrader) remote() (remote hub.TagLink, err error) {
+	mode := u.boot.RunMode()
+	// find all taglinks that matches the same run mode (ex: development)
+	matches, err := u.hub.Find(
+		ZosRepo,
+		hub.MatchName(mode.String()),
+		hub.MatchType(hub.TypeTagLink),
+	)
+
+	if err != nil {
+		return remote, err
+	}
+
+	if len(matches) != 1 {
+		return remote, fmt.Errorf("can't find taglink that matches '%s'", mode.String())
+	}
+
+	return hub.NewTagLink(matches[0]), nil
+}
+
+func (u *Upgrader) update() error {
+	// here we need to do a normal full update cycle
+	current, err := u.boot.Current()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get info about current version, update anyway")
+	}
+
+	remote, err := u.remote()
+	if err != nil {
+		return errors.Wrap(err, "failed to get remote tag")
+	}
+
+	// obviously a remote tag need to match the current tag.
+	// if the remote is different, we actually run the update and exit.
+	if remote.Target == current.Target {
+		// nothing to do!
+		return nil
+	}
+
+	log.Info().Str("version", filepath.Base(remote.Target)).Msg("updating system...")
+	if err := u.updateTo(remote); err != nil {
+		return errors.Wrapf(err, "failed to update to new tag '%s'", remote.Target)
+	}
+
+	if err := u.boot.Set(remote); err != nil {
+		return err
+	}
+
+	return ErrRestartNeeded
+}
+
+func (u *Upgrader) updateTo(link hub.TagLink) error {
+	repo, tag, err := link.Destination()
+	if err != nil {
+		return errors.Wrap(err, "failed to get destination tag")
+	}
+
+	packages, err := u.hub.ListTag(repo, tag)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list tag '%s' packages", tag)
+	}
+
+	var later [][]string
+	for _, pkg := range packages {
+		pkgRepo, name, err := pkg.Destination(repo)
+		if pkg.Name == ZosPackage {
+			// this is the last to do
+			log.Debug().Str("repo", pkgRepo).Str("name", name).Msg("schedule package for later")
+			later = append(later, []string{pkgRepo, name})
+			continue
+		}
+
+		if err != nil {
+			return errors.Wrapf(err, "failed to find target for package '%s'", pkg.Target)
+		}
+
+		// install package
+		if err := u.install(pkgRepo, name); err != nil {
+			return errors.Wrapf(err, "failed to install package %s/%s", pkgRepo, name)
+		}
+	}
+
+	if u.noZosUpgrade {
+		return nil
+	}
+
+	// probably check flag for zos installation
+	for _, pkg := range later {
+		repo, name := pkg[0], pkg[1]
+		if err := u.install(repo, name); err != nil {
+			return errors.Wrapf(err, "failed to install package %s/%s", repo, name)
+		}
+	}
+
+	return nil
+}
+
 func (u *Upgrader) flistCache() string {
 	return filepath.Join(u.root, "cache", "flist")
 }
@@ -122,26 +290,9 @@ func (u *Upgrader) fileCache() string {
 	return filepath.Join(u.root, "cache", "files")
 }
 
-// Upgrade is the method that does a full upgrade flow
-// first check if a new version is available
-// if yes, applies the upgrade
-// on a successfully update, upgrade WILL NOT RETURN
-// instead the upgraded daemon will be completely stopped
-func (u *Upgrader) Upgrade(from, to FullFListInfo) error {
-	if err := u.applyUpgrade(from, to); err != nil {
-		return err
-	}
-
-	return u.cleanup()
-}
-
-func (u *Upgrader) cleanup() error {
-	return u.zinit.Destroy(30*time.Second, deleteMe...)
-}
-
 // getFlist accepts fqdn of flist as `<repo>/<name>.flist`
-func (u *Upgrader) getFlist(flist string) (meta.Walker, error) {
-	db, err := u.hub.Download(u.flistCache(), flist)
+func (u *Upgrader) getFlist(repo, name string) (meta.Walker, error) {
+	db, err := u.hub.Download(u.flistCache(), repo, name)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to download flist")
 	}
@@ -160,18 +311,22 @@ func (u *Upgrader) getFlist(flist string) (meta.Walker, error) {
 	return walker, nil
 }
 
-// InstallBinary from a single flist.
-func (u *Upgrader) InstallBinary(flist FListInfo) error {
-	log.Info().Str("flist", flist.Fqdn()).Msg("start applying upgrade")
+// install from a single flist.
+func (u *Upgrader) install(repo, name string) error {
+	log.Info().Str("repo", repo).Str("name", name).Msg("start installing package")
 
-	store, err := u.getFlist(flist.Fqdn())
+	store, err := u.getFlist(repo, name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to process flist: %s", flist.Fqdn())
+		return errors.Wrapf(err, "failed to process flist: %s/%s", repo, name)
 	}
 	defer store.Close()
 
-	if err := u.copyRecursive(store, "/"); err != nil {
-		return errors.Wrapf(err, "failed to install flist: %s", flist.Fqdn())
+	if err := safe(func() error {
+		// copy is done in a safe closer to avoid interrupting
+		// the installation
+		return u.copyRecursive(store, "/")
+	}); err != nil {
+		return errors.Wrapf(err, "failed to install flist: %s/%s", repo, name)
 	}
 
 	services, err := u.servicesFromStore(store)
@@ -212,6 +367,11 @@ func (u *Upgrader) servicesFromStore(store meta.Walker) ([]string, error) {
 }
 
 func (u *Upgrader) ensureRestarted(service ...string) error {
+	// remove protected function from list, these never restarted
+	service = slices.DeleteFunc(service, func(e string) bool {
+		return slices.Contains(protected, e)
+	})
+
 	log.Debug().Strs("services", service).Msg("ensure services")
 	if len(service) == 0 {
 		return nil
@@ -229,253 +389,6 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 
 		if err := u.zinit.Monitor(name); err != nil && err != zinit.ErrAlreadyMonitored {
 			log.Error().Err(err).Str("service", name).Msg("could not monitor service")
-		}
-	}
-
-	return nil
-}
-
-// UninstallBinary  from a single flist.
-func (u *Upgrader) UninstallBinary(flist FListInfo) error {
-	// we never delete those files from the system
-	// since there is no `package manager` for zos (yet)
-	// deleting the files from the flist blindly can cause
-	// issues if some deleted files were shared between
-	// multiple packages.
-	return u.uninstall(flist, false)
-}
-
-// upgradeSelf will try to check if the flist has
-// an upgraded binary with different revision. If yes
-// it will copy the new binary and ask for a restart.
-// next time this method is called, it will match the flist
-// revision, and hence will continue updating all the other daemons
-func (u *Upgrader) upgradeSelf(store meta.Walker) error {
-	log.Debug().Msg("starting self upgrade")
-	if u.noSelfUpdate {
-		log.Debug().Msg("skipping self upgrade")
-		return nil
-	}
-
-	current := currentRevision()
-	log.Debug().Str("revision", current).Msg("current revision")
-
-	bin := currentBinPath()
-	info, exists := store.Get(bin)
-
-	if !exists {
-		// no bin for update daemon in the flist.
-		log.Debug().Str("bin", bin).Msg("binary file does not exist")
-		return nil
-	}
-
-	newBin := fmt.Sprintf("%s.new", bin)
-	if err := u.copyFile(newBin, info); err != nil {
-		return err
-	}
-
-	// the timeout here is set to 1 min because
-	// this most probably will trigger a download
-	// of the binary over 0-fs, hence we need to
-	// give it enough time to download the file
-	// on slow network (i am looking at u Egypt)
-	new, err := revisionOf(newBin, 2*time.Minute)
-	if err != nil {
-		return errors.Wrap(err, "failed to check new update daemon revision number")
-	}
-
-	log.Debug().Str("revision", new).Msg("new revision")
-
-	// nothing to be done here.
-	if current == new {
-		log.Debug().Msg("skipping self upgrade because same revision")
-		return nil
-	}
-
-	if err := os.Rename(newBin, bin); err != nil {
-		return errors.Wrap(err, "failed to update self binary")
-	}
-
-	log.Debug().Msg("revisions are differnet, self upgrade is needed")
-	return ErrRestartNeeded
-}
-
-// uninstall a package, if del is true, also delete the files in that package
-// from the system filesystem
-func (u *Upgrader) uninstall(flist FListInfo, del bool) error {
-	files, err := flist.Files()
-	if err != nil {
-		return errors.Wrapf(err, "failed to get list of current installed files for '%s'", flist.Absolute())
-	}
-
-	//stop all services names
-	var names []string
-	for _, file := range files {
-		dir := filepath.Dir(file.Path)
-		if dir != "/etc/zinit" {
-			continue
-		}
-
-		name := filepath.Base(file.Path)
-		if !strings.HasSuffix(name, ".yaml") {
-			continue
-		}
-
-		name = strings.TrimSuffix(name, ".yaml")
-		// skip self and redis
-		if isIn(name, protected) {
-			continue
-		}
-
-		names = append(names, name)
-	}
-
-	log.Debug().Strs("services", names).Msg("stopping services")
-
-	if err = u.zinit.StopMultiple(20*time.Second, names...); err != nil {
-		return errors.Wrapf(err, "failed to stop services")
-	}
-
-	// we do a forget so any changes of the zinit config
-	// themselves get reflected once monitored again
-	for _, name := range names {
-		if err := u.zinit.Forget(name); err != nil {
-			log.Error().Err(err).Str("service", name).Msg("error on zinit forget")
-		}
-	}
-
-	if !del {
-		return nil
-	}
-
-	// now delete ALL files, ignore what doesn't delete
-	for _, file := range files {
-		stat, err := os.Stat(file.Path)
-		if err != nil {
-			log.Debug().Err(err).Str("file", file.Path).Msg("failed to check file")
-			continue
-		}
-
-		if stat.IsDir() {
-			continue
-		}
-
-		log.Debug().Str("file", file.Path).Msg("deleting file")
-
-		if file.Path == flistIdentityPath {
-			log.Debug().Str("file", file.Path).Msg("skip deleting file")
-			continue
-		}
-
-		if err := os.Remove(file.Path); err != nil {
-			log.Error().Err(err).Str("file", file.Path).Msg("failed to remove file")
-		}
-	}
-
-	return nil
-}
-
-func (u *Upgrader) applyUpgrade(from, to FullFListInfo) error {
-	log.Info().Str("flist", to.Fqdn()).Str("version", to.TryVersion().String()).Msg("start applying upgrade")
-
-	store, err := u.getFlist(to.Fqdn())
-	if err != nil {
-		return errors.Wrap(err, "failed to get flist store")
-	}
-
-	defer store.Close()
-
-	if err := u.upgradeSelf(store); err != nil {
-		return err
-	}
-
-	if err := u.uninstall(from.FListInfo, true); err != nil {
-		log.Error().Err(err).Msg("failed to uninstall current flist. Upgraded anyway")
-	}
-
-	log.Info().Msg("clean up complete, copying new files")
-	services, err := u.servicesFromStore(store)
-	if err != nil {
-		return err
-	}
-	if err := u.copyRecursive(store, "/", flistIdentityPath); err != nil {
-		return err
-	}
-
-	log.Debug().Msg("copying files complete")
-	log.Debug().Msg("make sure all services are monitored")
-	if err := u.zinit.StartMultiple(20*time.Minute, services...); err != nil {
-		return errors.Wrap(err, "failed to monitor services")
-	}
-
-	return u.removeDuplicates(services)
-}
-
-func (u *Upgrader) removeDuplicates(services []string) error {
-	/*
-		this is a hack to clean up duplicate services duo to a bug in zinit version 0.2.6 (and earlier)
-		the issue has been fixed in next release of zinit (starting 0.2.7)
-
-		the issue is duo to this bug we can end up with multiple running instances of the same service.
-
-		to make sure this is cleaned up as expected we need to do the following:
-		- get the pid of each service from zinit status. Those are the processes that are known and
-		  managed by zinit
-		- for each service, find all processes that is running using the same command
-		- for the found service(s), kill the ones that their PIDs does not match the one managed by zinit
-
-		We will always assume that the binary name is the same as the service name
-	*/
-
-	names := make(map[string]struct{})
-	for _, name := range services {
-		names[name] = struct{}{}
-	}
-
-	all := make(map[string][]int)
-	processes, err := process.Processes()
-	if err != nil {
-		return err
-	}
-
-	for _, ps := range processes {
-		cmdline, err := ps.CmdlineSlice()
-		if err != nil {
-			log.Debug().Err(err).Msgf("failed to parse process '%d' commandline", ps.Pid)
-			continue
-		}
-		if len(cmdline) == 0 {
-			continue
-		}
-		name := cmdline[0]
-		if _, ok := names[name]; !ok {
-			continue
-		}
-
-		all[name] = append(all[name], int(ps.Pid))
-	}
-
-	cl := zinit.Default()
-
-	for _, service := range services {
-		ps, err := cl.Status(service)
-		if errors.Is(err, zinit.ErrUnknownService) {
-			continue
-		} else if err != nil {
-			log.Error().Err(err).Msg("failed to get service status")
-		}
-
-		pids, ok := all[service]
-		if !ok {
-			// probably a short lived service, or has exited
-			continue
-		}
-
-		for _, pid := range pids {
-			if ps.Pid != pid {
-				log.Warn().Str("service", service).Int("pid", pid).Msg("found unmanaged process for service. terminating.")
-				_ = syscall.Kill(pid, syscall.SIGKILL)
-			}
 		}
 	}
 
@@ -591,4 +504,17 @@ func (u *Upgrader) copyFile(dst string, src meta.Meta) error {
 	}
 
 	return nil
+}
+
+// safe makes sure function call not interrupted
+// with a signal while execution
+func safe(fn func() error) error {
+	ch := make(chan os.Signal, 4)
+	defer close(ch)
+	defer signal.Stop(ch)
+
+	// try to upgraded to latest
+	// but mean while also make sure the daemon can not be killed by a signal
+	signal.Notify(ch)
+	return fn()
 }

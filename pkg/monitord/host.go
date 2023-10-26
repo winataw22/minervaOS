@@ -6,11 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/upgrade"
 )
 
 // HostMonitor monitor host information
@@ -23,18 +20,6 @@ func NewHostMonitor(duration time.Duration) (pkg.HostMonitor, error) {
 	if duration == 0 {
 		duration = 2 * time.Second
 	}
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to initialize fs watcher")
-	}
-
-	// the file can not exist if the system was booted from overlay
-	if _, err := os.Stat(upgrade.FlistInfoFile); err == nil {
-		if err := watcher.Add(upgrade.FlistInfoFile); err != nil {
-			return nil, errors.Wrapf(err, "failed to watch '%s'", upgrade.FlistInfoFile)
-		}
-	}
-
 	return &hostMonitor{
 		duration: duration,
 	}, nil

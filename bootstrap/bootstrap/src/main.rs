@@ -41,8 +41,6 @@ fn app() -> Result<()> {
         },
         // install all system binaries
         |cfg| -> Result<()> { bootstrap::install(cfg) },
-        // install and start all services
-        |cfg| -> Result<()> { bootstrap::bootstrap(cfg) },
     ];
 
     let index = config.stage as usize - 1;

@@ -19,9 +19,10 @@ func TestUpgraderDownload(t *testing.T) {
 	err := Storage(defaultHubStorage)(up)
 	require.NoError(err)
 
-	const flist = "azmy.3bot/test-flist.flist"
+	const repo = "azmy.3bot"
+	const flist = "test-flist.flist"
 
-	store, err := up.getFlist(flist)
+	store, err := up.getFlist(repo, flist)
 	require.NoError(err)
 	tmp := t.TempDir()
 

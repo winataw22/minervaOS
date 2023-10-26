@@ -1,4 +1,8 @@
-name: Build Extra Binary
+# Builds a single runtime package, this
+# is similar to `bin-package.yaml` but never
+# tags the built binary. It means any package
+# built with this never becomes part of zos installation
+name: Build Extra Binary (no tagging)
 
 on:
   workflow_call:

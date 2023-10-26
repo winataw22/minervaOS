@@ -35,7 +35,7 @@ const (
 // Environment holds information about running environment of a node
 // it defines the different constant based on the running mode (dev, test, prod)
 type Environment struct {
-	RunningMode RunningMode
+	RunningMode RunMode
 
 	FlistURL string
 	BinRepo  string
@@ -67,10 +67,10 @@ type Environment struct {
 	PubMac PubMac
 }
 
-// RunningMode type
-type RunningMode string
+// RunMode type
+type RunMode string
 
-func (r RunningMode) String() string {
+func (r RunMode) String() string {
 	switch r {
 	case RunningDev:
 		return "development"
@@ -88,13 +88,13 @@ func (r RunningMode) String() string {
 // Possible running mode of a node
 const (
 	// RunningDev mode
-	RunningDev RunningMode = "dev"
+	RunningDev RunMode = "dev"
 	// RunningQA mode
-	RunningQA RunningMode = "qa"
+	RunningQA RunMode = "qa"
 	// RunningTest mode
-	RunningTest RunningMode = "test"
+	RunningTest RunMode = "test"
 	// RunningMain mode
-	RunningMain RunningMode = "prod"
+	RunningMain RunMode = "prod"
 
 	// Orphanage is the default farmid where nodes are registered
 	// if no farmid were specified on the kernel command line
@@ -213,7 +213,7 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		runmode = string(RunningMain)
 	}
 
-	switch RunningMode(runmode) {
+	switch RunMode(runmode) {
 	case RunningDev:
 		env = envDev
 	case RunningQA:
