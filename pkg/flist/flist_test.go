@@ -11,7 +11,7 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/threefoldtech/zos/pkg"
@@ -105,6 +105,10 @@ func (t *testCommander) Command(name string, args ...string) *exec.Cmd {
 	require.NoError(t.T, err)
 
 	return exec.Command("sh", "-c", script.String())
+}
+
+func (t *testCommander) GetNamespace(name string) (ns.NetNS, error) {
+	return nil, nil
 }
 
 type testSystem struct {
@@ -236,7 +240,6 @@ func TestIsolation(t *testing.T) {
 
 func TestDownloadFlist(t *testing.T) {
 	require := require.New(t)
-	assert := assert.New(t)
 	cmder := &testCommander{T: t}
 	strg := &StorageMock{}
 
@@ -246,31 +249,16 @@ func TestDownloadFlist(t *testing.T) {
 
 	f := newFlister(root, strg, cmder, sys)
 
-	path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
+	hash1, path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
 	require.NoError(err)
-
-	info1, err := os.Stat(path1)
-	require.NoError(err)
-
-	path2, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
-	require.NoError(err)
-
-	assert.Equal(path1, path2)
-
-	// mod time should be the same, this proof the second download
-	// didn't actually re-wrote the file a second time
-	info2, err := os.Stat(path2)
-	require.NoError(err)
-	assert.Equal(info1.ModTime(), info2.ModTime())
 
 	// now corrupt the flist
-	err = os.Truncate(path1, 512)
+	err = os.Truncate(string(path1), 512)
 	require.NoError(err)
 
-	path3, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
+	hash2, path2, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
 	require.NoError(err)
 
-	info3, err := os.Stat(path3)
-	require.NoError(err)
-	assert.NotEqual(info2.ModTime(), info3.ModTime())
+	require.EqualValues(path1, path2)
+	require.EqualValues(hash1, hash2)
 }

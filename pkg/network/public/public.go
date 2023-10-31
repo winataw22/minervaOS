@@ -28,6 +28,8 @@ import (
 const (
 	toZosVeth                   = "tozos" // veth pair from br-pub to zos
 	publicNsMACDerivationSuffix = "-public"
+	testMacvlan                 = "pub"
+	testNamespace               = "pubtestns"
 
 	// PublicBridge public bridge name, exists only after a call to EnsurePublicSetup
 	PublicBridge    = types.PublicBridge
@@ -352,6 +354,10 @@ func EnsurePublicSetup(nodeID pkg.Identifier, vlan *uint16, inf *pkg.PublicConfi
 		return nil, errors.Wrap(err, "failed to get current public bridge uplink")
 	}
 
+	if err := ensureTestNamespace(br); err != nil {
+		return nil, errors.Wrap(err, "failed to create test namespace")
+	}
+
 	if inf == nil || inf.IsEmpty() {
 		// we need to check if there is already a public config
 		// if yes! we need to make sure to delete it and also restart
@@ -380,6 +386,26 @@ func EnsurePublicSetup(nodeID pkg.Identifier, vlan *uint16, inf *pkg.PublicConfi
 	}
 
 	return br, netlink.LinkSetUp(br)
+}
+
+func ensureTestNamespace(publicBrdige *netlink.Bridge) error {
+	netNS, err := namespace.GetByName(testNamespace)
+	if errors.Is(err, os.ErrNotExist) {
+		netNS, err = namespace.Create(testNamespace)
+		if err != nil {
+			return fmt.Errorf("failed to create namespace %s: %w", testNamespace, err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to get namespace %s: %w", testNamespace, err)
+	}
+	err = netNS.Do(func(_ ns.NetNS) error {
+		_, err := macvlan.GetByName(testMacvlan)
+		return err
+	})
+	if err != nil {
+		_, err = macvlan.Create(testMacvlan, publicBrdige.Name, netNS)
+	}
+	return err
 }
 
 func detectExitNic() (string, error) {

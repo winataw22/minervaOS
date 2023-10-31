@@ -15,17 +15,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 const (
-	defaultRoot = "/var/cache/modules/flist"
-	mib         = 1024 * 1024
+	defaultRoot  = "/var/cache/modules/flist"
+	mib          = 1024 * 1024
+	md5HexLength = 32
+
+	defaultNamespace = "ndmz"
+	publicNamespace  = "public"
 )
 
 var (
@@ -35,16 +41,29 @@ var (
 	ErrNotMountPoint                   = errors.New("path is not a mountpoint")
 	ErrTransportEndpointIsNotConencted = errors.New("transport endpoint is not connected")
 	ErrZFSProcessNotFound              = errors.New("0-fs process not found")
+	ErrHashNotSupported                = errors.New("hash not supported by flist host")
+	ErrHashInvalidLen                  = errors.New("invalid hash length")
 )
+
+// Hash type
+type Hash string
+
+// Path type
+type Path string
 
 type commander interface {
 	Command(name string, arg ...string) *exec.Cmd
+	GetNamespace(name string) (ns.NetNS, error)
 }
 
 type cmd func(name string, arg ...string) *exec.Cmd
 
 func (c cmd) Command(name string, args ...string) *exec.Cmd {
 	return c(name, args...)
+}
+
+func (c cmd) GetNamespace(name string) (ns.NetNS, error) {
+	return namespace.GetByName(name)
 }
 
 type system interface {
@@ -169,9 +188,10 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 	sublog := log.With().Str("url", url).Str("storage", storage).Logger()
 	sublog.Info().Msg("request to mount flist")
 
-	hash, err := f.FlistHash(url)
+	hash, flistPath, err := f.downloadFlist(url)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get flist hash")
+		sublog.Err(err).Msg("fail to download flist")
+		return "", err
 	}
 
 	mountpoint, err := f.flistMountpath(hash)
@@ -200,48 +220,72 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 		storage = env.FlistURL
 	}
 
-	flistPath, err := f.downloadFlist(url)
-	if err != nil {
-		sublog.Err(err).Msg("fail to download flist")
-		return "", err
-	}
-
-	logPath := filepath.Join(f.log, hash) + ".log"
+	logPath := filepath.Join(f.log, string(hash)) + ".log"
 	flistExt := filepath.Ext(url)
 	args := []string{
 		"--cache", f.cache,
-		"--meta", flistPath,
+		"--meta", string(flistPath),
 		"--daemon",
 		"--log", logPath,
 	}
 
-	var cmd *exec.Cmd
+	var command string
 	if flistExt == ".flist" {
-		sublog.Info().Strs("args", args).Msg("starting g8ufs daemon")
-		args = append(args,
+		args = append([]string{
 			"--storage-url", storage,
 			// this is always read-only
 			"--ro",
-			mountpoint,
-		)
-		cmd = f.commander.Command("g8ufs", args...)
+		}, args...)
+		command = "g8ufs"
 	} else if flistExt == ".fl" {
-		sublog.Info().Strs("args", args).Msg("starting rfs daemon")
-		args = append([]string{"mount"}, append(args, mountpoint)...)
-		cmd = f.commander.Command("rfs", args...)
+		args = append([]string{
+			"mount",
+		}, args...)
+		command = "rfs"
 	} else {
 		return "", errors.Errorf("unknown extension: '%s'", flistExt)
 	}
 
-	var out []byte
-	if out, err = cmd.CombinedOutput(); err != nil {
-		sublog.Err(err).Str("out", string(out)).Msg("failed to start 0-fs daemon")
-		return "", err
+	args = append(args, mountpoint)
+	// we run the flist binary
+	nsName := defaultNamespace
+	if namespace.Exists(publicNamespace) {
+		nsName = publicNamespace
 	}
 
-	syscall.Sync()
+	// we do get the namespace via the commander
+	// only to be able to mock it via tests.
+	// by default this will be an actual namespace
+	// returned from the system.
+	// tests can return a mock namespace, or nil
+	// if nil the code will execute on host namespace
+	netNs, err := f.commander.GetNamespace(nsName)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get network namespace to run mount")
+	}
 
-	return mountpoint, nil
+	run := func(_ ns.NetNS) error {
+		// this command then will look something like
+		// ip netns exec <ns> (rfs|g8ufs) [mount] --cache C --meta M --daemon --log L [g8ufs specific flags] mountpoint
+		cmd := f.commander.Command(command, args...)
+		log.Debug().Stringer("command", cmd).Msg("starting mount")
+
+		var out []byte
+		if out, err = cmd.CombinedOutput(); err != nil {
+			sublog.Err(err).Str("out", string(out)).Msg("failed to start 0-fs daemon")
+			return err
+		}
+
+		return nil
+	}
+
+	if netNs != nil {
+		err = netNs.Do(run)
+	} else {
+		err = run(nil)
+	}
+
+	return mountpoint, err
 }
 
 func (f *flistModule) mountBind(ctx context.Context, name, ro string) error {
@@ -429,8 +473,8 @@ func (f *flistModule) mountpath(name string) (string, error) {
 	return mountpath, nil
 }
 
-func (f *flistModule) flistMountpath(hash string) (string, error) {
-	mountpath := filepath.Join(f.ro, hash)
+func (f *flistModule) flistMountpath(hash Hash) (string, error) {
+	mountpath := filepath.Join(f.ro, string(hash))
 	if filepath.Dir(mountpath) != f.ro {
 		return "", errors.New("invalid mount name")
 	}
@@ -566,62 +610,46 @@ func (f *flistModule) FlistHash(url string) (string, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		hash, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-
-		cleanhash := strings.TrimSpace(string(hash))
-		return cleanhash, nil
+	if resp.StatusCode == http.StatusNotFound {
+		return "", ErrHashNotSupported
+	} else if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get flist hash: %s", resp.Status)
 	}
 
-	return "", fmt.Errorf("fail to fetch hash, response: %v", resp.StatusCode)
-}
-
-// downloadFlist downloads an flits from a URL
-// if the flist location also provide and md5 hash of the flist
-// this function will use it to avoid downloading an flist that is
-// already present locally
-func (f *flistModule) downloadFlist(url string) (string, error) {
-	// first check if the md5 of the flist is available
-	hash, err := f.FlistHash(url)
+	hash, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 
-	flistPath := filepath.Join(f.flist, strings.TrimSpace(string(hash)))
-	file, err := os.Open(flistPath)
-	if err != nil && !os.IsNotExist(err) {
-		return "", err
+	hashStr := strings.TrimSpace(string(hash))
+	if len(hashStr) != md5HexLength {
+		return "", ErrHashInvalidLen
 	}
 
-	if err == nil {
-		defer file.Close()
+	return hashStr, nil
+}
 
-		log.Info().Str("url", url).Msg("flist already in on the filesystem")
-		// flist is already present locally, verify it's still valid
-		equal, err := md5Compare(hash, file)
-		if err != nil {
-			return "", err
-		}
+func (f *flistModule) downloadFlist(url string) (Hash, Path, error) {
+	// the problem here is that the same url (to an flist) might
+	// be completely differnet flists. because the flist was update
+	// on remote. so we can't optimize the download by avoiding redownloading
+	// the flist if the same url was downloaded before.
+	// this is also why flists are stored locally with hashes.
+	// While the hub allows us to get the md5sum of an flist, other hosts
+	// don't do that. So we will always need to download the flist anyway, maybe
+	// optimize in case of the hub.
 
-		if equal {
-			return flistPath, nil
-		}
-
-		log.Info().Str("url", url).Msg("flist on filesystem is corrupted, re-downloading it")
-	}
+	// for now we re-download every time and compute the hash on the fly
 
 	// we don't have the flist locally yet, let's download it
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("fail to download flist: %v", resp.Status)
+		return "", "", fmt.Errorf("fail to download flist: %v", resp.Status)
 	}
 
 	return f.saveFlist(resp.Body)
@@ -632,39 +660,30 @@ func (f *flistModule) downloadFlist(url string) (string, error) {
 // to avoid loading the full flist in memory to compute the hash
 // it uses a MultiWriter to write the flist in a temporary file and fill up
 // the md5 hash then it rename the file to the hash
-func (f *flistModule) saveFlist(r io.Reader) (string, error) {
+func (f *flistModule) saveFlist(r io.Reader) (Hash, Path, error) {
 	tmp, err := os.CreateTemp(f.flist, "*_flist_temp")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer tmp.Close()
 
 	h := md5.New()
 	mr := io.MultiWriter(tmp, h)
 	if _, err := io.Copy(mr, r); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	hash := fmt.Sprintf("%x", h.Sum(nil))
 	path := filepath.Join(f.flist, hash)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if err := os.Rename(tmp.Name(), path); err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return path, nil
-}
-
-func md5Compare(hash string, r io.Reader) (bool, error) {
-	h := md5.New()
-	_, err := io.Copy(h, r)
-	if err != nil {
-		return false, err
-	}
-	return strings.Compare(fmt.Sprintf("%x", h.Sum(nil)), hash) == 0, nil
+	return Hash(hash), Path(path), nil
 }
 
 var _ pkg.Flister = (*flistModule)(nil)
