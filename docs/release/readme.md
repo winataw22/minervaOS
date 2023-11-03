@@ -3,29 +3,43 @@
 We use a simple pipeline release workflow. Building and file distribution are made using GitHub Actions.
 Usable files are available on the [Zero-OS Hub](https://hub.grid.tf/tf-zos).
 
-This pipeline is made to match the 3 different type of running mode of 0-OS. For more information head to the [upgrade documentation](../identity/upgrade.md).
+Under this hub repo you can find 4 different `tag links` (ie. links to tags):
 
-## Development build
+- development
+- qa
+- testing
+- production
 
-On a push to main branch on the zos repository, a new development build is triggered. If the build succeed,
-binaries are packed into an flist and uploaded to the [tf-autobuilder](https://hub.grid.tf/tf-autobuilder) repository of the hub.
+A `tag` in the hub terminology is when multiple flist gets some `tag` then those flists appear grouped together under one directory which is the `tag` name. This means multiple flists that are built together or belong to a certain unique entity can be grouped for an ease of management and processing.
 
-This flist is then promoted into the [tf-zos](https://hub.grid.tf/tf-zos) repository of the hub and a symlink to this latest build is made (`tf-autobuilder/zos:development-3:latest.flist`)
+A `tag link` is a link that exists in a repo to a tag in another repo. We then use this feature to link from [tf-zos](https://hub.grid.tf/tf-zos) repo to a `build` tag under [tf-autobuilder](https://hub.grid.tf/tf-autobuilder/) repo.
+
+For example a `development` tag link from tf-zos will point to a tag (say `61cc487`) under tf-autobuilder. What does that mean? it means the development env zos is using this build tag, and the flists installed (and used by the zos nodes) in development are installed from that build tag.
+
+On creating a new release, the build tag will get that exact release version (say v3.20.0), instead of a commit short hash.
+
+For more details on how the system updates itself please check [upgrade documentation](../internals/identity/upgrade.md).
+
+## Building
+
+On a push to main branch on the zos repository, a new development build is triggered.  This builds ALL zos packages (main zos flist) and also all the [runtime packages](../../bins/packages/). All packages are tagged with the `short commit` hash. This means all built packages will appear under the `tf-autobuilder/<hash>` tag.
+
+Once the building process is over, the `tag link` **development** under `tf-zos` is then updated to point to the latest build tag.
 
 ## Releases
-We create 3 types of releases:
-- QA release, in this release the version is suffixed by `qa<number>` for example `v3.5.0-qa1`.
-- RC release, in this release the version is suffixed by `rc<number>` for example `v3.5.0-rc2`.
-- Main release, is this release the version has no suffix, for example `v3.5.0`
 
-The release cycle goes like this:
-- As mentioned before devnet is updated the moment new code is available on `main` branch. Since the `dev` release is auto linked to the latest `flist` on the hub. Nodes on devnet will auto update to the latest available build.
-- Creating a `qa` release, will not not trigger the same behavior on `qa` net, same for both testnet and mainnet. Instead a workflow must be triggered, this is only to make sure 100% that an update is needed.
-- Once the build of the release is available, a [deploy](../../.github/workflows/grid-deploy.yaml) workflow needed to be triggered with the right version to deploy on the proper network.
-  - The work flow all what it does is linking the right version under the hub [tf-zos](https://hub.grid.tf/tf-zos) repo
+On creating a release it's exactly the same as above except the tag will be the `release` version. This means that releasing a certain version to a specific network is as easy as creating the proper `tag link` from `tf-zos` to the corresponding tag under `tf-autobuilder` for example:
 
-> The `deploy` flow is rarely used, the on chain update is also available. By setting the right version on tfchain, the link on the hub is auto-updated and hence the deploy workflow won't be needed to be triggered. Although we have it now as a safety net in case something goes wrong (chain is broken) and we need to force a specific version on ZOS.
+```bash
+production -> ../tf-autobuilder/v3.4.5
+```
 
-- Development: https://playground.hub.grid.tf/tf-autobuilder/zos:development-3:latest.flist
-- Testing: https://playground.hub.grid.tf/tf-zos/zos:testing-3:latest.flist
-- Production: https://playground.hub.grid.tf/tf-zos/zos:production-3:latest.flist
+> NOTE: during the writing of this docs, not all networks are using this release pipeline and they might still using the old style. Hopefully this will phaseout as soon as possible to use the procedure described in this document.
+
+## Creating the links
+
+Now, once a release is created the links from the tag links (qa, testing, production) are not auto-created by the build pipeline. Instead, these has to be created by other means when the operators decide it's right time to deploy a certain version to a certain network. Once decided the link then must be created. This brings us to the `zos-update-worker`
+
+The update worker is a very simple process that watches changes to `tfchain` version as updated by the Council. and apply the correct link.
+
+Say the worker finds out that the zos version on production tfchain is set to `v3.4.5` then it will simply make sure the link from `production` is correctly pointing to the correct release tag. If not, will create that link.
