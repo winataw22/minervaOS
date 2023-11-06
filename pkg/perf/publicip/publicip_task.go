@@ -268,33 +268,48 @@ func getIPWithRoute(publicIP substrate.PublicIP) (net.IP, []*net.IPNet, []*netli
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to parse IP %s: %w", publicIP.IP, err)
 	}
+	ipNet.IP = ip
 	gateway := net.ParseIP(publicIP.Gateway)
 	if gateway == nil {
 		return nil, nil, nil, fmt.Errorf("failed to parse gateway %s: %w", publicIP.Gateway, err)
 	}
-	route, err := netlink.RouteGet(gateway)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get route to gateway %s", publicIP.Gateway)
+	route := netlink.Route{
+		Dst: &net.IPNet{
+			IP:   net.ParseIP("0.0.0.0"),
+			Mask: net.CIDRMask(0, 32),
+		},
+		Gw: gateway,
 	}
-	routes := make([]*netlink.Route, 0)
-	for _, r := range route {
-		routes = append(routes, &r)
-	}
-	return ip, []*net.IPNet{ipNet}, routes, nil
+	return ip, []*net.IPNet{ipNet}, []*netlink.Route{&route}, nil
 }
 
 func getRealPublicIP() (net.IP, error) {
 	// for testing now, should change to cloudflare
-	req, err := http.Get("https://api.ipify.org/")
+	con, err := net.DialTimeout("tcp", "api.ipify.org:443", 10*time.Second)
 	if err != nil {
 		return nil, errors.Join(err, errPublicIPLookup)
 	}
-	defer req.Body.Close()
 
-	if req.StatusCode != 200 {
-		return nil, fmt.Errorf("request to get public IP failed with status code %d", req.StatusCode)
+	defer con.Close()
+
+	cl := http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return con, nil
+			},
+		},
 	}
-	body, err := io.ReadAll(req.Body)
+	response, err := cl.Get("https://api.ipify.org/")
+	if err != nil {
+		return nil, errors.Join(err, errPublicIPLookup)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("request to get public IP failed with status code %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
