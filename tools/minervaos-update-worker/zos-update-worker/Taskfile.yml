@@ -1,0 +1,54 @@
+version: "3"
+
+tasks:
+    build:
+        desc: Build the app
+        cmds:
+        - GOFLAGS=-mod=mod go build -o bin/zos-update-worker main.go 
+
+    run: 
+        desc: Run the app
+        cmds:
+        - GOFLAGS=-mod=mod go run main.go
+
+    test:
+        desc: Test the app
+        cmds:
+        - go test -v -vet=off ./...
+    
+    benchmarks:
+        desc: Test the app benchmarks
+        cmds:
+        - go test -v -vet=off ./... -bench=. -count 1 -benchtime=10s -benchmem -run=^#
+    
+    coverage:
+        desc: Test the app coverages
+        cmds:
+        - rm ./coverage -rf
+        - mkdir coverage
+        - go test -v -vet=off ./... -coverprofile=coverage/coverage.out
+        - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+
+    deps:
+        desc: install deps
+        cmds: 
+        - go get -u golang.org/x/lint/golint
+        - go get -u github.com/fzipp/gocyclo/cmd/gocyclo
+        - go get -u github.com/remyoudompheng/go-misc/deadcode
+        - go get -u github.com/client9/misspell/cmd/misspell
+
+    verifiers:
+        desc: Run verifiers
+        cmds:
+        - gofmt -d .
+        - $(go env GOPATH)/bin/golangci-lint run
+        - $(go env GOPATH)/bin/gocyclo -over 100 .
+        - $(go env GOPATH)/bin/deadcode -test $(shell go list ./...) || true
+        - $(go env GOPATH)/bin/misspell -i monitord -error `find .`
+        - go run honnef.co/go/tools/cmd/staticcheck -- ./...
+  
+    clean:
+        desc: Remove all coverage and bin files
+        cmds:
+        - rm ./coverage -rf
+        - rm ./bin -rf
