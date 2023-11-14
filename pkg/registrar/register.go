@@ -207,6 +207,11 @@ func registerNode(
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 		}
+
+		// ignore virt-what value if the node is marked as real on the chain
+		if !onChain.Virtualized {
+			real.Virtualized = false
+		}
 	}
 
 	real.ID = types.U32(nodeID)

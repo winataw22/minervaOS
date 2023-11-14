@@ -70,6 +70,7 @@ func (pm *PerformanceMonitor) runTask(ctx context.Context, task Task) error {
 func (pm *PerformanceMonitor) Run(ctx context.Context) error {
 	ctx = withZbusClient(ctx, pm.zbusClient)
 	for _, task := range pm.tasks {
+		task := task
 		if _, err := pm.scheduler.CronWithSeconds(task.Cron()).Do(func() error {
 			return pm.runTask(ctx, task)
 		}); err != nil {

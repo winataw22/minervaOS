@@ -1,1 +1,50 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/952951bd3fc146bed6e8dcb820538d8d
+name: Zos Update Worker
+
+defaults:
+  run:
+    working-directory: tools/zos-update-worker 
+
+on: 
+  push:
+    paths:
+      - tools/zos-update-worker/**
+  pull_request:
+    paths:
+      - tools/zos-update-worker/**
+
+jobs:
+  Explore-Packge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install GO
+        uses: actions/setup-go@v3
+        with: 
+          go-version: 1.19
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          args: --timeout 3m --verbose
+          working-directory: tools/zos-update-worker 
+
+      - name: staticcheck
+        uses: dominikh/staticcheck-action@v1.3.0
+        with:
+          version: "2022.1.3"
+          working-directory: tools/zos-update-worker 
+        env:
+          GO111MODULE: on
+
+      - name: gofmt
+        uses: Jerome1337/gofmt-action@v1.0.5
+        with:
+          gofmt-flags: "-l -d"
+          gofmt-path: "tools/zos-update-worker"
+       
+      - name: Test
+        run: go test -v ./...
+  
+
