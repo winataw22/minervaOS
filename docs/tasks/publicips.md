@@ -27,3 +27,6 @@ The task is scheduled to run 4 times a day.
 ## Result
 
 The task only returns a single map of String (IP) to IPReport. The report consists of the IP state (valid, invalid or skipped) and the reason for the state.
+
+### Notes
+- Previously tested ips and marked as `Valid` doesn't get revalidated again.
