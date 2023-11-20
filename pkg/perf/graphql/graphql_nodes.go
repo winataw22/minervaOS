@@ -1,4 +1,4 @@
-package iperf
+package graphql
 
 import (
 	"context"
@@ -57,7 +57,9 @@ func (g *GraphQl) ListPublicNodes(ctx context.Context, nodesNum int, farmID, exc
 		excludeFarmCond = fmt.Sprintf(", farmID_not_eq: %d", excludeFarmID)
 	}
 
-	whereCond := fmt.Sprintf(`where: { publicConfig: {%s} %s %s }`, pubCond, farmCond, excludeFarmCond)
+	nodeUpReportInterval := time.Minute * 40
+	nodeUpInterval := time.Now().Unix() - 2*int64(nodeUpReportInterval.Seconds())
+	whereCond := fmt.Sprintf(`where: { updatedAt_gte: %d, AND: {power_isNull: true, OR: {power: {state_eq: Up, target_eq: Up}}}, publicConfig: {%s} %s %s }`, nodeUpInterval, pubCond, farmCond, excludeFarmCond)
 
 	itemCount, err := g.getItemTotalCount(ctx, "nodes", whereCond)
 	if err != nil {

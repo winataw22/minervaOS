@@ -49,6 +49,10 @@ func ReportChecks(metricsPath string) error {
 		return errors.Wrap(err, "failed to create metrics database")
 	}
 
+	if _, err := rrd.Slot(); err != nil {
+		return err
+	}
+
 	return rrd.Close()
 }
 

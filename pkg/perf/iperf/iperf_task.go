@@ -14,6 +14,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/iperf"
 	"github.com/threefoldtech/zos/pkg/perf"
+	"github.com/threefoldtech/zos/pkg/perf/graphql"
 )
 
 // IperfTest for iperf tcp/udp tests
@@ -57,7 +58,7 @@ func (t *IperfTest) Cron() string {
 // Run runs the tcp test and returns the result
 func (t *IperfTest) Run(ctx context.Context) (interface{}, error) {
 	env := environment.MustGet()
-	g := NewGraphQl(env.GraphQL)
+	g := graphql.NewGraphQl(env.GraphQL)
 
 	// get nodes
 	freeFarmNodes, err := g.ListPublicNodes(ctx, 0, 1, 0, true, true)

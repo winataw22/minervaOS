@@ -538,6 +538,9 @@ func (c *Client) StopMultiple(timeout time.Duration, service ...string) error {
 					log.Error().Err(err).Msgf("failed to send SIGKILL to service %s", service)
 				}
 			}
+			// after a kill we wait 1 second to make sure
+			// services are really dead before we move on
+			<-time.After(1 * time.Second)
 			return nil
 		case <-time.After(1 * time.Second):
 		}
