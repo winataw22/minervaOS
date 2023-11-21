@@ -216,13 +216,16 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to run the scheduler")
 	}
 	bus.WithHandler("zos.perf.get", func(ctx context.Context, payload []byte) (interface{}, error) {
-		var taskName string
-		err := json.Unmarshal(payload, &taskName)
+		type Payload struct {
+			Name string
+		}
+		var request Payload
+		err := json.Unmarshal(payload, &request)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to unmarshal payload: %v", payload)
 		}
 
-		return perfMon.Get(taskName)
+		return perfMon.Get(request.Name)
 	})
 	bus.WithHandler("zos.perf.get_all", func(ctx context.Context, payload []byte) (interface{}, error) {
 		return perfMon.GetAll()

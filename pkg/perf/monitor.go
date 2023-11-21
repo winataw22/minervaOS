@@ -55,9 +55,10 @@ func (pm *PerformanceMonitor) runTask(ctx context.Context, task Task) error {
 	}
 
 	err = pm.setCache(ctx, TaskResult{
-		Name:      task.ID(),
-		Timestamp: uint64(time.Now().Unix()),
-		Result:    res,
+		Name:        task.ID(),
+		Timestamp:   uint64(time.Now().Unix()),
+		Description: task.Description(),
+		Result:      res,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to set cache")

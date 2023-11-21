@@ -10,8 +10,11 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-const cpuBenchmarkTaskID = "CPUBenchmark"
-const cpuBenchmarkCronSchedule = "0 0 */6 * * *"
+const (
+	cpuBenchmarkTaskID       = "cpu-benchmark"
+	cpuBenchmarkCronSchedule = "0 0 */6 * * *"
+	cpuBenchmarkDescription  = "Measures the performance of the node CPU by reporting the timespent of computing a task in seconds."
+)
 
 // CPUBenchmarkTask defines CPU benchmark task data.
 type CPUBenchmarkTask struct {
@@ -19,6 +22,8 @@ type CPUBenchmarkTask struct {
 	taskID string
 	// schedule is a 6 field cron schedule (unlike unix cron).
 	schedule string
+	// description briefly describe what a task do.
+	description string
 }
 
 // CPUBenchmarkResult holds CPU benchmark results with the workloads number during the benchmark.
@@ -34,8 +39,9 @@ var _ perf.Task = (*CPUBenchmarkTask)(nil)
 // NewCPUBenchmarkTask returns a new CPU benchmark task.
 func NewCPUBenchmarkTask() CPUBenchmarkTask {
 	return CPUBenchmarkTask{
-		taskID:   cpuBenchmarkTaskID,
-		schedule: cpuBenchmarkCronSchedule,
+		taskID:      cpuBenchmarkTaskID,
+		schedule:    cpuBenchmarkCronSchedule,
+		description: cpuBenchmarkDescription,
 	}
 }
 
@@ -47,6 +53,11 @@ func (c *CPUBenchmarkTask) ID() string {
 // Cron returns task cron schedule.
 func (c *CPUBenchmarkTask) Cron() string {
 	return c.schedule
+}
+
+// Description returns task description.
+func (c *CPUBenchmarkTask) Description() string {
+	return c.description
 }
 
 // Run executes the CPU benchmark.

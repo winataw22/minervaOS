@@ -19,8 +19,9 @@ import (
 
 // IperfTest for iperf tcp/udp tests
 type IperfTest struct {
-	taskID   string
-	schedule string
+	taskID      string
+	schedule    string
+	description string
 }
 
 // IperfResult for iperf test results
@@ -42,7 +43,11 @@ func NewTask() perf.Task {
 	for _, match := range matches {
 		os.RemoveAll(match)
 	}
-	return &IperfTest{taskID: "iperf", schedule: "0 0 */6 * * *"}
+	return &IperfTest{
+		taskID:      "iperf",
+		schedule:    "0 0 */6 * * *",
+		description: "Test public nodes network performance with both UDP and TCP over IPv4 and IPv6",
+	}
 }
 
 // ID returns the ID of the tcp task
@@ -55,18 +60,23 @@ func (t *IperfTest) Cron() string {
 	return t.schedule
 }
 
+// Description returns the task description
+func (t *IperfTest) Description() string {
+	return t.description
+}
+
 // Run runs the tcp test and returns the result
 func (t *IperfTest) Run(ctx context.Context) (interface{}, error) {
 	env := environment.MustGet()
 	g := graphql.NewGraphQl(env.GraphQL)
 
-	// get nodes
-	freeFarmNodes, err := g.ListPublicNodes(ctx, 0, 1, 0, true, true)
+	// get public up nodes
+	freeFarmNodes, err := g.GetUpNodes(ctx, 0, 1, 0, true, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list freefarm nodes from graphql")
 	}
 
-	nodes, err := g.ListPublicNodes(ctx, 12, 0, 1, true, true)
+	nodes, err := g.GetUpNodes(ctx, 12, 0, 1, true, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list random nodes from graphql")
 	}

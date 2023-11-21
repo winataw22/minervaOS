@@ -18,6 +18,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/macvlan"
 	"github.com/threefoldtech/zos/pkg/network/namespace"
 	"github.com/threefoldtech/zos/pkg/perf"
+	"github.com/threefoldtech/zos/pkg/perf/graphql"
 	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/vishvananda/netlink"
 )
@@ -32,11 +33,13 @@ const (
 	IPIsUsed            = "ip is already assigned to a contract"
 	FetchRealIPFailed   = "failed to get real public IP to the node"
 
-	taskSchedule = "0 0 */6 * * *"
-	taskID       = "PublicIPValidation"
+	taskSchedule    = "0 0 */6 * * *"
+	taskID          = "public-ip-validation"
+	taskDescription = "Runs on the least NodeID node in a farm to validate all its IPs."
 )
 
 var errPublicIPLookup = errors.New("failed to reach public ip service")
+var errSkippedValidating = errors.New("skipped, there is a node with less ID available")
 
 const testMacvlan = "pub"
 const testNamespace = "pubtestns"
@@ -44,6 +47,7 @@ const testNamespace = "pubtestns"
 type publicIPValidationTask struct {
 	taskID        string
 	schedule      string
+	description   string
 	farmIPsReport map[string]IPReport
 }
 
@@ -58,6 +62,7 @@ func NewTask() perf.Task {
 	return &publicIPValidationTask{
 		taskID:        taskID,
 		schedule:      taskSchedule,
+		description:   taskDescription,
 		farmIPsReport: make(map[string]IPReport),
 	}
 }
@@ -68,6 +73,10 @@ func (p *publicIPValidationTask) ID() string {
 
 func (p *publicIPValidationTask) Cron() string {
 	return p.schedule
+}
+
+func (p *publicIPValidationTask) Description() string {
+	return p.description
 }
 
 func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
@@ -92,8 +101,8 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("failed to check if the node should run public IP verification: %w", err)
 	}
 	if !shouldRun {
-		log.Info().Msg("skipping because there is a node with less ID available")
-		return nil, nil
+		log.Warn().Msg(errSkippedValidating.Error())
+		return errSkippedValidating, nil
 	}
 
 	farm, err := sub.GetFarm(uint32(farmID))
@@ -200,7 +209,10 @@ outer:
 }
 
 func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substrate) (bool, error) {
-	nodes, err := sub.GetNodes(uint32(farmID))
+	env := environment.MustGet()
+	gql := graphql.NewGraphQl(env.GraphQL)
+
+	nodes, err := gql.GetUpNodes(ctx, 0, farmID, 0, false, false)
 	if err != nil {
 		return false, fmt.Errorf("failed to get farm %d nodes: %w", farmID, err)
 	}
@@ -221,19 +233,12 @@ func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substra
 	}
 
 	for _, node := range nodes {
-		if node >= uint32(nodeID) {
+		if node.NodeID >= uint32(nodeID) {
 			continue
 		}
-		state, err := sub.GetPowerTarget(node)
+		n, err := sub.GetNode(node.NodeID)
 		if err != nil {
-			return false, fmt.Errorf("failed to get node %d power target: %w", node, err)
-		}
-		if state.Target.IsDown {
-			continue
-		}
-		n, err := sub.GetNode(node)
-		if err != nil {
-			return false, fmt.Errorf("failed to get node %d: %w", node, err)
+			return false, fmt.Errorf("failed to get node %d: %w", node.NodeID, err)
 		}
 		ip, err := getValidNodeIP(n)
 		if err != nil {
@@ -242,7 +247,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substra
 		// stop at three and quiet output
 		err = exec.CommandContext(ctx, "ping", "-c", "3", "-q", ip).Run()
 		if err != nil {
-			log.Err(err).Msgf("failed to ping node %d", node)
+			log.Err(err).Msgf("failed to ping node %d", node.NodeID)
 			continue
 		}
 		return false, nil

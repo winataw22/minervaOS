@@ -9,6 +9,11 @@ import (
 	graphql "github.com/hasura/go-graphql-client"
 )
 
+const (
+	nodeUpStateFactor    = 2                // number of the cycles for the upInterval
+	nodeUpReportInterval = time.Minute * 40 // the interval to report for the up node
+)
+
 // GraphQl for tf graphql client
 type GraphQl struct {
 	client *graphql.Client
@@ -32,13 +37,13 @@ type PublicConfig struct {
 	Ipv6 string `graphql:"ipv6"`
 }
 
-// ListPublicNodes returns a list of public nodes
+// GetUpNodes returns a list of public nodes
 // if nodesNum is given the query will use a limit and offset
 // farmID id if not equal 0 will add a condition for it
 // excludeFarmID if not equal 0 will add a condition ro exclude the farm ID
 // ipv4 pool to set a condition for non empty ipv4
 // ipv6 pool to set a condition for non empty ipv6
-func (g *GraphQl) ListPublicNodes(ctx context.Context, nodesNum int, farmID, excludeFarmID uint32, ipv4, ipv6 bool) ([]Node, error) {
+func (g *GraphQl) GetUpNodes(ctx context.Context, nodesNum int, farmID, excludeFarmID uint32, ipv4, ipv6 bool) ([]Node, error) {
 	var pubCond string
 	if ipv4 {
 		pubCond = `ipv4_isNull: false, ipv4_not_eq: ""`
@@ -57,8 +62,7 @@ func (g *GraphQl) ListPublicNodes(ctx context.Context, nodesNum int, farmID, exc
 		excludeFarmCond = fmt.Sprintf(", farmID_not_eq: %d", excludeFarmID)
 	}
 
-	nodeUpReportInterval := time.Minute * 40
-	nodeUpInterval := time.Now().Unix() - 2*int64(nodeUpReportInterval.Seconds())
+	nodeUpInterval := time.Now().Unix() - int64(nodeUpStateFactor)*int64(nodeUpReportInterval.Seconds())
 	whereCond := fmt.Sprintf(`where: { updatedAt_gte: %d, AND: {power_isNull: true, OR: {power: {state_eq: Up, target_eq: Up}}}, publicConfig: {%s} %s %s }`, nodeUpInterval, pubCond, farmCond, excludeFarmCond)
 
 	itemCount, err := g.getItemTotalCount(ctx, "nodes", whereCond)
