@@ -45,10 +45,9 @@ const testMacvlan = "pub"
 const testNamespace = "pubtestns"
 
 type publicIPValidationTask struct {
-	taskID        string
-	schedule      string
-	description   string
-	farmIPsReport map[string]IPReport
+	taskID      string
+	schedule    string
+	description string
 }
 
 type IPReport struct {
@@ -60,10 +59,9 @@ var _ perf.Task = (*publicIPValidationTask)(nil)
 
 func NewTask() perf.Task {
 	return &publicIPValidationTask{
-		taskID:        taskID,
-		schedule:      taskSchedule,
-		description:   taskDescription,
-		farmIPsReport: make(map[string]IPReport),
+		taskID:      taskID,
+		schedule:    taskSchedule,
+		description: taskDescription,
 	}
 }
 
@@ -109,21 +107,23 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get farm with id %d: %w", farmID, err)
 	}
-	deleteOldIPs(farm.PublicIPs, p.farmIPsReport)
+	var report map[string]IPReport
 	err = netNS.Do(func(_ ns.NetNS) error {
-		return p.validateIPs(farm.PublicIPs)
+		report, err = p.validateIPs(farm.PublicIPs)
+		return err
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to run public IP validation: %w", err)
 	}
-	return p.farmIPsReport, nil
+	return report, nil
 }
 
-func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) error {
+func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) (map[string]IPReport, error) {
+	report := make(map[string]IPReport)
 	mv, err := macvlan.GetByName(testMacvlan)
 	if err != nil {
-		return fmt.Errorf("failed to get macvlan %s in namespace %s: %w", testMacvlan, testNamespace, err)
+		return nil, fmt.Errorf("failed to get macvlan %s in namespace %s: %w", testMacvlan, testNamespace, err)
 	}
 	// to delete any leftover IPs or routes
 	err = deleteAllIPsAndRoutes(mv)
@@ -132,15 +132,11 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) err
 	}
 
 	for _, publicIP := range publicIPs {
-		if report, ok := p.farmIPsReport[publicIP.IP]; ok && report.State == ValidState {
-			// no need to test it again
-			continue
-		}
-		p.farmIPsReport[publicIP.IP] = IPReport{
+		report[publicIP.IP] = IPReport{
 			State: ValidState,
 		}
 		if publicIP.ContractID != 0 {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  SkippedState,
 				Reason: IPIsUsed,
 			}
@@ -149,7 +145,7 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) err
 
 		ip, ipNet, routes, err := getIPWithRoute(publicIP)
 		if err != nil {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  InvalidState,
 				Reason: PublicIPDataInvalid,
 			}
@@ -158,7 +154,7 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) err
 		}
 		err = macvlan.Install(mv, nil, ipNet, routes, nil)
 		if err != nil {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  InvalidState,
 				Reason: PublicIPDataInvalid,
 			}
@@ -168,17 +164,17 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) err
 
 		realIP, err := getRealPublicIP()
 		if errors.Is(err, errPublicIPLookup) {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  InvalidState,
 				Reason: PublicIPDataInvalid,
 			}
 		} else if err != nil {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  SkippedState,
 				Reason: FetchRealIPFailed,
 			}
 		} else if !ip.Equal(realIP) {
-			p.farmIPsReport[publicIP.IP] = IPReport{
+			report[publicIP.IP] = IPReport{
 				State:  InvalidState,
 				Reason: IPsNotMatching,
 			}
@@ -191,21 +187,10 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) err
 	}
 	err = netlink.LinkSetDown(mv)
 	if err != nil {
-		return fmt.Errorf("failed to set link down: %w", err)
+		return nil, fmt.Errorf("failed to set link down: %w", err)
 	}
-	return nil
-}
 
-func deleteOldIPs(farmIPs []substrate.PublicIP, oldReport map[string]IPReport) {
-outer:
-	for ip := range oldReport {
-		for _, publicIP := range farmIPs {
-			if ip == publicIP.IP {
-				continue outer
-			}
-		}
-		delete(oldReport, ip)
-	}
+	return report, nil
 }
 
 func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substrate) (bool, error) {

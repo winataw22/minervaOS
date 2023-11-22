@@ -16,13 +16,13 @@ The `iperf` package is designed to facilitate network performance testing using 
 - For each node, it run the test with 4 times. through (UDP/TCP) using both node IPs (v4/v6)
 - result will be a slice of all public node report (4 for each) each one will include:
   ```
-    UploadSpeed: Upload speed in bits per second.
-    DownloadSpeed: Download speed in bits per second.
+    UploadSpeed: Upload speed (in bits per second).
+    DownloadSpeed: Download speed (in bits per second).
     NodeID: ID of the node where the test was conducted.
     NodeIpv4: IPv4 address of the node.
     TestType: Type of the test (TCP or UDP).
     Error: Any error encountered during the test.
-    CpuReport: CPU utilization report.
+    CpuReport: CPU utilization report (in percentage).
   ```
 
 ### Result sample

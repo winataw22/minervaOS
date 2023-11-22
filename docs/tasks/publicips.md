@@ -26,9 +26,6 @@ The goal of the task is to make sure public IPs assigned to a farm are valid and
 
 The task only returns a single map of String (IP) to IPReport. The report consists of the IP state (valid, invalid or skipped) and the reason for the state.
 
-### Notes
-- Previously tested ips and marked as `Valid` doesn't get revalidated again.
-
 ### Result sample
 ```json
 {
