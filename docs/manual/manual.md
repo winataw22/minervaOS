@@ -12,7 +12,7 @@ So what is `network`.Well, to allow developers to build and `zos` itself and mak
 - `production`: Well, as the name indicates this is the most stable network (also full price) once new features are fully tested on `testing` network they are released on `production`.
 
 ## Creating a farm
-While this is outside the scope of this document here you are a [link](https://library.threefold.me/info/manual/#/manual__create_farm)
+While this is outside the scope of this document here you are a [link](https://manual.grid.tf/farmers/3node_building/1_create_farm.html)
 
 # Interaction
 `ZOS` provide a simple `API` that can be used to:

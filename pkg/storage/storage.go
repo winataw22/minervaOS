@@ -543,6 +543,16 @@ func (s *Module) VolumeLookup(name string) (pkg.Volume, error) {
 	return fs, err
 }
 
+// VolumeExists returns an error if the lookup failed and a bool describing if
+// the volume exists
+func (s *Module) VolumeExists(name string) (bool, error) {
+	_, err := s.VolumeLookup(name)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *Module) path(name string) (filesystem.Pool, filesystem.Volume, pkg.Volume, error) {

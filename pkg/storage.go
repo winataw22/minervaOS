@@ -113,6 +113,9 @@ type StorageModule interface {
 	// VolumeLookup return volume information for given name
 	VolumeLookup(name string) (Volume, error)
 
+	// VolumeExists checks if a volume exists and returns error if the lookup failed
+	VolumeExists(name string) (bool, error)
+
 	// VolumeDelete deletes a volume by name
 	VolumeDelete(name string) error
 

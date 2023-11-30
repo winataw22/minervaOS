@@ -19,12 +19,10 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-var (
-	networkResourceNet = net.IPNet{
-		IP:   net.ParseIP("100.64.0.0"),
-		Mask: net.IPv4Mask(0xff, 0xff, 0, 0),
-	}
-)
+var networkResourceNet = net.IPNet{
+	IP:   net.ParseIP("100.64.0.0"),
+	Mask: net.IPv4Mask(0xff, 0xff, 0, 0),
+}
 
 // fill up the VM (machine) object with write boot config for a full virtual machine (with a disk image)
 func (p *Manager) prepVirtualMachine(
@@ -36,8 +34,7 @@ func (p *Manager) prepVirtualMachine(
 	deployment *gridtypes.Deployment,
 	wl *gridtypes.WorkloadWithID,
 ) error {
-
-	var storage = stubs.NewStorageModuleStub(p.zbus)
+	storage := stubs.NewStorageModuleStub(p.zbus)
 	// if a VM the vm has to have at least one mount
 	if len(config.Mounts) == 0 {
 		return fmt.Errorf("at least one mount has to be attached for Vm mode")
@@ -62,7 +59,7 @@ func (p *Manager) prepVirtualMachine(
 		return errors.Wrap(err, "disk does not exist")
 	}
 
-	//TODO: DiskWrite will not override the disk if it already has a partition table
+	// TODO: DiskWrite will not override the disk if it already has a partition table
 	// or a filesystem. this means that if later the disk is assigned to a new VM with
 	// a different flist it will have the same old operating system copied from previous
 	// setup.
@@ -103,6 +100,12 @@ func (p *Manager) prepContainer(
 	// via the flist, so we have control over when to decomission this volume.
 	// remounting in RW mode
 	volName := fmt.Sprintf("rootfs:%s", wl.ID.String())
+
+	volumeExists, err := storage.VolumeExists(ctx, volName)
+	if err != nil {
+		return errors.Wrap(err, "failed to check if vm rootfs exists")
+	}
+
 	volume, err := storage.VolumeCreate(ctx, volName, rootfsSize)
 	if err != nil {
 		return errors.Wrap(err, "failed to create vm rootfs")
@@ -121,9 +124,22 @@ func (p *Manager) prepContainer(
 		ReadOnly:        false,
 		PersistedVolume: volume.Path,
 	})
-
 	if err != nil {
 		return errors.Wrapf(err, "failed to mount flist: %s", wl.ID.String())
+	}
+
+	// clean up host keys
+	if !volumeExists {
+		files, err := filepath.Glob(filepath.Join(mnt, "etc", "ssh", "ssh_host_*"))
+		if err != nil {
+			log.Debug().Err(err).Msg("failed to list ssh host keys for a vm image")
+		}
+
+		for _, file := range files {
+			if err := os.Remove(file); err != nil {
+				log.Debug().Err(err).Str("file", file).Msg("failed to delete host key file")
+			}
+		}
 	}
 
 	// inject container kernel and init
@@ -162,8 +178,8 @@ func (p *Manager) prepContainer(
 func (p *Manager) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
-	//TODO: if we use `ygg` as a network name. this will conflict
-	//if the user has a network that is called `ygg`.
+	// TODO: if we use `ygg` as a network name. this will conflict
+	// if the user has a network that is called `ygg`.
 	tapName := wl.ID.Unique("ygg")
 	iface, err := network.SetupYggTap(ctx, tapName)
 	if err != nil {

@@ -9,10 +9,10 @@
 ## Starting a local zos node
 
 * Make sure `qemu` and `dnsmasq` are installed
-* [Create a farm](../manual/manual.md#creating-a-farm)
+* [Create a farm](https://manual.grid.tf/farmers/3node_building/1_create_farm.html)
 * [Download a zos image](https://bootstrap.grid.tf/kernel/zero-os-development-zos-v3-generic-7e587e499a.efi)
 * Make sure `zos0` bridge is allowed by qemu, you can add `allow zos0` in `/etc/qemu/bridge.conf` (create the file if it's not there)
-* Setup the network using this script [this script](./net.sh)
+* Setup the network using this script [this script](../../qemu/net.sh)
 
 Then, inside zos repository
 
