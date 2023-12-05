@@ -32,10 +32,6 @@ const (
 	PublicIPDataInvalid = "public ip or gateway data are not valid"
 	IPIsUsed            = "ip is already assigned to a contract"
 	FetchRealIPFailed   = "failed to get real public IP to the node"
-
-	taskSchedule    = "0 0 */6 * * *"
-	taskID          = "public-ip-validation"
-	taskDescription = "Runs on the least NodeID node in a farm to validate all its IPs."
 )
 
 var errPublicIPLookup = errors.New("failed to reach public ip service")
@@ -44,11 +40,7 @@ var errSkippedValidating = errors.New("skipped, there is a node with less ID ava
 const testMacvlan = "pub"
 const testNamespace = "pubtestns"
 
-type publicIPValidationTask struct {
-	taskID      string
-	schedule    string
-	description string
-}
+type publicIPValidationTask struct{}
 
 type IPReport struct {
 	State  string `json:"state"`
@@ -58,27 +50,26 @@ type IPReport struct {
 var _ perf.Task = (*publicIPValidationTask)(nil)
 
 func NewTask() perf.Task {
-	return &publicIPValidationTask{
-		taskID:      taskID,
-		schedule:    taskSchedule,
-		description: taskDescription,
-	}
+	return &publicIPValidationTask{}
 }
 
 func (p *publicIPValidationTask) ID() string {
-	return p.taskID
+	return "public-ip-validation"
 }
 
 func (p *publicIPValidationTask) Cron() string {
-	return p.schedule
+	return "0 0 */6 * * *"
 }
 
 func (p *publicIPValidationTask) Description() string {
-	return p.description
+	return "Runs on the least NodeID node in a farm to validate all its IPs."
+}
+
+func (p *publicIPValidationTask) Jitter() uint32 {
+	return 10 * 60
 }
 
 func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
-
 	netNS, err := namespace.GetByName(testNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace %s: %w", testNamespace, err)

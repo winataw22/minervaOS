@@ -12,6 +12,8 @@ const (
 	flagsDir = "/tmp/flags"
 	// LimitedCache represent the flag cache couldn't mount on ssd or hdd
 	LimitedCache = "limited-cache"
+	// ReadonlyCache represents the flag for cache is read only
+	ReadonlyCache = "readonly-cache"
 )
 
 // SetFlag is used when the /var/cache cannot be mounted on a SSD or HDD,

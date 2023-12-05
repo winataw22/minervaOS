@@ -1,6 +1,7 @@
 package zui
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -9,8 +10,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg/zui"
 	"github.com/urfave/cli/v2"
 )
+
+const module string = "zui"
 
 func trimFloat64(a []float64, size int) []float64 {
 	if len(a) > size {
@@ -42,6 +46,11 @@ var Module cli.Command = cli.Command{
 			Usage: "connection string to the message broker",
 			Value: "unix:///var/run/redis.sock",
 		},
+		&cli.UintFlag{
+			Name:  "workers",
+			Usage: "number of workers `N`",
+			Value: 1,
+		},
 	},
 
 	Action: action,
@@ -50,11 +59,17 @@ var Module cli.Command = cli.Command{
 func action(ctx *cli.Context) error {
 	var (
 		msgBrokerCon string = ctx.String("broker")
+		workerNr     uint   = ctx.Uint("workers")
 	)
 
 	client, err := zbus.NewRedisClient(msgBrokerCon)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to zbus")
+	}
+
+	server, err := zbus.NewRedisServer(module, msgBrokerCon, workerNr)
+	if err != nil {
+		return errors.Wrap(err, "fail to connect to message broker server")
 	}
 
 	if err := ui.Init(); err != nil {
@@ -78,6 +93,12 @@ func action(ctx *cli.Context) error {
 	resources.SetRect(0, 14, width, 22)
 	resources.Border = false
 
+	errorsParagraph := widgets.NewParagraph()
+	errorsParagraph.Title = "Errors"
+	errorsParagraph.SetRect(0, 22, width, 26)
+	errorsParagraph.Border = true
+	errorsParagraph.WrapText = true
+
 	var flag signalFlag
 
 	if err := headerRenderer(ctx.Context, client, header, &flag); err != nil {
@@ -92,8 +113,19 @@ func action(ctx *cli.Context) error {
 		log.Error().Err(err).Msg("failed to start resources renderer")
 	}
 
+	mod := zui.New(ctx.Context, errorsParagraph, &flag)
+
+	server.Register(zbus.ObjectID{Name: module, Version: "0.0.1"}, mod)
+
+	go func() {
+		if err := server.Run(ctx.Context); err != nil && err != context.Canceled {
+			log.Error().Err(err).Msg("unexpected error")
+		}
+
+	}()
+
 	render := func() {
-		ui.Render(header, netgrid, resources)
+		ui.Render(header, netgrid, resources, errorsParagraph)
 	}
 
 	render()
@@ -108,6 +140,7 @@ func action(ctx *cli.Context) error {
 			case "<Resize>":
 				payload := e.Payload.(ui.Resize)
 				header.SetRect(0, 0, payload.Width, 3)
+				errorsParagraph.SetRect(0, 22, payload.Width, 26)
 				// grid.SetRect(0, 3, payload.Width, payload.Height)
 				ui.Clear()
 				render()

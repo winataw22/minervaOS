@@ -18,11 +18,7 @@ import (
 )
 
 // IperfTest for iperf tcp/udp tests
-type IperfTest struct {
-	taskID      string
-	schedule    string
-	description string
-}
+type IperfTest struct{}
 
 // IperfResult for iperf test results
 type IperfResult struct {
@@ -43,26 +39,27 @@ func NewTask() perf.Task {
 	for _, match := range matches {
 		os.RemoveAll(match)
 	}
-	return &IperfTest{
-		taskID:      "iperf",
-		schedule:    "0 0 */6 * * *",
-		description: "Test public nodes network performance with both UDP and TCP over IPv4 and IPv6",
-	}
+	return &IperfTest{}
 }
 
 // ID returns the ID of the tcp task
 func (t *IperfTest) ID() string {
-	return t.taskID
+	return "iperf"
 }
 
 // Cron returns the schedule for the tcp task
 func (t *IperfTest) Cron() string {
-	return t.schedule
+	return "0 0 */6 * * *"
 }
 
 // Description returns the task description
 func (t *IperfTest) Description() string {
-	return t.description
+	return "Test public nodes network performance with both UDP and TCP over IPv4 and IPv6"
+}
+
+// Jitter returns the max number of seconds the job can sleep before actual execution.
+func (t *IperfTest) Jitter() uint32 {
+	return 20 * 60
 }
 
 // Run runs the tcp test and returns the result

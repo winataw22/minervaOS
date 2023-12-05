@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/host"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/utils"
 )
 
@@ -37,6 +38,11 @@ func NewUptime(sub substrate.Manager, id substrate.Identity) (*Uptime, error) {
 }
 
 func (u *Uptime) SendNow() (types.Hash, error) {
+	if !isNodeHealthy() {
+		log.Error().Msg("node is not healthy skipping uptime reports")
+		return types.Hash{}, nil
+	}
+
 	// the mutex is to avoid race when SendNow is called
 	// while the times reporting is working
 	u.m.Lock()
@@ -111,4 +117,17 @@ func (u *Uptime) Start(ctx context.Context) {
 		// even there is no error we try again until ctx is cancelled
 		<-time.After(10 * time.Second)
 	}
+}
+
+func isNodeHealthy() bool {
+	healthy := true
+	if app.CheckFlag(app.ReadonlyCache) {
+		log.Error().Msg("node cache is read only")
+		healthy = false
+	}
+	if app.CheckFlag(app.LimitedCache) {
+		log.Error().Msg("node is running on limited cache")
+		healthy = false
+	}
+	return healthy
 }

@@ -328,8 +328,8 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, opt *pk
 		return errors.Wrap(err, "failed to create overlay mountpoint")
 	}
 
-	persited := opt.PersistedVolume
-	if len(persited) == 0 {
+	persisted := opt.PersistedVolume
+	if len(persisted) == 0 {
 		// no persisted volume provided, hence
 		// we need to create one, or find one that is already
 		// there
@@ -360,12 +360,12 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, opt *pk
 			}
 		}
 
-		persited = volume.Path
+		persisted = volume.Path
 	}
 
-	log.Debug().Str("persisted-path", persited).Str("name", name).Msg("using persisted path for mount")
-	rw := filepath.Join(persited, "rw")
-	wd := filepath.Join(persited, "wd")
+	log.Debug().Str("persisted-path", persisted).Str("name", name).Msg("using persisted path for mount")
+	rw := filepath.Join(persisted, "rw")
+	wd := filepath.Join(persisted, "wd")
 	for _, d := range []string{rw, wd} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return errors.Wrapf(err, "failed to create overlay directory: %s", d)

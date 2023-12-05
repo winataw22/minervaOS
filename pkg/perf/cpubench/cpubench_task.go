@@ -10,21 +10,8 @@ import (
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
-const (
-	cpuBenchmarkTaskID       = "cpu-benchmark"
-	cpuBenchmarkCronSchedule = "0 0 */6 * * *"
-	cpuBenchmarkDescription  = "Measures the performance of the node CPU by reporting the timespent of computing a task in seconds."
-)
-
-// CPUBenchmarkTask defines CPU benchmark task data.
-type CPUBenchmarkTask struct {
-	// taskID is a unique string ID for the task.
-	taskID string
-	// schedule is a 6 field cron schedule (unlike unix cron).
-	schedule string
-	// description briefly describe what a task do.
-	description string
-}
+// CPUBenchmarkTask defines CPU benchmark task.
+type CPUBenchmarkTask struct{}
 
 // CPUBenchmarkResult holds CPU benchmark results with the workloads number during the benchmark.
 type CPUBenchmarkResult struct {
@@ -36,28 +23,29 @@ type CPUBenchmarkResult struct {
 
 var _ perf.Task = (*CPUBenchmarkTask)(nil)
 
-// NewCPUBenchmarkTask returns a new CPU benchmark task.
-func NewCPUBenchmarkTask() CPUBenchmarkTask {
-	return CPUBenchmarkTask{
-		taskID:      cpuBenchmarkTaskID,
-		schedule:    cpuBenchmarkCronSchedule,
-		description: cpuBenchmarkDescription,
-	}
+// NewTask returns a new CPU benchmark task.
+func NewTask() perf.Task {
+	return &CPUBenchmarkTask{}
 }
 
 // ID returns task ID.
 func (c *CPUBenchmarkTask) ID() string {
-	return c.taskID
+	return "cpu-benchmark"
 }
 
 // Cron returns task cron schedule.
 func (c *CPUBenchmarkTask) Cron() string {
-	return c.schedule
+	return "0 0 */6 * * *"
 }
 
 // Description returns task description.
 func (c *CPUBenchmarkTask) Description() string {
-	return c.description
+	return "Measures the performance of the node CPU by reporting the timespent of computing a task in seconds."
+}
+
+// Jitter returns the max number of seconds the job can sleep before actual execution.
+func (c *CPUBenchmarkTask) Jitter() uint32 {
+	return 0
 }
 
 // Run executes the CPU benchmark.

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	cloudContainerFlist = "https://hub.grid.tf/tf-autobuilder/cloud-container-8730b6f.flist"
+	cloudContainerFlist = "https://hub.grid.tf/tf-autobuilder/cloud-container-32b445e.flist"
 	cloudContainerName  = "cloud-container"
 )
 
