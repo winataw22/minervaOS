@@ -33,9 +33,9 @@ const (
 	cacheLabel         = "zos-cache"
 	gib                = 1024 * 1024 * 1024
 	cacheSize          = 5 * gib
-	cacheGrowPercent   = 80
+	cacheGrowPercent   = 60
 	cacheShrinkPercent = 20
-	cacheCheckDuration = 30 * time.Minute
+	cacheCheckDuration = 5 * time.Minute
 )
 
 var (

@@ -115,6 +115,8 @@ func main() {
 
 	monitor := newVersionMonitor(10*time.Second, upgrader.Version())
 	// 3. start zbus server to serve identity interface
+	log.Info().Stringer("version", monitor.GetVersion()).Msg("current")
+
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {
 		log.Fatal().Msgf("fail to connect to message broker server: %v\n", err)

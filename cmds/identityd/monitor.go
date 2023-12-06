@@ -19,6 +19,7 @@ var _ pkg.VersionMonitor = (*monitorStream)(nil)
 func newVersionMonitor(d time.Duration, version semver.Version) *monitorStream {
 	return &monitorStream{
 		duration: d,
+		version:  version,
 	}
 }
 
