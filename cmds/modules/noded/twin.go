@@ -38,7 +38,17 @@ func withDefaultPort(substrateUrl string) (string, error) {
 	return u.String(), nil
 }
 
+func pkill(ps string) error {
+	return exec.Command("pkill", "-9", ps).Run()
+}
+
 func runMsgBus(ctx context.Context, sk ed25519.PrivateKey, substrateURLs []string, relayAddr []string, redisAddr string) error {
+	// todo: this is a hack to make sure that no other rmb instances running on the node
+	// that are not managed by noded. I only saw this one time but no harm of being careful
+	if err := pkill("rmb"); err != nil {
+		log.Debug().Err(err).Msg("no rmb processes killed")
+	}
+
 	// select the first one as only one URL is set for now
 	if len(substrateURLs) == 0 {
 		return errors.New("at least one substrate URL must be provided")
