@@ -1,6 +1,7 @@
 package zinit
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -496,8 +497,10 @@ func (c *Client) StopMultiple(timeout time.Duration, service ...string) error {
 		services[name] = struct{}{}
 	}
 
-	deadline := time.After(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
+	killCount := 0
 	for len(services) > 0 {
 		var stopped []string
 		for service := range services {
@@ -531,17 +534,20 @@ func (c *Client) StopMultiple(timeout time.Duration, service ...string) error {
 		}
 
 		select {
-		case <-deadline:
+		case <-ctx.Done():
 			for service := range services {
 				log.Warn().Str("service", service).Msg("service didn't stop in time. use SIGKILL")
 				if err := c.Kill(service, SIGKILL); err != nil {
 					log.Error().Err(err).Msgf("failed to send SIGKILL to service %s", service)
 				}
 			}
-			// after a kill we wait 1 second to make sure
-			// services are really dead before we move on
+			// we do kill -9 only 10 times before we give up
+			killCount += 1
+			if killCount == 10 {
+				return fmt.Errorf("not all services are dead in time")
+			}
+			// we wait 1 second between each kill
 			<-time.After(1 * time.Second)
-			return nil
 		case <-time.After(1 * time.Second):
 		}
 	}

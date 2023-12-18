@@ -379,16 +379,26 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 
 	log.Debug().Strs("services", service).Msg("restarting services")
 	if err := u.zinit.StopMultiple(20*time.Second, service...); err != nil {
-		return err
+		// we log here so we don't leave the node in a bad state!
+		// by just trying to start as much services as we can
+		log.Error().Err(err).Msg("failed to stop all services")
 	}
 
 	for _, name := range service {
+		log.Info().Str("service", name).Msg("starting service")
 		if err := u.zinit.Forget(name); err != nil {
 			log.Warn().Err(err).Str("service", name).Msg("could not forget service")
 		}
 
 		if err := u.zinit.Monitor(name); err != nil && err != zinit.ErrAlreadyMonitored {
 			log.Error().Err(err).Str("service", name).Msg("could not monitor service")
+		}
+
+		// this has no effect if Monitor already worked with no issue
+		// but we do it anyway for services that could not be forgotten (did not stop)
+		// so we start them again
+		if err := u.zinit.Start(name); err != nil {
+			log.Error().Err(err).Str("service", name).Msg("could not start service")
 		}
 	}
 
