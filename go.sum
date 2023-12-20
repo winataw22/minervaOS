@@ -106,6 +106,7 @@ github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c/go.mod h1:Ct2BUK8SB0YC1S
 github.com/d2g/dhcp4client v1.0.0/go.mod h1:j0hNfjhrt2SxUOw55nL0ATM/z4Yt3t2Kd1mW34z5W5s=
 github.com/d2g/dhcp4server v0.0.0-20181031114812-7d4a0a7f59a5/go.mod h1:Eo87+Kg/IX2hfWJfwxMzLyuSZyxSoAug2nGa1G2QAi8=
 github.com/d2g/hardwareaddr v0.0.0-20190221164911-e7d9fbe030e4/go.mod h1:bMl4RjIciD2oAxI7DmWRx6gbeqrkoLqv3MV0vzNad+I=
+github.com/dave/jennifer v1.3.0/go.mod h1:fIb+770HOpJ2fmN9EPPKOqm1vMGhB+TwXKMZhrIygKg=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -534,6 +535,8 @@ github.com/threefoldtech/0-fs v1.3.1-0.20230829115549-fb4c502d6d93 h1:zUuaeCpE92
 github.com/threefoldtech/0-fs v1.3.1-0.20230829115549-fb4c502d6d93/go.mod h1:6CV22IyiPkZoHxA7+140GBZ0EN5l9k7EjfY6ihQDiwY=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231017113908-9d56a805ead0 h1:pglLeTJMA2ScxF0vvsV3lIuwqykWKjVoPZZmjRY/pL4=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231017113908-9d56a805ead0/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231219172415-55d2f8e63f47 h1:UXtGyqxZY8M+5v0/1COne9ztio4zxA9EBD9XjjsRqWY=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231219172415-55d2f8e63f47/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4 h1:A5UXbV+UhqL3RKIoVLSjfk+bNLJP7IhyfyfAHbvjx+o=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4/go.mod h1:syWja2/ZiUoGXnhRWiCGWmTMZ9B1vf5exZ5gdIj9118=
 github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=

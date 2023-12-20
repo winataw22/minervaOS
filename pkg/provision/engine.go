@@ -779,14 +779,18 @@ func (e *NativeEngine) updateWorkload(ctx context.Context, wl *gridtypes.Workloa
 	if e.provisioner.CanUpdate(ctx, wl.Type) {
 		result, err = e.provisioner.Update(ctx, wl)
 	} else {
-		// deprecated. We should never update resources by decomission and then provsion
+		// deprecated. We should never update resources by decommission and then provision
 		// the check in Update method should prevent this
 		// #unreachable
 		err = fmt.Errorf("can not update this workload type")
 	}
 
 	if errors.Is(err, ErrNoActionNeeded) {
-		return nil
+		currentWl, err := e.storage.Current(twin, deployment, name)
+		if err != nil {
+			return err
+		}
+		result = currentWl.Result
 	} else if err != nil {
 		return err
 	}

@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
 
-	"github.com/machinebox/graphql"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -46,8 +44,8 @@ var (
 
 type options struct {
 	mnemonics string
-	dry       bool
 	network   string
+	farm      uint64
 }
 
 type Result struct {
@@ -58,7 +56,7 @@ type Result struct {
 }
 
 func run(opt options) error {
-	sudo, err := substrate.NewIdentityFromSr25519Phrase(opt.mnemonics)
+	identity, err := substrate.NewIdentityFromSr25519Phrase(opt.mnemonics)
 	if err != nil {
 		return errors.Wrap(err, "failed to create identity from mnemonics")
 	}
@@ -79,55 +77,20 @@ func run(opt options) error {
 
 	defer cl.Close()
 
-	grqph := graphql.NewClient(urls.Graphql)
-	req := graphql.NewRequest(`
-	query MyQuery ($limit: Int!, $offset: Int!){
-		nodes(where: {certification_eq: Diy, secure_eq: true}, limit: $limit, offset: $offset, orderBy: nodeID_ASC) {
-		  nodeID
-		  farmID
-		}
-	  }
-	`)
-
-	possible := 0
-	certified := 0
-
-	i := 0
-	for {
-		req.Var("limit", limit)
-		req.Var("offset", i*limit)
-		i += 1
-		var result Result
-		if err := grqph.Run(context.TODO(), req, &result); err != nil {
-			return err
-		}
-		if len(result.Nodes) == 0 {
-			break
-		}
-
-		for _, node := range result.Nodes {
-			log := log.With().
-				Uint32("node-id", uint32(node.NodeID)).
-				Uint32("farm-id", uint32(node.FarmID)).
-				Logger()
-
-			log.Info().Msg("possible node to certify")
-			possible++
-			if opt.dry {
-				continue
-			}
-
-			if err := cl.SetNodeCertificate(sudo, uint32(node.NodeID), substrate.NodeCertification{IsCertified: true}); err != nil {
-				log.Error().Err(err).Msg("failed to mark node as certified")
-				continue
-			}
-
-			certified++
-		}
+	nodes, err := cl.GetNodes(uint32(opt.farm))
+	if err != nil {
+		return fmt.Errorf("failed to get farm nodes: %w", err)
 	}
 
-	log.Info().Int("count", possible).Msg("found nodes that can be certified")
-	log.Info().Int("count", certified).Msg("nodes that has been certified by this run")
+	for _, node := range nodes {
+		hash, err := cl.SetNodePowerTarget(identity, node, true)
+		if err != nil {
+			log.Error().Err(err).Uint32("node", node).Msg("failed to set node target to up")
+			continue
+		}
+		log.Info().Uint32("node", node).Str("block", hash.Hex()).Msg("node target was set to up")
+	}
+
 	return nil
 }
 
@@ -137,8 +100,8 @@ func main() {
 	var debug bool
 
 	flag.StringVar(&opt.network, "network", "main", "network (main, test, dev)")
-	flag.BoolVar(&opt.dry, "dry-run", false, "print the list of the nodes to be migrated")
-	flag.StringVar(&opt.mnemonics, "mnemonics", "", "mnemonics for the sudo key")
+	flag.StringVar(&opt.mnemonics, "mnemonics", "", "mnemonics for the farmer")
+	flag.Uint64Var(&opt.farm, "farm", 0, "farm id")
 	flag.BoolVar(&debug, "debug", false, "show debugging logs")
 	flag.Parse()
 
@@ -146,6 +109,10 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
+	if opt.farm == 0 {
+		fmt.Fprintf(os.Stderr, "farm id is required")
 	}
 
 	if len(opt.mnemonics) == 0 {
