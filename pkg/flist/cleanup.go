@@ -15,8 +15,8 @@ import (
 // Cleaner interface, implementer of this interface
 // can start a cleaner job
 type Cleaner interface {
-	// MountsCleaner runs the clean process, MountsCleaner should be
-	// blocking. Caller then can do `go MountsCleaner()` to run it in the background
+	// CacheCleaner runs the clean process, CacheCleaner should be
+	// blocking. Caller then can do `go CacheCleaner()` to run it in the background
 	CacheCleaner(ctx context.Context, every time.Duration, age time.Duration)
 }
 
@@ -123,6 +123,23 @@ func (f *flistModule) cleanUnusedMounts() error {
 
 		if err := os.RemoveAll(mount.Target); err != nil {
 			log.Error().Err(err).Str("target", mount.Target).Msg("failed to delete mountpoint")
+		}
+	}
+
+	// clean any folder that is not a mount point.
+	entries, err := os.ReadDir(f.mountpoint)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		path := filepath.Join(f.mountpoint, entry.Name())
+		if err := f.isMountpoint(path); err == nil {
+			continue
+		}
+
+		if err := os.Remove(path); err != nil {
+			log.Error().Err(err).Msgf("failed to clean mountpoint %s", path)
 		}
 	}
 

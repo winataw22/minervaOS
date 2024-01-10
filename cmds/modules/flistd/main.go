@@ -71,7 +71,7 @@ func action(cli *cli.Context) error {
 	ctx, _ := utils.WithSignal(context.Background())
 
 	if cleaner, ok := mod.(flist.Cleaner); ok {
-		//go cleaner.MountsCleaner(ctx, time.Minute)
+		// go cleaner.MountsCleaner(ctx, cacheCleanup)
 		go cleaner.CacheCleaner(ctx, cacheCleanup, cacheAge)
 	}
 
