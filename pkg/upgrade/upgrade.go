@@ -163,6 +163,7 @@ func (u *Upgrader) Run(ctx context.Context) error {
 		} else if err != nil {
 			log.Error().Err(err).Msg("failed while checking for updates")
 			<-time.After(10 * time.Second)
+			continue
 		}
 
 		select {
