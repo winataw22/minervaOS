@@ -537,6 +537,8 @@ github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231017113908
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231017113908-9d56a805ead0/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231219172415-55d2f8e63f47 h1:UXtGyqxZY8M+5v0/1COne9ztio4zxA9EBD9XjjsRqWY=
 github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231219172415-55d2f8e63f47/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20240116163757-68c63d80a9e0 h1:0ZMm/xYPgYv3vICNRw3vXTiJ/jVg8LkBLe8TPBEO0MQ=
+github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20240116163757-68c63d80a9e0/go.mod h1:dtDKAPiUDxAwIkfHV7xcAFZcOm+xwNIuOI1MLFS+MeQ=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4 h1:A5UXbV+UhqL3RKIoVLSjfk+bNLJP7IhyfyfAHbvjx+o=
 github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4/go.mod h1:syWja2/ZiUoGXnhRWiCGWmTMZ9B1vf5exZ5gdIj9118=
 github.com/threefoldtech/zbus v1.0.1 h1:3KaEpyOiDYAw+lrAyoQUGIvY9BcjVRXlQ1beBRqhRNk=

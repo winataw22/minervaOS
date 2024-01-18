@@ -45,7 +45,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.8.4
 	github.com/threefoldtech/0-fs v1.3.1-0.20230829115549-fb4c502d6d93
-	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20231219172415-55d2f8e63f47
+	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20240116163757-68c63d80a9e0
 	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tyler-smith/go-bip39 v1.1.0
