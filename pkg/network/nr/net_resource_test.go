@@ -83,8 +83,7 @@ func (t *testIdentityManager) PrivateKey() []byte {
 }
 
 func TestNamespace(t *testing.T) {
-	nr, err := New(pkg.Network{})
-	require.NoError(t, err)
+	nr := New(pkg.Network{}, "")
 
 	nsName, err := nr.Namespace()
 	require.NoError(t, err)
@@ -101,8 +100,7 @@ func TestNamespace(t *testing.T) {
 }
 
 func TestNaming(t *testing.T) {
-	nr, err := New(pkg.Network{})
-	require.NoError(t, err)
+	nr := New(pkg.Network{}, "")
 
 	nsName, err := nr.Namespace()
 	require.NoError(t, err)
@@ -119,13 +117,12 @@ func TestNaming(t *testing.T) {
 }
 
 func TestCreateBridge(t *testing.T) {
-	nr, err := New(pkg.Network{})
-	require.NoError(t, err)
+	nr := New(pkg.Network{}, "")
 
 	brName, err := nr.BridgeName()
 	require.NoError(t, err)
 
-	err = nr.createBridge()
+	err = nr.ensureNRBridge()
 	require.NoError(t, err)
 
 	l, err := netlink.LinkByName(brName)
@@ -204,4 +201,30 @@ func Test_convert4to6(t *testing.T) {
 			assert.EqualValues(t, tt.want, got)
 		})
 	}
+}
+
+func TestMyceliumGw(t *testing.T) {
+	data := MyceliumInspection{
+		Address: net.ParseIP("3b4:ca67:822d:b0c1:5d6f:c647:1ed8:6ced"),
+	}
+
+	subnet, gw, err := data.Gateway()
+	require.NoError(t, err)
+
+	require.Equal(t, net.ParseIP("3b4:ca67:822d:b0c1::1"), gw.IP)
+	require.Equal(t, "3b4:ca67:822d:b0c1::1/64", gw.String())
+	require.Equal(t, "3b4:ca67:822d:b0c1::/64", subnet.String())
+
+}
+func TestMyceliumIP(t *testing.T) {
+	data := MyceliumInspection{
+		Address: net.ParseIP("3b4:ca67:822d:b0c1:5d6f:c647:1ed8:6ced"),
+	}
+
+	ip, gw, err := data.IP([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
+	require.NoError(t, err)
+
+	require.Equal(t, net.ParseIP("3b4:ca67:822d:b0c1:ffff:11:2233:4455"), ip.IP)
+	require.Equal(t, "3b4:ca67:822d:b0c1::1/64", gw.String())
+
 }

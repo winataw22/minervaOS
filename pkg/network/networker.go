@@ -59,6 +59,7 @@ const (
 	networkDir          = "networks"
 	linkDir             = "link"
 	ipamLeaseDir        = "ndmz-lease"
+	myceliumKeyDir      = "mycelium-key"
 	zdbNamespacePrefix  = "zdb-ns-"
 	qsfsNamespacePrefix = "qfs-ns-"
 )
@@ -73,11 +74,12 @@ var (
 )
 
 type networker struct {
-	identity     *stubs.IdentityManagerStub
-	networkDir   string
-	linkDir      string
-	ipamLeaseDir string
-	portSet      *set.UIntSet
+	identity       *stubs.IdentityManagerStub
+	networkDir     string
+	linkDir        string
+	ipamLeaseDir   string
+	myceliumKeyDir string
+	portSet        *set.UIntSet
 
 	ndmz ndmz.DMZ
 	ygg  *yggdrasil.YggServer
@@ -95,19 +97,21 @@ func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdr
 	runtimeDir := filepath.Join(vd, networkDir)
 	linkDir := filepath.Join(runtimeDir, linkDir)
 	ipamLease := filepath.Join(vd, ipamLeaseDir)
+	myceliumKey := filepath.Join(vd, myceliumKeyDir)
 
-	for _, dir := range []string{linkDir, ipamLease} {
+	for _, dir := range []string{linkDir, ipamLease, myceliumKey} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, errors.Wrapf(err, "failed to create directory: '%s'", dir)
 		}
 	}
 
 	nw := &networker{
-		identity:     identity,
-		networkDir:   runtimeDir,
-		linkDir:      linkDir,
-		ipamLeaseDir: ipamLease,
-		portSet:      set.NewInt(),
+		identity:       identity,
+		networkDir:     runtimeDir,
+		linkDir:        linkDir,
+		ipamLeaseDir:   ipamLease,
+		myceliumKeyDir: myceliumKey,
+		portSet:        set.NewInt(),
 
 		ygg:  ygg,
 		ndmz: ndmz,
@@ -282,10 +286,7 @@ func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (ifc string, 
 		return "", errors.Wrapf(err, "couldn't load network with id (%s)", networkID)
 	}
 
-	netRes, err := nr.New(localNR)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to load network resource")
-	}
+	netRes := nr.New(localNR, n.myceliumKeyDir)
 
 	bridgeName, err := netRes.BridgeName()
 	if err != nil {
@@ -349,9 +350,53 @@ func (n *networker) SetupPubTap(name string) (string, error) {
 	return tapIface, err
 }
 
+// SetupMyceliumTap creates a new mycelium tap device attached to this network resource with deterministic IP address
+func (n *networker) SetupMyceliumTap(name string, netID zos.NetID, config zos.MyceliumIP) (tap pkg.PlanetaryTap, err error) {
+	log.Info().Str("tap-name", string(name)).Msg("Setting up mycelium tap interface")
+
+	network, err := n.networkOf(netID)
+	if err != nil {
+		return tap, errors.Wrapf(err, "failed to get network resource '%s'", netID)
+	}
+
+	if network.Mycelium == nil {
+		return tap, fmt.Errorf("network resource does not support mycelium")
+	}
+
+	tapIface, err := tapName(name)
+	if err != nil {
+		return tap, errors.Wrap(err, "could not get network namespace tap device name")
+	}
+
+	tap.Name = tapIface
+
+	// calculate the hw address that will be set INSIDE the vm (not the host)
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("mycelium:" + name))
+	tap.HW = hw
+
+	netNR := nr.New(network, n.myceliumKeyDir)
+
+	ip, gw, err := netNR.MyceliumIP(config.Seed)
+	if err != nil {
+		return tap, err
+	}
+	tap.IP = ip
+	tap.Gateway = gw
+
+	if ifaceutil.Exists(tapIface, nil) {
+		return tap, nil
+	}
+
+	if err := netNR.AttachMycelium(tapIface); err != nil {
+		return tap, err
+	}
+
+	return tap, err
+}
+
 // SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
-func (n *networker) SetupYggTap(name string) (tap pkg.YggdrasilTap, err error) {
-	log.Info().Str("pubtap-name", string(name)).Msg("Setting up public tap interface")
+func (n *networker) SetupYggTap(name string) (tap pkg.PlanetaryTap, err error) {
+	log.Info().Str("tap-name", string(name)).Msg("Setting up yggdrasil tap interface")
 
 	tapIface, err := tapName(name)
 	if err != nil {
@@ -762,6 +807,10 @@ func (n *networker) Addrs(iface string, netns string) (ips []net.IP, mac string,
 func (n *networker) CreateNR(wl gridtypes.WorkloadID, netNR pkg.Network) (string, error) {
 	log.Info().Str("network", string(netNR.NetID)).Msg("create network resource")
 
+	if err := n.storeNetwork(wl, netNR); err != nil {
+		return "", errors.Wrap(err, "failed to store network object")
+	}
+
 	// check if there is a reserved wireguard port for this NR already
 	// or if we need to update it
 	storedNR, err := n.networkOf(netNR.NetID)
@@ -779,10 +828,7 @@ func (n *networker) CreateNR(wl gridtypes.WorkloadID, netNR pkg.Network) (string
 		return "", err
 	}
 
-	netr, err := nr.New(netNR)
-	if err != nil {
-		return "", err
-	}
+	netr := nr.New(netNR, n.myceliumKeyDir)
 
 	cleanup := func() {
 		log.Error().Msg("clean up network resource")
@@ -808,6 +854,11 @@ func (n *networker) CreateNR(wl gridtypes.WorkloadID, netNR pkg.Network) (string
 	log.Info().Msg("create network resource namespace")
 	if err = netr.Create(); err != nil {
 		return "", errors.Wrap(err, "failed to create network resource")
+	}
+
+	// setup mycelium
+	if err := netr.SetMycelium(); err != nil {
+		return "", errors.Wrap(err, "failed to setup mycelium")
 	}
 
 	exists, err := netr.HasWireguard()
@@ -837,10 +888,6 @@ func (n *networker) CreateNR(wl gridtypes.WorkloadID, netNR pkg.Network) (string
 
 	if err = netr.ConfigureWG(netNR.WGPrivateKey); err != nil {
 		return "", errors.Wrap(err, "failed to configure network resource")
-	}
-
-	if err = n.storeNetwork(wl, netNR); err != nil {
-		return "", errors.Wrap(err, "failed to store network object")
 	}
 
 	return netr.Namespace()
@@ -902,10 +949,7 @@ func (n *networker) DeleteNR(wl gridtypes.WorkloadID) error {
 		return err
 	}
 
-	nr, err := nr.New(netNR)
-	if err != nil {
-		return errors.Wrap(err, "failed to load network resource")
-	}
+	nr := nr.New(netNR, n.myceliumKeyDir)
 
 	if err := nr.Delete(); err != nil {
 		return errors.Wrap(err, "failed to delete network resource")

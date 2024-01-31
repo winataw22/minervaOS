@@ -1,0 +1,29 @@
+@startuml
+component [m-<netid>] as bridge
+note left of bridge
+- net.ipv6.conf.b-<netid>.disable_ipv6 = 1
+- tap devices are cerated attached to this bridge
+- tap devices assigned to VMs
+- VM given an IP in the correct `/64` subnet
+end note
+
+package "n-<netid> namespace" {
+    component [br-my\nmacvlan] as nic
+    bridge .. nic: macvlan
+
+    note bottom of nic
+    - br-my gets the first ip "::1" in the assigned
+    user subnet.
+    - works as gw for VMs
+    - route rule added `NET/64 via br-my`
+    - example: `3b4:ca67:822d:b0c1::/64 dev br-my`
+    end note
+    component [my\nmyceliunm interface] as my
+
+    note bottom of my
+    - gets IP from mycelium process (from the seed)
+    - example: `3b4:ca67:822d:b0c1:5d6f:c647:1ed8:6ced/7`
+    end note
+}
+
+@enduml

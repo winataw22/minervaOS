@@ -1,6 +1,7 @@
 package zos
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -66,4 +67,36 @@ func (d DeviceType) Valid() error {
 		return fmt.Errorf("invalid device type")
 	}
 	return nil
+}
+
+// Bytes value that is represented as hex when serialized to json
+type Bytes []byte
+
+// BytesFromHex creates bytes from hex
+func BytesFromHex(h string) (Bytes, error) {
+	return hex.DecodeString(h)
+}
+
+// MustBytesFromHex like BytesFromHex but panics if h is not a valid hex string
+func MustBytesFromHex(h string) Bytes {
+	bytes, err := BytesFromHex(h)
+	if err != nil {
+		panic(err)
+	}
+
+	return bytes
+}
+
+func (h *Bytes) UnmarshalText(text []byte) error {
+	data, err := hex.DecodeString(string(text))
+	if err != nil {
+		return err
+	}
+
+	*h = data
+	return nil
+}
+
+func (h Bytes) MarshalText() (text []byte, err error) {
+	return []byte(hex.EncodeToString(h)), nil
 }

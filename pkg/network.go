@@ -21,8 +21,8 @@ type ContainerNetworkConfig struct {
 	YggdrasilIP bool
 }
 
-// YggdrasilTap structure
-type YggdrasilTap struct {
+// PlanetaryTap structure
+type PlanetaryTap struct {
 	Name    string
 	HW      net.HardwareAddr
 	IP      net.IPNet
@@ -115,8 +115,11 @@ type Networker interface {
 	// to the network bridge. The name of the tap interface is returned
 	SetupPrivTap(networkID NetID, name string) (tap string, err error)
 
+	// SetupMyceliumTap creates a new mycelium tap device attached to this network resource with deterministic IP address
+	SetupMyceliumTap(name string, netID zos.NetID, config zos.MyceliumIP) (PlanetaryTap, error)
+
 	// SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
-	SetupYggTap(name string) (YggdrasilTap, error)
+	SetupYggTap(name string) (PlanetaryTap, error)
 
 	// TapExists checks if the tap device with the given name exists already
 	TapExists(name string) (bool, error)

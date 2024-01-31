@@ -137,3 +137,9 @@ jobs:
       package: cpubench
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  mycelium:
+    uses: ./.github/workflows/bin-package.yaml
+    with:
+      package: mycelium
+    secrets:
+      token: ${{ secrets.HUB_JWT }}

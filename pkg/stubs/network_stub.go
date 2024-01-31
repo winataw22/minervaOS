@@ -518,6 +518,23 @@ func (s *NetworkerStub) SetPublicExitDevice(ctx context.Context, arg0 string) (r
 	return
 }
 
+func (s *NetworkerStub) SetupMyceliumTap(ctx context.Context, arg0 string, arg1 zos.NetID, arg2 zos.MyceliumIP) (ret0 pkg.PlanetaryTap, ret1 error) {
+	args := []interface{}{arg0, arg1, arg2}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupMyceliumTap", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) SetupPrivTap(ctx context.Context, arg0 zos.NetID, arg1 string) (ret0 string, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupPrivTap", args...)
@@ -567,7 +584,7 @@ func (s *NetworkerStub) SetupPubTap(ctx context.Context, arg0 string) (ret0 stri
 	return
 }
 
-func (s *NetworkerStub) SetupYggTap(ctx context.Context, arg0 string) (ret0 pkg.YggdrasilTap, ret1 error) {
+func (s *NetworkerStub) SetupYggTap(ctx context.Context, arg0 string) (ret0 pkg.PlanetaryTap, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "SetupYggTap", args...)
 	if err != nil {

@@ -56,3 +56,14 @@ func RemoveService(name string) error {
 	path := filepath.Join("/etc/zinit", fmt.Sprintf("%s.yaml", name))
 	return os.RemoveAll(path)
 }
+
+func LoadService(name string) (service InitService, err error) {
+	path := filepath.Join("/etc/zinit", fmt.Sprintf("%s.yaml", name))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return service, err
+	}
+
+	err = yaml.Unmarshal(data, &service)
+	return
+}

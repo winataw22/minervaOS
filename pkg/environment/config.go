@@ -17,6 +17,9 @@ type Config struct {
 	Yggdrasil struct {
 		Peers []string `json:"peers"`
 	} `json:"yggdrasil"`
+	Mycelium struct {
+		Peers []string `json:"peers"`
+	} `json:"mycelium"`
 }
 
 // Merge, updates current config with cfg merging and override config

@@ -175,6 +175,39 @@ func (p *Manager) prepContainer(
 	return nil
 }
 
+func (p *Manager) newMyceliumNetworkInterface(ctx context.Context, dl gridtypes.Deployment, wl *gridtypes.WorkloadWithID, config *zos.MyceliumIP) (pkg.VMIface, error) {
+	network := stubs.NewNetworkerStub(p.zbus)
+	netID := zos.NetworkID(dl.TwinID, config.Network)
+
+	tapName := wl.ID.Unique("mycelium")
+	iface, err := network.SetupMyceliumTap(ctx, tapName, netID, *config)
+
+	if err != nil {
+		return pkg.VMIface{}, errors.Wrap(err, "could not set up tap device")
+	}
+
+	out := pkg.VMIface{
+		Tap: iface.Name,
+		MAC: iface.HW.String(),
+		IPs: []net.IPNet{
+			iface.IP,
+		},
+		Routes: []pkg.Route{
+			{
+				Net: net.IPNet{
+					IP:   net.ParseIP("200::"),
+					Mask: net.CIDRMask(7, 128),
+				},
+				Gateway: iface.Gateway.IP,
+			},
+		},
+		PublicIPv4: false,
+		PublicIPv6: false,
+	}
+
+	return out, nil
+}
+
 func (p *Manager) newYggNetworkInterface(ctx context.Context, wl *gridtypes.WorkloadWithID) (pkg.VMIface, error) {
 	network := stubs.NewNetworkerStub(p.zbus)
 
