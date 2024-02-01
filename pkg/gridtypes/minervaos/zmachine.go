@@ -39,6 +39,10 @@ type MyceliumIP struct {
 }
 
 func (c *MyceliumIP) Challenge(w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "%s", c.Network); err != nil {
+		return err
+	}
+
 	if _, err := fmt.Fprintf(w, "%x", c.Seed); err != nil {
 		return err
 	}
@@ -349,4 +353,28 @@ type ZMachineResult struct {
 	IP          string `json:"ip"`
 	PlanetaryIP string `json:"planetary_ip"`
 	ConsoleURL  string `json:"console_url"`
+}
+
+func (r *ZMachineResult) UnmarshalJSON(data []byte) error {
+	var deprecated struct {
+		ID          string `json:"id"`
+		IP          string `json:"ip"`
+		YggIP       string `json:"ygg_ip"`
+		PlanetaryIP string `json:"planetary_ip"`
+		ConsoleURL  string `json:"console_url"`
+	}
+
+	if err := json.Unmarshal(data, &deprecated); err != nil {
+		return err
+	}
+
+	r.ID = deprecated.ID
+	r.IP = deprecated.IP
+	r.PlanetaryIP = deprecated.PlanetaryIP
+	if deprecated.YggIP != "" {
+		r.PlanetaryIP = deprecated.YggIP
+	}
+	r.ConsoleURL = deprecated.ConsoleURL
+
+	return nil
 }

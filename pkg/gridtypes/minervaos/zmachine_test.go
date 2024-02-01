@@ -1,6 +1,7 @@
 package zos
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -93,4 +94,25 @@ func TestZMachineSRU(t *testing.T) {
 			require.Equal(t, expected, vm.RootSize())
 		})
 	}
+}
+
+func TestResultDeprecated(t *testing.T) {
+	raw := ` {
+		"id": "192-74881-testing2",
+		"ip": "10.20.2.2",
+		"ygg_ip": "32b:8310:9b03:5529:ff0f:37cd:de80:b322",
+		"console_url": "10.20.2.0:20002"
+	  }`
+
+	var result ZMachineResult
+
+	err := json.Unmarshal([]byte(raw), &result)
+	require.NoError(t, err)
+
+	require.EqualValues(t, ZMachineResult{
+		ID:          "192-74881-testing2",
+		IP:          "10.20.2.2",
+		PlanetaryIP: "32b:8310:9b03:5529:ff0f:37cd:de80:b322",
+		ConsoleURL:  "10.20.2.0:20002",
+	}, result)
 }
