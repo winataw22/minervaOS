@@ -79,6 +79,7 @@ import (
 	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/capacity/dmi"
+	"github.com/threefoldtech/zos/pkg/diagnostics"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
@@ -325,5 +326,11 @@ func (n *NodeClient) SystemHypervisor(ctx context.Context) (result string, err e
 		return
 	}
 
+	return
+}
+
+func (n *NodeClient) SystemDiagnostics(ctx context.Context) (result diagnostics.Diagnostics, err error) {
+	const cmd = "zos.system.diagnostics"
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result)
 	return
 }
