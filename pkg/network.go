@@ -162,6 +162,10 @@ type Networker interface {
 	// GetPublicIPv6Subnet returns the IPv6 prefix op the public subnet of the host
 	GetPublicIPv6Subnet() (net.IPNet, error)
 
+	// GetPublicIPV6Gateway gets the gateway for public IPv6 that can be used
+	// by the VMs
+	GetPublicIPV6Gateway() (net.IP, error)
+
 	// GetDefaultGwIP returns the IPs of the default gateways inside the network
 	// resource identified by the network ID on the local node, for IPv4 and IPv6
 	// respectively

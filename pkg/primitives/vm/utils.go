@@ -335,22 +335,31 @@ func (p *Manager) newPubNetworkInterface(ctx context.Context, deployment gridtyp
 	// to set the IP on the interface. We need to configure it ONLY for ipv4
 	// hence:
 	var ips []net.IPNet
-	var gw net.IP
+	var gw4 net.IP
+	var gw6 net.IP
+
 	if !config.IP.Nil() {
-		ips = []net.IPNet{
-			config.IP.IPNet,
+		ips = append(ips, config.IP.IPNet)
+		gw4 = config.Gateway
+	}
+
+	if !config.IPv6.Nil() {
+		ips = append(ips, config.IPv6.IPNet)
+		gw6, err = network.GetPublicIPV6Gateway(ctx)
+		log.Debug().IPAddr("gw", gw6).Msg("found gateway for ipv6")
+		if err != nil {
+			return pkg.VMIface{}, errors.Wrap(err, "failed to get the default gateway for ipv6")
 		}
-		gw = config.Gateway
 	}
 
 	return pkg.VMIface{
 		Tap:               pubIface,
 		MAC:               mac.String(), // mac so we always get the same IPv6 from slaac
 		IPs:               ips,
-		IP4DefaultGateway: gw,
-		// for now we get ipv6 from slaac, so leave ipv6 stuffs this empty
-		PublicIPv4: config.HasIPv4(),
-		PublicIPv6: config.HasIPv6(),
+		IP4DefaultGateway: gw4,
+		IP6DefaultGateway: gw6,
+		PublicIPv4:        config.HasIPv4(),
+		PublicIPv6:        config.HasIPv6(),
 	}, nil
 }
 

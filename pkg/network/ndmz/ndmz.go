@@ -31,6 +31,10 @@ type DMZ interface {
 	// GetIP gets ndmz public ips from ndmz
 	GetIP(family int) ([]net.IPNet, error)
 
+	// Get gateway to given destination ip
+	GetDefaultGateway(destination net.IP) (net.IP, error)
+
+	// GetIPFor get the ip of an
 	GetIPFor(inf string) ([]net.IPNet, error)
 	//GetIP(family netlink.FAM)
 	// SupportsPubIPv4 indicates if the node supports public ipv4 addresses for

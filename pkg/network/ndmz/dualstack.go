@@ -303,6 +303,39 @@ func (d *dmzImpl) GetIP(family int) ([]net.IPNet, error) {
 	return results, err
 }
 
+// Get gateway to given destination ip
+func (d *dmzImpl) GetDefaultGateway(destination net.IP) (net.IP, error) {
+	netns, err := namespace.GetByName(dmzNamespace)
+	if err != nil {
+		return nil, err
+	}
+
+	defer netns.Close()
+
+	var gw net.IP
+	err = netns.Do(func(_ ns.NetNS) error {
+		routes, err := netlink.RouteGet(destination)
+		if err != nil {
+			return err
+		}
+
+		for _, route := range routes {
+			if route.Gw != nil {
+				gw = route.Gw
+				return nil
+			}
+		}
+
+		return nil
+	})
+
+	if gw == nil {
+		return nil, fmt.Errorf("default gateway not found")
+	}
+
+	return gw, err
+}
+
 // SupportsPubIPv4 implements DMZ interface
 func (d *dmzImpl) SupportsPubIPv4() bool {
 	return true

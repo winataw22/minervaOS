@@ -638,6 +638,12 @@ func (n *networker) GetPublicIPv6Subnet() (net.IPNet, error) {
 	return net.IPNet{}, fmt.Errorf("no public ipv6 found")
 }
 
+func (n *networker) GetPublicIPV6Gateway() (net.IP, error) {
+	// simply find the default gw for a well known public ip. in this case
+	// we use the public google dns service
+	return n.ndmz.GetDefaultGateway(net.ParseIP("2001:4860:4860::8888"))
+}
+
 // GetSubnet of a local network resource identified by the network ID, ipv4 and ipv6
 // subnet respectively
 func (n *networker) GetSubnet(networkID pkg.NetID) (net.IPNet, error) {
