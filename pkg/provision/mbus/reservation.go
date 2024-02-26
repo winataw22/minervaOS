@@ -80,6 +80,25 @@ func (d *Deployments) get(ctx context.Context, payload []byte) (interface{}, mw.
 	return deployment, nil
 }
 
+func (d *Deployments) list(ctx context.Context, payload []byte) ([]gridtypes.Deployment, error) {
+	deploymentIDs, err := d.engine.Storage().ByTwin(rmb.GetTwinID(ctx))
+	if err != nil {
+		return nil, err
+	}
+	deployments := make([]gridtypes.Deployment, 0)
+	for _, id := range deploymentIDs {
+		deployment, err := d.engine.Storage().Get(rmb.GetTwinID(ctx), id)
+		if err != nil {
+			return nil, err
+		}
+		if !deployment.IsActive() {
+			continue
+		}
+		deployments = append(deployments, deployment)
+	}
+	return deployments, nil
+}
+
 func (d *Deployments) changes(ctx context.Context, payload []byte) (interface{}, mw.Response) {
 	var args idArgs
 	err := json.Unmarshal(payload, &args)

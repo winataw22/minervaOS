@@ -352,6 +352,7 @@ type ZMachineResult struct {
 	ID          string `json:"id"`
 	IP          string `json:"ip"`
 	PlanetaryIP string `json:"planetary_ip"`
+	MyceliumIP  string `json:"mycelium_ip"`
 	ConsoleURL  string `json:"console_url"`
 }
 
@@ -361,6 +362,7 @@ func (r *ZMachineResult) UnmarshalJSON(data []byte) error {
 		IP          string `json:"ip"`
 		YggIP       string `json:"ygg_ip"`
 		PlanetaryIP string `json:"planetary_ip"`
+		MyceliumIP  string `json:"mycelium_ip"`
 		ConsoleURL  string `json:"console_url"`
 	}
 
@@ -374,6 +376,7 @@ func (r *ZMachineResult) UnmarshalJSON(data []byte) error {
 	if deprecated.YggIP != "" {
 		r.PlanetaryIP = deprecated.YggIP
 	}
+	r.MyceliumIP = deprecated.MyceliumIP
 	r.ConsoleURL = deprecated.ConsoleURL
 
 	return nil

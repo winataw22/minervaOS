@@ -200,24 +200,25 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 	}
 
 	if config.Network.Planetary {
-		var inf pkg.VMIface
-		if config.Network.Mycelium == nil {
-			inf, err = p.newYggNetworkInterface(ctx, wl)
-			if err != nil {
-				return result, err
-			}
-			ifs = append(ifs, wl.ID.Unique("ygg"))
-		} else {
-			inf, err = p.newMyceliumNetworkInterface(ctx, deployment, wl, config.Network.Mycelium)
-			if err != nil {
-				return result, err
-			}
-			ifs = append(ifs, wl.ID.Unique("mycelium"))
+		inf, err := p.newYggNetworkInterface(ctx, wl)
+		if err != nil {
+			return result, err
 		}
+		ifs = append(ifs, wl.ID.Unique("ygg"))
 
 		log.Debug().Msgf("Planetary: %+v", inf)
 		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
 		result.PlanetaryIP = inf.IPs[0].IP.String()
+	}
+
+	if config.Network.Mycelium != nil {
+		inf, err := p.newMyceliumNetworkInterface(ctx, deployment, wl, config.Network.Mycelium)
+		if err != nil {
+			return result, err
+		}
+		ifs = append(ifs, wl.ID.Unique("mycelium"))
+		networkInfo.Ifaces = append(networkInfo.Ifaces, inf)
+		result.MyceliumIP = inf.IPs[0].IP.String()
 	}
 	// - mount flist RO
 	mnt, err := flist.Mount(ctx, wl.ID.String(), config.FList, pkg.ReadOnlyMountOptions)

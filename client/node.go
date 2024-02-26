@@ -146,6 +146,14 @@ func (n *NodeClient) DeploymentGet(ctx context.Context, contractID uint64) (dl g
 	return dl, nil
 }
 
+// DeploymentList gets all deployments for a twin
+func (n *NodeClient) DeploymentList(ctx context.Context) (dls []gridtypes.Deployment, err error) {
+	const cmd = "zos.deployment.list"
+
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &dls)
+	return
+}
+
 // DeploymentGet gets a deployment via contract ID
 func (n *NodeClient) DeploymentChanges(ctx context.Context, contractID uint64) (changes []gridtypes.Workload, err error) {
 	const cmd = "zos.deployment.changes"
@@ -284,6 +292,21 @@ func (n *NodeClient) NetworkListPublicIPs(ctx context.Context) ([]string, error)
 	var result []string
 
 	if err := n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// NetworkListPrivateIPs list private ips reserved for a network
+func (n *NodeClient) NetworkListPrivateIPs(ctx context.Context, networkName string) ([]string, error) {
+	const cmd = "zos.network.list_private_ips"
+	var result []string
+	in := args{
+		"network_name": networkName,
+	}
+
+	if err := n.bus.Call(ctx, n.nodeTwin, cmd, in, &result); err != nil {
 		return nil, err
 	}
 

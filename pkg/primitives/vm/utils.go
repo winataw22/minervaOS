@@ -195,7 +195,7 @@ func (p *Manager) newMyceliumNetworkInterface(ctx context.Context, dl gridtypes.
 		Routes: []pkg.Route{
 			{
 				Net: net.IPNet{
-					IP:   net.ParseIP("200::"),
+					IP:   net.ParseIP("400::"),
 					Mask: net.CIDRMask(7, 128),
 				},
 				Gateway: iface.Gateway.IP,
