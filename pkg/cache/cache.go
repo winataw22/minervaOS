@@ -2,9 +2,9 @@ package cache
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"syscall"
+
+	"github.com/threefoldtech/zos/pkg"
 )
 
 const (
@@ -17,6 +17,10 @@ const (
 // It is the caller's responsibility to remove the directory when no longer needed.
 // If the directory already exist error of type os.IsExist will be returned
 func VolatileDir(name string, size uint64) (string, error) {
+	return volatileDir(name, size, pkg.DefaultSystemOS, pkg.DefaultSysCall)
+}
+
+func volatileDir(name string, size uint64, os pkg.SystemOS, syscall pkg.SystemCall) (string, error) {
 	const volatileBaseDir = "/var/run/cache"
 	name = filepath.Join(volatileBaseDir, name)
 	if err := os.MkdirAll(volatileBaseDir, 0700); err != nil {
