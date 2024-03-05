@@ -13,14 +13,15 @@ import (
 
 const (
 	id          = "healthcheck"
-	schedule    = "0 */20 * * * *"
+	schedule    = "0 */15 * * * *"
 	description = "health check task runs multiple checks to ensure the node is in a usable state and set flags for the power daemon to stop reporting uptime if it is not usable"
 )
 
 // NewTask returns a new health check task.
 func NewTask() perf.Task {
 	checks := map[string]checkFunc{
-		"cache": cacheCheck,
+		"cache":   cacheCheck,
+		"network": networkCheck,
 	}
 	return &healthcheckTask{
 		checks: checks,

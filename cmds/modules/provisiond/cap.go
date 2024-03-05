@@ -10,6 +10,7 @@ import (
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 type DeploymentID struct {
@@ -18,18 +19,16 @@ type DeploymentID struct {
 }
 
 type CapacitySetter struct {
-	id      substrate.Identity
-	sub     substrate.Manager
-	ch      chan DeploymentID
-	storage provision.Storage
+	apiGateway *stubs.APIGatewayStub
+	ch         chan DeploymentID
+	storage    provision.Storage
 }
 
-func NewCapacitySetter(id substrate.Identity, sub substrate.Manager, storage provision.Storage) CapacitySetter {
+func NewCapacitySetter(apiGateway *stubs.APIGatewayStub, storage provision.Storage) CapacitySetter {
 	return CapacitySetter{
-		id:      id,
-		sub:     sub,
-		storage: storage,
-		ch:      make(chan DeploymentID, 215),
+		apiGateway: apiGateway,
+		storage:    storage,
+		ch:         make(chan DeploymentID, 215),
 	}
 }
 
@@ -45,7 +44,7 @@ func (c *CapacitySetter) Callback(twin uint32, contract uint64, delete bool) {
 	c.ch <- DeploymentID{Twin: twin, Contract: contract}
 }
 
-func (c *CapacitySetter) setWithClient(cl *substrate.Substrate, deployments ...gridtypes.Deployment) error {
+func (c *CapacitySetter) setWithClient(deployments ...gridtypes.Deployment) error {
 	caps := make([]substrate.ContractResources, 0, len(deployments))
 	for _, deployment := range deployments {
 		var total gridtypes.Capacity
@@ -89,7 +88,7 @@ func (c *CapacitySetter) setWithClient(cl *substrate.Substrate, deployments ...g
 	)
 
 	return backoff.RetryNotify(func() error {
-		return cl.SetContractConsumption(c.id, caps...)
+		return c.apiGateway.SetContractConsumption(context.Background(), caps...)
 	}, bo, func(err error, d time.Duration) {
 		log.Error().Err(err).Dur("retry-in", d).Msg("failed to set contract consumption")
 	})
@@ -100,14 +99,7 @@ func (c *CapacitySetter) Set(deployment ...gridtypes.Deployment) error {
 		return nil
 	}
 
-	cl, err := c.sub.Substrate()
-	if err != nil {
-		return err
-	}
-
-	defer cl.Close()
-
-	return c.setWithClient(cl, deployment...)
+	return c.setWithClient(deployment...)
 }
 
 func (c *CapacitySetter) Run(ctx context.Context) error {

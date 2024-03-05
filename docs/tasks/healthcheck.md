@@ -7,11 +7,14 @@ Health check task executes some checks over ZOS components to determine if the n
 ## Configuration
 
 - Name: `healthcheck`
-- Schedule: Every 20 mins.
+- Schedule: Every 15 mins.
 
 ## Details
 
-- Check if the node cache disk is usable or not by trying to write some data to it. If it failed, it set the Readonly flag.
+- `cacheCheck`:
+   Check if the node cache disk is usable or not by trying to write some data to it. If it failed, it set the Readonly flag.
+- `networkCheck`:
+   Check if the node can connect to the grid services chain, relay, hub, graphql, ...
 
 ## Result Sample
 

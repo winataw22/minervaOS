@@ -74,18 +74,11 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace %s: %w", testNamespace, err)
 	}
-	manager, err := environment.GetSubstrate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get substrate client: %w", err)
-	}
-	sub, err := manager.Substrate()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get substrate client: %w", err)
-	}
-	defer sub.Close()
+	cl := perf.GetZbusClient(ctx)
+	apiGateway := stubs.NewAPIGatewayStub(cl)
 	farmID := environment.MustGet().FarmID
 
-	shouldRun, err := isLeastValidNode(ctx, uint32(farmID), sub)
+	shouldRun, err := isLeastValidNode(ctx, uint32(farmID), apiGateway)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if the node should run public IP verification: %w", err)
 	}
@@ -94,7 +87,7 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 		return errSkippedValidating, nil
 	}
 
-	farm, err := sub.GetFarm(uint32(farmID))
+	farm, err := apiGateway.GetFarm(ctx, uint32(farmID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get farm with id %d: %w", farmID, err)
 	}
@@ -184,7 +177,7 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) (ma
 	return report, nil
 }
 
-func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substrate) (bool, error) {
+func isLeastValidNode(ctx context.Context, farmID uint32, apiGateway *stubs.APIGatewayStub) (bool, error) {
 	env := environment.MustGet()
 	gql := graphql.NewGraphQl(env.GraphQL)
 
@@ -212,7 +205,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substra
 		if node.NodeID >= uint32(nodeID) {
 			continue
 		}
-		n, err := sub.GetNode(node.NodeID)
+		n, err := apiGateway.GetNode(ctx, node.NodeID)
 		if err != nil {
 			return false, fmt.Errorf("failed to get node %d: %w", node.NodeID, err)
 		}
@@ -231,7 +224,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, sub *substrate.Substra
 	return true, nil
 }
 
-func getValidNodeIP(node *substrate.Node) (string, error) {
+func getValidNodeIP(node substrate.Node) (string, error) {
 	for _, inf := range node.Interfaces {
 		if inf.Name != "zos" {
 			continue

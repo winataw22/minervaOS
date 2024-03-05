@@ -2,7 +2,6 @@ package registrar
 
 import (
 	"context"
-	"crypto/ed25519"
 	"os"
 	"sync"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -142,25 +140,9 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 }
 
 func (r *Registrar) reActivate(ctx context.Context, cl zbus.Client, env environment.Environment) error {
-	mgr, err := environment.GetSubstrate()
-	if err != nil {
-		return err
-	}
+	apiGateway := stubs.NewAPIGatewayStub(cl)
 
-	sub, err := mgr.Substrate()
-	if err != nil {
-		return err
-	}
-
-	defer sub.Close()
-
-	sk := ed25519.PrivateKey(stubs.NewIdentityManagerStub(cl).PrivateKey(ctx))
-	id, err := substrate.NewIdentityFromEd25519Key(sk)
-	if err != nil {
-		return err
-	}
-
-	_, err = sub.EnsureAccount(id, env.ActivationURL, tcUrl, tcHash)
+	_, err := apiGateway.EnsureAccount(ctx, env.ActivationURL, tcUrl, tcHash)
 
 	return err
 }

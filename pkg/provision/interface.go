@@ -102,6 +102,8 @@ type StorageCapacity struct {
 	Deployments []gridtypes.Deployment
 	// Workloads the total number of all workloads
 	Workloads int
+	// LastDeploymentTimestamp last deployment timestamp
+	LastDeploymentTimestamp gridtypes.Timestamp
 }
 
 // Used with Storage interface to compute capacity, exclude any deployment

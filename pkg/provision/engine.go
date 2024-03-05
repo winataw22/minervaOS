@@ -16,6 +16,7 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 // EngineOption interface
@@ -42,11 +43,11 @@ func WithStartupOrder(t ...gridtypes.WorkloadType) EngineOption {
 	return &withStartupOrder{t}
 }
 
-// WithSubstrate sets the substrate client. If set it will
+// WithAPIGateway sets the API Gateway. If set it will
 // be used by the engine to fetch (and validate) the deployment contract
 // then contract with be available on the deployment context
-func WithSubstrate(node uint32, sub substrate.Manager) EngineOption {
-	return &withSubstrate{node, sub}
+func WithAPIGateway(node uint32, apiGateway *stubs.APIGatewayStub) EngineOption {
+	return &withAPIGateway{node, apiGateway}
 }
 
 // WithRerunAll if set forces the engine to re-run all reservations
@@ -115,9 +116,9 @@ type NativeEngine struct {
 	typeIndex map[gridtypes.WorkloadType]int
 	rerunAll  bool
 	//substrate specific attributes
-	nodeID   uint32
-	sub      substrate.Manager
-	callback Callback
+	nodeID     uint32
+	apiGateway *stubs.APIGatewayStub
+	callback   Callback
 }
 
 var _ Engine = (*NativeEngine)(nil)
@@ -139,14 +140,14 @@ func (o *withAdminsKeyGetter) apply(e *NativeEngine) {
 	e.admins = o.g
 }
 
-type withSubstrate struct {
-	nodeID uint32
-	sub    substrate.Manager
+type withAPIGateway struct {
+	nodeID     uint32
+	apiGateway *stubs.APIGatewayStub
 }
 
-func (o *withSubstrate) apply(e *NativeEngine) {
+func (o *withAPIGateway) apply(e *NativeEngine) {
 	e.nodeID = o.nodeID
-	e.sub = o.sub
+	e.apiGateway = o.apiGateway
 }
 
 type withStartupOrder struct {
@@ -205,7 +206,6 @@ type deploymentValue struct {
 	deployment uint64
 }
 type contractKey struct{}
-type substrateKey struct{}
 type rentKey struct{}
 
 // GetEngine gets engine from context
@@ -277,11 +277,6 @@ func IsRentedNode(ctx context.Context) bool {
 // sets node rented flag on the ctx
 func withRented(ctx context.Context, rent bool) context.Context {
 	return context.WithValue(ctx, rentKey{}, rent)
-}
-
-// GetSubstrate if engine has substrate set, panics otherwise
-func GetSubstrate(ctx context.Context) substrate.Manager {
-	return ctx.Value(substrateKey{}).(substrate.Manager)
 }
 
 // New creates a new engine. Once started, the engine
@@ -573,20 +568,13 @@ func (e *NativeEngine) safeCallback(d *gridtypes.Deployment, delete bool) {
 // validate validates and injects the deployment contracts is substrate is configured
 // for this instance of the provision engine. If noValidation is set contracts checks is skipped
 func (e *NativeEngine) validate(ctx context.Context, dl *gridtypes.Deployment, noValidation bool) (context.Context, error) {
-	if e.sub == nil {
+	if e.apiGateway == nil {
 		return ctx, fmt.Errorf("substrate is not configured in engine")
 	}
 
-	ctx = context.WithValue(ctx, substrateKey{}, e.sub)
-	// if substrate is set. we need to get contract
-	sub, err := e.sub.Substrate()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to chain")
-	}
-	defer sub.Close()
-	contract, err := sub.GetContract(uint64(dl.ContractID))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get deployment contract")
+	contract, subErr := e.apiGateway.GetContract(ctx, uint64(dl.ContractID))
+	if subErr.IsError() {
+		return nil, errors.Wrap(subErr.Err, "failed to get deployment contract")
 	}
 
 	if !contract.ContractType.IsNodeContract {
@@ -594,12 +582,12 @@ func (e *NativeEngine) validate(ctx context.Context, dl *gridtypes.Deployment, n
 	}
 	ctx = withContract(ctx, contract.ContractType.NodeContract)
 
-	rent, err := sub.GetNodeRentContract(e.nodeID)
-	if err != nil && !errors.Is(err, substrate.ErrNotFound) {
+	rent, subErr := e.apiGateway.GetNodeRentContract(ctx, e.nodeID)
+	if subErr.IsError() && !subErr.IsCode(pkg.CodeNotFound) {
 		return nil, fmt.Errorf("failed to check node rent state")
 	}
 
-	ctx = withRented(ctx, err == nil && rent != 0)
+	ctx = withRented(ctx, !subErr.IsError() && rent != 0)
 
 	if noValidation {
 		return ctx, nil

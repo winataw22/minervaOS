@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/geoip"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
@@ -83,15 +84,9 @@ func (r *Registrar) registration(ctx context.Context, cl zbus.Client, env enviro
 		Uint64("hru", uint64(info.Capacity.HRU)).
 		Msg("node capacity")
 
-	sub, err := environment.GetSubstrate()
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to create substrate client")
-	}
-
 	info = info.WithLocation(loc)
 
-	nodeID, twinID, err = registerNode(ctx, env, cl, sub, info)
-
+	nodeID, twinID, err = registerNode(ctx, env, cl, info)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to register node")
 	}
@@ -107,19 +102,13 @@ func registerNode(
 	ctx context.Context,
 	env environment.Environment,
 	cl zbus.Client,
-	subMgr substrate.Manager,
 	info RegistrationInfo,
 ) (nodeID, twinID uint32, err error) {
 	var (
-		mgr    = stubs.NewIdentityManagerStub(cl)
-		netMgr = stubs.NewNetworkerStub(cl)
+		mgr        = stubs.NewIdentityManagerStub(cl)
+		netMgr     = stubs.NewNetworkerStub(cl)
+		apiGateway = stubs.NewAPIGatewayStub(cl)
 	)
-
-	sub, err := subMgr.Substrate()
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "failed to get substrate connection")
-	}
-	defer sub.Close()
 
 	zosIps, zosMac, err := netMgr.Addrs(ctx, "zos", "")
 	if err != nil {
@@ -159,20 +148,17 @@ func registerNode(
 	log.Info().Msg("registering node on blockchain")
 
 	sk := ed25519.PrivateKey(mgr.PrivateKey(ctx))
-	id, err := substrate.NewIdentityFromEd25519Key(sk)
-	if err != nil {
-		return 0, 0, err
-	}
-	if _, err := sub.EnsureAccount(id, env.ActivationURL, tcUrl, tcHash); err != nil {
+
+	if _, err := apiGateway.EnsureAccount(ctx, env.ActivationURL, tcUrl, tcHash); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 
-	twinID, err = ensureTwin(sub, sk)
+	twinID, err = ensureTwin(ctx, apiGateway, sk)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure twin")
 	}
-
-	nodeID, err = sub.GetNodeByTwinID(twinID)
+	var subErr pkg.SubstrateError
+	nodeID, subErr = apiGateway.GetNodeByTwinID(ctx, twinID)
 
 	var serial substrate.OptionBoardSerial
 	if len(info.SerialNumber) != 0 {
@@ -190,20 +176,20 @@ func registerNode(
 		BoardSerial: serial,
 	}
 
-	var onChain *substrate.Node
-	if errors.Is(err, substrate.ErrNotFound) {
+	var onChain substrate.Node
+	if subErr.IsCode(pkg.CodeNotFound) {
 		// node not found, create node
-		nodeID, err = sub.CreateNode(id, real)
+		nodeID, err = apiGateway.CreateNode(ctx, real)
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "failed to create node on chain")
 		}
 
-	} else if err != nil {
+	} else if subErr.IsError() {
 		// other error occurred
-		return 0, 0, errors.Wrapf(err, "failed to get node information for twin id: %d", twinID)
+		return 0, 0, errors.Wrapf(subErr.Err, "failed to get node information for twin id: %d", twinID)
 	} else {
 		// node exists
-		onChain, err = sub.GetNode(nodeID)
+		onChain, err = apiGateway.GetNode(ctx, nodeID)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 		}
@@ -220,9 +206,9 @@ func registerNode(
 	// otherwise we update the node
 	log.Debug().Uint32("node", nodeID).Msg("node already found on blockchain")
 
-	if !real.Eq(onChain) {
+	if !real.Eq(&onChain) {
 		log.Debug().Msgf("node data have changing, issuing an update node: %+v", real)
-		_, err := sub.UpdateNode(id, real)
+		_, err := apiGateway.UpdateNode(ctx, real)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to update node data with id: %d", nodeID)
 		}
@@ -231,16 +217,16 @@ func registerNode(
 	return nodeID, twinID, err
 }
 
-func ensureTwin(sub *substrate.Substrate, sk ed25519.PrivateKey) (uint32, error) {
+func ensureTwin(ctx context.Context, apiGateway *stubs.APIGatewayStub, sk ed25519.PrivateKey) (uint32, error) {
 	identity, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return 0, err
 	}
-	twinID, err := sub.GetTwinByPubKey(identity.PublicKey())
-	if errors.Is(err, substrate.ErrNotFound) {
-		return sub.CreateTwin(identity, "", nil)
-	} else if err != nil {
-		return 0, errors.Wrap(err, "failed to list twins")
+	twinID, subErr := apiGateway.GetTwinByPubKey(ctx, identity.PublicKey())
+	if subErr.IsCode(pkg.CodeNotFound) {
+		return apiGateway.CreateTwin(ctx, "", nil)
+	} else if subErr.IsError() {
+		return 0, errors.Wrap(subErr.Err, "failed to list twins")
 	}
 
 	return twinID, nil

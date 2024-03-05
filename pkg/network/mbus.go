@@ -7,25 +7,20 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
-	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 // Authorized middleware allows only admins to make these calls
-func Authorized(mgr substrate.Manager, farmID uint32) (rmb.Middleware, error) {
-	sub, err := mgr.Substrate()
-	if err != nil {
-		return nil, err
-	}
-	defer sub.Close()
-	farm, err := sub.GetFarm(farmID)
+func Authorized(apiGateway *stubs.APIGatewayStub, farmID uint32) (rmb.Middleware, error) {
+	farm, err := apiGateway.GetFarm(context.Background(), farmID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get farm")
 	}
 
-	farmer, err := sub.GetTwin(uint32(farm.TwinID))
+	farmer, err := apiGateway.GetTwin(context.Background(), uint32(farm.TwinID))
 	if err != nil {
 		return nil, err
 	}
@@ -46,12 +41,12 @@ type Network struct {
 }
 
 // NewNetworkMessageBus creates a new messagebus instance
-func NewNetworkMessageBus(router rmb.Router, mgr pkg.Networker) (*Network, error) {
+func NewNetworkMessageBus(router rmb.Router, mgr pkg.Networker, apiGateway *stubs.APIGatewayStub) (*Network, error) {
 	api := &Network{
 		mgr: mgr,
 	}
 
-	if err := api.setup(router); err != nil {
+	if err := api.setup(router, apiGateway); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +57,7 @@ func (n *Network) hasPublicIPv6Handler(ctx context.Context, payload []byte) (int
 	return n.hasPublicIPv6(ctx), nil
 }
 
-func (n *Network) setup(router rmb.Router) error {
+func (n *Network) setup(router rmb.Router, apiGateway *stubs.APIGatewayStub) error {
 
 	// network handlers
 	sub := router.Subroute("network")
@@ -76,11 +71,7 @@ func (n *Network) setup(router rmb.Router) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get environment")
 	}
-	mgr, err := environment.GetSubstrate()
-	if err != nil {
-		return errors.Wrap(err, "failed to get substrate")
-	}
-	mw, err := Authorized(mgr, uint32(env.FarmID))
+	mw, err := Authorized(apiGateway, uint32(env.FarmID))
 	if err != nil {
 		return errors.Wrap(err, "failed to initialized admin mw")
 	}

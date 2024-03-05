@@ -14,7 +14,7 @@ import (
 
 const (
 	callTimeout    = 3 * time.Second
-	testNetworkKey = "perf.network-health"
+	testNetworkKey = "perf.healthcheck"
 )
 
 // Modules is all the registered modules on zbus
@@ -45,8 +45,8 @@ type Diagnostics struct {
 	SystemStatusOk bool `json:"system_status_ok"`
 	// ZosModules is a list of modules with their objects and workers
 	ZosModules map[string]ModuleStatus `json:"modules"`
-	// Online is the state of the grid services reachable from the node
-	Online bool `json:"online"`
+	// Healthy is the state of the node health check
+	Healthy bool `json:"healthy"`
 }
 
 type DiagnosticsManager struct {
@@ -99,7 +99,7 @@ func (m *DiagnosticsManager) GetSystemDiagnostics(ctx context.Context) (Diagnost
 	wg.Wait()
 
 	results.SystemStatusOk = !hasError
-	results.Online = m.isOnline(ctx)
+	results.Healthy = m.isHealthy()
 
 	return results, nil
 }
@@ -115,7 +115,7 @@ func (m *DiagnosticsManager) getModuleStatus(ctx context.Context, module string)
 	}
 }
 
-func (m *DiagnosticsManager) isOnline(ctx context.Context) bool {
+func (m *DiagnosticsManager) isHealthy() bool {
 	conn := m.redisPool.Get()
 	defer conn.Close()
 
@@ -129,10 +129,8 @@ func (m *DiagnosticsManager) isOnline(ctx context.Context) bool {
 		return false
 	}
 
-	for _, service := range result.Result.([]interface{}) {
-		if !service.(map[string]interface{})["is_reachable"].(bool) {
-			return false
-		}
+	if len(result.Result.(map[string]interface{})) != 0 {
+		return false
 	}
 
 	return true

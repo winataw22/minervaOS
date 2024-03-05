@@ -1,0 +1,4 @@
+exec: api-gateway --broker unix:///var/run/redis.sock
+after:
+  - boot
+  - identityd

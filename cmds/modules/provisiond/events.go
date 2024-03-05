@@ -6,21 +6,21 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/provision"
+	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
 type ContractEventHandler struct {
 	node           uint32
-	pool           substrate.Manager
+	apiGateway     *stubs.APIGatewayStub
 	engine         provision.Engine
 	eventsConsumer *events.RedisConsumer
 }
 
-func NewContractEventHandler(node uint32, mgr substrate.Manager, engine provision.Engine, events *events.RedisConsumer) ContractEventHandler {
-	return ContractEventHandler{node: node, pool: mgr, engine: engine, eventsConsumer: events}
+func NewContractEventHandler(node uint32, apiGateway *stubs.APIGatewayStub, engine provision.Engine, events *events.RedisConsumer) ContractEventHandler {
+	return ContractEventHandler{node: node, apiGateway: apiGateway, engine: engine, eventsConsumer: events}
 }
 
 func (r *ContractEventHandler) current() (map[uint64]gridtypes.Deployment, error) {
@@ -46,13 +46,7 @@ func (r *ContractEventHandler) sync(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get current active contracts")
 	}
-	sub, err := r.pool.Substrate()
-	if err != nil {
-		return err
-	}
-
-	defer sub.Close()
-	onchain, err := sub.GetNodeContracts(r.node)
+	onchain, err := r.apiGateway.GetNodeContracts(ctx, r.node)
 	if err != nil {
 		return errors.Wrap(err, "failed to get active node contracts")
 	}
@@ -94,9 +88,9 @@ func (r *ContractEventHandler) sync(ctx context.Context) error {
 			Uint64("contract", id).
 			Logger()
 
-		contract, err := sub.GetContract(id)
-		if err != nil {
-			logger.Error().Err(err).Msg("failed to get contract from chain")
+		contract, err := r.apiGateway.GetContract(ctx, id)
+		if err.IsError() {
+			logger.Error().Err(err.Err).Msg("failed to get contract from chain")
 			continue
 		}
 		// locked is chain state for that contract

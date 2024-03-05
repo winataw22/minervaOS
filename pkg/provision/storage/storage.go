@@ -718,6 +718,9 @@ func (b *BoltStorage) Capacity(exclude ...provision.Exclude) (storageCap provisi
 				isActive = true
 				storageCap.Workloads += 1
 				storageCap.Cap.Add(&c)
+				if wl.Result.Created > storageCap.LastDeploymentTimestamp {
+					storageCap.LastDeploymentTimestamp = wl.Result.Created
+				}
 			}
 			if isActive {
 				storageCap.Deployments = append(storageCap.Deployments, deployment)

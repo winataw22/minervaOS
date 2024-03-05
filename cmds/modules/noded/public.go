@@ -32,29 +32,16 @@ func setPublicConfig(ctx context.Context, cl zbus.Client, cfg *substrate.PublicC
 
 // public sets and watches changes to public config on chain and tries to apply the provided setup
 func public(ctx context.Context, nodeID uint32, env environment.Environment, cl zbus.Client, events *events.RedisConsumer) error {
-	mgr, err := environment.GetSubstrate()
-	if err != nil {
-		return err
-	}
-
 	ch, err := events.PublicConfig(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to subscribe to node events")
 	}
 
-	getNode := func() (*substrate.Node, error) {
-		sub, err := mgr.Substrate()
-		if err != nil {
-			return nil, err
-		}
-
-		defer sub.Close()
-		return sub.GetNode(nodeID)
-	}
+	apiGateway := stubs.NewAPIGatewayStub(cl)
 
 reapply:
 	for {
-		node, err := getNode()
+		node, err := apiGateway.GetNode(ctx, nodeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get node public config")
 		}

@@ -14,7 +14,6 @@ import (
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/rrd"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -34,9 +33,9 @@ type Reporter struct {
 	cl  zbus.Client
 	rrd rrd.RRD
 
-	identity  substrate.Identity
-	queue     *dque.DQue
-	substrate substrate.Manager
+	identity   substrate.Identity
+	queue      *dque.DQue
+	apiGateway *stubs.APIGatewayStub
 }
 
 func reportBuilder() interface{} {
@@ -80,10 +79,7 @@ func NewReporter(metricsPath string, cl zbus.Client, root string) (*Reporter, er
 		return nil, errors.Wrap(err, "failed to setup report persisted queue")
 	}
 
-	sub, err := environment.GetSubstrate()
-	if err != nil {
-		return nil, err
-	}
+	apiGateway := stubs.NewAPIGatewayStub(cl)
 
 	rrd, err := rrd.NewRRDBolt(metricsPath, 5*time.Minute, 24*time.Hour)
 	if err != nil {
@@ -91,11 +87,11 @@ func NewReporter(metricsPath string, cl zbus.Client, root string) (*Reporter, er
 	}
 
 	return &Reporter{
-		cl:        cl,
-		rrd:       rrd,
-		identity:  id,
-		queue:     queue,
-		substrate: sub,
+		cl:         cl,
+		rrd:        rrd,
+		identity:   id,
+		queue:      queue,
+		apiGateway: apiGateway,
 	}, nil
 }
 
@@ -109,14 +105,7 @@ func (r *Reporter) pushOne() error {
 
 	log.Info().Int("len", len(report.Consumption)).Msgf("sending capacity report")
 
-	sub, err := r.substrate.Substrate()
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to chain")
-	}
-
-	defer sub.Close()
-
-	hash, err := sub.Report(r.identity, report.Consumption)
+	hash, err := r.apiGateway.Report(context.Background(), report.Consumption)
 	if err != nil {
 		return errors.Wrap(err, "failed to publish consumption report")
 	}

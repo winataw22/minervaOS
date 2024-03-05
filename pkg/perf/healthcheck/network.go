@@ -1,4 +1,4 @@
-package networkhealth
+package healthcheck
 
 import (
 	"context"
@@ -8,50 +8,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog/log"
+	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
-	"github.com/threefoldtech/zos/pkg/perf"
 )
 
 const defaultRequestTimeout = 5 * time.Second
 
-type NetworkHealthTask struct{}
-
-type ServiceStatus struct {
-	Url         string `json:"url"`
-	IsReachable bool   `json:"is_reachable"`
-}
-
-var _ perf.Task = (*NetworkHealthTask)(nil)
-
-func NewTask() *NetworkHealthTask {
-	return &NetworkHealthTask{}
-}
-
-func (t *NetworkHealthTask) ID() string {
-	return "network-health"
-}
-
-func (t *NetworkHealthTask) Description() string {
-	return "Network health check runs periodically to check the connection to most of grid services."
-}
-
-func (t *NetworkHealthTask) Cron() string {
-	return "0 */15 * * * *"
-}
-
-// Jitter returns the max number of seconds the job can sleep before actual execution.
-func (t *NetworkHealthTask) Jitter() uint32 {
-	return 5 * 60
-}
-
-func (t *NetworkHealthTask) Run(ctx context.Context) (interface{}, error) {
+func networkCheck(ctx context.Context) []error {
 	env := environment.MustGet()
 	servicesUrl := []string{
 		env.ActivationURL, env.GraphQL, env.FlistURL,
 	}
 	servicesUrl = append(append(servicesUrl, env.SubstrateURL...), env.RelayURL...)
 
-	reports := []ServiceStatus{}
+	var errors []error
 
 	var wg sync.WaitGroup
 	var mut sync.Mutex
@@ -59,35 +30,41 @@ func (t *NetworkHealthTask) Run(ctx context.Context) (interface{}, error) {
 		wg.Add(1)
 		go func(serviceUrl string) {
 			defer wg.Done()
-			report := getNetworkReport(ctx, serviceUrl)
 
-			mut.Lock()
-			defer mut.Unlock()
+			err := checkService(ctx, serviceUrl)
+			if err != nil {
+				mut.Lock()
+				defer mut.Unlock()
 
-			reports = append(reports, report)
+				errors = append(errors, err)
+			}
 		}(serviceUrl)
 	}
 	wg.Wait()
 
-	return reports, nil
+	if len(errors) == 0 {
+		if err := app.DeleteFlag(app.NotReachable); err != nil {
+			log.Error().Err(err).Msg("failed to delete readonly flag")
+		}
+	}
+
+	return errors
 }
 
-func getNetworkReport(ctx context.Context, serviceUrl string) ServiceStatus {
+func checkService(ctx context.Context, serviceUrl string) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
 	defer cancel()
-
-	report := ServiceStatus{
-		Url:         serviceUrl,
-		IsReachable: true,
-	}
 
 	address := parseUrl(serviceUrl)
 	err := isReachable(ctx, address)
 	if err != nil {
-		report.IsReachable = false
+		if err := app.SetFlag(app.NotReachable); err != nil {
+			log.Error().Err(err).Msg("failed to set not reachable flag")
+		}
+		return fmt.Errorf("%s is not reachable: %w", serviceUrl, err)
 	}
 
-	return report
+	return nil
 }
 
 func parseUrl(serviceUrl string) string {

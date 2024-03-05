@@ -13,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/host"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zos/pkg/app"
+	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/utils"
 )
 
@@ -24,16 +25,16 @@ type Uptime struct {
 	// Mark is set to done after the first uptime is sent
 	Mark utils.Mark
 
-	id  substrate.Identity
-	sub substrate.Manager
-	m   sync.Mutex
+	id         substrate.Identity
+	apiGateway *stubs.APIGatewayStub
+	m          sync.Mutex
 }
 
-func NewUptime(sub substrate.Manager, id substrate.Identity) (*Uptime, error) {
+func NewUptime(apiGateway *stubs.APIGatewayStub, id substrate.Identity) (*Uptime, error) {
 	return &Uptime{
-		id:   id,
-		sub:  sub,
-		Mark: utils.NewMark(),
+		id:         id,
+		apiGateway: apiGateway,
+		Mark:       utils.NewMark(),
 	}, nil
 }
 
@@ -52,18 +53,12 @@ func (u *Uptime) SendNow() (types.Hash, error) {
 	// hence we first establish a connection THEN get the node
 	// uptime.
 	// to make sure the uptime is correct at the time of reporting
-	sub, err := u.sub.Substrate()
-	if err != nil {
-		return types.Hash{}, err
-	}
-	defer sub.Close()
-
 	uptime, err := host.Uptime()
 	if err != nil {
 		return types.Hash{}, errors.Wrap(err, "failed to get uptime")
 	}
 
-	return sub.UpdateNodeUptimeV2(u.id, uptime, uint64(time.Now().Unix()))
+	return u.apiGateway.UpdateNodeUptimeV2(context.Background(), uptime, uint64(time.Now().Unix()))
 }
 
 func (u *Uptime) uptime(ctx context.Context) error {
@@ -127,6 +122,10 @@ func isNodeHealthy() bool {
 	}
 	if app.CheckFlag(app.LimitedCache) {
 		log.Error().Msg("node is running on limited cache")
+		healthy = false
+	}
+	if app.CheckFlag(app.NotReachable) {
+		log.Error().Msg("node can not reach grid services")
 		healthy = false
 	}
 	return healthy

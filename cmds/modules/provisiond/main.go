@@ -260,16 +260,13 @@ func action(cli *cli.Context) error {
 		provisioners,
 	)
 
-	mgr, err := environment.GetSubstrate()
-	if err != nil {
-		return err
-	}
-	users, err := provision.NewSubstrateTwins(mgr)
+	apiGateway := stubs.NewAPIGatewayStub(cl)
+	users, err := provision.NewSubstrateTwins(apiGateway)
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate users database")
 	}
 
-	admins, err := provision.NewSubstrateAdmins(mgr, uint32(env.FarmID))
+	admins, err := provision.NewSubstrateAdmins(apiGateway, uint32(env.FarmID))
 	if err != nil {
 		return errors.Wrap(err, "failed to create substrate admins database")
 	}
@@ -279,29 +276,22 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to get substrate keypair from secure key")
 	}
 
-	sub, err := mgr.Substrate()
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to substrate")
-	}
-	defer sub.Close()
-	twin, err := sub.GetTwinByPubKey(kp.PublicKey())
-	if err != nil {
-		return errors.Wrap(err, "failed to get node twin id")
+	twin, subErr := apiGateway.GetTwinByPubKey(ctx, kp.PublicKey())
+	if subErr.IsError() {
+		return errors.Wrap(subErr.Err, "failed to get node twin id")
 	}
 
-	node, err := sub.GetNodeByTwinID(twin)
-	if err != nil {
-		return errors.Wrap(err, "failed to get node from twin")
+	node, subErr := apiGateway.GetNodeByTwinID(ctx, twin)
+	if subErr.IsError() {
+		return errors.Wrap(subErr.Err, "failed to get node from twin")
 	}
-
-	sub.Close()
 
 	queues := filepath.Join(rootDir, "queues")
 	if err := os.MkdirAll(queues, 0755); err != nil {
 		return errors.Wrap(err, "failed to create storage for queues")
 	}
 
-	setter := NewCapacitySetter(kp, mgr, store)
+	setter := NewCapacitySetter(apiGateway, store)
 
 	log.Info().Int("contracts", len(active)).Msg("setting used capacity by contracts")
 	if err := setter.Set(active...); err != nil {
@@ -322,7 +312,7 @@ func action(cli *cli.Context) error {
 		queues,
 		provision.WithTwins(users),
 		provision.WithAdmins(admins),
-		provision.WithSubstrate(node, mgr),
+		provision.WithAPIGateway(node, apiGateway),
 		// set priority to some reservation types on boot
 		// so we always need to make sure all volumes and networks
 		// comes first.
@@ -383,7 +373,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create event consumer")
 	}
 
-	handler := NewContractEventHandler(node, mgr, engine, consumer)
+	handler := NewContractEventHandler(node, apiGateway, engine, consumer)
 
 	go func() {
 		if err := handler.Run(ctx); err != nil && err != context.Canceled {

@@ -10,48 +10,42 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
-	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/network/bridge"
+	"github.com/threefoldtech/zos/pkg/stubs"
 	"github.com/threefoldtech/zos/pkg/zinit"
 )
 
 type PowerServer struct {
-	cl       zbus.Client
-	consumer *events.RedisConsumer
-	sub      substrate.Manager
+	consumer   *events.RedisConsumer
+	apiGateway *stubs.APIGatewayStub
 
 	// enabled means the node can power off!
-	enabled  bool
-	farm     pkg.FarmID
-	node     uint32
-	twin     uint32
-	identity substrate.Identity
-	ut       *Uptime
+	enabled bool
+	farm    pkg.FarmID
+	node    uint32
+	twin    uint32
+	ut      *Uptime
 }
 
 func NewPowerServer(
-	cl zbus.Client,
-	sub substrate.Manager,
+	apiGateway *stubs.APIGatewayStub,
 	consumer *events.RedisConsumer,
 	enabled bool,
 	farm pkg.FarmID,
 	node uint32,
 	twin uint32,
-	identity substrate.Identity,
 	ut *Uptime) (*PowerServer, error) {
 
 	return &PowerServer{
-		cl:       cl,
-		sub:      sub,
-		consumer: consumer,
-		enabled:  enabled,
-		farm:     farm,
-		node:     node,
-		twin:     twin,
-		identity: identity,
-		ut:       ut,
+		apiGateway: apiGateway,
+		consumer:   consumer,
+		enabled:    enabled,
+		farm:       farm,
+		node:       node,
+		twin:       twin,
+		ut:         ut,
 	}, nil
 }
 
@@ -102,14 +96,7 @@ func EnsureWakeOnLan(ctx context.Context) (bool, error) {
 }
 
 func (p *PowerServer) syncSelf() error {
-	cl, err := p.sub.Substrate()
-	if err != nil {
-		return err
-	}
-
-	defer cl.Close()
-
-	power, err := cl.GetPowerTarget(p.node)
+	power, err := p.apiGateway.GetPowerTarget(context.Background(), p.node)
 	if err != nil {
 		return err
 	}
@@ -122,7 +109,7 @@ func (p *PowerServer) syncSelf() error {
 	// if target is down, we make sure state is down, then shutdown
 
 	if power.Target.IsUp {
-		if err := p.setNodePowerState(cl, true); err != nil {
+		if err := p.setNodePowerState(true); err != nil {
 			return errors.Wrap(err, "failed to set state to up")
 		}
 
@@ -132,7 +119,7 @@ func (p *PowerServer) syncSelf() error {
 	// now the target must be down.
 	// we need to shutdown
 
-	if err := p.setNodePowerState(cl, false); err != nil {
+	if err := p.setNodePowerState(false); err != nil {
 		return errors.Wrap(err, "failed to set state to down")
 	}
 
@@ -201,20 +188,14 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 		Uint32("node", p.node).
 		Msg("received power event for farm")
 
-	cl, err := p.sub.Substrate()
-	if err != nil {
-		return err
-	}
-
-	defer cl.Close()
-	node, err := cl.GetNode(event.NodeID)
+	node, err := p.apiGateway.GetNode(context.Background(), event.NodeID)
 	if err != nil {
 		return err
 	}
 
 	if event.NodeID == p.node && event.Target.IsDown {
 		// we need to shutdown!
-		if err := p.setNodePowerState(cl, false); err != nil {
+		if err := p.setNodePowerState(false); err != nil {
 			return errors.Wrap(err, "failed to set node power state to down")
 		}
 
@@ -225,7 +206,7 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 
 	if event.Target.IsUp {
 		log.Info().Uint32("target", event.NodeID).Msg("received an event to power up")
-		return p.powerUp(node, "target is up")
+		return p.powerUp(&node, "target is up")
 	}
 
 	return nil
@@ -235,7 +216,7 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 // not enabled on this node.
 // this function makes sure to compare the state with on chain state to not do
 // un-necessary transactions.
-func (p *PowerServer) setNodePowerState(cl *substrate.Substrate, up bool) error {
+func (p *PowerServer) setNodePowerState(up bool) error {
 
 	/*
 		if power is not enabled, the node state should always be up
@@ -251,7 +232,7 @@ func (p *PowerServer) setNodePowerState(cl *substrate.Substrate, up bool) error 
 	*/
 
 	up = !p.enabled || up
-	power, err := cl.GetPowerTarget(p.node)
+	power, err := p.apiGateway.GetPowerTarget(context.Background(), p.node)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to check power state")
@@ -264,7 +245,7 @@ func (p *PowerServer) setNodePowerState(cl *substrate.Substrate, up bool) error 
 
 	log.Info().Bool("state", up).Msg("setting node power state")
 	// this to make sure node state is fixed also for nodes
-	_, err = cl.SetNodePowerState(p.identity, up)
+	_, err = p.apiGateway.SetNodePowerState(context.Background(), up)
 	return err
 }
 

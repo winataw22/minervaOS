@@ -14,11 +14,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/cache"
-	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -54,10 +52,10 @@ var (
 )
 
 type gatewayModule struct {
-	volatile string
-	cl       zbus.Client
-	resolver *net.Resolver
-	sub      substrate.Manager
+	volatile   string
+	cl         zbus.Client
+	resolver   *net.Resolver
+	apiGateway *stubs.APIGatewayStub
 	// maps domain to workload id
 	reservedDomains map[string]string
 	domainLock      sync.RWMutex
@@ -282,15 +280,12 @@ func New(ctx context.Context, cl zbus.Client, root string) (pkg.Gateway, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load old domains")
 	}
-	sub, err := environment.GetSubstrate()
-	if err != nil {
-		return nil, err
-	}
+	apiGateway := stubs.NewAPIGatewayStub(cl)
 
 	gw := &gatewayModule{
 		cl:               cl,
 		resolver:         resolver,
-		sub:              sub,
+		apiGateway:       apiGateway,
 		volatile:         volatile,
 		staticConfigPath: staticCfgPath,
 		certScriptPath:   certScriptPath,
@@ -536,24 +531,19 @@ func (g *gatewayModule) configPath(name string) string {
 }
 
 func (g *gatewayModule) validateNameContract(name string, twinID uint32) error {
-	sub, err := g.sub.Substrate()
-	if err != nil {
-		return err
-	}
-	defer sub.Close()
-	contractID, err := sub.GetContractIDByNameRegistration(string(name))
-	if errors.Is(err, substrate.ErrNotFound) {
+
+	contractID, subErr := g.apiGateway.GetContractIDByNameRegistration(context.Background(), string(name))
+	if subErr.IsCode(pkg.CodeNotFound) {
 		return ErrContractNotReserved
 	}
-	if err != nil {
-		return err
+	if subErr.IsError() {
+		return subErr.Err
 	}
-	contract, err := sub.GetContract(contractID)
-	if errors.Is(err, substrate.ErrNotFound) {
+	contract, subErr := g.apiGateway.GetContract(context.Background(), contractID)
+	if subErr.IsCode(pkg.CodeNotFound) {
 		return fmt.Errorf("contract by name returned %d, but retreiving it results in 'not found' error", contractID)
-	}
-	if err != nil {
-		return err
+	} else if subErr.IsError() {
+		return subErr.Err
 	}
 	if !contract.State.IsCreated {
 		return ErrInvalidContractState
