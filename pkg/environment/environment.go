@@ -114,6 +114,7 @@ var (
 		},
 		RelayURL: []string{
 			"wss://relay.dev.grid.tf",
+			"wss://relay.02.dev.grid.tf",
 		},
 		ActivationURL: "https://activation.dev.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
@@ -128,6 +129,7 @@ var (
 		},
 		RelayURL: []string{
 			"wss://relay.test.grid.tf",
+			"wss://relay.02.test.grid.tf",
 		},
 		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
@@ -139,6 +141,7 @@ var (
 		RunningMode: RunningQA,
 		SubstrateURL: []string{
 			"wss://tfchain.qa.grid.tf/",
+			"wss://tfchain.02.qa.grid.tf/",
 		},
 		RelayURL: []string{
 			"wss://relay.qa.grid.tf",
