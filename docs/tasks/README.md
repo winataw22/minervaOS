@@ -36,6 +36,7 @@ To ensure that the node always has a test result available, a check is performed
 
     - `"public-ip-validation"`
     - `"cpu-benchmark"`
+    - `"healthcheck"`
     - `"iperf"`
 
   - Return: a single task result.
@@ -69,4 +70,5 @@ Notes:
 
 - [Public IP validation](./publicips.md)
 - [CPU benchmark](./cpubench.md)
+- [Health Check](./healthcheck.md)
 - [IPerf](./iperf.md)

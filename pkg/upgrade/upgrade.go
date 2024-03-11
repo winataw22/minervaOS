@@ -41,6 +41,7 @@ const (
 
 	checkForUpdateEvery = 60 * time.Minute
 	checkJitter         = 10 // minutes
+	defaultHubTimeout   = 20 * time.Second
 
 	ZosRepo    = "tf-zos"
 	ZosPackage = "zos.flist"
@@ -53,7 +54,7 @@ type Upgrader struct {
 	zinit        *zinit.Client
 	root         string
 	noZosUpgrade bool
-	hub          hub.HubClient
+	hub          *hub.HubClient
 	storage      storage.Storage
 }
 
@@ -95,8 +96,10 @@ func Zinit(socket string) func(u *Upgrader) error {
 
 // NewUpgrader creates a new upgrader instance
 func NewUpgrader(root string, opts ...UpgraderOption) (*Upgrader, error) {
+	hubClient := hub.NewHubClient(defaultHubTimeout)
 	u := &Upgrader{
 		root: root,
+		hub:  hubClient,
 	}
 
 	for _, dir := range []string{u.fileCache(), u.flistCache()} {

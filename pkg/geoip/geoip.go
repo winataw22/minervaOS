@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -20,6 +21,10 @@ type Location struct {
 
 var (
 	geoipURLs = []string{"https://geoip.grid.tf/", "https://02.geoip.grid.tf/", "https://03.geoip.grid.tf/"}
+
+	defaultHttpClient = &http.Client{
+		Timeout: 10 * time.Second,
+	}
 )
 
 // Fetch retrieves the location of the system calling this function
@@ -47,7 +52,7 @@ func getLocation(geoIPService string) (Location, error) {
 		City:      "Unknown",
 	}
 
-	resp, err := http.Get(geoIPService)
+	resp, err := defaultHttpClient.Get(geoIPService)
 	if err != nil {
 		return l, err
 	}
