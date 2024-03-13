@@ -1,3 +1,4 @@
 exec: gateway --broker unix:///var/run/redis.sock --root /var/cache/modules/gateway
 after:
   - boot
+  - networkd
