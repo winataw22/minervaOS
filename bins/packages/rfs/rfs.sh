@@ -1,7 +1,7 @@
 RFS_VERSION_V1="1.1.1"
-RFS_VERSION_V2="2.0.5"
+RFS_VERSION_V2="2.0.6"
 RFS_CHECKSUM_V1="974b8dc45ae9c1b00238a79b0f4fc9de"
-RFS_CHECKSUM_V2="4da037b5fce13ac7269439d69f26ae7a"
+RFS_CHECKSUM_V2="9e37743dfe94b4577ccf90c573c07638"
 RFS_LINK_V1="https://github.com/threefoldtech/rfs/releases/download/v${RFS_VERSION_V1}/rfs"
 RFS_LINK_V2="https://github.com/threefoldtech/rfs/releases/download/v${RFS_VERSION_V2}/rfs"
 

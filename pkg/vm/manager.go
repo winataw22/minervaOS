@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,11 +38,12 @@ const (
 var (
 	//defaultKernelArgs if no args are set
 	defaultKernelArgs = pkg.KernelArgs{
-		"rw":      "",
-		"console": "ttyS0",
-		"reboot":  "k",
-		"panic":   "1",
-		"root":    "/dev/vda",
+		"rw":                 "",
+		"console":            "ttyS0",
+		"reboot":             "k",
+		"panic":              "1",
+		"root":               "/dev/vda",
+		"boot.shell_on_fail": "",
 	}
 )
 
@@ -146,7 +148,7 @@ func (m *Module) Exists(id string) bool {
 	return err == nil
 }
 
-func (m *Module) getConsoleConfig(ctx context.Context, vmName string, ifc pkg.VMIface) (*Console, error) {
+func (m *Module) getConsoleConfig(ctx context.Context, ifc pkg.VMIface) (*Console, error) {
 	stub := stubs.NewNetworkerStub(m.client)
 	namespace := stub.Namespace(ctx, ifc.NetID)
 
@@ -154,9 +156,23 @@ func (m *Module) getConsoleConfig(ctx context.Context, vmName string, ifc pkg.VM
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get network '%s'", ifc.NetID)
 	}
-	return &Console{Namespace: namespace, NetworkAddr: networkAddr, IP: ifc.IPs[0]}, nil
 
+	networkAddr.IP = networkAddr.IP.To4()
+
+	if len(networkAddr.IP) != net.IPv4len {
+		return nil, fmt.Errorf("invalid network address: %s", networkAddr.IP.String())
+	}
+
+	// always listen on ip .1
+	networkAddr.IP[3] = 1
+
+	return &Console{
+		Namespace:     namespace,
+		ListenAddress: networkAddr,
+		VmAddress:     ifc.IPs[0],
+	}, nil
 }
+
 func (m *Module) makeNetwork(ctx context.Context, vm *pkg.VM, cfg *cloudinit.Configuration) ([]Interface, error) {
 	// assume there is always at least 1 iface present
 
@@ -188,7 +204,7 @@ func (m *Module) makeNetwork(ctx context.Context, vm *pkg.VM, cfg *cloudinit.Con
 		}
 		if ifcfg.NetID != "" && len(ifcfg.IPs) > 0 {
 			// if NetID is set on this interface means it is a private network so we add console config to it.
-			console, err := m.getConsoleConfig(ctx, vm.Name, ifcfg)
+			console, err := m.getConsoleConfig(ctx, ifcfg)
 			if err != nil {
 				return nil, errors.Wrapf(err, "could not get console config for vm %s", vm.Name)
 			}
@@ -427,9 +443,10 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 	cmdline := vm.KernelArgs
 	if cmdline == nil {
 		cmdline = pkg.KernelArgs{}
-		cmdline.Extend(defaultKernelArgs)
 	}
-	var env map[string]string
+
+	cmdline.Extend(defaultKernelArgs)
+
 	if vm.Boot.Type == pkg.BootVirtioFS {
 		// booting from a virtiofs. the vm is basically
 		// running as a container. hence we set extra cmdline
@@ -444,7 +461,6 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 			Path: vm.Boot.Path,
 		})
 		// we set the environment
-		env = vm.Environment
 		// add we also add disk mounts
 		for i, mnt := range vm.Disks {
 			name := fmt.Sprintf("/dev/vd%c", 'a'+i)
@@ -494,11 +510,9 @@ func (m *Module) Run(vm pkg.VM) (pkg.MachineInfo, error) {
 			Mem:       MemMib(vm.Memory / gridtypes.Megabyte),
 			HTEnabled: false,
 		},
-		Entrypoint:  vm.Entrypoint,
 		FS:          fs,
 		Interfaces:  nics,
 		Disks:       disks,
-		Environment: env,
 		Devices:     vm.Devices,
 		NoKeepAlive: vm.NoKeepAlive,
 	}

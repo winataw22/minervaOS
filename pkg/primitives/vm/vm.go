@@ -124,9 +124,11 @@ func (p *Manager) virtualMachineProvisionImpl(ctx context.Context, wl *gridtypes
 	}
 
 	machine := pkg.VM{
-		Name:   wl.ID.String(),
-		CPU:    config.ComputeCapacity.CPU,
-		Memory: config.ComputeCapacity.Memory,
+		Name:       wl.ID.String(),
+		CPU:        config.ComputeCapacity.CPU,
+		Memory:     config.ComputeCapacity.Memory,
+		Entrypoint: config.Entrypoint,
+		KernelArgs: pkg.KernelArgs{},
 	}
 
 	// expand GPUs

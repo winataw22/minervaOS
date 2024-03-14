@@ -92,10 +92,6 @@ type KernelArgs map[string]string
 func (s KernelArgs) String() string {
 	var buf bytes.Buffer
 	for k, v := range s {
-		if k == "init" {
-			//init must be handled later separately
-			continue
-		}
 		if buf.Len() > 0 {
 			buf.WriteRune(' ')
 		}
