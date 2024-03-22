@@ -20,6 +20,7 @@ const (
 	failuresBeforeDestroy = 4
 	monitorEvery          = 10 * time.Second
 	logrotateEvery        = 10 * time.Minute
+	cleanupEvery          = 10 * time.Minute
 )
 
 var (
@@ -57,6 +58,8 @@ func (m *Module) Monitor(ctx context.Context) {
 		defer monTicker.Stop()
 		logTicker := time.NewTicker(logrotateEvery)
 		defer logTicker.Stop()
+		cleanupTicker := time.NewTicker(cleanupEvery)
+		defer cleanupTicker.Stop()
 
 		for {
 			select {
@@ -67,6 +70,10 @@ func (m *Module) Monitor(ctx context.Context) {
 			case <-logTicker.C:
 				if err := m.logrotate(ctx); err != nil {
 					log.Error().Err(err).Msg("failed to run log rotation")
+				}
+			case <-cleanupTicker.C:
+				if err := m.cleanupCidata(); err != nil {
+					log.Error().Err(err).Msg("failed to run cleanup")
 				}
 			case <-ctx.Done():
 				return
@@ -115,6 +122,35 @@ func (m *Module) monitor(ctx context.Context) error {
 		_ = syscall.Kill(ps.Pid, syscall.SIGKILL)
 	}
 
+	return nil
+}
+
+func (m *Module) cleanupCidata() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	log.Debug().Msg("running cleanup for vms cidata")
+
+	running, err := FindAll()
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Join(m.root, cloudInitDir)
+	files, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to list directory '%s' files: %w", dir, err)
+	}
+
+	for _, file := range files {
+		name := file.Name()
+		if _, ok := running[name]; !ok {
+			_ = os.Remove(filepath.Join(dir, name))
+			continue
+		}
+	}
 	return nil
 }
 
