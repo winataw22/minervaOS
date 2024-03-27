@@ -83,7 +83,7 @@ func (t *testIdentityManager) PrivateKey() []byte {
 }
 
 func TestNamespace(t *testing.T) {
-	nr := New(pkg.Network{}, "")
+	nr := New(pkg.Network{NetID: "networkd1"}, "")
 
 	nsName, err := nr.Namespace()
 	require.NoError(t, err)
@@ -94,26 +94,9 @@ func TestNamespace(t *testing.T) {
 	wgName, err := nr.WGName()
 	require.NoError(t, err)
 
-	assert.Equal(t, "net-networkd1", nsName)
-	assert.Equal(t, "br-networkd1", brName)
-	assert.Equal(t, "wg-networkd1", wgName)
-}
-
-func TestNaming(t *testing.T) {
-	nr := New(pkg.Network{}, "")
-
-	nsName, err := nr.Namespace()
-	require.NoError(t, err)
-
-	brName, err := nr.BridgeName()
-	require.NoError(t, err)
-
-	wgName, err := nr.WGName()
-	require.NoError(t, err)
-
-	assert.Equal(t, "net-networkd1", nsName)
-	assert.Equal(t, "br-networkd1", brName)
-	assert.Equal(t, "wg-networkd1", wgName)
+	assert.Equal(t, "n-networkd1", nsName)
+	assert.Equal(t, "b-networkd1", brName)
+	assert.Equal(t, "w-networkd1", wgName)
 }
 
 func TestCreateBridge(t *testing.T) {
@@ -224,7 +207,7 @@ func TestMyceliumIP(t *testing.T) {
 	ip, gw, err := data.IP([]byte{0x00, 0x11, 0x22, 0x33, 0x44, 0x55})
 	require.NoError(t, err)
 
-	require.Equal(t, net.ParseIP("3b4:ca67:822d:b0c1:ffff:11:2233:4455"), ip.IP)
+	require.Equal(t, net.ParseIP("3b4:ca67:822d:b0c1:ff0f:11:2233:4455"), ip.IP)
 	require.Equal(t, "3b4:ca67:822d:b0c1::1/64", gw.String())
 
 }

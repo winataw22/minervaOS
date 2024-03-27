@@ -143,3 +143,9 @@ jobs:
       package: mycelium
     secrets:
       token: ${{ secrets.HUB_JWT }}
+  mdadm:
+    uses: ./.github/workflows/bin-package-18.04.yaml
+    with:
+      package: mdadm
+    secrets:
+      token: ${{ secrets.HUB_JWT }}
