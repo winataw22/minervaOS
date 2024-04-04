@@ -112,11 +112,12 @@ sudo dnsmasq --strict-order \
 1. Now run your vm
 
 ```bash
-sudo ./vm.sh -n node-01 -c "farmer_id=47 printk.devmsg=on runmode=dev"
+sudo ./vm.sh -n node-01 -c "farmer_id=47 printk.devmsg=on runmode=dev ssh-user=<github username>"
 ```
 
 where `runmode` is one of `dev` , `test`  or `prod`, 
-and `farmer_id` is the id of the farm you registered with `tffarmer`
+      `farmer_id` is the id of the farm you registered with `tffarmer`
+      `ssh-user` is github username provided if a user need to pass ssh-key to the node
 
 NOTE: it is assumed you get a proper IPv6 address, if not, omit the IPv6 parts
 

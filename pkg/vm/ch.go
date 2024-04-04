@@ -286,8 +286,9 @@ func (m *Machine) waitAndAdjOom(ctx context.Context, name string, socket string)
 func (m *Machine) startFs(socket, path string) (int, error) {
 	cmd := exec.Command("busybox", "setsid",
 		"virtiofsd-rs",
-		"--socket", socket,
+		"--socket-path", socket,
 		"--shared-dir", path,
+		"--shared-dir-stats", fmt.Sprintf("/usr/share/btrfs/volstat.sh %s", path),
 	)
 
 	if err := cmd.Start(); err != nil {
@@ -299,6 +300,8 @@ func (m *Machine) startFs(socket, path string) (int, error) {
 
 func (m *Machine) release(ps *os.Process) error {
 	pid := ps.Pid
+	// TODO: what does this do? i can't remember why this
+	// code is here!
 	go func() {
 		ps, err := os.FindProcess(pid)
 		if err != nil {

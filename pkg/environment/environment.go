@@ -2,10 +2,9 @@ package environment
 
 import (
 	"os"
+	"slices"
 	"strconv"
 	"sync"
-
-	"slices"
 
 	"github.com/pkg/errors"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
@@ -51,8 +50,6 @@ type Environment struct {
 	RelayURL      []string
 	ActivationURL string
 	GraphQL       string
-
-	ExtendedConfigURL string
 
 	// private vlan to join
 	// if set, zos will use this as its priv vlan
@@ -227,11 +224,6 @@ func getEnvironmentFromParams(params kernel.Params) (Environment, error) {
 		env = envProd
 	default:
 		env = envProd
-	}
-
-	extended, found := params.Get("config_url")
-	if found && len(extended) >= 1 {
-		env.ExtendedConfigURL = extended[len(extended)-1]
 	}
 
 	if substrate, ok := params.Get("substrate"); ok {

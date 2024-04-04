@@ -1,6 +1,6 @@
-VIRTIOFSD_VERSION="1.3.0"
-VIRTIOFSD_CHECKSUM="0fc813a373eef188dc6b8ca152b2f286"
-VIRTIOFSD_LINK="https://gitlab.com/virtio-fs/virtiofsd/uploads/9a4f2261fcb1701f1e709694b5c5d980/virtiofsd-v1.3.0.zip"
+VIRTIOFSD_VERSION="v1.10.2"
+VIRTIOFSD_CHECKSUM="df1ed186ee84843605137758e2aa6e80"
+VIRTIOFSD_LINK="https://gitlab.com/muhamad.azmy/virtiofsd/-/jobs/6547244336/artifacts/download?file_type=archive"
 
 download_virtiofsd() {
     download_file ${VIRTIOFSD_LINK} ${VIRTIOFSD_CHECKSUM} virtiofsd-${VIRTIOFSD_VERSION}.zip

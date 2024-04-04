@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"time"
@@ -14,8 +15,6 @@ import (
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/identity"
-
-	"flag"
 
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
@@ -139,6 +138,11 @@ func main() {
 		log.Info().Msg("received a termination signal")
 	})
 
+	err = manageSSHKeys()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to configure ssh users")
+	}
+
 	err = upgrader.Run(ctx)
 	if errors.Is(err, upgrade.ErrRestartNeeded) {
 		return
@@ -146,7 +150,6 @@ func main() {
 		log.Error().Err(err).Msg("error during update")
 		os.Exit(1)
 	}
-
 }
 
 func getIdentityMgr(root string, debug bool) (pkg.IdentityManager, error) {

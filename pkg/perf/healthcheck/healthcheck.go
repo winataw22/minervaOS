@@ -25,7 +25,6 @@ func NewTask() perf.Task {
 	}
 	return &healthcheckTask{
 		checks: checks,
-		errors: make(map[string][]string),
 	}
 }
 
@@ -33,7 +32,6 @@ type checkFunc func(context.Context) []error
 
 type healthcheckTask struct {
 	checks map[string]checkFunc
-	errors map[string][]string
 }
 
 var _ perf.Task = (*healthcheckTask)(nil)
@@ -60,30 +58,27 @@ func (h *healthcheckTask) Description() string {
 // Run executes the health checks.
 func (h *healthcheckTask) Run(ctx context.Context) (interface{}, error) {
 	log.Debug().Msg("starting health check task")
-	for k := range h.errors {
-		// reset errors on each run
-		h.errors[k] = nil
-	}
+	errs := make(map[string][]string)
 
 	for label, check := range h.checks {
 		errors := check(ctx)
 		if len(errors) == 0 {
 			continue
 		}
-		stringErrs := errorsToStrings(errors)
-		h.errors[label] = append(h.errors[label], stringErrs...)
+
+		errs[label] = errorsToStrings(errors)
 	}
 
 	cl := perf.GetZbusClient(ctx)
 	zui := stubs.NewZUIStub(cl)
 
-	for label, data := range h.errors {
-		err := zui.PushErrors(ctx, label, data)
+	for label := range h.checks {
+		err := zui.PushErrors(ctx, label, errs[label])
 		if err != nil {
 			return nil, err
 		}
 	}
-	return h.errors, nil
+	return errs, nil
 }
 
 func errorsToStrings(errs []error) []string {

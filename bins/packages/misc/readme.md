@@ -16,3 +16,7 @@ file
 
 I am not sure if the hard-link is maintained in a github repo (I assume not) so any changes to the prop.script must be maintained in
 the two copies
+
+### `volstat.sh`
+
+this file is used by virtiofsd to fetch the real state of the shard directory (total size and available space) based on btrfs subvolume quota information
