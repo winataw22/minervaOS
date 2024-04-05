@@ -74,7 +74,7 @@ func NoZosUpgrade(o bool) UpgraderOption {
 
 // Storage option overrides the default hub storage url
 // default value is hub.grid.tf
-func Storage(url string) func(u *Upgrader) error {
+func Storage(url string) UpgraderOption {
 	return func(u *Upgrader) error {
 		storage, err := storage.NewSimpleStorage(url)
 		if err != nil {
@@ -86,7 +86,7 @@ func Storage(url string) func(u *Upgrader) error {
 }
 
 // Zinit option overrides the default zinit socket
-func Zinit(socket string) func(u *Upgrader) error {
+func Zinit(socket string) UpgraderOption {
 	return func(u *Upgrader) error {
 		zinit := zinit.New(socket)
 		u.zinit = zinit
@@ -130,6 +130,7 @@ func NewUpgrader(root string, opts ...UpgraderOption) (*Upgrader, error) {
 	return u, nil
 }
 
+// Run strats the upgrader module and run the update according to the detected boot method
 func (u *Upgrader) Run(ctx context.Context) error {
 	method := u.boot.DetectBootMethod()
 	if method == BootMethodOther {
@@ -159,6 +160,8 @@ func (u *Upgrader) Run(ctx context.Context) error {
 		return nil
 	}
 
+	// if the booting method is bootstrap then we run update periodically
+	// after u.nextUpdate to make sure all the modules are always up to date
 	for {
 		err := u.update()
 		if errors.Is(err, ErrRestartNeeded) {
@@ -182,6 +185,9 @@ func (u *Upgrader) Version() semver.Version {
 	return u.boot.Version()
 }
 
+// nextUpdate returns the interval until the next update
+// which is approximately 60 minutes + jitter interval(0-10 minutes)
+// to make sure not all nodes run upgrader at the same time
 func (u *Upgrader) nextUpdate() time.Duration {
 	jitter := rand.Intn(checkJitter)
 	next := checkForUpdateEvery + (time.Duration(jitter) * time.Minute)
@@ -189,6 +195,7 @@ func (u *Upgrader) nextUpdate() time.Duration {
 	return next
 }
 
+// remote finds the `tag link` associated with the node network (for example devnet)
 func (u *Upgrader) remote() (remote hub.TagLink, err error) {
 	mode := u.boot.RunMode()
 	// find all taglinks that matches the same run mode (ex: development)
@@ -197,7 +204,6 @@ func (u *Upgrader) remote() (remote hub.TagLink, err error) {
 		hub.MatchName(mode.String()),
 		hub.MatchType(hub.TypeTagLink),
 	)
-
 	if err != nil {
 		return remote, err
 	}
@@ -240,6 +246,8 @@ func (u *Upgrader) update() error {
 	return ErrRestartNeeded
 }
 
+// updateTo updates flist packages to match "link"
+// and only update zos package if u.noZosUpgrade is set to false
 func (u *Upgrader) updateTo(link hub.TagLink) error {
 	repo, tag, err := link.Destination()
 	if err != nil {
@@ -255,7 +263,7 @@ func (u *Upgrader) updateTo(link hub.TagLink) error {
 	for _, pkg := range packages {
 		pkgRepo, name, err := pkg.Destination(repo)
 		if pkg.Name == ZosPackage {
-			// this is the last to do
+			// this is the last to do to make sure all dependencies are installed before updating zos
 			log.Debug().Str("repo", pkgRepo).Str("name", name).Msg("schedule package for later")
 			later = append(later, []string{pkgRepo, name})
 			continue
@@ -411,7 +419,6 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 
 func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...string) error {
 	return store.Walk("", func(path string, info meta.Meta) error {
-
 		dest := filepath.Join(destination, path)
 		if isIn(dest, skip) {
 			if info.IsDir() {
@@ -435,7 +442,7 @@ func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...
 			// regular file (or other types that we don't handle)
 			return u.copyFile(dest, info)
 		case meta.LinkType:
-			//fmt.Println("link target", stat.LinkTarget)
+			// fmt.Println("link target", stat.LinkTarget)
 			target := stat.LinkTarget
 			if filepath.IsAbs(target) {
 				// if target is absolute, we make sure it's under destination
@@ -454,7 +461,6 @@ func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...
 
 		return nil
 	})
-
 }
 
 func isIn(target string, list []string) bool {
