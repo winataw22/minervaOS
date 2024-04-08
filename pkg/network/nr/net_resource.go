@@ -305,6 +305,7 @@ func (nr *NetResource) SetMycelium() (err error) {
 	args := []string{
 		"ip", "netns", "exec", ns,
 		"mycelium",
+		"--silent",
 		"--key-file", keyFile,
 		"--tun-name", "my",
 		"--peers",
