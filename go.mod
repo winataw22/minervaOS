@@ -19,6 +19,7 @@ require (
 	github.com/containerd/typeurl v1.0.2
 	github.com/containernetworking/cni v0.8.1
 	github.com/containernetworking/plugins v0.9.1
+	github.com/cyberdelia/lzo v1.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/decred/base58 v1.0.5
 	github.com/diskfs/go-diskfs v1.2.0
@@ -32,14 +33,17 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/gtank/merlin v0.1.1
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
 	github.com/hasura/go-graphql-client v0.10.0
 	github.com/jbenet/go-base58 v0.0.0-20150317085156-6237cf65f3a6
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
+	github.com/klauspost/compress v1.16.7
 	github.com/lestrrat-go/jwx v1.1.7
 	github.com/machinebox/graphql v0.2.2
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.31.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -49,10 +53,12 @@ require (
 	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.11.4
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tyler-smith/go-bip39 v1.1.0
+	github.com/ulikunitz/xz v0.5.8
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
+	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	github.com/yggdrasil-network/yggdrasil-go v0.4.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/sys v0.13.0
@@ -70,11 +76,9 @@ require (
 	github.com/coreos/go-iptables v0.6.0 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/dave/jennifer v1.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/ethereum/go-ethereum v1.11.6 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -83,7 +87,6 @@ require (
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
@@ -91,9 +94,9 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
 	github.com/hanwen/go-fuse/v2 v2.3.0 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/holiman/uint256 v1.2.2-0.20230321075855-87b91420868c // indirect
 	github.com/josharian/native v0.0.0-20200817173448-b6b71def0850 // indirect
-	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.7 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.0 // indirect
 	github.com/lestrrat-go/httpcc v1.0.0 // indirect
@@ -132,7 +135,6 @@ require (
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
-	github.com/ulikunitz/xz v0.5.8 // indirect
 	github.com/vedhavyas/go-subkey v1.0.3 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
