@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/klauspost/compress/zstd"
 	"github.com/pierrec/lz4/v4"
+	"github.com/rs/zerolog/log"
 	"github.com/ulikunitz/xz/lzma"
 	"github.com/xi2/xz"
 )
@@ -136,8 +137,11 @@ func tryDecompressKernel(kernelImagePath string) error {
 
 	// if kernel is already an elf (uncompressed)
 	if err := isValidELFKernel(kernelImagePath); err == nil {
+		log.Debug().Msg("kernel is decompressed")
 		return nil
 	}
+
+	log.Debug().Msg("kernel is compressed, trying to decompress kernel")
 
 	// Prepare temp files:
 	tmpFile, err := os.CreateTemp("", "vmlinux-")
@@ -197,6 +201,10 @@ func tryDecompressKernel(kernelImagePath string) error {
 
 	for _, algo := range algos {
 		if err = decompressData(kernelData, tmpFile, algo); err == nil {
+			if _, err = tmpFile.Seek(0, io.SeekStart); err != nil {
+				return err
+			}
+
 			f, err := os.Create(kernelImagePath)
 			if err != nil {
 				return err
@@ -208,6 +216,7 @@ func tryDecompressKernel(kernelImagePath string) error {
 				return err
 			}
 
+			log.Debug().Str("algorithm", algo.name).Msg("kernel is decompressed")
 			return nil
 		}
 
