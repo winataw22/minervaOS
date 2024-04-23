@@ -11,6 +11,7 @@ import (
 	_ "github.com/pkg/errors"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
 
@@ -65,8 +66,17 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 		return buf.String()
 	}
 
+	a, err := stub.Interfaces(ctx, types.DefaultBridge, "")
+	if err != nil {
+		return err
+	}
+
+	table.Rows[0][1] = toString(a[types.DefaultBridge].IPs)
+
 	go func() {
 		for {
+			render.Signal()
+
 			table.ColumnWidths = []int{6, table.Size().X - 9}
 			select {
 			case a := <-zos:
@@ -90,8 +100,6 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 			}
 
 			table.Rows[4][1] = dual
-
-			render.Signal()
 		}
 	}()
 

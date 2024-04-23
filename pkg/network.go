@@ -35,6 +35,8 @@ type Interface struct {
 	Mac  string
 }
 
+type Interfaces map[string]Interface
+
 type ExitDevice struct {
 	// IsSingle is set to true if br-pub
 	// is connected to zos bridge
@@ -178,7 +180,7 @@ type Networker interface {
 	// if the interface is in a network namespace netns needs to be not empty
 	// if iface is empty, return ALL interfaces in the given namespace
 	// if they are physical
-	Interfaces(iface string, netns string) (map[string]Interface, error)
+	Interfaces(iface string, netns string) (Interfaces, error)
 
 	// Addrs return the IP addresses of interface
 	// if the interface is in a network namespace netns needs to be not empty

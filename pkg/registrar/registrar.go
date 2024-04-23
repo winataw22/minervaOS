@@ -107,24 +107,35 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 		r.setState(FailedState(errors.New("virtualization is not enabled. please enable in BIOS")))
 		return
 	}
+
 	exp := backoff.NewExponentialBackOff()
 	exp.MaxInterval = 2 * time.Minute
 	exp.MaxElapsedTime = 0 // retry indefinitely
 	bo := backoff.WithContext(exp, ctx)
-	err := backoff.RetryNotify(func() error {
-		nodeID, twinID, err := r.registration(ctx, cl, env, info)
+	register := func() {
+		err := backoff.RetryNotify(func() error {
+			nodeID, twinID, err := r.registration(ctx, cl, env, info)
+			if err != nil {
+				r.setState(FailedState(err))
+				return err
+			} else {
+				r.setState(DoneState(nodeID, twinID))
+			}
+			return nil
+		}, bo, retryNotify)
 		if err != nil {
-			r.setState(FailedState(err))
-			return err
-		} else {
-			r.setState(DoneState(nodeID, twinID))
+			// this should never happen because we retry indefinitely
+			log.Error().Err(err).Msg("registration failed")
+			return
 		}
-		return nil
-	}, bo, retryNotify)
+	}
 
+	register()
+
+	stub := stubs.NewNetworkerStub(cl)
+	addressesUpdate, err := stub.ZOSAddresses(ctx)
 	if err != nil {
-		// this should never happen because we retry indefinitely
-		log.Error().Err(err).Msg("registration failed")
+		log.Error().Err(err).Msg("failed to monitor ip changes")
 		return
 	}
 
@@ -135,6 +146,8 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 			if err := r.reActivate(ctx, cl, env); err != nil {
 				log.Error().Err(err).Msg("failed to reactivate account")
 			}
+		case <-addressesUpdate:
+			register()
 		}
 	}
 }

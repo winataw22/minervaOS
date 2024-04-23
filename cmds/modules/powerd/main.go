@@ -61,7 +61,7 @@ func action(cli *cli.Context) error {
 
 	twinID, err := register.TwinID(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to get node id")
+		return errors.Wrap(err, "failed to get twin id")
 	}
 
 	sk := ed25519.PrivateKey(identity.PrivateKey(ctx))

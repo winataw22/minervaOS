@@ -56,9 +56,9 @@ func (e *FileState) Get(cl *gsrpc.SubstrateAPI) (types.BlockNumber, error) {
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get last block")
 	}
+
 	// set latest to previous block because
 	return block.Block.Header.Number - 1, nil
-
 }
 
 type Callback func(events *substrate.EventRecords)
@@ -106,7 +106,7 @@ func (e *Processor) eventsTo(cl *gsrpc.SubstrateAPI, meta *types.Metadata, block
 
 	key, err := types.CreateStorageKey(meta, "System", "Events", nil)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create storage key")
 	}
 
 	start := last + 1
@@ -177,6 +177,7 @@ func (e *Processor) Start(ctx context.Context) {
 	for {
 		err := e.subscribe(ctx)
 		if err != nil {
+			log.Error().Err(err).Msg("failed to subscribe to event blocks")
 			<-time.After(10 * time.Second)
 			continue
 		}

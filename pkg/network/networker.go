@@ -68,10 +68,8 @@ const (
 	mib = 1024 * 1024
 )
 
-var (
-	//NetworkSchemaLatestVersion last version
-	NetworkSchemaLatestVersion = semver.MustParse("0.1.0")
-)
+// NetworkSchemaLatestVersion last version
+var NetworkSchemaLatestVersion = semver.MustParse("0.1.0")
 
 type networker struct {
 	identity       *stubs.IdentityManagerStub
@@ -705,7 +703,7 @@ func (n *networker) SetPublicExitDevice(iface string) error {
 	return public.SetPublicExitLink(link)
 }
 
-func (n *networker) Interfaces(iface string, netns string) (map[string]pkg.Interface, error) {
+func (n *networker) Interfaces(iface string, netns string) (pkg.Interfaces, error) {
 	getter := func(iface string) ([]netlink.Link, error) {
 		if iface != "" {
 			l, err := netlink.LinkByName(iface)
@@ -1277,14 +1275,22 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 		return result
 	}
 
+	updateChan := make(chan netlink.AddrUpdate)
+	err := netlink.AddrSubscribe(updateChan, ctx.Done())
+	if err != nil {
+		log.Error().Err(err).Msgf("could not subscribe to addresses updates")
+		return nil
+	}
+
 	ch := make(chan pkg.NetlinkAddresses)
 	go func() {
 		defer close(ch)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(30 * time.Second):
+			case <-updateChan:
 				ch <- get()
 			}
 		}

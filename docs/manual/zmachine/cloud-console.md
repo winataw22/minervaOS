@@ -12,3 +12,5 @@ wg-quick up wireguard.conf
 ```
 
 - Then go to your browser with the network router IP `10.20.2.1:20002`
+
+> Note: You might need to create a user/password in the vm first before connecting to cloud-console if the image used does not have a default user.

@@ -256,7 +256,7 @@ func (s *NetworkerStub) GetSubnet(ctx context.Context, arg0 zos.NetID) (ret0 net
 	return
 }
 
-func (s *NetworkerStub) Interfaces(ctx context.Context, arg0 string, arg1 string) (ret0 interface{}, ret1 error) {
+func (s *NetworkerStub) Interfaces(ctx context.Context, arg0 string, arg1 string) (ret0 pkg.Interfaces, ret1 error) {
 	args := []interface{}{arg0, arg1}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Interfaces", args...)
 	if err != nil {

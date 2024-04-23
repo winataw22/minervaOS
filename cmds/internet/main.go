@@ -53,6 +53,8 @@ func main() {
 	log.Info().Msg("network bootstrapped successfully")
 }
 
+// debugZos prints some helpful debugging information
+// to help with debugging issues if internet connection wasn't established
 func debugZos() error {
 	br, err := bridge.Get(types.DefaultBridge)
 	if err != nil {
@@ -80,13 +82,13 @@ func debugZos() error {
 	return nil
 }
 
+// check tests the internet connection after configuration is completed.
+// it keeps retrying to connect until the test is completed successfully.
 func check() error {
 	retries := 0
 	f := func() error {
 		retries += 1
 
-		// print some helpful debugging information to help with debugging issues
-		// if internet connection wasn't established
 		if err := debugZos(); err != nil {
 			log.Error().Err(err).Msg("failed to list default bridge debug information")
 		}
@@ -135,7 +137,6 @@ before but with the next twist:
 - link is added to vlan as `bridge vlan add vid <id> dev <link>`
 */
 func configureZOS() error {
-
 	env := environment.MustGet()
 
 	f := func() error {
