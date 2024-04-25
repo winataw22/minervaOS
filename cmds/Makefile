@@ -14,7 +14,7 @@ output:
 	mkdir -p $(OUT)
 
 identityd:
-	cd identityd && GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
+	cd identityd && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/identityd
 
 internet: output
 	cd internet && CGO_ENABLED=0 GOOS=linux go build -ldflags $(ldflags) -o $(OUT)/internet

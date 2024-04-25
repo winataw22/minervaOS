@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/blang/semver"
@@ -303,8 +304,8 @@ func (u *Upgrader) fileCache() string {
 }
 
 // getFlist accepts fqdn of flist as `<repo>/<name>.flist`
-func (u *Upgrader) getFlist(repo, name string) (meta.Walker, error) {
-	db, err := u.hub.Download(u.flistCache(), repo, name)
+func (u *Upgrader) getFlist(repo, name string, cache cache) (meta.Walker, error) {
+	db, err := u.hub.Download(cache.flistCache(), repo, name)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to download flist")
 	}
@@ -323,12 +324,62 @@ func (u *Upgrader) getFlist(repo, name string) (meta.Walker, error) {
 	return walker, nil
 }
 
+type cache interface {
+	flistCache() string
+	fileCache() string
+}
+
+type inMemoryCache struct {
+	file  string
+	flist string
+	root  string
+}
+
+func newInMemoryCache() (*inMemoryCache, error) {
+	root := filepath.Join("/tmp", service)
+	file := filepath.Join(root, "cache", "file")
+	flist := filepath.Join(root, "cache", "flist")
+	if err := os.MkdirAll(file, 0755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(flist, 0755); err != nil {
+		return nil, err
+	}
+	return &inMemoryCache{file: file, flist: flist, root: root}, nil
+}
+
+func (c *inMemoryCache) flistCache() string {
+	return c.flist
+}
+func (c *inMemoryCache) fileCache() string {
+	return c.file
+}
+func (c *inMemoryCache) clean() {
+	os.RemoveAll(c.root)
+}
+
 // install from a single flist.
 func (u *Upgrader) install(repo, name string) error {
 	log.Info().Str("repo", repo).Str("name", name).Msg("start installing package")
+	var cache cache = u
+	store, err := u.getFlist(repo, name, cache)
+	if errors.Is(err, syscall.EROFS) ||
+		errors.Is(err, syscall.EPERM) ||
+		errors.Is(err, syscall.EIO) {
+		// try in memory
+		inMemoryCache, err := newInMemoryCache()
+		if err != nil {
+			return fmt.Errorf("failed to create in memory cache: %w", err)
+		}
+		defer inMemoryCache.clean()
+		cache = inMemoryCache
 
-	store, err := u.getFlist(repo, name)
-	if err != nil {
+		log.Info().Msg("downloading in memory")
+		store, err = u.getFlist(repo, name, cache)
+		if err != nil {
+			return errors.Wrapf(err, "failed to process flist: %s/%s", repo, name)
+		}
+	} else if err != nil {
 		return errors.Wrapf(err, "failed to process flist: %s/%s", repo, name)
 	}
 	defer store.Close()
@@ -336,7 +387,7 @@ func (u *Upgrader) install(repo, name string) error {
 	if err := safe(func() error {
 		// copy is done in a safe closer to avoid interrupting
 		// the installation
-		return u.copyRecursive(store, "/")
+		return u.copyRecursive(store, "/", cache)
 	}); err != nil {
 		return errors.Wrapf(err, "failed to install flist: %s/%s", repo, name)
 	}
@@ -417,7 +468,7 @@ func (u *Upgrader) ensureRestarted(service ...string) error {
 	return nil
 }
 
-func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...string) error {
+func (u *Upgrader) copyRecursive(store meta.Walker, destination string, cache cache, skip ...string) error {
 	return store.Walk("", func(path string, info meta.Meta) error {
 		dest := filepath.Join(destination, path)
 		if isIn(dest, skip) {
@@ -440,7 +491,7 @@ func (u *Upgrader) copyRecursive(store meta.Walker, destination string, skip ...
 		switch stat.Type {
 		case meta.RegularType:
 			// regular file (or other types that we don't handle)
-			return u.copyFile(dest, info)
+			return u.copyFile(dest, info, cache)
 		case meta.LinkType:
 			// fmt.Println("link target", stat.LinkTarget)
 			target := stat.LinkTarget
@@ -472,7 +523,7 @@ func isIn(target string, list []string) bool {
 	return false
 }
 
-func (u *Upgrader) copyFile(dst string, src meta.Meta) error {
+func (u *Upgrader) copyFile(dst string, src meta.Meta, cache cache) error {
 	log.Info().Str("source", src.Name()).Str("destination", dst).Msg("copy file")
 
 	var (
@@ -513,8 +564,8 @@ func (u *Upgrader) copyFile(dst string, src meta.Meta) error {
 	}
 	defer fDst.Close()
 
-	cache := rofs.NewCache(u.fileCache(), u.storage)
-	fSrc, err := cache.CheckAndGet(src)
+	fsCache := rofs.NewCache(cache.fileCache(), u.storage)
+	fSrc, err := fsCache.CheckAndGet(src)
 	if err != nil {
 		return err
 	}

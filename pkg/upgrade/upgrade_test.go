@@ -25,11 +25,11 @@ func TestUpgraderDownload(t *testing.T) {
 	const repo = "azmy.3bot"
 	const flist = "test-flist.flist"
 
-	store, err := up.getFlist(repo, flist)
+	store, err := up.getFlist(repo, flist, up)
 	require.NoError(err)
 	tmp := t.TempDir()
 
-	err = up.copyRecursive(store, tmp)
+	err = up.copyRecursive(store, tmp, up)
 	require.NoError(err)
 
 	// validation of download

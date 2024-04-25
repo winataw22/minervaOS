@@ -147,6 +147,7 @@ func (r *Registrar) register(ctx context.Context, cl zbus.Client, env environmen
 				log.Error().Err(err).Msg("failed to reactivate account")
 			}
 		case <-addressesUpdate:
+			log.Info().Msg("zos address has changed, re-register")
 			register()
 		}
 	}
