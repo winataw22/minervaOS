@@ -1,4 +1,4 @@
-# 1. Dynamic Cache
+# 1. Uptime Hints
 
 Date: 2023-06-14
 

@@ -10,7 +10,7 @@ import (
 type APIGateway interface {
 	CreateNode(node substrate.Node) (uint32, error)
 	CreateTwin(relay string, pk []byte) (uint32, error)
-	EnsureAccount(activationURL string, termsAndConditionsLink string, terminsAndConditionsHash string) (info substrate.AccountInfo, err error)
+	EnsureAccount(activationURL string, termsAndConditionsLink string, termsAndConditionsHash string) (info substrate.AccountInfo, err error)
 	GetContract(id uint64) (substrate.Contract, SubstrateError)
 	GetContractIDByNameRegistration(name string) (uint64, SubstrateError)
 	GetFarm(id uint32) (substrate.Farm, error)
