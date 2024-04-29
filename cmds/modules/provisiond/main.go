@@ -318,6 +318,7 @@ func action(cli *cli.Context) error {
 		// comes first.
 		provision.WithStartupOrder(
 			zos.ZMountType,
+			zos.VolumeType,
 			zos.QuantumSafeFSType,
 			zos.NetworkType,
 			zos.PublicIPv4Type,

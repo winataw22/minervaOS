@@ -860,26 +860,29 @@ func (e *NativeEngine) uninstallDeployment(ctx context.Context, dl *gridtypes.De
 
 }
 
-func getZmountSize(wl *gridtypes.Workload) (gridtypes.Unit, error) {
+func getMountSize(wl *gridtypes.Workload) (gridtypes.Unit, error) {
 	data, err := wl.WorkloadData()
 	if err != nil {
 		return 0, err
 	}
-	zmount, ok := data.(*zos.ZMount)
-	if !ok {
-		return 0, fmt.Errorf("failed to get workload data as a zmount '%v'", data)
+	switch d := data.(type) {
+	case *zos.ZMount:
+		return d.Size, nil
+	case *zos.Volume:
+		return d.Size, nil
+	default:
+		return 0, fmt.Errorf("failed to get workload as zmount or volume '%v'", data)
 	}
-	return zmount.Size, nil
 }
 
-func sortZmountWorkloads(workloads []*gridtypes.WorkloadWithID) {
+func sortMountWorkloads(workloads []*gridtypes.WorkloadWithID) {
 	sort.Slice(workloads, func(i, j int) bool {
-		sizeI, err := getZmountSize(workloads[i].Workload)
+		sizeI, err := getMountSize(workloads[i].Workload)
 		if err != nil {
 			return false
 		}
 
-		sizeJ, err := getZmountSize(workloads[j].Workload)
+		sizeJ, err := getMountSize(workloads[j].Workload)
 		if err != nil {
 			return false
 		}
@@ -892,8 +895,8 @@ func (e *NativeEngine) installDeployment(ctx context.Context, getter gridtypes.W
 	for _, typ := range e.order {
 		workloads := getter.ByType(typ)
 
-		if typ == zos.ZMountType {
-			sortZmountWorkloads(workloads)
+		if typ == zos.ZMountType || typ == zos.VolumeType {
+			sortMountWorkloads(workloads)
 		}
 
 		for _, wl := range workloads {

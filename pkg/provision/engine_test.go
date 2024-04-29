@@ -78,63 +78,107 @@ import (
 // 	assert.EqualValues(t, 0, workloads.K8sVM)
 // }
 
-func TestGetZmountSize(t *testing.T) {
+func TestGetMountSize(t *testing.T) {
 	t.Run("invalid type", func(t *testing.T) {
 		wl := gridtypes.WorkloadWithID{
 			Workload: &gridtypes.Workload{Type: "invalid"},
 		}
-		_, err := getZmountSize(wl.Workload)
+		_, err := getMountSize(wl.Workload)
 		assert.Error(t, err)
 	})
 	t.Run("different data type", func(t *testing.T) {
 		wl := gridtypes.WorkloadWithID{
 			Workload: &gridtypes.Workload{Type: zos.ZDBType, Data: json.RawMessage(`{"size": 10}`)},
 		}
-		_, err := getZmountSize(wl.Workload)
+		_, err := getMountSize(wl.Workload)
 		assert.Error(t, err)
 	})
 	t.Run("valid data", func(t *testing.T) {
 		wl := gridtypes.WorkloadWithID{
 			Workload: &gridtypes.Workload{Type: zos.ZMountType, Data: json.RawMessage(`{"size": 10}`)},
 		}
-		size, err := getZmountSize(wl.Workload)
+		size, err := getMountSize(wl.Workload)
+		assert.NoError(t, err)
+		assert.Equal(t, size, gridtypes.Unit(10))
+	})
+	t.Run("volumes", func(t *testing.T) {
+		wl := gridtypes.WorkloadWithID{
+			Workload: &gridtypes.Workload{Type: zos.VolumeType, Data: json.RawMessage(`{"size": 10}`)},
+		}
+		size, err := getMountSize(wl.Workload)
 		assert.NoError(t, err)
 		assert.Equal(t, size, gridtypes.Unit(10))
 	})
 
 }
 
-func TestSortZmountWorkloads(t *testing.T) {
-	workloads := []*gridtypes.WorkloadWithID{
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 10}`),
-		}},
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 30}`),
-		}},
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 20}`),
-		}},
-	}
+func TestSortMountWorkloads(t *testing.T) {
+	t.Run("zmounts", func(t *testing.T) {
+		workloads := []*gridtypes.WorkloadWithID{
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 10}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 30}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 20}`),
+			}},
+		}
 
-	expectedWorkloads := []*gridtypes.WorkloadWithID{
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 30}`),
-		}},
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 20}`),
-		}},
-		{Workload: &gridtypes.Workload{
-			Type: zos.ZMountType,
-			Data: json.RawMessage(`{"size": 10}`),
-		}},
-	}
+		expectedWorkloads := []*gridtypes.WorkloadWithID{
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 30}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 20}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.ZMountType,
+				Data: json.RawMessage(`{"size": 10}`),
+			}},
+		}
 
-	sortZmountWorkloads(workloads)
-	assert.Equal(t, expectedWorkloads, workloads)
+		sortMountWorkloads(workloads)
+		assert.Equal(t, expectedWorkloads, workloads)
+	})
+	t.Run("volumes", func(t *testing.T) {
+		workloads := []*gridtypes.WorkloadWithID{
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 10}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 30}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 20}`),
+			}},
+		}
+
+		expectedWorkloads := []*gridtypes.WorkloadWithID{
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 30}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 20}`),
+			}},
+			{Workload: &gridtypes.Workload{
+				Type: zos.VolumeType,
+				Data: json.RawMessage(`{"size": 10}`),
+			}},
+		}
+
+		sortMountWorkloads(workloads)
+		assert.Equal(t, expectedWorkloads, workloads)
+	})
 }

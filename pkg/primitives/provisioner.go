@@ -9,6 +9,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/primitives/pubip"
 	"github.com/threefoldtech/zos/pkg/primitives/qsfs"
 	"github.com/threefoldtech/zos/pkg/primitives/vm"
+	"github.com/threefoldtech/zos/pkg/primitives/volume"
 	"github.com/threefoldtech/zos/pkg/primitives/zdb"
 	"github.com/threefoldtech/zos/pkg/primitives/zlogs"
 	"github.com/threefoldtech/zos/pkg/primitives/zmount"
@@ -26,6 +27,7 @@ func NewPrimitivesProvisioner(zbus zbus.Client) provision.Provisioner {
 		zos.PublicIPType:         pubip.NewManager(zbus),
 		zos.PublicIPv4Type:       pubip.NewManager(zbus), // backward compatibility
 		zos.ZMachineType:         vm.NewManager(zbus),
+		zos.VolumeType:           volume.NewManager(zbus),
 		zos.GatewayNameProxyType: gateway.NewNameManager(zbus),
 		zos.GatewayFQDNProxyType: gateway.NewFQDNManager(zbus),
 	}

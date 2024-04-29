@@ -16,6 +16,8 @@ const (
 	ZDBType gridtypes.WorkloadType = "zdb"
 	// ZMachineType type
 	ZMachineType gridtypes.WorkloadType = "zmachine"
+	// VolumeType type
+	VolumeType gridtypes.WorkloadType = "volume"
 	//PublicIPv4Type type [deprecated]
 	PublicIPv4Type gridtypes.WorkloadType = "ipv4"
 	//PublicIPType type is the new way to assign public ips
@@ -37,6 +39,7 @@ func init() {
 	// deployments.
 	gridtypes.RegisterSharableType(NetworkType, Network{})
 	gridtypes.RegisterType(ZMountType, ZMount{})
+	gridtypes.RegisterType(VolumeType, Volume{})
 	gridtypes.RegisterType(ZDBType, ZDB{})
 	gridtypes.RegisterType(ZMachineType, ZMachine{})
 	gridtypes.RegisterType(PublicIPv4Type, PublicIP4{})

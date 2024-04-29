@@ -65,6 +65,10 @@ func (p *Manager) vmMounts(ctx context.Context, deployment *gridtypes.Deployment
 			if err := p.mountQsfs(wl, mount, vm); err != nil {
 				return err
 			}
+		case zos.VolumeType:
+			if err := p.mountVolume(ctx, wl, mount, vm); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("expecting a reservation of type '%s' or '%s' for disk '%s'", zos.ZMountType, zos.QuantumSafeFSType, mount.Name)
 		}
@@ -88,6 +92,18 @@ func (p *Manager) mountDisk(ctx context.Context, wl *gridtypes.WorkloadWithID, m
 
 	vm.Disks = append(vm.Disks, pkg.VMDisk{Path: info.Path, Target: mount.Mountpoint})
 
+	return nil
+}
+
+func (p *Manager) mountVolume(ctx context.Context, wl *gridtypes.WorkloadWithID, mount zos.MachineMount, vm *pkg.VM) error {
+	storage := stubs.NewStorageModuleStub(p.zbus)
+
+	volume, err := storage.VolumeLookup(ctx, wl.ID.String())
+	if err != nil {
+		return fmt.Errorf("failed to lookup volume %q: %w", wl.ID.String(), err)
+	}
+
+	vm.Shared = append(vm.Shared, pkg.SharedDir{ID: wl.Name.String(), Path: volume.Path, Target: mount.Mountpoint})
 	return nil
 }
 
