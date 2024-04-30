@@ -23,6 +23,7 @@ const (
 // NewTask returns a new health check task.
 func NewTask() perf.Task {
 	checks := map[string]checkFunc{
+		"ntp":     ntpCheck,
 		"cache":   cacheCheck,
 		"network": networkCheck,
 	}
@@ -119,13 +120,13 @@ func errorsToStrings(errs []error) []string {
 
 func cacheCheck(ctx context.Context) []error {
 	var errors []error
-	if err := readonlyCheck(ctx); err != nil {
+	if err := readonlyCheck(); err != nil {
 		errors = append(errors, err)
 	}
 	return errors
 }
 
-func readonlyCheck(ctx context.Context) error {
+func readonlyCheck() error {
 	const checkFile = "/var/cache/healthcheck"
 
 	_, err := os.Create(checkFile)
