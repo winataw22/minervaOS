@@ -215,6 +215,7 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to create a new perfMon")
 	}
 
+	healthcheck.RunNTPCheck(ctx)
 	perfMon.AddTask(iperf.NewTask())
 	perfMon.AddTask(cpubench.NewTask())
 	perfMon.AddTask(publicip.NewTask())

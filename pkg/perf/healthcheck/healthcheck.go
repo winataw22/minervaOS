@@ -23,7 +23,6 @@ const (
 // NewTask returns a new health check task.
 func NewTask() perf.Task {
 	checks := map[string]checkFunc{
-		"ntp":     ntpCheck,
 		"cache":   cacheCheck,
 		"network": networkCheck,
 	}

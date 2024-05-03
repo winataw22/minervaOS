@@ -73,7 +73,7 @@ func (pm *PerformanceMonitor) runTask(ctx context.Context, task Task) error {
 	return nil
 }
 
-// Run adds the tasks to the corn queue and start the scheduler
+// Run adds the tasks to the cron queue and start the scheduler
 func (pm *PerformanceMonitor) Run(ctx context.Context) error {
 	ctx = withZbusClient(ctx, pm.zbusClient)
 	for _, task := range pm.tasks {
