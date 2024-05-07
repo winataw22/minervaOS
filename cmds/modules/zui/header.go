@@ -37,7 +37,6 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 
 	identity := stubs.NewIdentityManagerStub(c)
 	registrar := stubs.NewRegistrarStub(c)
-	farmID, _ := identity.FarmID(ctx)
 
 	h.Text = "\n    Fetching realtime node information... please wait."
 
@@ -55,6 +54,7 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 	}
 
 	go func() {
+		farmID, _ := identity.FarmID(ctx)
 		for version := range ch {
 			var name string
 			var nodeID string

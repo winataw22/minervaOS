@@ -13,13 +13,15 @@ import (
 )
 
 const (
-	gig = 1024 * 1024 * 1024.0
-	mb  = 1024 * 1024.0
+	gig     = 1024 * 1024 * 1024.0
+	mb      = 1024 * 1024.0
+	loading = "Loading..."
 )
 
 func resourcesRender(client zbus.Client, grid *ui.Grid, render *signalFlag) error {
 	prov := widgets.NewTable()
 	usage := widgets.NewTable()
+	prov.FillRow = true
 
 	grid.Set(
 		ui.NewRow(1.0,
@@ -45,11 +47,11 @@ func provRender(client zbus.Client, render *signalFlag, prov *widgets.Table) err
 
 	prov.Rows = [][]string{
 		{"", "Total", "Reserved"},
-		{"CRU", "", ""},
-		{"Memory", "", ""},
-		{"SSD", "", ""},
-		{"HDD", "", ""},
-		{"IPv4", "", ""},
+		{"CRU", loading, loading},
+		{"Memory", loading, loading},
+		{"SSD", loading, loading},
+		{"HDD", loading, loading},
+		{"IPv4", loading, loading},
 	}
 
 	monitor := stubs.NewStatisticsStub(client)
@@ -85,8 +87,8 @@ func usageRender(client zbus.Client, render *signalFlag, usage *widgets.Table) e
 	usage.FillRow = true
 
 	usage.Rows = [][]string{
-		{"CPU", ""},
-		{"Memory", ""},
+		{"CPU", loading},
+		{"Memory", loading},
 	}
 
 	sysMonitor := stubs.NewSystemMonitorStub(client)
