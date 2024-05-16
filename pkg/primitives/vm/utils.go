@@ -148,11 +148,6 @@ func (p *Manager) prepContainer(
 
 	// can be overridden from the flist itself if exists
 	if len(imageInfo.KernelPath) != 0 {
-		// try to decompress kernel
-		if err := tryDecompressKernel(imageInfo.KernelPath); err != nil {
-			return errors.Wrapf(err, "failed to decompress kernel: %s", imageInfo.KernelPath)
-		}
-
 		machine.KernelImage = imageInfo.KernelPath
 		machine.InitrdImage = imageInfo.InitrdPath
 		// we are using kernel from flist, we need to respect
