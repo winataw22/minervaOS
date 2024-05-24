@@ -13,14 +13,14 @@ import (
 )
 
 type ContractEventHandler struct {
-	node           uint32
-	apiGateway     *stubs.APIGatewayStub
-	engine         provision.Engine
-	eventsConsumer *events.RedisConsumer
+	node             uint32
+	substrateGateway *stubs.SubstrateGatewayStub
+	engine           provision.Engine
+	eventsConsumer   *events.RedisConsumer
 }
 
-func NewContractEventHandler(node uint32, apiGateway *stubs.APIGatewayStub, engine provision.Engine, events *events.RedisConsumer) ContractEventHandler {
-	return ContractEventHandler{node: node, apiGateway: apiGateway, engine: engine, eventsConsumer: events}
+func NewContractEventHandler(node uint32, substrateGateway *stubs.SubstrateGatewayStub, engine provision.Engine, events *events.RedisConsumer) ContractEventHandler {
+	return ContractEventHandler{node: node, substrateGateway: substrateGateway, engine: engine, eventsConsumer: events}
 }
 
 func (r *ContractEventHandler) current() (map[uint64]gridtypes.Deployment, error) {
@@ -46,7 +46,7 @@ func (r *ContractEventHandler) sync(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get current active contracts")
 	}
-	onchain, err := r.apiGateway.GetNodeContracts(ctx, r.node)
+	onchain, err := r.substrateGateway.GetNodeContracts(ctx, r.node)
 	if err != nil {
 		return errors.Wrap(err, "failed to get active node contracts")
 	}
@@ -88,7 +88,7 @@ func (r *ContractEventHandler) sync(ctx context.Context) error {
 			Uint64("contract", id).
 			Logger()
 
-		contract, err := r.apiGateway.GetContract(ctx, id)
+		contract, err := r.substrateGateway.GetContract(ctx, id)
 		if err.IsError() {
 			logger.Error().Err(err.Err).Msg("failed to get contract from chain")
 			continue

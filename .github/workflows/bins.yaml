@@ -65,12 +65,6 @@ jobs:
       package: cloudhypervisor
     secrets:
       token: ${{ secrets.HUB_JWT }}
-  rmb:
-    uses: ./.github/workflows/bin-package.yaml
-    with:
-      package: rmb
-    secrets:
-      token: ${{ secrets.HUB_JWT }}
   tailstream:
     uses: ./.github/workflows/bin-package.yaml
     with:

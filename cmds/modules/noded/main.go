@@ -3,10 +3,7 @@ package noded
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff"
@@ -14,10 +11,8 @@ import (
 	"github.com/urfave/cli/v2"
 
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
-	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/capacity"
-	"github.com/threefoldtech/zos/pkg/diagnostics"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/monitord"
@@ -166,48 +161,6 @@ func action(cli *cli.Context) error {
 		WithVirtualized(len(hypervisor) != 0)
 
 	go registerationServer(ctx, msgBrokerCon, env, info)
-	bus, err := rmb.NewRouter(msgBrokerCon)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize message bus server")
-	}
-
-	bus.WithHandler("zos.system.version", func(ctx context.Context, payload []byte) (interface{}, error) {
-		ver := stubs.NewVersionMonitorStub(redis)
-		output, err := exec.CommandContext(ctx, "zinit", "-V").CombinedOutput()
-		var zInitVer string
-		if err != nil {
-			zInitVer = err.Error()
-		} else {
-			zInitVer = strings.TrimSpace(strings.TrimPrefix(string(output), "zinit"))
-		}
-
-		version := struct {
-			ZOS   string `json:"zos"`
-			ZInit string `json:"zinit"`
-		}{
-			ZOS:   ver.GetVersion(ctx).String(),
-			ZInit: zInitVer,
-		}
-
-		return version, nil
-	})
-
-	diagnosticsMgr, err := diagnostics.NewDiagnosticsManager(msgBrokerCon, redis)
-	if err != nil {
-		return errors.Wrap(err, "failed to create a new Diagnostics manager")
-	}
-	bus.WithHandler("zos.system.diagnostics", func(ctx context.Context, payload []byte) (interface{}, error) {
-		return diagnosticsMgr.GetSystemDiagnostics(ctx)
-	})
-
-	bus.WithHandler("zos.system.dmi", func(ctx context.Context, payload []byte) (interface{}, error) {
-		return dmi, nil
-	})
-
-	bus.WithHandler("zos.system.hypervisor", func(ctx context.Context, payload []byte) (interface{}, error) {
-		return hypervisor, nil
-	})
-
 	log.Info().Msg("start perf scheduler")
 
 	perfMon, err := perf.NewPerformanceMonitor(msgBrokerCon)
@@ -224,28 +177,6 @@ func action(cli *cli.Context) error {
 	if err = perfMon.Run(ctx); err != nil {
 		return errors.Wrap(err, "failed to run the scheduler")
 	}
-	bus.WithHandler("zos.perf.get", func(ctx context.Context, payload []byte) (interface{}, error) {
-		type Payload struct {
-			Name string
-		}
-		var request Payload
-		err := json.Unmarshal(payload, &request)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal payload: %v", payload)
-		}
-
-		return perfMon.Get(request.Name)
-	})
-	bus.WithHandler("zos.perf.get_all", func(ctx context.Context, payload []byte) (interface{}, error) {
-		return perfMon.GetAll()
-	})
-
-	// answer calls for dmi
-	go func() {
-		if err := bus.Run(ctx); err != nil {
-			log.Fatal().Err(err).Msg("message bus handler failure")
-		}
-	}()
 
 	// block indefinietly, and other modules will get an error
 	// when calling the registrar NodeID
@@ -298,12 +229,7 @@ func action(cli *cli.Context) error {
 
 	server.Register(zbus.ObjectID{Name: "host", Version: "0.0.1"}, host)
 	server.Register(zbus.ObjectID{Name: "system", Version: "0.0.1"}, system)
-
-	go func() {
-		if err := server.Run(ctx); err != nil && err != context.Canceled {
-			log.Fatal().Err(err).Msg("unexpected error")
-		}
-	}()
+	server.Register(zbus.ObjectID{Name: "performance-monitor", Version: "0.0.1"}, perfMon)
 
 	log.Info().Uint32("node", node).Uint32("twin", twin).Msg("node registered")
 
@@ -326,19 +252,10 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	log.Debug().Msg("start message bus")
-	for {
-		err := runMsgBus(ctx, sk, env.SubstrateURL, env.RelayURL, msgBrokerCon)
-
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			// if context is cancelled, then it's a normal shutdown
-			return nil
-		}
-
-		log.Error().Err(err).Msg("rmb-peer exited with an error, restarting")
-		<-time.After(1 * time.Second)
+	if err := server.Run(ctx); err != nil && err != context.Canceled {
+		log.Fatal().Err(err).Msg("unexpected error")
 	}
+	return nil
 }
 
 func retryNotify(err error, d time.Duration) {

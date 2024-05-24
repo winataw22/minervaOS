@@ -1,4 +1,5 @@
 # Run 0-OS in a VM using qemu
+
 | For a quick development docs check [here](../docs/development/README.md)
 
 This folder contains a script that you can use to run 0-OS in a VM using qemu.
@@ -45,20 +46,19 @@ For qemu to run, you need the have the vm connected to a network.
 
 There are 2 ways to do that, each with their own pitfalls.
 
-- using a bridge, that hosts it's own network, and NATs that network with the IP of the host   
+- using a bridge, that hosts it's own network, and NATs that network with the IP of the host
   That means you have to provide your own IP-management on that network (dnsmasq), and you have to setup the NAT part.
-- also with a bridge, but that has a real connection  interface as slave  
+- also with a bridge, but that has a real connection  interface as slave
   That way, your local network is providing for ip-configuration, and that will only work on wired interfaces. (i.e. wifi interfaces can't be a bridge slave)
 
 It's important to make the distinction: in case of your own hosted network, that doesn't look like it would be a real ZOS host connected to a network, which basically means that that is better not used for network testing.
 
 When using a direct wired connection, on a Linux development machine, you'll have to set it up on your own, as a personal computer has all sorts of automagic network setup tools.
 
-
 First thing to do, ensure your qemu's bridge configuration allows our bridge, edit file `/etc/qemu/bridge.conf`.
 The bridge we will use is called `zos0`, you need to allow this bridge:
 
-```bash 
+```bash
 # This should have the following permissions: root:qemu 0640
 # [...]
 allow zos0
@@ -115,7 +115,7 @@ sudo dnsmasq --strict-order \
 sudo ./vm.sh -n node-01 -c "farmer_id=47 printk.devmsg=on runmode=dev ssh-user=<github username>"
 ```
 
-where `runmode` is one of `dev` , `test`  or `prod`, 
+where `runmode` is one of `dev` , `test`  or `prod`,
       `farmer_id` is the id of the farm you registered with `tffarmer`
       `ssh-user` is github username provided if a user need to pass ssh-key to the node
 
@@ -123,7 +123,7 @@ NOTE: it is assumed you get a proper IPv6 address, if not, omit the IPv6 parts
 
 ## Case2, have the bridge be part of your local lan
 
-1. same, crate your bridge, bring it up 
+1. same, crate your bridge, bring it up
 
 ```bash
 sudo ip link add zos0 type bridge
@@ -150,19 +150,20 @@ sudo ip link set forzos up
 ./vm.sh -n node-01 -c "farmer_id=47 version=v3 printk.devmsg=on runmode=dev"
 ```
 
-where `runmode` is one of `dev` , `test`  or `prod`, 
+where `runmode` is one of `dev` , `test`  or `prod`,
 and `farmer_id` is the id of the farm you registered with `tffarmer`
 
-Note: `double quotes around the flags after -c are very important` 
-
+Note: `double quotes around the flags after -c are very important`
 
 ## To ssh into the machine
 
 ### Authorizing yourself
-- `cp ~/.ssh/id_rsa.pub qemu/overlay/root/.ssh/authorized_keys`
 
+- To inject you ssh key into zos. You need to add `ssh-user=<github-username>` to your kernel params (with `-c` flag)
+- replace `<github-username>` with you actual username. ZOS will use that name to fetch your public ssh key and auto inject it
 
 ### SSH to the node
+
 - use `ssh root@{NODE_IP}`
 
 ## inspecting the cmdline Arguments

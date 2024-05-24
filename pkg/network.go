@@ -35,8 +35,6 @@ type Interface struct {
 	Mac  string
 }
 
-type Interfaces map[string]Interface
-
 type ExitDevice struct {
 	// IsSingle is set to true if br-pub
 	// is connected to zos bridge
@@ -287,4 +285,10 @@ func (p PublicConfig) Equal(cfg PublicConfig) bool {
 type OptionPublicConfig struct {
 	PublicConfig
 	HasPublicConfig bool
+}
+
+// Interfaces struct to bypass zbus generation error
+// where it generate a stub with map as interface instead of map
+type Interfaces struct {
+	Interfaces map[string]Interface
 }

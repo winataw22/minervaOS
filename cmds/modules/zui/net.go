@@ -71,7 +71,7 @@ func addressRender(ctx context.Context, table *widgets.Table, client zbus.Client
 		return err
 	}
 
-	table.Rows[0][1] = toString(a[types.DefaultBridge].IPs)
+	table.Rows[0][1] = toString(a.Interfaces[types.DefaultBridge].IPs)
 
 	go func() {
 		for {

@@ -18,8 +18,8 @@ import (
 )
 
 type PowerServer struct {
-	consumer   *events.RedisConsumer
-	apiGateway *stubs.APIGatewayStub
+	consumer         *events.RedisConsumer
+	substrateGateway *stubs.SubstrateGatewayStub
 
 	// enabled means the node can power off!
 	enabled bool
@@ -30,7 +30,7 @@ type PowerServer struct {
 }
 
 func NewPowerServer(
-	apiGateway *stubs.APIGatewayStub,
+	substrateGateway *stubs.SubstrateGatewayStub,
 	consumer *events.RedisConsumer,
 	enabled bool,
 	farm pkg.FarmID,
@@ -39,13 +39,13 @@ func NewPowerServer(
 	ut *Uptime) (*PowerServer, error) {
 
 	return &PowerServer{
-		apiGateway: apiGateway,
-		consumer:   consumer,
-		enabled:    enabled,
-		farm:       farm,
-		node:       node,
-		twin:       twin,
-		ut:         ut,
+		substrateGateway: substrateGateway,
+		consumer:         consumer,
+		enabled:          enabled,
+		farm:             farm,
+		node:             node,
+		twin:             twin,
+		ut:               ut,
 	}, nil
 }
 
@@ -96,7 +96,7 @@ func EnsureWakeOnLan(ctx context.Context) (bool, error) {
 }
 
 func (p *PowerServer) syncSelf() error {
-	power, err := p.apiGateway.GetPowerTarget(context.Background(), p.node)
+	power, err := p.substrateGateway.GetPowerTarget(context.Background(), p.node)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (p *PowerServer) event(event *pkg.PowerTargetChangeEvent) error {
 		Uint32("node", p.node).
 		Msg("received power event for farm")
 
-	node, err := p.apiGateway.GetNode(context.Background(), event.NodeID)
+	node, err := p.substrateGateway.GetNode(context.Background(), event.NodeID)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (p *PowerServer) setNodePowerState(up bool) error {
 	*/
 
 	up = !p.enabled || up
-	power, err := p.apiGateway.GetPowerTarget(context.Background(), p.node)
+	power, err := p.substrateGateway.GetPowerTarget(context.Background(), p.node)
 
 	if err != nil {
 		return errors.Wrap(err, "failed to check power state")
@@ -245,7 +245,7 @@ func (p *PowerServer) setNodePowerState(up bool) error {
 
 	log.Info().Bool("state", up).Msg("setting node power state")
 	// this to make sure node state is fixed also for nodes
-	_, err = p.apiGateway.SetNodePowerState(context.Background(), up)
+	_, err = p.substrateGateway.SetNodePowerState(context.Background(), up)
 	return err
 }
 

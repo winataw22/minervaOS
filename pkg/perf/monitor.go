@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zbus"
+	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/utils"
 )
 
@@ -21,6 +22,8 @@ type PerformanceMonitor struct {
 	zbusClient zbus.Client
 	tasks      []Task
 }
+
+var _ pkg.PerformanceMonitor = (*PerformanceMonitor)(nil)
 
 // NewPerformanceMonitor returns PerformanceMonitor instance
 func NewPerformanceMonitor(redisAddr string) (*PerformanceMonitor, error) {
@@ -60,7 +63,7 @@ func (pm *PerformanceMonitor) runTask(ctx context.Context, task Task) error {
 		return errors.Wrapf(err, "failed to run task: %s", task.ID())
 	}
 
-	err = pm.setCache(ctx, TaskResult{
+	err = pm.setCache(ctx, pkg.TaskResult{
 		Name:        task.ID(),
 		Timestamp:   uint64(time.Now().Unix()),
 		Description: task.Description(),

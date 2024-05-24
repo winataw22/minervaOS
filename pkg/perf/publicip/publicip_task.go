@@ -75,10 +75,10 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("failed to get namespace %s: %w", testNamespace, err)
 	}
 	cl := perf.GetZbusClient(ctx)
-	apiGateway := stubs.NewAPIGatewayStub(cl)
+	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 	farmID := environment.MustGet().FarmID
 
-	shouldRun, err := isLeastValidNode(ctx, uint32(farmID), apiGateway)
+	shouldRun, err := isLeastValidNode(ctx, uint32(farmID), substrateGateway)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if the node should run public IP verification: %w", err)
 	}
@@ -87,7 +87,7 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 		return errSkippedValidating, nil
 	}
 
-	farm, err := apiGateway.GetFarm(ctx, uint32(farmID))
+	farm, err := substrateGateway.GetFarm(ctx, uint32(farmID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get farm with id %d: %w", farmID, err)
 	}
@@ -177,7 +177,7 @@ func (p *publicIPValidationTask) validateIPs(publicIPs []substrate.PublicIP) (ma
 	return report, nil
 }
 
-func isLeastValidNode(ctx context.Context, farmID uint32, apiGateway *stubs.APIGatewayStub) (bool, error) {
+func isLeastValidNode(ctx context.Context, farmID uint32, substrateGateway *stubs.SubstrateGatewayStub) (bool, error) {
 	env := environment.MustGet()
 	gql := graphql.NewGraphQl(env.GraphQL)
 
@@ -205,7 +205,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, apiGateway *stubs.APIG
 		if node.NodeID >= uint32(nodeID) {
 			continue
 		}
-		n, err := apiGateway.GetNode(ctx, node.NodeID)
+		n, err := substrateGateway.GetNode(ctx, node.NodeID)
 		if err != nil {
 			return false, fmt.Errorf("failed to get node %d: %w", node.NodeID, err)
 		}

@@ -52,10 +52,10 @@ var (
 )
 
 type gatewayModule struct {
-	volatile   string
-	cl         zbus.Client
-	resolver   *net.Resolver
-	apiGateway *stubs.APIGatewayStub
+	volatile         string
+	cl               zbus.Client
+	resolver         *net.Resolver
+	substrateGateway *stubs.SubstrateGatewayStub
 	// maps domain to workload id
 	reservedDomains map[string]string
 	domainLock      sync.RWMutex
@@ -280,12 +280,12 @@ func New(ctx context.Context, cl zbus.Client, root string) (pkg.Gateway, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load old domains")
 	}
-	apiGateway := stubs.NewAPIGatewayStub(cl)
+	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 
 	gw := &gatewayModule{
 		cl:               cl,
 		resolver:         resolver,
-		apiGateway:       apiGateway,
+		substrateGateway: substrateGateway,
 		volatile:         volatile,
 		staticConfigPath: staticCfgPath,
 		certScriptPath:   certScriptPath,
@@ -532,14 +532,14 @@ func (g *gatewayModule) configPath(name string) string {
 
 func (g *gatewayModule) validateNameContract(name string, twinID uint32) error {
 
-	contractID, subErr := g.apiGateway.GetContractIDByNameRegistration(context.Background(), string(name))
+	contractID, subErr := g.substrateGateway.GetContractIDByNameRegistration(context.Background(), string(name))
 	if subErr.IsCode(pkg.CodeNotFound) {
 		return ErrContractNotReserved
 	}
 	if subErr.IsError() {
 		return subErr.Err
 	}
-	contract, subErr := g.apiGateway.GetContract(context.Background(), contractID)
+	contract, subErr := g.substrateGateway.GetContract(context.Background(), contractID)
 	if subErr.IsCode(pkg.CodeNotFound) {
 		return fmt.Errorf("contract by name returned %d, but retreiving it results in 'not found' error", contractID)
 	} else if subErr.IsError() {

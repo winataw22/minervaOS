@@ -11,20 +11,20 @@ import (
 )
 
 type substrateTwins struct {
-	apiGateway *stubs.APIGatewayStub
-	mem        *lru.Cache
+	substrateGateway *stubs.SubstrateGatewayStub
+	mem              *lru.Cache
 }
 
 // NewSubstrateTwins creates a substrate users db that implements the provision.Users interface.
-func NewSubstrateTwins(apiGateway *stubs.APIGatewayStub) (Twins, error) {
+func NewSubstrateTwins(substrateGateway *stubs.SubstrateGatewayStub) (Twins, error) {
 	cache, err := lru.New(1024)
 	if err != nil {
 		return nil, err
 	}
 
 	return &substrateTwins{
-		apiGateway: apiGateway,
-		mem:        cache,
+		substrateGateway: substrateGateway,
+		mem:              cache,
 	}, nil
 }
 
@@ -33,7 +33,7 @@ func (s *substrateTwins) GetKey(id uint32) ([]byte, error) {
 	if value, ok := s.mem.Get(id); ok {
 		return value.([]byte), nil
 	}
-	user, err := s.apiGateway.GetTwin(context.Background(), id)
+	user, err := s.substrateGateway.GetTwin(context.Background(), id)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get user with id '%d'", id)
 	}
@@ -50,13 +50,13 @@ type substrateAdmins struct {
 
 // NewSubstrateAdmins creates a substrate twins db that implements the provision.Users interface.
 // but it also make sure the user is an admin
-func NewSubstrateAdmins(apiGateway *stubs.APIGatewayStub, farmID uint32) (Twins, error) {
-	farm, err := apiGateway.GetFarm(context.Background(), farmID)
+func NewSubstrateAdmins(substrateGateway *stubs.SubstrateGatewayStub, farmID uint32) (Twins, error) {
+	farm, err := substrateGateway.GetFarm(context.Background(), farmID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get farm")
 	}
 
-	twin, err := apiGateway.GetTwin(context.Background(), uint32(farm.TwinID))
+	twin, err := substrateGateway.GetTwin(context.Background(), uint32(farm.TwinID))
 	if err != nil {
 		return nil, err
 	}

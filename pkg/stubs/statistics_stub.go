@@ -7,6 +7,7 @@ package stubs
 import (
 	"context"
 	zbus "github.com/threefoldtech/zbus"
+	pkg "github.com/threefoldtech/zos/pkg"
 	gridtypes "github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
@@ -30,6 +31,40 @@ func NewStatisticsStub(client zbus.Client) *StatisticsStub {
 func (s *StatisticsStub) Current(ctx context.Context) (ret0 gridtypes.Capacity, ret1 error) {
 	args := []interface{}{}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Current", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StatisticsStub) GetCounters(ctx context.Context) (ret0 pkg.Counters, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetCounters", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *StatisticsStub) ListGPUs(ctx context.Context) (ret0 []pkg.GPUInfo, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "ListGPUs", args...)
 	if err != nil {
 		panic(err)
 	}

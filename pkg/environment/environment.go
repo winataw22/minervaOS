@@ -159,6 +159,7 @@ var (
 		},
 		RelayURL: []string{
 			"wss://relay.grid.tf",
+			"wss://relay.02.grid.tf",
 		},
 		ActivationURL: "https://activation.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",

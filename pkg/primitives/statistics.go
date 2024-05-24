@@ -2,15 +2,18 @@ package primitives
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/mem"
-	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"github.com/threefoldtech/zos/pkg/kernel"
 	"github.com/threefoldtech/zos/pkg/provision"
 )
 
@@ -195,66 +198,6 @@ func (s *Statistics) Resume(ctx context.Context, wl *gridtypes.WorkloadWithID) (
 	return s.inner.Resume(ctx, wl)
 }
 
-// statistics api handlers for msgbus
-type statisticsMessageBus struct {
-	stats *Statistics
-}
-
-// NewStatisticsMessageBus register statistics handlers for message bus
-func NewStatisticsMessageBus(router rmb.Router, stats *Statistics) error {
-	api := statisticsMessageBus{stats}
-	return api.setup(router)
-}
-
-func (s *statisticsMessageBus) setup(router rmb.Router) error {
-	sub := router.Subroute("statistics")
-	sub.WithHandler("get", s.getCounters)
-	return nil
-}
-
-// UsersCounters the expected counters for deployments and workloads
-type UsersCounters struct {
-	// Total deployments count
-	Deployments int `json:"deployments"`
-	// Total workloads count
-	Workloads int `json:"workloads"`
-	// Last deployment timestamp
-	LastDeploymentTimestamp gridtypes.Timestamp `json:"last_deployment_timestamp"`
-}
-
-func (s *statisticsMessageBus) getCounters(ctx context.Context, payload []byte) (interface{}, error) {
-
-	activeCounters, err := s.stats.active()
-	if err != nil {
-		return nil, err
-	}
-
-	reserved, err := s.stats.reserved()
-	if err != nil {
-		return nil, err
-	}
-
-	return struct {
-		// Total system capacity
-		Total gridtypes.Capacity `json:"total"`
-		// Used capacity this include user + system resources
-		Used gridtypes.Capacity `json:"used"`
-		// System resource reserved by zos
-		System gridtypes.Capacity `json:"system"`
-		// Users statistics by zos
-		Users UsersCounters `json:"users"`
-	}{
-		Total:  s.stats.Total(),
-		Used:   activeCounters.cap,
-		System: reserved,
-		Users: UsersCounters{
-			Deployments:             activeCounters.deployments,
-			Workloads:               activeCounters.workloads,
-			LastDeploymentTimestamp: activeCounters.lastDeploymentTimestamp,
-		},
-	}, nil
-}
-
 type statsStream struct {
 	stats *Statistics
 }
@@ -298,4 +241,94 @@ func (s *statsStream) Workloads() (int, error) {
 		return 0, err
 	}
 	return capacity.Workloads, nil
+}
+
+func (s *statsStream) GetCounters() (pkg.Counters, error) {
+	activeCounters, err := s.stats.active()
+	if err != nil {
+		return pkg.Counters{}, err
+	}
+
+	reserved, err := s.stats.reserved()
+	if err != nil {
+		return pkg.Counters{}, err
+	}
+	return pkg.Counters{
+		Total:  s.stats.Total(),
+		Used:   activeCounters.cap,
+		System: reserved,
+		Users: pkg.UsersCounters{
+			Deployments:             activeCounters.deployments,
+			Workloads:               activeCounters.workloads,
+			LastDeploymentTimestamp: activeCounters.lastDeploymentTimestamp,
+		},
+	}, nil
+}
+
+func (s *statsStream) ListGPUs() ([]pkg.GPUInfo, error) {
+	usedGpus := func() (map[string]uint64, error) {
+		gpus := make(map[string]uint64)
+		active, err := s.stats.storage.Capacity()
+		if err != nil {
+			return nil, err
+		}
+		for _, dl := range active.Deployments {
+			for _, wl := range dl.Workloads {
+				if wl.Type != zos.ZMachineType {
+					continue
+				}
+				var vm zos.ZMachine
+				if err := json.Unmarshal(wl.Data, &vm); err != nil {
+					return nil, errors.Wrapf(err, "invalid workload data (%d.%s)", dl.ContractID, wl.Name)
+				}
+
+				for _, gpu := range vm.GPU {
+					gpus[string(gpu)] = dl.ContractID
+				}
+			}
+		}
+		return gpus, nil
+	}
+	var list []pkg.GPUInfo
+	if kernel.GetParams().IsGPUDisabled() {
+		return list, nil
+	}
+	devices, err := capacity.ListPCI(capacity.GPU)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list available devices")
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list active deployments")
+	}
+
+	used, err := usedGpus()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list used gpus")
+	}
+
+	for _, pciDevice := range devices {
+		id := pciDevice.ShortID()
+		info := pkg.GPUInfo{
+			ID:       id,
+			Vendor:   "unknown",
+			Device:   "unknown",
+			Contract: used[id],
+		}
+
+		vendor, device, ok := pciDevice.GetDevice()
+		if ok {
+			info.Vendor = vendor.Name
+			info.Device = device.Name
+		}
+
+		subdevice, ok := pciDevice.GetSubdevice()
+		if ok {
+			info.Device = subdevice.Name
+		}
+
+		list = append(list, info)
+	}
+
+	return list, nil
 }

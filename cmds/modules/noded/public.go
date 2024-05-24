@@ -37,11 +37,11 @@ func public(ctx context.Context, nodeID uint32, env environment.Environment, cl 
 		return errors.Wrap(err, "failed to subscribe to node events")
 	}
 
-	apiGateway := stubs.NewAPIGatewayStub(cl)
+	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 
 reapply:
 	for {
-		node, err := apiGateway.GetNode(ctx, nodeID)
+		node, err := substrateGateway.GetNode(ctx, nodeID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get node public config")
 		}

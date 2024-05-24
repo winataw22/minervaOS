@@ -19,16 +19,16 @@ type DeploymentID struct {
 }
 
 type CapacitySetter struct {
-	apiGateway *stubs.APIGatewayStub
-	ch         chan DeploymentID
-	storage    provision.Storage
+	substrateGateway *stubs.SubstrateGatewayStub
+	ch               chan DeploymentID
+	storage          provision.Storage
 }
 
-func NewCapacitySetter(apiGateway *stubs.APIGatewayStub, storage provision.Storage) CapacitySetter {
+func NewCapacitySetter(substrateGateway *stubs.SubstrateGatewayStub, storage provision.Storage) CapacitySetter {
 	return CapacitySetter{
-		apiGateway: apiGateway,
-		storage:    storage,
-		ch:         make(chan DeploymentID, 215),
+		substrateGateway: substrateGateway,
+		storage:          storage,
+		ch:               make(chan DeploymentID, 215),
 	}
 }
 
@@ -88,7 +88,7 @@ func (c *CapacitySetter) setWithClient(deployments ...gridtypes.Deployment) erro
 	)
 
 	return backoff.RetryNotify(func() error {
-		return c.apiGateway.SetContractConsumption(context.Background(), caps...)
+		return c.substrateGateway.SetContractConsumption(context.Background(), caps...)
 	}, bo, func(err error, d time.Duration) {
 		log.Error().Err(err).Dur("retry-in", d).Msg("failed to set contract consumption")
 	})

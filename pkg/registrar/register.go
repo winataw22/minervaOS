@@ -105,9 +105,9 @@ func registerNode(
 	info RegistrationInfo,
 ) (nodeID, twinID uint32, err error) {
 	var (
-		mgr        = stubs.NewIdentityManagerStub(cl)
-		netMgr     = stubs.NewNetworkerStub(cl)
-		apiGateway = stubs.NewAPIGatewayStub(cl)
+		mgr              = stubs.NewIdentityManagerStub(cl)
+		netMgr           = stubs.NewNetworkerStub(cl)
+		substrateGateway = stubs.NewSubstrateGatewayStub(cl)
 	)
 
 	zosIps, zosMac, err := netMgr.Addrs(ctx, "zos", "")
@@ -149,16 +149,16 @@ func registerNode(
 
 	sk := ed25519.PrivateKey(mgr.PrivateKey(ctx))
 
-	if _, err := apiGateway.EnsureAccount(ctx, env.ActivationURL, tcUrl, tcHash); err != nil {
+	if _, err := substrateGateway.EnsureAccount(ctx, env.ActivationURL, tcUrl, tcHash); err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure account")
 	}
 
-	twinID, err = ensureTwin(ctx, apiGateway, sk)
+	twinID, err = ensureTwin(ctx, substrateGateway, sk)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "failed to ensure twin")
 	}
 	var subErr pkg.SubstrateError
-	nodeID, subErr = apiGateway.GetNodeByTwinID(ctx, twinID)
+	nodeID, subErr = substrateGateway.GetNodeByTwinID(ctx, twinID)
 
 	var serial substrate.OptionBoardSerial
 	if len(info.SerialNumber) != 0 {
@@ -179,7 +179,7 @@ func registerNode(
 	var onChain substrate.Node
 	if subErr.IsCode(pkg.CodeNotFound) {
 		// node not found, create node
-		nodeID, err = apiGateway.CreateNode(ctx, real)
+		nodeID, err = substrateGateway.CreateNode(ctx, real)
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "failed to create node on chain")
 		}
@@ -189,7 +189,7 @@ func registerNode(
 		return 0, 0, errors.Wrapf(subErr.Err, "failed to get node information for twin id: %d", twinID)
 	} else {
 		// node exists
-		onChain, err = apiGateway.GetNode(ctx, nodeID)
+		onChain, err = substrateGateway.GetNode(ctx, nodeID)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to get node with id: %d", nodeID)
 		}
@@ -208,7 +208,7 @@ func registerNode(
 
 	if !real.Eq(&onChain) {
 		log.Debug().Msgf("node data have changing, issuing an update node: %+v", real)
-		_, err := apiGateway.UpdateNode(ctx, real)
+		_, err := substrateGateway.UpdateNode(ctx, real)
 		if err != nil {
 			return 0, 0, errors.Wrapf(err, "failed to update node data with id: %d", nodeID)
 		}
@@ -217,14 +217,14 @@ func registerNode(
 	return nodeID, twinID, err
 }
 
-func ensureTwin(ctx context.Context, apiGateway *stubs.APIGatewayStub, sk ed25519.PrivateKey) (uint32, error) {
+func ensureTwin(ctx context.Context, substrateGateway *stubs.SubstrateGatewayStub, sk ed25519.PrivateKey) (uint32, error) {
 	identity, err := substrate.NewIdentityFromEd25519Key(sk)
 	if err != nil {
 		return 0, err
 	}
-	twinID, subErr := apiGateway.GetTwinByPubKey(ctx, identity.PublicKey())
+	twinID, subErr := substrateGateway.GetTwinByPubKey(ctx, identity.PublicKey())
 	if subErr.IsCode(pkg.CodeNotFound) {
-		return apiGateway.CreateTwin(ctx, "", nil)
+		return substrateGateway.CreateTwin(ctx, "", nil)
 	} else if subErr.IsError() {
 		return 0, errors.Wrap(subErr.Err, "failed to list twins")
 	}

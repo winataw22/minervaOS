@@ -7,6 +7,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/zos/pkg"
 )
 
 const (
@@ -17,21 +18,13 @@ var (
 	ErrResultNotFound = errors.New("result not found")
 )
 
-// TaskResult the result test schema
-type TaskResult struct {
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Timestamp   uint64      `json:"timestamp"`
-	Result      interface{} `json:"result"`
-}
-
 // generateKey is helper method to add moduleName as prefix for the taskName
 func generateKey(taskName string) string {
 	return fmt.Sprintf("%s.%s", moduleName, taskName)
 }
 
 // setCache set result in redis
-func (pm *PerformanceMonitor) setCache(ctx context.Context, result TaskResult) error {
+func (pm *PerformanceMonitor) setCache(ctx context.Context, result pkg.TaskResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal data to JSON")
@@ -45,8 +38,8 @@ func (pm *PerformanceMonitor) setCache(ctx context.Context, result TaskResult) e
 }
 
 // get directly gets result for some key
-func get(conn redis.Conn, key string) (TaskResult, error) {
-	var res TaskResult
+func get(conn redis.Conn, key string) (pkg.TaskResult, error) {
+	var res pkg.TaskResult
 
 	data, err := conn.Do("GET", key)
 	if err != nil {
@@ -66,15 +59,15 @@ func get(conn redis.Conn, key string) (TaskResult, error) {
 }
 
 // Get gets data from redis
-func (pm *PerformanceMonitor) Get(taskName string) (TaskResult, error) {
+func (pm *PerformanceMonitor) Get(taskName string) (pkg.TaskResult, error) {
 	conn := pm.pool.Get()
 	defer conn.Close()
 	return get(conn, generateKey(taskName))
 }
 
 // GetAll gets the results for all the tests with moduleName as prefix
-func (pm *PerformanceMonitor) GetAll() ([]TaskResult, error) {
-	var res []TaskResult
+func (pm *PerformanceMonitor) GetAll() ([]pkg.TaskResult, error) {
+	var res []pkg.TaskResult
 
 	conn := pm.pool.Get()
 	defer conn.Close()

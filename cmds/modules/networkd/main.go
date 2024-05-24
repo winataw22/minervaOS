@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
 	"github.com/threefoldtech/zos/pkg/network/public"
@@ -156,43 +155,9 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "error creating network manager")
 	}
 
-	mBus, err := rmb.NewRouter(broker)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize message bus")
-	}
-
-	zosRouter := mBus.Subroute("zos")
-	zosRouter.Use(rmb.LoggerMiddleware)
-
-	if _, err := network.NewNetworkMessageBus(zosRouter, networker, stubs.NewAPIGatewayStub(client)); err != nil {
-		return errors.Wrap(err, "failed to initialize rmb api")
-	}
-
-	// we need to start both rmb server and zbus server.
-	go func(ctx context.Context) {
-		if err := startRmbServer(ctx, mBus); err != nil {
-			log.Fatal().Err(err).Msg("rmb exited unexpectedly")
-		}
-	}(ctx)
-
 	log.Info().Msg("start zbus server")
 	if err := startZBusServer(ctx, broker, networker); err != nil {
 		return errors.Wrap(err, "unexpected error")
-	}
-
-	return nil
-}
-
-func startRmbServer(ctx context.Context, bus *rmb.DefaultRouter) error {
-	log.Info().
-		Msg("starting networkd rmb module")
-
-	for _, handler := range bus.Handlers() {
-		log.Debug().Msgf("registered handler: %s", handler)
-	}
-
-	if err := bus.Run(ctx); err != nil && err != context.Canceled {
-		return err
 	}
 
 	return nil

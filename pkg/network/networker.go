@@ -775,20 +775,20 @@ func (n *networker) Interfaces(iface string, netns string) (pkg.Interfaces, erro
 	if netns != "" {
 		netNS, err := namespace.GetByName(netns)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get network namespace %s", netns)
+			return pkg.Interfaces{}, errors.Wrapf(err, "failed to get network namespace %s", netns)
 		}
 		defer netNS.Close()
 
 		if err := netNS.Do(f); err != nil {
-			return nil, err
+			return pkg.Interfaces{}, err
 		}
 	} else {
 		if err := f(nil); err != nil {
-			return nil, err
+			return pkg.Interfaces{}, err
 		}
 	}
 
-	return interfaces, nil
+	return pkg.Interfaces{Interfaces: interfaces}, nil
 }
 
 // [obsolete] use Interfaces instead Addrs return the IP addresses of interface
@@ -801,7 +801,7 @@ func (n *networker) Addrs(iface string, netns string) (ips []net.IP, mac string,
 		return nil, "", err
 	}
 
-	inf := interfaces[iface]
+	inf := interfaces.Interfaces[iface]
 	mac = inf.Mac
 	for _, ip := range inf.IPs {
 		ips = append(ips, ip.IP)

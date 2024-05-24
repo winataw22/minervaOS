@@ -3,16 +3,19 @@ package apigateway
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
+	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go/peer"
 	"github.com/threefoldtech/zbus"
-	apigateway "github.com/threefoldtech/zos/pkg/api_gateway"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/stubs"
+	substrategw "github.com/threefoldtech/zos/pkg/substrate_gateway"
 	"github.com/threefoldtech/zos/pkg/utils"
+	zosapi "github.com/threefoldtech/zos/pkg/zos_api"
 	"github.com/urfave/cli/v2"
 )
 
@@ -65,17 +68,39 @@ func action(cli *cli.Context) error {
 		return fmt.Errorf("failed to create substrate manager: %w", err)
 	}
 
-	gw, err := apigateway.NewAPIGateway(manager, id)
+	router := peer.NewRouter()
+	gw, err := substrategw.NewSubstrateGateway(manager, id)
 	if err != nil {
 		return fmt.Errorf("failed to create api gateway: %w", err)
 	}
 
 	server.Register(zbus.ObjectID{Name: "api-gateway", Version: "0.0.1"}, gw)
+	api, err := zosapi.NewZosAPI(manager, redis, msgBrokerCon)
+	if err != nil {
+		return fmt.Errorf("failed to create zos api: %w", err)
+	}
+	api.SetupRoutes(router)
+
+	pair, err := id.KeyPair()
+	if err != nil {
+		return err
+	}
 
 	ctx, _ := utils.WithSignal(context.Background())
 	utils.OnDone(ctx, func(_ error) {
 		log.Info().Msg("shutting down")
 	})
+	_, err = peer.NewPeer(
+		ctx,
+		hex.EncodeToString(pair.Seed()),
+		manager,
+		router.Serve,
+		peer.WithKeyType(peer.KeyTypeEd25519),
+		peer.WithRelay(environment.MustGet().RelayURL...),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to start a new rmb peer: %w", err)
+	}
 
 	log.Info().
 		Str("broker", msgBrokerCon).

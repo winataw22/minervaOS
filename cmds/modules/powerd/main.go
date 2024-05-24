@@ -71,9 +71,9 @@ func action(cli *cli.Context) error {
 		return err
 	}
 
-	apiGateway := stubs.NewAPIGatewayStub(cl)
+	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 
-	uptime, err := power.NewUptime(apiGateway, id)
+	uptime, err := power.NewUptime(substrateGateway, id)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize uptime reported")
 	}
@@ -101,7 +101,7 @@ func action(cli *cli.Context) error {
 	}
 
 	// start power manager
-	power, err := power.NewPowerServer(apiGateway, consumer, enabled, env.FarmID, nodeID, twinID, uptime)
+	power, err := power.NewPowerServer(substrateGateway, consumer, enabled, env.FarmID, nodeID, twinID, uptime)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize power manager")
 	}

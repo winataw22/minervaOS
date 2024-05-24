@@ -33,9 +33,9 @@ type Reporter struct {
 	cl  zbus.Client
 	rrd rrd.RRD
 
-	identity   substrate.Identity
-	queue      *dque.DQue
-	apiGateway *stubs.APIGatewayStub
+	identity         substrate.Identity
+	queue            *dque.DQue
+	substrateGateway *stubs.SubstrateGatewayStub
 }
 
 func reportBuilder() interface{} {
@@ -79,7 +79,7 @@ func NewReporter(metricsPath string, cl zbus.Client, root string) (*Reporter, er
 		return nil, errors.Wrap(err, "failed to setup report persisted queue")
 	}
 
-	apiGateway := stubs.NewAPIGatewayStub(cl)
+	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 
 	rrd, err := rrd.NewRRDBolt(metricsPath, 5*time.Minute, 24*time.Hour)
 	if err != nil {
@@ -87,11 +87,11 @@ func NewReporter(metricsPath string, cl zbus.Client, root string) (*Reporter, er
 	}
 
 	return &Reporter{
-		cl:         cl,
-		rrd:        rrd,
-		identity:   id,
-		queue:      queue,
-		apiGateway: apiGateway,
+		cl:               cl,
+		rrd:              rrd,
+		identity:         id,
+		queue:            queue,
+		substrateGateway: substrateGateway,
 	}, nil
 }
 
@@ -105,7 +105,7 @@ func (r *Reporter) pushOne() error {
 
 	log.Info().Int("len", len(report.Consumption)).Msgf("sending capacity report")
 
-	hash, err := r.apiGateway.Report(context.Background(), report.Consumption)
+	hash, err := r.substrateGateway.Report(context.Background(), report.Consumption)
 	if err != nil {
 		return errors.Wrap(err, "failed to publish consumption report")
 	}

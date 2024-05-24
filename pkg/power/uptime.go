@@ -25,16 +25,16 @@ type Uptime struct {
 	// Mark is set to done after the first uptime is sent
 	Mark utils.Mark
 
-	id         substrate.Identity
-	apiGateway *stubs.APIGatewayStub
-	m          sync.Mutex
+	id               substrate.Identity
+	substrateGateway *stubs.SubstrateGatewayStub
+	m                sync.Mutex
 }
 
-func NewUptime(apiGateway *stubs.APIGatewayStub, id substrate.Identity) (*Uptime, error) {
+func NewUptime(substrateGateway *stubs.SubstrateGatewayStub, id substrate.Identity) (*Uptime, error) {
 	return &Uptime{
-		id:         id,
-		apiGateway: apiGateway,
-		Mark:       utils.NewMark(),
+		id:               id,
+		substrateGateway: substrateGateway,
+		Mark:             utils.NewMark(),
 	}, nil
 }
 
@@ -58,7 +58,7 @@ func (u *Uptime) SendNow() (types.Hash, error) {
 		return types.Hash{}, errors.Wrap(err, "failed to get uptime")
 	}
 
-	return u.apiGateway.UpdateNodeUptimeV2(context.Background(), uptime, uint64(time.Now().Unix()))
+	return u.substrateGateway.UpdateNodeUptimeV2(context.Background(), uptime, uint64(time.Now().Unix()))
 }
 
 func (u *Uptime) uptime(ctx context.Context) error {

@@ -25,7 +25,7 @@ after:
 ## Interface
 
 ```go
-type APIGateway interface {
+type SubstrateGateway interface {
     CreateNode(node substrate.Node) (uint32, error)
     CreateTwin(relay string, pk []byte) (uint32, error)
     EnsureAccount(activationURL string, termsAndConditionsLink string, termsAndConditionsHash string) (info substrate.AccountInfo, err error)
