@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/pkg/errors"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go/peer"
@@ -75,6 +75,23 @@ func action(cli *cli.Context) error {
 	}
 
 	server.Register(zbus.ObjectID{Name: "api-gateway", Version: "0.0.1"}, gw)
+
+	ctx, _ := utils.WithSignal(context.Background())
+	utils.OnDone(ctx, func(_ error) {
+		log.Info().Msg("shutting down")
+	})
+
+	go func() {
+		for {
+			if err := server.Run(ctx); err != nil && err != context.Canceled {
+				log.Error().Err(err).Msg("unexpected error")
+				continue
+			}
+
+			break
+		}
+	}()
+
 	api, err := zosapi.NewZosAPI(manager, redis, msgBrokerCon)
 	if err != nil {
 		return fmt.Errorf("failed to create zos api: %w", err)
@@ -86,29 +103,30 @@ func action(cli *cli.Context) error {
 		return err
 	}
 
-	ctx, _ := utils.WithSignal(context.Background())
-	utils.OnDone(ctx, func(_ error) {
-		log.Info().Msg("shutting down")
-	})
-	_, err = peer.NewPeer(
-		ctx,
-		hex.EncodeToString(pair.Seed()),
-		manager,
-		router.Serve,
-		peer.WithKeyType(peer.KeyTypeEd25519),
-		peer.WithRelay(environment.MustGet().RelayURL...),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start a new rmb peer: %w", err)
-	}
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0
+	backoff.Retry(func() error {
+		_, err = peer.NewPeer(
+			ctx,
+			hex.EncodeToString(pair.Seed()),
+			manager,
+			router.Serve,
+			peer.WithKeyType(peer.KeyTypeEd25519),
+			peer.WithRelay(environment.MustGet().RelayURL...),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to start a new rmb peer: %w", err)
+		}
+
+		return nil
+	}, bo)
 
 	log.Info().
 		Str("broker", msgBrokerCon).
 		Uint("worker nr", workerNr).
 		Msg("starting api-gateway module")
 
-	if err := server.Run(ctx); err != nil && err != context.Canceled {
-		return errors.Wrap(err, "unexpected error")
-	}
+	// block forever
+	<-ctx.Done()
 	return nil
 }

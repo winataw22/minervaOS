@@ -221,7 +221,12 @@ func (p *btrfsPool) removeVolume(root string) error {
 
 	qgroupID := fmt.Sprintf("0/%d", info.ID)
 	if err := p.utils.QGroupDestroy(ctx, qgroupID, p.Path()); err != nil {
-		return errors.Wrapf(err, "failed to delete qgroup %s", qgroupID)
+		// we log here and not return an error because
+		// - qgroup deletion can fail because it is still used by the system
+		//   even if the volume is gone
+		// - failure to delete a qgroup is not a fatal error
+		log.Warn().Err(err).Str("group-id", qgroupID).Msg("failed to delete qgroup")
+		return nil
 	}
 
 	return nil
@@ -265,6 +270,7 @@ func (p *btrfsPool) Usage() (usage Usage, err error) {
 	return
 }
 
+// TODO: we need to run this periodically for each pool
 func (p *btrfsPool) maintenance() error {
 	// this method cleans up all the unused
 	// qgroups that could exists on a filesystem
@@ -292,7 +298,7 @@ func (p *btrfsPool) maintenance() error {
 		if !ok {
 			log.Debug().Str("id", qgroupID).Msg("destroy qgroup")
 			if err := p.utils.QGroupDestroy(ctx, qgroupID, p.Path()); err != nil {
-				return err
+				log.Warn().Err(err).Str("group-id", qgroupID).Msg("failed to destroy unused group")
 			}
 		}
 	}
