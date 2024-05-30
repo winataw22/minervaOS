@@ -2,6 +2,24 @@
 
 This document explains in a nutshell the internals of ZOS. This includes the boot process, architecture, the internal modules (and their responsibilities), and the inter-process communication.
 
+## 0-initramfs
+
+[0-initramfs](https://github.com/threefoldtech/0-initramfs) is where we build our efi image which contains the kernel and intramfs required to boot zos nodes
+we will go through about how it works in this documentation for more info about how to build and other stuff refer to the original docs [here](https://github.com/threefoldtech/0-initramfs/blob/development-zos-v3/README.md)
+
+- The efi images are hosted on [bootstrap](https://bootstrap.grid.tf/images)
+- The entrypoint for building the efi image is the `initramfs.sh` script
+- normally we don't modify this repo unless we want ot change something in the base image like kernel version for example
+- This efi image contains Kernel, zinit and some packages(the pkgs are defined in the main func of the initramfs.sh)
+- Under `packages/` directory you will find the list of packages that we need to build those packages are required during boot other packages that need to run the node are defined in [zos repo](https://github.com/threefoldtech/zos/tree/main/bins/packages) but the ones in 0-initramfs are required during boot then the bootstrap service download zos packages
+- Since zos uses zinit as its init process if we modified zinit for example we need to
+  - Do the required modification in zinit repo
+  - Create a release
+  - Update zinit script in `0-initramfs/packages/zinit.sh` to include the new release and hash
+  - Rebuild base image
+- Nodes are booted from ipexi server so after the image is updated we will need to reboot the nodes to get the new image
+- Another important pkg in 0-initramfs repo is `packages/modules.sh` this is where we add `internet` and `bootstrap` to the base image so after internet is done bootstrap can then pickup and download zos packages and flists
+
 ## Booting
 
 ZOS is a linux based operating system in the sense that we use the main-stream linux kernel with no modifications (but heavily customized). The base image of ZOS includes linux, busybox, [zinit](https://github.com/threefoldtech/zinit) and other required tools that are needed during the boot process. The base image is also shipped with a bootstrap utility that is self-updating on boot which kick starts everything.
