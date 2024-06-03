@@ -18,6 +18,10 @@ const (
 	VirtualMachine = "zos-debug-vm"
 	// if disable-gpu flag is provided gpu feature will be disabled on that node
 	DisableGPU = "disable-gpu"
+
+	// This allows the node to work without ssd disk. If ssd disk is available
+	// it will still be preferred for workloads. Otherwise fall back on HDD
+	MissingSSD = "missing-ssd"
 )
 
 // Params represent the parameters passed to the kernel at boot

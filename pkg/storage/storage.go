@@ -263,32 +263,6 @@ func (s *Module) initialize(ctx context.Context) error {
 		}
 	}
 
-	// clean up hdd disks to make sure only zdb subvolumes exists
-	// this code makes sure HDDs only have volumes for zdb. Or none
-	for _, hdd := range s.hdds {
-		// we know that all pools are mounted already so it's okay
-		// to access them direction
-		volumes, err := hdd.Volumes()
-		if err != nil {
-			log.Error().Err(err).Str("pool", hdd.Name()).Msg("failed to list pool volumes")
-			continue
-		}
-
-		for _, vol := range volumes {
-			if vol.Name() != zdbVolume && vol.Name() != cacheLabel {
-				// we don't delete zdb volumes, also zos-cache volumes
-				// although they should not exist on hdd for protection
-				// in case of error or bad detection of device speed.
-				if err := hdd.RemoveVolume(vol.Name()); err != nil {
-					log.Error().Err(err).
-						Str("volume", vol.Name()).
-						Str("pool", hdd.Name()).
-						Msg("failed to delete non zdb volume from harddisk")
-				}
-			}
-		}
-	}
-
 	log.Info().
 		Int("ssd-pools", len(s.ssds)).
 		Int("hdd-pools", len(s.hdds)).
@@ -429,7 +403,7 @@ func (s *Module) VolumeCreate(name string, size gridtypes.Unit) (pkg.Volume, err
 
 	// otherwise, create a new volume
 
-	fs, err := s.createSubvolWithQuota(size, name)
+	fs, err := s.createSubvolWithQuota(size, name, PolicySSDFirst)
 	if err != nil {
 		return pkg.Volume{}, err
 	}
@@ -455,7 +429,7 @@ func (s *Module) VolumeCreate(name string, size gridtypes.Unit) (pkg.Volume, err
 func (s *Module) VolumeDelete(name string) error {
 	log.Info().Msgf("Deleting volume %v", name)
 
-	for _, pool := range s.ssds {
+	for _, pool := range s.pools(PolicySSDFirst) {
 		if _, err := pool.Mounted(); err != nil {
 			continue
 		}
@@ -500,7 +474,7 @@ func (s *Module) VolumeDelete(name string) error {
 func (s *Module) VolumeList() ([]pkg.Volume, error) {
 	fss := make([]pkg.Volume, 0, 10)
 
-	for _, pool := range s.ssds {
+	for _, pool := range s.pools(PolicySSDFirst) {
 		if _, err := pool.Mounted(); err != nil {
 			continue
 		}
@@ -556,7 +530,7 @@ func (s *Module) VolumeExists(name string) (bool, error) {
 // Path return the path of the mountpoint of the named filesystem
 // if no volume with name exists, an empty path and an error is returned
 func (s *Module) path(name string) (filesystem.Pool, filesystem.Volume, pkg.Volume, error) {
-	for _, pool := range s.ssds {
+	for _, pool := range s.pools(PolicySSDFirst) {
 		if _, err := pool.Mounted(); err != nil {
 			continue
 		}
@@ -600,7 +574,8 @@ func (s *Module) ensureCache(ctx context.Context) error {
 	var cacheFs filesystem.Volume
 
 	// check if cache volume available
-	for _, pool := range s.ssds {
+	// prefer SSD over hdd
+	for _, pool := range s.pools(PolicySSDFirst) {
 		log.Debug().Str("pool", pool.Name()).Msg("checking pool for cache volume")
 		if _, err := pool.Mounted(); err != nil {
 			log.Debug().Str("pool", pool.Name()).Msg("pool is not mounted")
@@ -628,7 +603,7 @@ func (s *Module) ensureCache(ctx context.Context) error {
 		log.Debug().Msgf("No cache found, try to create new cache")
 
 		log.Debug().Msgf("Trying to create new cache on SSD")
-		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel)
+		fs, err := s.createSubvolWithQuota(cacheSize, cacheLabel, PolicySSDFirst)
 
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to create new cache on SSD")
@@ -717,8 +692,8 @@ func (s *Module) watchCache(ctx context.Context, cache filesystem.Volume) {
 // createSubvolWithQuota creates a subvolume with the given name and limits it to the given size
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this methods does set a quota limit equal to size on the created volume
-func (s *Module) createSubvolWithQuota(size gridtypes.Unit, name string) (filesystem.Volume, error) {
-	volume, err := s.createSubvol(size, name)
+func (s *Module) createSubvolWithQuota(size gridtypes.Unit, name string, policy Policy) (filesystem.Volume, error) {
+	volume, err := s.createSubvol(size, name, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -734,11 +709,11 @@ func (s *Module) createSubvolWithQuota(size gridtypes.Unit, name string) (filesy
 // createSubvol creates a subvolume with the given name
 // if the requested disk type does not have a storage pool with enough free size available, an error is returned
 // this method does not set any quota on the subvolume, for this uses createSubvolWithQuota
-func (s *Module) createSubvol(size gridtypes.Unit, name string) (filesystem.Volume, error) {
+func (s *Module) createSubvol(size gridtypes.Unit, name string, policy Policy) (filesystem.Volume, error) {
 	var err error
 
-	// Look for candidates in mounted pools first
-	candidates, err := s.findCandidates(size)
+	// looking for candidates
+	candidates, err := s.findCandidates(size, policy)
 	if err != nil {
 		log.Error().Err(err).Msgf("failed to search candidates on mounted pools")
 		return nil, err
@@ -763,25 +738,12 @@ type candidate struct {
 	Available uint64
 }
 
-func (s *Module) findCandidates(size gridtypes.Unit) ([]candidate, error) {
+func (s *Module) findCandidates(size gridtypes.Unit, policy Policy) ([]candidate, error) {
 
 	// Look for candidates in mounted pools first
-	candidates, err := s.checkForCandidates(size, true)
+	candidates, err := s.checkForCandidates(size, policy)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to search candidate on mounted pools")
-	}
-
-	log.Debug().Msgf("found %d candidates in mounted pools", len(candidates))
-
-	// If no candidates or found in mounted pools, we check the unmounted pools and get the first one that fits
-	if len(candidates) == 0 {
-		log.Debug().Msg("Checking unmounted pools")
-		candidates, err = s.checkForCandidates(size, false)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to search candidates on unmounted pools")
-		}
-
-		log.Debug().Msgf("found %d candidates in unmounted pools", len(candidates))
 	}
 
 	if len(candidates) == 0 {
@@ -791,18 +753,26 @@ func (s *Module) findCandidates(size gridtypes.Unit) ([]candidate, error) {
 	return candidates, nil
 }
 
-func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candidate, error) {
+func (s *Module) checkForCandidates(size gridtypes.Unit, policy Policy) ([]candidate, error) {
 	var candidates []candidate
-	for _, pool := range s.ssds {
+	for _, pool := range s.pools(policy) {
 		_, err := pool.Mounted()
-		poolIsMounted := err == nil
-		if mounted != poolIsMounted {
-			continue
-		}
+		isMounted := err == nil
 
+		if !isMounted && len(candidates) > 0 {
+			// we starting to check unmounted pools
+			// but since we already have found some candidates
+			// we can safely break now.
+			break
+		}
 		log.Debug().Msgf("checking pool %s for space", pool.Name())
 
-		if !poolIsMounted && !mounted {
+		if !isMounted {
+			if size > gridtypes.Unit(pool.Device().Size) {
+				// requested size is bigger than physical device,
+				continue
+			}
+
 			log.Debug().Msgf("Mounting pool %s...", pool.Name())
 			// if the pool is not mounted, and we are looking for not mounted pools, mount it first
 			_, err := pool.Mount()
@@ -810,6 +780,7 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 				log.Error().Err(err).Msgf("failed to mount pool %s", pool.Name())
 				return nil, err
 			}
+
 		}
 
 		usage, err := pool.Usage()
@@ -828,7 +799,7 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 		if usage.Used+uint64(size) > usage.Size*SSDOverProvisionFactor {
 			log.Info().Msgf("Disk does not have enough space left to hold filesystem")
 
-			if !poolIsMounted && !mounted {
+			if !isMounted {
 				log.Info().Msgf("Previously unmounted pool shutting down again..")
 				err = pool.UnMount()
 				if err != nil {
@@ -847,12 +818,8 @@ func (s *Module) checkForCandidates(size gridtypes.Unit, mounted bool) ([]candid
 			Pool:      pool,
 			Available: usage.Size*SSDOverProvisionFactor - (usage.Used + uint64(size)),
 		})
-
-		// if we are looking for not mounted pools, break here
-		if !mounted {
-			return candidates, nil
-		}
 	}
+
 	sort.Slice(candidates, func(i, j int) bool {
 		// reverse sorting so most available is at beginning
 		return candidates[i].Available > candidates[j].Available

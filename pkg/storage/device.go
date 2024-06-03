@@ -2,11 +2,13 @@ package storage
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
+	"github.com/threefoldtech/zos/pkg/storage/filesystem"
 )
 
 const (
@@ -17,7 +19,7 @@ const (
 func (m *Module) Devices() ([]pkg.Device, error) {
 	var devices []pkg.Device
 	log.Debug().Int("disks", len(m.hdds)).Msg("listing zdb devices")
-	for _, hdd := range m.hdds {
+	for _, hdd := range m.pools(PolicyHDDOnly) {
 		log.Debug().Str("device", hdd.Path()).Msg("checking device")
 		if _, err := hdd.Mounted(); err != nil {
 			log.Debug().Str("device", hdd.Path()).Msg("not mounted")
@@ -29,10 +31,12 @@ func (m *Module) Devices() ([]pkg.Device, error) {
 			log.Error().Err(err).Str("pool", hdd.Name()).Msg("failed to get pool volumes")
 			continue
 		}
+
 		usage, err := hdd.Usage()
 		if err != nil {
 			return nil, err
 		}
+
 		for _, vol := range volumes {
 			log.Debug().Str("volume", vol.Path()).Str("name", vol.Name()).Msg("checking volume")
 			if vol.Name() != zdbVolume {
@@ -56,7 +60,7 @@ func (m *Module) Devices() ([]pkg.Device, error) {
 
 // DeviceLookup looks up device by name
 func (m *Module) DeviceLookup(name string) (pkg.Device, error) {
-	for _, hdd := range m.hdds {
+	for _, hdd := range m.pools(PolicyHDDOnly) {
 		if hdd.Name() != name {
 			continue
 		}
@@ -98,12 +102,7 @@ func (m *Module) DeviceLookup(name string) (pkg.Device, error) {
 // DeviceAllocate allocates a new free device, allocation is done
 // by creation a zdb subvolume
 func (m *Module) DeviceAllocate(min gridtypes.Unit) (pkg.Device, error) {
-	for _, hdd := range m.hdds {
-		if _, err := hdd.Mounted(); err == nil {
-			// mounted pool. skip
-			continue
-		}
-
+	for _, hdd := range m.pools(PolicyHDDOnly) {
 		if hdd.Device().Size < uint64(min) {
 			continue
 		}
@@ -119,8 +118,22 @@ func (m *Module) DeviceAllocate(min gridtypes.Unit) (pkg.Device, error) {
 			continue
 		}
 
-		if len(volumes) != 0 {
-			log.Info().Str("pool", hdd.Name()).Msg("pool is already used")
+		exists := slices.ContainsFunc(volumes, func(vol filesystem.Volume) bool {
+			return vol.Name() == zdbVolume
+		})
+
+		if exists {
+			// a zdb volume already existws
+			continue
+		}
+
+		usage, err := hdd.Usage()
+		if err != nil {
+			return pkg.Device{}, err
+		}
+
+		if usage.Used+uint64(min) > usage.Size {
+			// not enough space
 			continue
 		}
 
@@ -128,11 +141,6 @@ func (m *Module) DeviceAllocate(min gridtypes.Unit) (pkg.Device, error) {
 		if err != nil {
 			log.Error().Err(err).Msg("failed to create zdb volume")
 			continue
-		}
-
-		usage, err := hdd.Usage()
-		if err != nil {
-			return pkg.Device{}, err
 		}
 
 		return pkg.Device{
