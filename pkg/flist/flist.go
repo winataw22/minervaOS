@@ -6,7 +6,9 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -78,6 +80,7 @@ type defaultSystem struct{}
 func (d *defaultSystem) Mount(source string, target string, fstype string, flags uintptr, data string) (err error) {
 	return syscall.Mount(source, target, fstype, flags, data)
 }
+
 func (d *defaultSystem) Unmount(target string, flags int) error {
 	return syscall.Unmount(target, flags)
 }
@@ -190,13 +193,13 @@ func New(root string, storage *stubs.StorageModuleStub) pkg.Flister {
 
 // MountRO mounts an flist in read-only mode. This mount then can be shared between multiple rw mounts
 // TODO: how to know that this ro mount is no longer used, hence can be unmounted and cleaned up?
-func (f *flistModule) mountRO(url, storage string) (string, error) {
+func (f *flistModule) mountRO(url, storage, nsName string) (string, error) {
 	// this should return always the flist mountpoint. which is used
 	// as a base for all RW mounts.
 	sublog := log.With().Str("url", url).Str("storage", storage).Logger()
 	sublog.Info().Msg("request to mount flist")
 
-	hash, flistPath, err := f.downloadFlist(url)
+	hash, flistPath, err := f.downloadFlist(url, nsName)
 	if err != nil {
 		sublog.Err(err).Msg("fail to download flist")
 		return "", err
@@ -255,11 +258,6 @@ func (f *flistModule) mountRO(url, storage string) (string, error) {
 	}
 
 	args = append(args, mountpoint)
-	// we run the flist binary
-	nsName := defaultNamespace
-	if namespace.Exists(publicNamespace) {
-		nsName = publicNamespace
-	}
 
 	// we do get the namespace via the commander
 	// only to be able to mock it via tests.
@@ -391,7 +389,6 @@ func (f *flistModule) mountOverlay(ctx context.Context, name, ro string, opt *pk
 			ro, rw, wd,
 		),
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "failed to mount overlay")
 	}
@@ -416,6 +413,10 @@ func (f *flistModule) Exists(name string) (bool, error) {
 }
 
 func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, error) {
+	return f.mountInNamespace(name, url, opt, defaultNamespace)
+}
+
+func (f *flistModule) mountInNamespace(name, url string, opt pkg.MountOptions, namespace string) (string, error) {
 	sublog := log.With().Str("name", name).Str("url", url).Str("storage", opt.Storage).Logger()
 	sublog.Info().Msgf("request to mount flist: %+v", opt)
 
@@ -436,7 +437,7 @@ func (f *flistModule) Mount(name, url string, opt pkg.MountOptions) (string, err
 		return "", errors.Wrap(err, "validating of mount point failed")
 	}
 
-	ro, err := f.mountRO(url, opt.Storage)
+	ro, err := f.mountRO(url, opt.Storage, namespace)
 	if err != nil {
 		return "", errors.Wrap(err, "ro mount of flist failed")
 	}
@@ -522,6 +523,7 @@ func (f *flistModule) waitMountpoint(path string, seconds int) error {
 
 	return fmt.Errorf("was not mounted in time")
 }
+
 func (f *flistModule) isMountpoint(path string) error {
 	log.Debug().Str("mnt", path).Msg("testing mountpoint")
 	return f.commander.Command("mountpoint", path).Run()
@@ -612,12 +614,15 @@ func (f *flistModule) FlistHash(url string) (string, error) {
 	// first check if the md5 of the flist is available
 	md5URL := url + ".md5"
 
-	resp, err := f.httpClient.Get(md5URL)
+	resp, con, err := f.downloadInNamespace(defaultNamespace, md5URL)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get flist hash from '%s'", md5URL)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		resp.Body.Close()
+		con.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return "", ErrHashNotSupported
@@ -638,7 +643,7 @@ func (f *flistModule) FlistHash(url string) (string, error) {
 	return hashStr, nil
 }
 
-func (f *flistModule) downloadFlist(url string) (Hash, Path, error) {
+func (f *flistModule) downloadFlist(url, namespace string) (Hash, Path, error) {
 	// the problem here is that the same url (to an flist) might
 	// be completely differnet flists. because the flist was update
 	// on remote. so we can't optimize the download by avoiding redownloading
@@ -651,11 +656,18 @@ func (f *flistModule) downloadFlist(url string) (Hash, Path, error) {
 	// for now we re-download every time and compute the hash on the fly
 
 	// we don't have the flist locally yet, let's download it
-	resp, err := f.httpClient.Get(url)
+
+	resp, con, err := f.downloadInNamespace(namespace, url)
 	if err != nil {
 		return "", "", err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		resp.Body.Close()
+		if con != nil {
+			con.Close()
+		}
+	}()
 
 	if resp.StatusCode != 200 {
 		return "", "", fmt.Errorf("fail to download flist: %v", resp.Status)
@@ -696,3 +708,60 @@ func (f *flistModule) saveFlist(r io.Reader) (Hash, Path, error) {
 }
 
 var _ pkg.Flister = (*flistModule)(nil)
+
+func (f *flistModule) downloadInNamespace(name, u string) (resp *http.Response, con net.Conn, err error) {
+	if len(name) == 0 {
+		resp, err = f.httpClient.Get(u)
+		return
+	}
+
+	namespace, err := namespace.GetByName(name)
+	if err != nil {
+		return resp, con, errors.Wrapf(err, "failed to get namespace %s", name)
+	}
+
+	err = namespace.Do(func(_ ns.NetNS) error {
+		hostPort, err := parseURL(u)
+		if err != nil {
+			return err
+		}
+
+		con, err = net.Dial("tcp", hostPort)
+		if err != nil {
+			return errors.Wrap(err, "failed to start tcp connection")
+		}
+
+		cl := http.Client{
+			Transport: &http.Transport{
+				DisableKeepAlives: true,
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return con, nil
+				},
+			},
+		}
+
+		resp, err = cl.Get(u)
+		return err
+	})
+
+	return
+}
+
+func parseURL(u string) (hostPort string, err error) {
+	rawURL, err := url.Parse(u)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse url")
+	}
+
+	port := rawURL.Port()
+	if port == "" {
+		p, err := net.LookupPort("tcp", rawURL.Scheme)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to lookup url port")
+		}
+		port = fmt.Sprint(p)
+	}
+
+	hostPort = net.JoinHostPort(rawURL.Hostname(), port)
+	return hostPort, nil
+}

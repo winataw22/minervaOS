@@ -18,11 +18,9 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
 
-var (
-	templ = template.Must(template.New("script").Parse(`
+var templ = template.Must(template.New("script").Parse(`
 echo "mount ready" > {{.log}}
 `))
-)
 
 // StorageMock is a mock object of the storage modules
 type StorageMock struct {
@@ -73,8 +71,8 @@ func (t *testCommander) args(args ...string) (map[string]string, []string) {
 			continue
 		}
 
-		//if no -, then it must be a value.
-		//so if lk is set, update, otherwise append to r
+		// if no -, then it must be a value.
+		// so if lk is set, update, otherwise append to r
 		if len(lk) > 0 {
 			v[lk] = arg
 			lk = ""
@@ -161,7 +159,7 @@ func TestMountUnmount(t *testing.T) {
 
 	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
 
-	mnt, err := flister.Mount(name, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
+	mnt, err := flister.mountInNamespace(name, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions, "")
 	require.NoError(t, err)
 
 	// Trick flister into thinking that 0-fs has exited
@@ -188,7 +186,7 @@ func TestMountUnmountRO(t *testing.T) {
 	flist := mock.Anything
 	sys.On("Mount", flist, filepath.Join(root, "mountpoint", name), "bind", uintptr(syscall.MS_BIND), "").Return(nil)
 
-	mnt, err := flister.Mount(name, "https://hub.grid.tf/thabet/redis.flist", pkg.ReadOnlyMountOptions)
+	mnt, err := flister.mountInNamespace(name, "https://hub.grid.tf/thabet/redis.flist", pkg.ReadOnlyMountOptions, "")
 	require.NoError(t, err)
 
 	// Trick flister into thinking that 0-fs has exited
@@ -225,17 +223,16 @@ func TestIsolation(t *testing.T) {
 	name2 := "test2"
 	sys.On("Mount", "overlay", filepath.Join(root, "mountpoint", name2), "overlay", uintptr(syscall.MS_NOATIME), mock.Anything).Return(nil)
 
-	path1, err := flister.Mount(name1, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
+	path1, err := flister.mountInNamespace(name1, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions, "")
 	require.NoError(err)
 	args1 := cmder.m
 
-	path2, err := flister.Mount(name2, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions)
+	path2, err := flister.mountInNamespace(name2, "https://hub.grid.tf/thabet/redis.flist", pkg.DefaultMountOptions, "")
 	require.NoError(err)
 	args2 := cmder.m
 
 	require.NotEqual(path1, path2)
 	require.Equal(args1, args2)
-
 }
 
 func TestDownloadFlist(t *testing.T) {
@@ -249,14 +246,14 @@ func TestDownloadFlist(t *testing.T) {
 
 	f := newFlister(root, strg, cmder, sys)
 
-	hash1, path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
+	hash1, path1, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist", "")
 	require.NoError(err)
 
 	// now corrupt the flist
 	err = os.Truncate(string(path1), 512)
 	require.NoError(err)
 
-	hash2, path2, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist")
+	hash2, path2, err := f.downloadFlist("https://hub.grid.tf/thabet/redis.flist", "")
 	require.NoError(err)
 
 	require.EqualValues(path1, path2)

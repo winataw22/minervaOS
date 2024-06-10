@@ -24,6 +24,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/network/bootstrap"
 	"github.com/threefoldtech/zos/pkg/network/iperf"
+	"github.com/threefoldtech/zos/pkg/network/mycelium"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
@@ -56,7 +57,8 @@ const (
 	// PubIface is pub interface name of the interface used in the 0-db network namespace
 	PubIface = "eth0"
 	// ZDBYggIface is ygg interface name of the interface used in the 0-db network namespace
-	ZDBYggIface = "ygg0"
+	ZDBYggIface      = "ygg0"
+	ZDBMyceliumIface = "my0"
 
 	networkDir          = "networks"
 	linkDir             = "link"
@@ -81,14 +83,15 @@ type networker struct {
 	myceliumKeyDir string
 	portSet        *set.UIntSet
 
-	ndmz ndmz.DMZ
-	ygg  *yggdrasil.YggServer
+	ndmz     ndmz.DMZ
+	ygg      *yggdrasil.YggServer
+	mycelium *mycelium.MyceliumServer
 }
 
 var _ pkg.Networker = (*networker)(nil)
 
 // NewNetworker create a new pkg.Networker that can be used over zbus
-func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdrasil.YggServer) (pkg.Networker, error) {
+func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdrasil.YggServer, myc *mycelium.MyceliumServer) (pkg.Networker, error) {
 	vd, err := cache.VolatileDir("networkd", 50*mib)
 	if err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("failed to create networkd cache directory: %w", err)
@@ -113,14 +116,15 @@ func NewNetworker(identity *stubs.IdentityManagerStub, ndmz ndmz.DMZ, ygg *yggdr
 		myceliumKeyDir: myceliumKey,
 		portSet:        set.NewInt(),
 
-		ygg:  ygg,
-		ndmz: ndmz,
+		ygg:      ygg,
+		mycelium: myc,
+		ndmz:     ndmz,
 	}
 
-	// always add the reserved yggdrasil port to the port set so we make sure they are never
+	// always add the reserved yggdrasil and mycelium ports to the port set so we make sure they are never
 	// picked for wireguard endpoints
 	// we also add http, https, and traefik metrics ports 8082 to the list.
-	for _, port := range []int{yggdrasil.YggListenTCP, yggdrasil.YggListenTLS, yggdrasil.YggListenLinkLocal, iperf.IperfPort, 80, 443, 8082} {
+	for _, port := range []int{yggdrasil.YggListenTCP, yggdrasil.YggListenTLS, yggdrasil.YggListenLinkLocal, mycelium.MyListenTCP, iperf.IperfPort, 80, 443, 8082} {
 		if err := nw.portSet.Add(uint(port)); err != nil && errors.Is(err, set.ErrConflict{}) {
 			return nil, err
 		}
@@ -192,9 +196,51 @@ func (n *networker) detachYgg(id string, netNs ns.NetNS) error {
 	})
 }
 
-// prepare creates a unique namespace (based on id) with "prefix"
+func (n *networker) attachMycelium(id string, netNs ns.NetNS) (net.IPNet, error) {
+	// new hardware address for mycelium interface
+	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("my:" + id))
+
+	myc, err := n.mycelium.InspectMycelium()
+	if err != nil {
+		return net.IPNet{}, err
+	}
+
+	ip, err := myc.IPFor(hw)
+	log.Info().Msgf("mycelium IP is %s", ip.IP)
+	if err != nil {
+		return net.IPNet{}, fmt.Errorf("failed to generate mycelium IP: %w", err)
+	}
+
+	ips := []*net.IPNet{
+		&ip,
+	}
+
+	gw, err := myc.Gateway()
+	if err != nil {
+		return net.IPNet{}, fmt.Errorf("failed to get mycelium gateway IP: %w", err)
+	}
+
+	routes := []*netlink.Route{
+		{
+			Dst: &net.IPNet{
+				IP:   net.ParseIP("400::"),
+				Mask: net.CIDRMask(7, 128),
+			},
+			Gw: gw.IP,
+			// LinkIndex:... this is set by macvlan.Install
+		},
+	}
+
+	if err := n.createMacVlan(ZDBMyceliumIface, types.MyceliumBridge, hw, ips, routes, netNs); err != nil {
+		return net.IPNet{}, errors.Wrap(err, "failed to setup zdb mycelium interface")
+	}
+
+	return ip, nil
+}
+
+// ensurePrepare ensurets that a unique namespace is created (based on id) with "prefix"
 // and make sure it's wired to the bridge on host namespace
-func (n *networker) prepare(id, prefix, bridge string) (string, error) {
+func (n *networker) ensurePrepare(id, prefix, bridge string) (string, error) {
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("pub:" + id))
 
 	netNSName := prefix + strings.Replace(hw.String(), ":", "", -1)
@@ -209,11 +255,22 @@ func (n *networker) prepare(id, prefix, bridge string) (string, error) {
 		return "", errors.Wrap(err, "failed to setup zdb public interface")
 	}
 
-	if n.ygg == nil {
-		return netNSName, nil
+	if n.ygg != nil {
+		_, err = n.attachYgg(id, netNs)
+		if err != nil {
+			return "", err
+		}
+
 	}
-	_, err = n.attachYgg(id, netNs)
-	return netNSName, err
+
+	if n.mycelium != nil {
+		_, err = n.attachMycelium(id, netNs)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return netNSName, nil
 }
 
 func (n *networker) destroy(ns string) error {
@@ -232,10 +289,10 @@ func (n *networker) destroy(ns string) error {
 }
 
 // func (n *networker) NSPrepare(id string, )
-// ZDBPrepare sends a macvlan interface into the
+// EnsureZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
-func (n *networker) ZDBPrepare(id string) (string, error) {
-	return n.prepare(id, zdbNamespacePrefix, types.PublicBridge)
+func (n *networker) EnsureZDBPrepare(id string) (string, error) {
+	return n.ensurePrepare(id, zdbNamespacePrefix, types.PublicBridge)
 }
 
 // ZDBDestroy is the opposite of ZDPrepare, it makes sure network setup done
@@ -259,7 +316,6 @@ func (n *networker) createMacVlan(iface string, master string, hw net.HardwareAd
 
 	if _, ok := err.(netlink.LinkNotFoundError); ok {
 		macVlan, err = macvlan.Create(iface, master, netNs)
-
 		if err != nil {
 			return err
 		}
@@ -557,7 +613,7 @@ func (n *networker) SetupPubIPFilter(filterName string, iface string, ipv4 net.I
 		return errors.Wrap(err, "failed to execute filter template")
 	}
 
-	//TODO: use nft.Apply
+	// TODO: use nft.Apply
 	cmd := exec.Command("/bin/sh", "-c", buffer.String())
 
 	output, err := cmd.CombinedOutput()
@@ -999,7 +1055,7 @@ func (n *networker) SetPublicConfig(cfg pkg.PublicConfig) error {
 	}
 
 	if current != nil && current.Equal(cfg) {
-		//nothing to do
+		// nothing to do
 		return nil
 	}
 
@@ -1107,7 +1163,7 @@ func (n *networker) networkOf(id zos.NetID) (nr pkg.Network, err error) {
 	dec := json.NewDecoder(reader)
 
 	version := reader.Version()
-	//validV1 := versioned.MustParseRange(fmt.Sprintf("=%s", pkg.NetworkSchemaV1))
+	// validV1 := versioned.MustParseRange(fmt.Sprintf("=%s", pkg.NetworkSchemaV1))
 	validLatest := versioned.MustParseRange(fmt.Sprintf("<=%s", NetworkSchemaLatestVersion.String()))
 
 	if validLatest(version) {
@@ -1202,7 +1258,6 @@ func (n *networker) Metrics() (pkg.NetResourceMetrics, error) {
 			metrics[wl] = m
 			return nil
 		})
-
 		if err != nil {
 			log.Error().Err(err).Msg("failed to collect metrics for network")
 		}
@@ -1258,7 +1313,6 @@ func (n *networker) PublicAddresses(ctx context.Context) <-chan pkg.OptionPublic
 }
 
 func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresses {
-
 	var index int
 	_ = backoff.Retry(func() error {
 		link, err := netlink.LinkByName(types.DefaultBridge)
@@ -1327,7 +1381,6 @@ func (n *networker) ZOSAddresses(ctx context.Context) <-chan pkg.NetlinkAddresse
 	}()
 
 	return ch
-
 }
 
 func (n *networker) syncWGPorts() error {
@@ -1372,7 +1425,7 @@ func (n *networker) syncWGPorts() error {
 			log.Error().Err(err).Str("namespace", name).Msgf("failed to read port for network namespace")
 			continue
 		}
-		//skip error cause we don't care if there are some duplicate at this point
+		// skip error cause we don't care if there are some duplicate at this point
 		_ = n.portSet.Add(uint(port))
 	}
 
@@ -1396,7 +1449,6 @@ func createNetNS(name string) (ns.NetNS, error) {
 	err = netNs.Do(func(_ ns.NetNS) error {
 		return ifaceutil.SetLoUp()
 	})
-
 	if err != nil {
 		_ = namespace.Delete(netNs)
 		return nil, fmt.Errorf("failed to bring lo interface up in namespace %s: %w", name, err)

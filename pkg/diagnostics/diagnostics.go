@@ -8,7 +8,6 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/threefoldtech/zbus"
-	"github.com/threefoldtech/zos/pkg"
 	"github.com/threefoldtech/zos/pkg/utils"
 )
 
@@ -119,18 +118,23 @@ func (m *DiagnosticsManager) isHealthy() bool {
 	conn := m.redisPool.Get()
 	defer conn.Close()
 
-	data, err := conn.Do("GET", testNetworkKey)
+	data, err := redis.Bytes(conn.Do("GET", testNetworkKey))
 	if err != nil || data == nil {
 		return false
 	}
 
-	var result pkg.TaskResult
-	if err := json.Unmarshal(data.([]byte), &result); err != nil {
+	var result struct {
+		Result map[string][]string `json:"result"`
+	}
+
+	if err := json.Unmarshal(data, &result); err != nil {
 		return false
 	}
 
-	if len(result.Result.(map[string]interface{})) != 0 {
-		return false
+	for _, errors := range result.Result {
+		if len(errors) > 0 {
+			return false
+		}
 	}
 
 	return true

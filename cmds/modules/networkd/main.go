@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/network/dhcp"
+	"github.com/threefoldtech/zos/pkg/network/mycelium"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -110,47 +111,25 @@ func action(cli *cli.Context) error {
 	if err := dmz.Create(ctx); err != nil {
 		return errors.Wrap(err, "failed to create ndmz")
 	}
+
+	namespace := dmz.Namespace()
+	if public.HasPublicSetup() {
+		namespace = public.PublicNamespace
+	}
+
 	log.Debug().Msg("starting yggdrasil")
-	yggNamespace := dmz.Namespace()
-	if public.HasPublicSetup() {
-		yggNamespace = public.PublicNamespace
-	}
-
-	yggNs, err := yggdrasil.NewYggdrasilNamespace(yggNamespace)
+	ygg, err := setupYgg(ctx, namespace, dmz.Namespace(), identity.PrivateKey(cli.Context))
 	if err != nil {
-		return errors.Wrap(err, "failed to create yggdrasil namespace")
+		return err
 	}
 
-	ygg, err := yggdrasil.EnsureYggdrasil(ctx, identity.PrivateKey(cli.Context), yggNs)
+	log.Debug().Msg("starting mycelium")
+	mycelium, err := setupMycelium(ctx, namespace, dmz.Namespace(), identity.PrivateKey(cli.Context))
 	if err != nil {
-		return errors.Wrap(err, "failed to start yggdrasil")
+		return err
 	}
 
-	if public.HasPublicSetup() {
-		// if yggdrasil is living inside public namespace
-		// we still need to setup ndmz to also have yggdrasil but we set the yggdrasil interface
-		// a different Ip that lives inside the yggdrasil range.
-		dmzYgg, err := yggdrasil.NewYggdrasilNamespace(dmz.Namespace())
-		if err != nil {
-			return errors.Wrap(err, "failed to setup ygg for dmz namespace")
-		}
-
-		ip, err := ygg.SubnetFor([]byte(fmt.Sprintf("ygg:%s", dmz.Namespace())))
-		if err != nil {
-			return errors.Wrap(err, "failed to calculate ip for ygg inside dmz")
-		}
-
-		gw, err := ygg.Gateway()
-		if err != nil {
-			return err
-		}
-
-		if err := dmzYgg.SetYggIP(ip, gw.IP); err != nil {
-			return errors.Wrap(err, "failed to set yggdrasil ip for dmz")
-		}
-	}
-
-	networker, err := network.NewNetworker(identity, dmz, ygg)
+	networker, err := network.NewNetworker(identity, dmz, ygg, mycelium)
 	if err != nil {
 		return errors.Wrap(err, "error creating network manager")
 	}
@@ -164,7 +143,6 @@ func action(cli *cli.Context) error {
 }
 
 func startZBusServer(ctx context.Context, broker string, networker pkg.Networker) error {
-
 	server, err := zbus.NewRedisServer(module, broker, 1)
 	if err != nil {
 		log.Error().Err(err).Msgf("fail to connect to message broker server")
@@ -187,7 +165,7 @@ func startZBusServer(ctx context.Context, broker string, networker pkg.Networker
 func waitYggdrasilBin() {
 	log.Info().Msg("wait for yggdrasil binary to be available")
 	bo := backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 0 //forever
+	bo.MaxElapsedTime = 0 // forever
 	_ = backoff.RetryNotify(func() error {
 		_, err := exec.LookPath("yggdrasil")
 		return err
@@ -211,4 +189,83 @@ func migrateOlderDHCPService() error {
 	}
 
 	return nil
+}
+
+func setupYgg(ctx context.Context, namespace, dmzNs string, privateKey []byte) (ygg *yggdrasil.YggServer, err error) {
+	yggNs, err := yggdrasil.NewYggdrasilNamespace(namespace)
+	if err != nil {
+		return ygg, errors.Wrap(err, "failed to create yggdrasil namespace")
+	}
+
+	ygg, err = yggdrasil.EnsureYggdrasil(ctx, privateKey, yggNs)
+	if err != nil {
+		return ygg, errors.Wrap(err, "failed to start yggdrasil")
+	}
+
+	if public.HasPublicSetup() {
+		// if yggdrasil is living inside public namespace
+		// we still need to setup ndmz to also have yggdrasil but we set the yggdrasil interface
+		// a different Ip that lives inside the yggdrasil range.
+		dmzYgg, err := yggdrasil.NewYggdrasilNamespace(dmzNs)
+		if err != nil {
+			return ygg, errors.Wrap(err, "failed to setup ygg for dmz namespace")
+		}
+
+		ip, err := ygg.SubnetFor([]byte(fmt.Sprintf("ygg:%s", dmzNs)))
+		if err != nil {
+			return ygg, errors.Wrap(err, "failed to calculate ip for ygg inside dmz")
+		}
+
+		gw, err := ygg.Gateway()
+		if err != nil {
+			return ygg, err
+		}
+
+		if err := dmzYgg.SetYggIP(ip, gw.IP); err != nil {
+			return ygg, errors.Wrap(err, "failed to set yggdrasil ip for dmz")
+		}
+	}
+	return
+}
+
+func setupMycelium(ctx context.Context, namespace, dmzNs string, privateKey []byte) (myc *mycelium.MyceliumServer, err error) {
+	myNs, err := mycelium.NewMyNamespace(namespace)
+	if err != nil {
+		return myc, errors.Wrap(err, "failed to create mycelium namespace")
+	}
+
+	myc, err = mycelium.EnsureMycelium(ctx, privateKey, myNs)
+	if err != nil {
+		return myc, errors.Wrap(err, "failed to start mycelium")
+	}
+
+	if public.HasPublicSetup() {
+		// if mycelium is living inside public namespace
+		// we still need to setup ndmz to also have mycelium but we set the mycelium interface
+		// a different Ip that lives inside the mycelium range.
+		dmzMy, err := mycelium.NewMyNamespace(dmzNs)
+		if err != nil {
+			return myc, errors.Wrap(err, "failed to setup mycelium for dmz namespace")
+		}
+
+		inspcet, err := myc.InspectMycelium()
+		if err != nil {
+			return myc, err
+		}
+
+		ip, err := inspcet.IPFor([]byte(fmt.Sprintf("my:%s", dmzNs)))
+		if err != nil {
+			return myc, errors.Wrap(err, "failed to calculate ip for mycelium inside dmz")
+		}
+
+		gw, err := inspcet.Gateway()
+		if err != nil {
+			return myc, err
+		}
+
+		if err := dmzMy.SetMyIP(ip, gw.IP); err != nil {
+			return myc, errors.Wrap(err, "failed to set mycelium ip for dmz")
+		}
+	}
+	return
 }

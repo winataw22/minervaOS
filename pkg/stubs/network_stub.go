@@ -119,6 +119,23 @@ func (s *NetworkerStub) DisconnectPubTap(ctx context.Context, arg0 string) (ret0
 	return
 }
 
+func (s *NetworkerStub) EnsureZDBPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
+	args := []interface{}{arg0}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "EnsureZDBPrepare", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) GetDefaultGwIP(ctx context.Context, arg0 zos.NetID) (ret0 []uint8, ret1 []uint8, ret2 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetDefaultGwIP", args...)
@@ -700,23 +717,6 @@ func (s *NetworkerStub) ZDBDestroy(ctx context.Context, arg0 string) (ret0 error
 	result.PanicOnError()
 	ret0 = result.CallError()
 	loader := zbus.Loader{}
-	if err := result.Unmarshal(&loader); err != nil {
-		panic(err)
-	}
-	return
-}
-
-func (s *NetworkerStub) ZDBPrepare(ctx context.Context, arg0 string) (ret0 string, ret1 error) {
-	args := []interface{}{arg0}
-	result, err := s.client.RequestContext(ctx, s.module, s.object, "ZDBPrepare", args...)
-	if err != nil {
-		panic(err)
-	}
-	result.PanicOnError()
-	ret1 = result.CallError()
-	loader := zbus.Loader{
-		&ret0,
-	}
 	if err := result.Unmarshal(&loader); err != nil {
 		panic(err)
 	}
