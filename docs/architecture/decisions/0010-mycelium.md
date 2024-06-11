@@ -1,1 +1,19 @@
-/var/folders/15/5nqgf_n51czb2vfntylx44tw4mppxx/T/repo_cache/50262ffb3347f1fb13b219a9ef81c793
+# 1. Mycelium
+
+Date: 2024-05-29
+
+## Status
+
+Accepted
+
+## Context
+
+Support mycelium network for zdbs and zos host to get flists over mycelium
+
+## Decision
+
+Integrate mycelium in zos and allow zos host to have mycelium IPs, mount flists over mycelium, and support mycelium on zdbs
+
+## Consequences
+
+Using mycelium IP is optional. Old clients should work normally without breakage.
