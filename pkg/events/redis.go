@@ -265,7 +265,7 @@ func (r *RedisConsumer) consumer(ctx context.Context, stream string, ch reflect.
 					if chosen == 0 {
 						return
 					}
-				} else if err != nil {
+				} else {
 					logger.Error().Err(err).Str("id", message.ID).Msg("failed to handle message")
 				}
 

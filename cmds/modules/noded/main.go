@@ -235,7 +235,7 @@ func action(cli *cli.Context) error {
 
 	go func() {
 		for {
-			if err := public(ctx, node, env, redis, consumer); err != nil {
+			if err := public(ctx, node, redis, consumer); err != nil {
 				log.Error().Err(err).Msg("setting public config failed")
 				<-time.After(10 * time.Second)
 			}

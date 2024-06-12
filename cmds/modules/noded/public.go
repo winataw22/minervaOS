@@ -9,7 +9,6 @@ import (
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg"
-	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/events"
 	"github.com/threefoldtech/zos/pkg/stubs"
 )
@@ -31,7 +30,7 @@ func setPublicConfig(ctx context.Context, cl zbus.Client, cfg *substrate.PublicC
 }
 
 // public sets and watches changes to public config on chain and tries to apply the provided setup
-func public(ctx context.Context, nodeID uint32, env environment.Environment, cl zbus.Client, events *events.RedisConsumer) error {
+func public(ctx context.Context, nodeID uint32, cl zbus.Client, events *events.RedisConsumer) error {
 	ch, err := events.PublicConfig(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to subscribe to node events")
@@ -57,8 +56,9 @@ reapply:
 
 		for {
 			select {
+			case <-ctx.Done():
+				return nil
 			case event := <-ch:
-
 				log.Info().Msgf("got a public config update: %+v", event.PublicConfig)
 				var cfg *substrate.PublicConfig
 				if event.PublicConfig.HasValue {
