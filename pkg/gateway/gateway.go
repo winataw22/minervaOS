@@ -348,7 +348,7 @@ func (g *gatewayModule) validateNameContracts() error {
 	baseDomain := cfg.Domain
 	if baseDomain == "" {
 		// domain doesn't exist so no name workloads exist
-		// or the domain was unset and name wokrloads will never be deleted
+		// or the domain was unset and name workloads will never be deleted
 		// should iterate over workloads instead?
 		return nil
 	}
@@ -574,10 +574,7 @@ func (g *gatewayModule) SetNamedProxy(wlID string, config zos.GatewayNameProxy) 
 		return "", errors.New("node doesn't support name proxy (doesn't have a domain)")
 	}
 
-	subdomains := strings.Split(config.Name, ".")
-	reservedName := subdomains[len(subdomains)-1]
-
-	if err := g.validateNameContract(reservedName, twinID); err != nil {
+	if err := g.validateNameContract(config.Name, twinID); err != nil {
 		return "", errors.Wrap(err, "failed to verify name contract")
 	}
 
