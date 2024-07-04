@@ -136,9 +136,10 @@ func (t *IperfTest) runIperfTest(ctx context.Context, clientIP string, tcp bool)
 	opts := make([]string, 0)
 	opts = append(opts,
 		"--client", clientIP,
-		"--bandwidth", "1M",
 		"--port", fmt.Sprint(iperf.IperfPort),
 		"--interval", "20",
+		"--bandwidth", "0", // unlimited because udp limit is set to 1M by default
+		"-R", // doing the test in reverse gives more accurate results
 		"--json",
 	)
 
