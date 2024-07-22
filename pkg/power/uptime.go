@@ -126,7 +126,7 @@ func isNodeHealthy() bool {
 	}
 	if app.CheckFlag(app.NotReachable) {
 		log.Error().Msg("node can not reach grid services")
-		healthy = false
+		// healthy = false // disabled for now
 	}
 	return healthy
 }
