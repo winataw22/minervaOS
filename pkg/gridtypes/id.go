@@ -80,6 +80,10 @@ func IsValidName(n Name) error {
 		return fmt.Errorf("name cannot be empty")
 	}
 
+	if len(n) > 50 {
+		return fmt.Errorf("name cannot exceed 50 characters")
+	}
+
 	if !nameMatch.MatchString(string(n)) {
 		return fmt.Errorf("unsupported character in workload name")
 	}
