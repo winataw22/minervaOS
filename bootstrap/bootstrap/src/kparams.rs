@@ -40,10 +40,11 @@ mod tests {
 
     #[test]
     fn test_parse() -> Result<(), Error> {
-        let input: &str = "initrd=initramfs-linux.img root=UUID=10f9e7bb-ba63-4fbd-a95e-c78b5496cfbe rootflags=subvol=root rw b43.allhwsupport=1";
+        let input: &str = "initrd=initramfs-linux.img version=v3 root=UUID=10f9e7bb-ba63-4fbd-a95e-c78b5496cfbe rootflags=subvol=root rw b43.allhwsupport=1";
         let result = parse(input.as_bytes())?;
-        assert_eq!(result.len(), 5);
+        assert_eq!(result.len(), 6);
         assert_eq!(result["rw"], None);
+        assert_eq!(result["version"], Some(String::from("v3")));
         assert_eq!(result["rootflags"], Some(String::from("subvol=root")));
         Ok(())
     }

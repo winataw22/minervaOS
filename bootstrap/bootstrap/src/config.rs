@@ -28,6 +28,7 @@ impl Display for RunMode {
 #[derive(Debug)]
 pub enum Version {
     V3,
+    V4,
 }
 
 fn runmode() -> Result<RunMode> {
@@ -64,6 +65,7 @@ fn version() -> Result<Version> {
         Some(input) => match input {
             Some(input) => match input.as_ref() {
                 "v3" => Version::V3,
+                "v4" => Version::V4,
                 m => {
                     bail!("unknown version: {}", m);
                 }
@@ -119,7 +121,7 @@ impl Config {
         }
 
         Ok(Config {
-            stage: stage,
+            stage,
             debug: matches.occurrences_of("debug") > 0,
             runmode: runmode()?,
             version: version()?,

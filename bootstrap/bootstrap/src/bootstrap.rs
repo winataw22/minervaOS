@@ -8,62 +8,15 @@ use super::workdir::WorkDir;
 use super::zfs::Zfs;
 use super::zinit;
 use anyhow::{Context, Result};
-use config::{RunMode, Version};
+use config::Version;
 use retry;
 
 const ZOS_REPO: &str = "tf-zos";
-const BIN_REPO_V2: &str = "tf-zos-bins";
-const BIN_REPO_V3: &str = "tf-zos-v3-bins";
 
-const FLIST_INFO_FILE: &str = "/tmp/flist.info";
-const FLIST_NAME_FILE: &str = "/tmp/flist.name";
 const FLIST_TAG_FILE: &str = "/tmp/tag.info";
 const BOOTSTAP_FLIST: &str = "bootstrap:latest.flist";
 
 const WORKDIR: &str = "/tmp/bootstrap";
-
-fn bootstrap_zos(cfg: &config::Config) -> Result<()> {
-    let flist = match &cfg.runmode {
-        RunMode::Prod => match &cfg.version {
-            Version::V3 => "zos:production-3:latest.flist",
-        },
-        RunMode::Dev => match &cfg.version {
-            Version::V3 => "zos:development-3:latest.flist",
-        },
-        RunMode::Test => match &cfg.version {
-            Version::V3 => "zos:testing-3:latest.flist",
-        },
-        RunMode::QA => match &cfg.version {
-            Version::V3 => "zos:qa-3:latest.flist",
-        },
-    };
-
-    debug!("using flist: {}/{}", ZOS_REPO, flist);
-    let repo = hub::Repo::new(ZOS_REPO);
-    let flist = retry::retry(retry::delay::Exponential::from_millis(200), || {
-        info!("get flist info: {}", flist);
-        let info = match repo.get(flist) {
-            Ok(info) => info,
-            Err(err) => {
-                error!("failed to get info: {}", err);
-                bail!("failed to get info: {}", err);
-            }
-        };
-
-        Ok(info)
-    });
-
-    let flist = match flist {
-        Ok(flist) => flist,
-        Err(e) => bail!("failed to download flist: {:?}", e),
-    };
-
-    // write down boot info for other system components (like upgraded)
-    flist.write(FLIST_INFO_FILE)?;
-    std::fs::write(FLIST_NAME_FILE, format!("{}/{}", ZOS_REPO, flist.name))?;
-
-    install_package(&flist)
-}
 
 /// update stage make sure we are running latest
 /// version of bootstrap
@@ -116,11 +69,16 @@ pub fn install(cfg: &config::Config) -> Result<()> {
     let repo = Repo::new(ZOS_REPO);
 
     let runmode = cfg.runmode.to_string();
-    // we need to list all taglinks inside the repo
 
+    let mut listname = runmode.clone();
+    match cfg.version {
+        Version::V3 => {}
+        Version::V4 => listname = format!("{}-v4", runmode),
+    }
+    // we need to list all taglinks
     let mut tag = None;
     for list in repo.list()? {
-        if list.kind == Kind::TagLink && list.name == runmode {
+        if list.kind == Kind::TagLink && list.name == listname {
             tag = Some(list);
             break;
         }
@@ -133,12 +91,7 @@ pub fn install(cfg: &config::Config) -> Result<()> {
     let result = WorkDir::run(WORKDIR, || -> Result<()> {
         match tag {
             None => {
-                // old style bootstrap.
-                // we need to install binaries and zos from 2 different
-                // places
-                // we also track which binaries are installed individually
-                install_packages_old(cfg)?;
-                bootstrap_zos(cfg)
+                bail!("no tag found attached to this version")
             }
             Some(tag) => {
                 // new style bootstrap
@@ -158,57 +111,6 @@ pub fn install(cfg: &config::Config) -> Result<()> {
     })?;
 
     result
-}
-
-fn install_packages_old(cfg: &config::Config) -> Result<()> {
-    let name = match cfg.version {
-        Version::V3 => BIN_REPO_V3,
-    };
-
-    let repo = match cfg.runmode {
-        config::RunMode::Prod => name.into(),
-        config::RunMode::Dev => format!("{}.dev", name),
-        config::RunMode::Test => format!("{}.test", name),
-        config::RunMode::QA => format!("{}.qanet", name),
-    };
-
-    let client = hub::Repo::new(&repo);
-    let packages = retry::retry(retry::delay::Exponential::from_millis(200), || {
-        info!("list packages in: {}", BIN_REPO_V2);
-        //the full point of this match is the logging.
-        let packages = match client.list() {
-            Ok(info) => info,
-            Err(err) => {
-                error!("failed to list repo '{}': {}", BIN_REPO_V2, err);
-                bail!("failed to list repo '{}': {}", BIN_REPO_V2, err);
-            }
-        };
-
-        Ok(packages)
-    });
-
-    let packages = match packages {
-        Ok(packages) => packages,
-        Err(err) => bail!("failed to list '{}': {:?}", BIN_REPO_V2, err),
-    };
-
-    let mut map = std::collections::HashMap::new();
-    for package in packages.iter() {
-        match install_package(package) {
-            Ok(_) => {}
-            Err(err) => warn!("failed to install package '{}': {}", package.url, err),
-        };
-
-        map.insert(format!("{}/{}", repo, package.name), package.clone());
-    }
-
-    let output = std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open("/tmp/bins.info")?;
-    serde_json::to_writer(&output, &map)?;
-
-    Ok(())
 }
 
 fn install_packages(packages: &[Flist]) -> Result<()> {
