@@ -119,12 +119,15 @@ impl Config {
         if stage == 0 {
             bail!("invalid stage value 0, stages starting from 1");
         }
-
+        let mut ver = Version::V3;
+        if stage == 2 {
+            ver = version()?
+        }
         Ok(Config {
             stage,
             debug: matches.occurrences_of("debug") > 0,
             runmode: runmode()?,
-            version: version()?,
+            version: ver,
         })
     }
 }
