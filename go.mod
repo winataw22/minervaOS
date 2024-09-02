@@ -39,15 +39,16 @@ require (
 	github.com/joncrlsn/dque v0.0.0-20200702023911-3e80e3146ce5
 	github.com/lestrrat-go/jwx v1.1.7
 	github.com/machinebox/graphql v0.2.2
+	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/rs/zerolog v1.32.0
+	github.com/rs/zerolog v1.33.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.9.0
 	github.com/threefoldtech/0-fs v1.3.1-0.20240424140157-b488dfedcc56
-	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20240416134707-eb36aa90df2d
-	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.15.2
+	github.com/threefoldtech/tfchain/clients/tfchain-client-go v0.0.0-20240827163226-d4e15e206974
+	github.com/threefoldtech/tfgrid-sdk-go/rmb-sdk-go v0.15.14
 	github.com/threefoldtech/zbus v1.0.1
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/urfave/cli/v2 v2.17.2-0.20221006022127-8f469abc00aa
@@ -55,8 +56,8 @@ require (
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 	github.com/whs/nacl-sealed-box v0.0.0-20180930164530-92b9ba845d8d
 	github.com/yggdrasil-network/yggdrasil-go v0.4.0
-	golang.org/x/crypto v0.23.0
-	golang.org/x/sys v0.20.0
+	golang.org/x/crypto v0.26.0
+	golang.org/x/sys v0.23.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools v2.2.0+incompatible
@@ -74,7 +75,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ethereum/go-ethereum v1.11.6 // indirect
@@ -89,7 +90,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
 	github.com/hanwen/go-fuse/v2 v2.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -115,7 +116,6 @@ require (
 	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/nsf/termbox-go v1.1.1 // indirect
-	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/onsi/gomega v1.16.0 // indirect
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7 // indirect
@@ -147,8 +147,8 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.20200320 // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
