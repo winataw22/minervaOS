@@ -2,6 +2,7 @@ package graphql
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -16,13 +17,15 @@ const (
 
 // GraphQl for tf graphql client
 type GraphQl struct {
-	client *graphql.Client
+	urls []string
 }
 
 // NewGraphQl creates a new tf graphql client
-func NewGraphQl(url string) GraphQl {
-	client := graphql.NewClient(url, nil)
-	return GraphQl{client: client}
+func NewGraphQl(urls ...string) (GraphQl, error) {
+	if len(urls) == 0 {
+		return GraphQl{}, errors.New("urls can't be empty")
+	}
+	return GraphQl{urls: urls}, nil
 }
 
 // Node from graphql
@@ -85,7 +88,7 @@ func (g *GraphQl) GetUpNodes(ctx context.Context, nodesNum int, farmID, excludeF
 		Nodes []Node
 	}{}
 
-	if err := g.client.Exec(ctx, query, &res, nil); err != nil {
+	if err := g.exec(ctx, query, &res, nil); err != nil {
 		return []Node{}, err
 	}
 
@@ -101,9 +104,20 @@ func (g *GraphQl) getItemTotalCount(ctx context.Context, itemName string, option
 		}
 	}{}
 
-	if err := g.client.Exec(ctx, query, &res, nil); err != nil {
+	if err := g.exec(ctx, query, &res, nil); err != nil {
 		return 0, err
 	}
 
 	return res.Items.Count, nil
+}
+
+// exec is a wrapper around graphql.Client.Exec to retry another endpoints in case some are down.
+func (g *GraphQl) exec(ctx context.Context, query string, result interface{}, variables map[string]interface{}, options ...graphql.Option) (err error) {
+	for _, url := range g.urls {
+		client := graphql.NewClient(url, nil)
+		if err = client.Exec(ctx, query, result, variables, options...); err == nil {
+			return
+		}
+	}
+	return
 }

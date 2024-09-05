@@ -49,7 +49,7 @@ type Environment struct {
 	//   PLEASE MAKE SURE THAT ANY ENV HAS NO MORE THAN FOUR RELAYS CONFIGURED
 	RelayURL      []string
 	ActivationURL string
-	GraphQL       string
+	GraphQL       []string
 
 	// private vlan to join
 	// if set, zos will use this as its priv vlan
@@ -116,7 +116,10 @@ var (
 		ActivationURL: "https://activation.dev.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.dev",
-		GraphQL:       "https://graphql.dev.grid.tf/graphql",
+		GraphQL: []string{
+			"https://graphql.dev.grid.tf/graphql",
+			"https://graphql.02.dev.grid.tf/graphql",
+		},
 	}
 
 	envTest = Environment{
@@ -131,7 +134,10 @@ var (
 		ActivationURL: "https://activation.test.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.test",
-		GraphQL:       "https://graphql.test.grid.tf/graphql",
+		GraphQL: []string{
+			"https://graphql.test.grid.tf/graphql",
+			"https://graphql.02.test.grid.tf/graphql",
+		},
 	}
 
 	envQA = Environment{
@@ -146,7 +152,10 @@ var (
 		ActivationURL: "https://activation.qa.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins.qanet",
-		GraphQL:       "https://graphql.qa.grid.tf/graphql",
+		GraphQL: []string{
+			"https://graphql.qa.grid.tf/graphql",
+			"https://graphql.02.qa.grid.tf/graphql",
+		},
 	}
 
 	envProd = Environment{
@@ -164,7 +173,10 @@ var (
 		ActivationURL: "https://activation.grid.tf/activation/activate",
 		FlistURL:      "redis://hub.grid.tf:9900",
 		BinRepo:       "tf-zos-v3-bins",
-		GraphQL:       "https://graphql.grid.tf/graphql",
+		GraphQL: []string{
+			"https://graphql.grid.tf/graphql",
+			"https://graphql.02.grid.tf/graphql",
+		},
 	}
 )
 
