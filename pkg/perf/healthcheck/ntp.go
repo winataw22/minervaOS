@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zos/pkg/zinit"
@@ -17,8 +18,13 @@ const acceptableSkew = 10 * time.Minute
 func RunNTPCheck(ctx context.Context) {
 	go func() {
 		for {
-			if err := ntpCheck(); err != nil {
+			exp := backoff.NewExponentialBackOff()
+			retryNotify := func(err error, d time.Duration) {
 				log.Error().Err(err).Msg("failed to run ntp check")
+			}
+
+			if err := backoff.RetryNotify(ntpCheck, backoff.WithContext(exp, ctx), retryNotify); err != nil {
+				log.Error().Err(err).Send()
 				continue
 			}
 

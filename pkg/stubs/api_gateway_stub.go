@@ -63,7 +63,7 @@ func (s *SubstrateGatewayStub) CreateTwin(ctx context.Context, arg0 string, arg1
 	return
 }
 
-func (s *SubstrateGatewayStub) EnsureAccount(ctx context.Context, arg0 string, arg1 string, arg2 string) (ret0 tfchainclientgo.AccountInfo, ret1 error) {
+func (s *SubstrateGatewayStub) EnsureAccount(ctx context.Context, arg0 []string, arg1 string, arg2 string) (ret0 tfchainclientgo.AccountInfo, ret1 error) {
 	args := []interface{}{arg0, arg1, arg2}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "EnsureAccount", args...)
 	if err != nil {
