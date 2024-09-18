@@ -5,7 +5,6 @@ import (
 )
 
 func (g *ZosAPI) SetupRoutes(router *peer.Router) {
-
 	root := router.SubRoute("zos")
 	root.Use(g.log)
 	system := root.SubRoute("system")
@@ -13,6 +12,7 @@ func (g *ZosAPI) SetupRoutes(router *peer.Router) {
 	system.WithHandler("dmi", g.systemDMIHandler)
 	system.WithHandler("hypervisor", g.systemHypervisorHandler)
 	system.WithHandler("diagnostics", g.systemDiagnosticsHandler)
+	system.WithHandler("node_features_get", g.systemNodeFeaturesHandler)
 
 	perf := root.SubRoute("perf")
 	perf.WithHandler("get", g.perfGetHandler)

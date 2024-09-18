@@ -37,3 +37,7 @@ func (g *ZosAPI) systemHypervisorHandler(ctx context.Context, payload []byte) (i
 func (g *ZosAPI) systemDiagnosticsHandler(ctx context.Context, payload []byte) (interface{}, error) {
 	return g.diagnosticsManager.GetSystemDiagnostics(ctx)
 }
+
+func (g *ZosAPI) systemNodeFeaturesHandler(ctx context.Context, payload []byte) (interface{}, error) {
+	return g.systemMonitorStub.GetNodeFeatures(ctx), nil
+}

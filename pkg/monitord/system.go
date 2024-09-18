@@ -10,11 +10,10 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
-var (
-	_ pkg.SystemMonitor = (*systemMonitor)(nil)
-)
+var _ pkg.SystemMonitor = (*systemMonitor)(nil)
 
 // systemMonitor stream
 type systemMonitor struct {
@@ -198,4 +197,22 @@ func (m *systemMonitor) Nics(ctx context.Context) <-chan pkg.NicsIOCounterStat {
 	}()
 
 	return ch
+}
+
+// Get the types of workloads can be deployed depending on the network manager running on the node
+func (n *systemMonitor) GetNodeFeatures() []pkg.NodeFeature {
+	feat := []pkg.NodeFeature{
+		pkg.NodeFeature(zos.ZMountType),
+		pkg.NodeFeature(zos.NetworkType),
+		pkg.NodeFeature(zos.ZDBType),
+		pkg.NodeFeature(zos.ZMachineType),
+		pkg.NodeFeature(zos.VolumeType),
+		pkg.NodeFeature(zos.PublicIPv4Type),
+		pkg.NodeFeature(zos.PublicIPType),
+		pkg.NodeFeature(zos.GatewayNameProxyType),
+		pkg.NodeFeature(zos.GatewayFQDNProxyType),
+		pkg.NodeFeature(zos.QuantumSafeFSType),
+		pkg.NodeFeature(zos.ZLogsType),
+	}
+	return feat
 }

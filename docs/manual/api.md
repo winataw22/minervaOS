@@ -217,6 +217,22 @@ name must be one of (free) names returned by `zos.network.admin.interfaces`
 |---|---|---|
 | `zos.system.hypervisor` | - | `string` |
 
+### Get Node Features
+
+| command |body| return|
+|---|---|---|
+| `zos.system.node_features_get` | - |`[]NodeFeature` |
+
+
+Where
+
+```json
+NodeFeature: "string"
+
+```
+
+returns the types of workloads can be deployed depending on the network manager running on the node
+
 ## GPUs
 
 ### List Gpus

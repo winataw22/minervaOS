@@ -212,7 +212,6 @@ func (n *NodeClient) Counters(ctx context.Context) (counters Counters, err error
 	const cmd = "zos.statistics.get"
 	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &counters)
 	return
-
 }
 
 // Pools returns statistics of separate pools
@@ -267,7 +266,6 @@ func (n *NodeClient) NetworkListAllInterfaces(ctx context.Context) (result map[s
 	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &result)
 
 	return
-
 }
 
 // NetworkSetPublicExitDevice select which physical interface to use as an exit device
@@ -319,6 +317,13 @@ func (n *NodeClient) NetworkGetPublicConfig(ctx context.Context) (cfg pkg.Public
 	const cmd = "zos.network.public_config_get"
 
 	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &cfg)
+	return
+}
+
+func (n *NodeClient) SystemGetNodeFeatures(ctx context.Context) (feat []pkg.NodeFeature, err error) {
+	const cmd = "zos.system.node_features_get"
+
+	err = n.bus.Call(ctx, n.nodeTwin, cmd, nil, &feat)
 	return
 }
 
