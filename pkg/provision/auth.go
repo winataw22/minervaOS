@@ -40,7 +40,7 @@ func (s *substrateTwins) GetKey(id uint32) ([]byte, error) {
 
 	key := user.Account.PublicKey()
 	s.mem.Add(id, key)
-	return []byte(key), nil
+	return key, nil
 }
 
 type substrateAdmins struct {

@@ -46,7 +46,7 @@ func Monitor(addr string, ns string, id string, backend io.WriteCloser) error {
 
 	ctx := namespaces.WithNamespace(context.Background(), ns)
 
-	container, err := client.LoadContainer(ctx, string(id))
+	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		log.Error().Err(err).Msg("metric container")
 		return err

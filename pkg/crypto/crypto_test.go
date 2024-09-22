@@ -77,7 +77,8 @@ func TestPyNACLCompatibilityEncryption(t *testing.T) {
 	sk := ed25519.NewKeyFromSeed(seed)
 
 	chiper := ""
-	fmt.Sscanf("0bfe9e3b9ce17fe6d570b165ea2a01034326b8c81d5f2c5384c8fe886552f074ec43017465598c4f5a857b495b445be46c3df48d14878bd0b1b907", "%x", &chiper)
+	_, err := fmt.Sscanf("0bfe9e3b9ce17fe6d570b165ea2a01034326b8c81d5f2c5384c8fe886552f074ec43017465598c4f5a857b495b445be46c3df48d14878bd0b1b907", "%x", &chiper)
+	require.NoError(t, err)
 
 	decrypted, err := Decrypt([]byte(chiper), sk)
 	require.NoError(t, err)

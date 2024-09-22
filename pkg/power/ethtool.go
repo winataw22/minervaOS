@@ -57,7 +57,7 @@ func valueOfFlag(output []byte, flag Flag) (string, error) {
 		if len(parts) != 2 {
 			return "", fmt.Errorf("invalid ethtool output format (%s)", line)
 		}
-		return strings.TrimSpace(string(parts[1])), nil
+		return strings.TrimSpace(parts[1]), nil
 	}
 
 	return "", ErrFlagNotFound

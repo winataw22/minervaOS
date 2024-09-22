@@ -322,7 +322,7 @@ func (m *Module) withLogs(path string, err error) error {
 		return errors.Wrapf(err, "failed to tail machine logs: %s", tailErr)
 	}
 
-	return errors.Wrapf(err, string(logs))
+	return errors.Wrap(err, logs)
 }
 
 func (m *Module) checkDevicesUsed(devices []string) error {

@@ -572,7 +572,7 @@ func (e *NativeEngine) validate(ctx context.Context, dl *gridtypes.Deployment, n
 		return ctx, fmt.Errorf("substrate is not configured in engine")
 	}
 
-	contract, subErr := e.substrateGateway.GetContract(ctx, uint64(dl.ContractID))
+	contract, subErr := e.substrateGateway.GetContract(ctx, dl.ContractID)
 	if subErr.IsError() {
 		return nil, errors.Wrap(subErr.Err, "failed to get deployment contract")
 	}

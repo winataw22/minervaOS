@@ -207,7 +207,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, substrateGateway *stub
 	}
 
 	for _, node := range nodes {
-		if node.NodeID >= uint32(nodeID) {
+		if node.NodeID >= nodeID {
 			continue
 		}
 		n, err := substrateGateway.GetNode(ctx, node.NodeID)

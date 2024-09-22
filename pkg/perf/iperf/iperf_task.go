@@ -154,7 +154,7 @@ func (t *IperfTest) runIperfTest(ctx context.Context, clientIP string, tcp bool)
 	operation := func() error {
 		res := runIperfCommand(ctx, opts)
 		if res.Error == errServerBusy {
-			return fmt.Errorf(errServerBusy)
+			return errors.New(errServerBusy)
 		}
 
 		report = res

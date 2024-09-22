@@ -360,7 +360,7 @@ func (n *networker) SetupPrivTap(networkID pkg.NetID, name string) (ifc string, 
 }
 
 func (n *networker) TapExists(name string) (bool, error) {
-	log.Info().Str("tap-name", string(name)).Msg("Checking if tap interface exists")
+	log.Info().Str("tap-name", name).Msg("Checking if tap interface exists")
 
 	tapIface, err := tapName(name)
 	if err != nil {
@@ -372,7 +372,7 @@ func (n *networker) TapExists(name string) (bool, error) {
 
 // RemoveTap in the network resource.
 func (n *networker) RemoveTap(name string) error {
-	log.Info().Str("tap-name", string(name)).Msg("Removing tap interface")
+	log.Info().Str("tap-name", name).Msg("Removing tap interface")
 
 	tapIface, err := tapName(name)
 	if err != nil {
@@ -390,7 +390,7 @@ func (n *networker) PublicIPv4Support() bool {
 // reservation id. It is hooked to the public bridge. The name of the tap
 // interface is returned
 func (n *networker) SetupPubTap(name string) (string, error) {
-	log.Info().Str("pubtap-name", string(name)).Msg("Setting up public tap interface")
+	log.Info().Str("pubtap-name", name).Msg("Setting up public tap interface")
 
 	if !n.ndmz.SupportsPubIPv4() {
 		return "", errors.New("can't create public tap on this node")
@@ -408,7 +408,7 @@ func (n *networker) SetupPubTap(name string) (string, error) {
 
 // SetupMyceliumTap creates a new mycelium tap device attached to this network resource with deterministic IP address
 func (n *networker) SetupMyceliumTap(name string, netID zos.NetID, config zos.MyceliumIP) (tap pkg.PlanetaryTap, err error) {
-	log.Info().Str("tap-name", string(name)).Msg("Setting up mycelium tap interface")
+	log.Info().Str("tap-name", name).Msg("Setting up mycelium tap interface")
 
 	network, err := n.networkOf(netID)
 	if err != nil {
@@ -452,7 +452,7 @@ func (n *networker) SetupMyceliumTap(name string, netID zos.NetID, config zos.My
 
 // SetupYggTap sets up a tap device in the host namespace for the yggdrasil ip
 func (n *networker) SetupYggTap(name string) (tap pkg.PlanetaryTap, err error) {
-	log.Info().Str("tap-name", string(name)).Msg("Setting up yggdrasil tap interface")
+	log.Info().Str("tap-name", name).Msg("Setting up yggdrasil tap interface")
 
 	tapIface, err := tapName(name)
 	if err != nil {
@@ -486,7 +486,7 @@ func (n *networker) SetupYggTap(name string) (tap pkg.PlanetaryTap, err error) {
 
 // PubTapExists checks if the tap device for the public network exists already
 func (n *networker) PubTapExists(name string) (bool, error) {
-	log.Info().Str("pubtap-name", string(name)).Msg("Checking if public tap interface exists")
+	log.Info().Str("pubtap-name", name).Msg("Checking if public tap interface exists")
 
 	tapIface, err := pubTapName(name)
 	if err != nil {
@@ -499,7 +499,7 @@ func (n *networker) PubTapExists(name string) (bool, error) {
 // RemovePubTap removes the public tap device from the host namespace
 // of the networkID
 func (n *networker) RemovePubTap(name string) error {
-	log.Info().Str("pubtap-name", string(name)).Msg("Removing public tap interface")
+	log.Info().Str("pubtap-name", name).Msg("Removing public tap interface")
 
 	tapIface, err := pubTapName(name)
 	if err != nil {
@@ -660,7 +660,7 @@ func (n *networker) RemovePubIPFilter(filterName string) error {
 // DisconnectPubTap disconnects the public tap from the network. The interface
 // itself is not removed and will need to be cleaned up later
 func (n *networker) DisconnectPubTap(name string) error {
-	log.Info().Str("pubtap-name", string(name)).Msg("Disconnecting public tap interface")
+	log.Info().Str("pubtap-name", name).Msg("Disconnecting public tap interface")
 	tapIfaceName, err := pubTapName(name)
 	if err != nil {
 		return errors.Wrap(err, "could not get network namespace tap device name")

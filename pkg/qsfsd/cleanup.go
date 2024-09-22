@@ -59,11 +59,11 @@ func (q *QSFS) checkDeadQSFSs(ctx context.Context, state *failedQSFSState) error
 	}
 	for _, path := range paths {
 		wlID := filepath.Base(path)
-		metrics, err := q.qsfsMetrics(ctx, string(wlID))
+		metrics, err := q.qsfsMetrics(ctx, wlID)
 		if err != nil {
-			log.Err(err).Str("id", string(wlID)).Msg("couldn't get qsfs metrics")
-			state.metricsFailureCount[string(wlID)] += 1
-			if state.metricsFailureCount[string(wlID)] >= 10 {
+			log.Err(err).Str("id", wlID).Msg("couldn't get qsfs metrics")
+			state.metricsFailureCount[wlID] += 1
+			if state.metricsFailureCount[wlID] >= 10 {
 				q.Unmount(wlID)
 				state.delete(wlID)
 			}

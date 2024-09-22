@@ -71,7 +71,7 @@ func (i WorkloadID) Unique(n string) string {
 		b = b[:13]
 	}
 
-	return string(b)
+	return b
 }
 
 // IsValidName validates workload name

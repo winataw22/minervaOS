@@ -32,7 +32,7 @@ func NetworkID(twin uint32, network gridtypes.Name) NetID {
 	if len(b) > 13 {
 		b = b[:13]
 	}
-	return NetID(string(b))
+	return NetID(b)
 }
 
 func NetworkIDFromWorkloadID(wl gridtypes.WorkloadID) (NetID, error) {

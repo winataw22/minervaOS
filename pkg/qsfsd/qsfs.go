@@ -169,7 +169,7 @@ func (q *QSFS) Mount(wlID string, cfg zos.QuantumSafeFS) (info pkg.QSFSInfo, err
 		if containerErr != nil {
 			log.Error().Err(containerErr).Msg("Failed to read container logs")
 		}
-		err = errors.Wrapf(lerr, fmt.Sprintf("Container Logs:\n%s", logs))
+		err = errors.Wrapf(lerr, "Container Logs:\n%s", logs)
 		return
 	}
 	log.Debug().Str("duration", time.Since(t).String()).Msg("waiting for qsfs deployment took")

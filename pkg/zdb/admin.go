@@ -1,7 +1,7 @@
 package zdb
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
@@ -18,7 +18,7 @@ func (c *clientImpl) CreateNamespace(name string) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -49,7 +49,7 @@ func (c *clientImpl) DeleteNamespace(name string) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -70,7 +70,7 @@ func (c *clientImpl) NamespaceSetSize(name string, size uint64) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (c *clientImpl) NamespaceSetPassword(name, password string) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func (c *clientImpl) NamespaceSetMode(name, mode string) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func (c *clientImpl) NamespaceSetLock(name string, lock bool) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }
@@ -136,7 +136,7 @@ func (c *clientImpl) NamespaceSetPublic(name string, public bool) error {
 		return err
 	}
 	if ok != "OK" {
-		return fmt.Errorf(ok)
+		return errors.New(ok)
 	}
 	return nil
 }

@@ -1,0 +1,17 @@
+linters:
+  enable:
+    - errcheck
+    - gofmt
+    - govet
+    - ineffassign
+    - unconvert
+    - staticcheck
+    - gocyclo
+  enable-all: false
+linters-settings:
+  gocyclo:
+    # Minimal code complexity to report.
+    # Default: 30 (but we recommend 10-20)
+    min-complexity: 100
+run:
+  timeout: 20m

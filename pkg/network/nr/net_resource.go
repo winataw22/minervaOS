@@ -644,7 +644,7 @@ func (nr *NetResource) wgPeers() ([]*wireguard.Peer, error) {
 		}
 
 		wgPeer := &wireguard.Peer{
-			PublicKey:  string(peer.WGPublicKey),
+			PublicKey:  peer.WGPublicKey,
 			AllowedIPs: allowedIPs,
 			Endpoint:   peer.Endpoint,
 		}

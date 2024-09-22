@@ -59,7 +59,7 @@ func (f *flistModule) cleanCache(now time.Time, age time.Duration) error {
 
 		if sys, ok := sys.(*syscall.Stat_t); ok {
 			// int64 cast required for arm32 targets
-			atime := time.Unix(int64(sys.Atim.Sec), int64(sys.Atim.Nsec))
+			atime := time.Unix(sys.Atim.Sec, sys.Atim.Nsec)
 
 			if now.Sub(atime) > age {
 				if err := os.Remove(path); err != nil {

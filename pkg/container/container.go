@@ -426,7 +426,7 @@ func (c *Module) start(ns, id string) error {
 
 	ctx := namespaces.WithNamespace(context.Background(), ns)
 
-	container, err := client.LoadContainer(ctx, string(id))
+	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -615,7 +615,7 @@ func (c *Module) Delete(ns string, id pkg.ContainerID) error {
 		_ = task.Kill(ctx, syscall.SIGTERM)
 		select {
 		case <-exitC:
-		case <-time.After(time.Duration(shutdownTimeout)):
+		case <-time.After(shutdownTimeout):
 			log.Debug().Str("id", string(id)).Int("signal", int(syscall.SIGKILL)).Msg("sending signal")
 			_ = task.Kill(ctx, syscall.SIGKILL)
 			select {

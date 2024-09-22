@@ -21,7 +21,7 @@ func TestTimestamp(t *testing.T) {
 	exp, err := json.Marshal(n)
 	require.NoError(err)
 
-	err = json.Unmarshal([]byte(exp), &v)
+	err = json.Unmarshal(exp, &v)
 	require.NoError(err)
 
 	require.Equal(Timestamp(n.Unix()), v)

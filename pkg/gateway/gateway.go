@@ -532,7 +532,7 @@ func (g *gatewayModule) configPath(name string) string {
 
 func (g *gatewayModule) validateNameContract(name string, twinID uint32) error {
 
-	contractID, subErr := g.substrateGateway.GetContractIDByNameRegistration(context.Background(), string(name))
+	contractID, subErr := g.substrateGateway.GetContractIDByNameRegistration(context.Background(), name)
 	if subErr.IsCode(pkg.CodeNotFound) {
 		return ErrContractNotReserved
 	}
@@ -633,7 +633,7 @@ func (g *gatewayModule) setupRouting(ctx context.Context, wlID string, fqdn stri
 
 	backend := config.Backends[0]
 
-	if err := zos.Backend(backend).Valid(config.TLSPassthrough); err != nil {
+	if err := backend.Valid(config.TLSPassthrough); err != nil {
 		return errors.Wrapf(err, "failed to validate backend '%s'", backend)
 	}
 

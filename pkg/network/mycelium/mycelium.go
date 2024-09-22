@@ -183,7 +183,7 @@ func (s *MyceliumServer) InspectMycelium() (inspection MyceliumInspection, err e
 
 // IP return the address in the 400::/7 subnet allocated by mycelium
 func (m *MyceliumInspection) IP() net.IP {
-	return net.IP(m.Address)
+	return m.Address
 }
 
 // Subnet return the 400::/64 subnet allocated by mycelium
