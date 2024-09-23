@@ -286,6 +286,7 @@ func (m *Machine) waitAndAdjOom(ctx context.Context, name string, socket string)
 func (m *Machine) startFs(socket, path string) (int, error) {
 	cmd := exec.Command("busybox", "setsid",
 		"virtiofsd-rs",
+		"--xattr",
 		"--socket-path", socket,
 		"--shared-dir", path,
 		"--shared-dir-stats", fmt.Sprintf("/usr/share/btrfs/volstat.sh %s", path),
