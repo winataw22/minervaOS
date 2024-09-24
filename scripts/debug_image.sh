@@ -2,6 +2,7 @@
 
 # Constants
 readonly SOCKET="/tmp/virtiofs.sock"
+readonly CH_API_SOCKET="/tmp/ch-api.sock"
 readonly OVERLAYFS="/tmp/overlay"
 readonly CCFLIST="https://hub.grid.tf/tf-autobuilder/cloud-container-9dba60e.flist"
 readonly MACHINE_TYPE="machine"
@@ -24,6 +25,7 @@ declare -A options=(
 )
 
 image_type=$MACHINE_TYPE
+install_deps=false
 init=""
 kernel=""
 initramfs=""
@@ -51,6 +53,7 @@ usage() {
     echo "  -d                    Enable debugging mode with 'set -x'."
     echo "  -h                    Show this help message."
     echo "  -c                    Run on container mode (will provide a kernel and initrd)."
+    echo "  -i                    Don't fail on missing deps and install them."
     echo ""
     echo "Example:"
     echo "  debug_image.sh --image /path/to/rootfs --debug true"
@@ -75,6 +78,10 @@ handle_options() {
                 image_type=$CONTAINER_TYPE
                 shift
                 ;;
+            -i)
+                install_deps=true
+                shift
+                ;;
             *)
                 usage
                 exit 1
@@ -88,37 +95,23 @@ handle_options() {
 }
 
 check_or_install_deps() {
-    mkdir -p ~/chv
-    cd ~/chv
-
-    if ! command -v cloud-hypervisor &>/dev/null; then
-        wget https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v39.0/cloud-hypervisor
-        chmod +x cloud-hypervisor
-        sudo ln -s $(realpath ./cloud-hypervisor) /usr/local/bin/cloud-hypervisor
+    if [ "$install_deps" = true ]; then
+        bash ./install_deps.sh
+        return
     fi
 
-    if ! command -v virtiofsd &>/dev/null; then
-        git clone https://gitlab.com/muhamad.azmy/virtiofsd.git
-        pushd virtiofsd
-        cargo build --release
-        sudo ln -s $(realpath ./target/release/virtiofsd) /usr/local/bin/virtiofsd
-        popd
-    fi
+    for cmd in cloud-hypervisor virtiofsd rfs1 screen; do
+        if ! command -v $cmd &>/dev/null; then
+            fail "$cmd command not found"
+        fi
+    done
 
-    if ! command -v rfs1 &>/dev/null; then
-        wget https://github.com/threefoldtech/rfs/releases/download/v1.1.1/rfs
-        chmod +x rfs
-        sudo ln -s $(realpath ./rfs) /usr/local/bin/rfs1
-    fi
-
-    if [[ -n "${options[--cidata]}" && ! $(command -v mkdosfs &>/dev/null) ]]; then
-        sudo apt update
-        sudo apt -y install dosfstools
-    fi
-
-    if ! command -v screen &>/dev/null; then
-        sudo apt update
-        sudo apt -y install screen
+    if [[ -n "${options[--cidata]}" ]]; then
+        for cmd in mcopy mkdosfs; do
+            if ! command -v $cmd &>/dev/null; then
+                fail "$cmd command not found"
+            fi
+        done
     fi
 }
 
@@ -195,7 +188,7 @@ mount_flist() {
         wget $flist_url -O $flist_path
     fi
 
-    sudo mkdir -p "$mountpoint"
+    mkdir -p "$mountpoint"
 
     rfs1 --meta "$flist_path" "$mountpoint" &
     pids+=($!)
@@ -225,8 +218,8 @@ prepare_rootfs() {
     fi
 
     echo "Mounting overlay"
-    sudo mkdir -p /tmp/upper /tmp/workdir "$OVERLAYFS"
-    sudo mount \
+    mkdir -p /tmp/upper /tmp/workdir "$OVERLAYFS"
+    mount \
         -t overlay \
         -o lowerdir="$lowerdir",upperdir=/tmp/upper,workdir=/tmp/workdir \
         none \
@@ -234,7 +227,7 @@ prepare_rootfs() {
 
     echo "Starting virtiofs"
     # a trick to not mess the logs, it asks for sudo
-    sudo screen -dmS virtiofsd_session sudo virtiofsd --socket-path="$SOCKET" --shared-dir="$OVERLAYFS" --cache=never
+    screen -dmS virtiofsd_session sudo virtiofsd --socket-path="$SOCKET" --shared-dir="$OVERLAYFS" --cache=never
     pids+=($!)
 }
 
@@ -243,8 +236,8 @@ cleanup() {
 
     dirs=("$OVERLAYFS" /tmp/flist /tmp/cloud-container /tmp/upper /tmp/workdir)
     for dir in "${dirs_to_umount[@]}"; do
-        sudo umount "$dir" &>/dev/null || true
-        sudo rm -rf "$dir" &>/dev/null || true
+        umount "$dir" &>/dev/null || true
+        rm -rf "$dir" &>/dev/null || true
     done
 
     for pid in "${pids[@]}"; do
@@ -255,7 +248,7 @@ cleanup() {
 }
 
 boot() {
-    sudo cloud-hypervisor \
+    cloud-hypervisor \
         --cpus boot=1,max=1 \
         --memory size=1024M,shared=on \
         --kernel "${kernel}" \
@@ -263,13 +256,15 @@ boot() {
         --fs tag=vroot,socket="$SOCKET" \
         --disk path="$cidata" \
         --cmdline "$cmdline" \
+        --api-socket="$CH_API_SOCKET" \
         --serial tty \
         --console off
 }
 
-if [ "$EUID" -ne 0 ]
-  then echo "Please run as root"
-  exit
+# must run as superuser
+if [ $(id -u) != "0" ]; then
+echo "You must be the superuser to run this script" >&2
+exit 1
 fi
 
 cleanup
