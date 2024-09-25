@@ -9,6 +9,8 @@ import (
 
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/pkg/errors"
+
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/app"
 	"github.com/threefoldtech/zos/pkg/environment"
@@ -54,6 +56,14 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 	}
 
 	go func() {
+		registrarLable := "registrar"
+		zui := stubs.NewZUIStub(c)
+
+		// empty out zui errors for registrar
+		if zuiErr := zui.PushErrors(ctx, registrarLable, []string{}); zuiErr != nil {
+			log.Info().Err(zuiErr).Send()
+		}
+
 		farmID, _ := identity.FarmID(ctx)
 		for version := range ch {
 			var name string
@@ -69,7 +79,10 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 				if isInProgressError(err) {
 					nodeID = green(err.Error())
 				} else {
-					nodeID = red(err.Error())
+					nodeID = red(fmt.Sprintf("%d (unregistered)", node))
+					if zuiErr := zui.PushErrors(ctx, registrarLable, []string{err.Error()}); zuiErr != nil {
+						log.Info().Err(zuiErr).Send()
+					}
 				}
 			} else {
 				nodeID = green(fmt.Sprint(node))
@@ -77,7 +90,7 @@ func headerRenderer(ctx context.Context, c zbus.Client, h *widgets.Paragraph, r 
 
 			cache := green("OK")
 			if app.CheckFlag(app.LimitedCache) {
-				cache = red("no ssd disks detected")
+				cache = red("no ssd disks detected, running on hdd-only mode")
 			} else if app.CheckFlag(app.ReadonlyCache) {
 				cache = red("cache is read-only")
 			}

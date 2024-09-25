@@ -20,6 +20,7 @@ import (
 	"github.com/threefoldtech/0-fs/rofs"
 	"github.com/threefoldtech/0-fs/storage"
 	"github.com/threefoldtech/zos/pkg/app"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/upgrade/hub"
 	"github.com/threefoldtech/zos/pkg/zinit"
 
@@ -131,7 +132,7 @@ func NewUpgrader(root string, opts ...UpgraderOption) (*Upgrader, error) {
 	return u, nil
 }
 
-// Run strats the upgrader module and run the update according to the detected boot method
+// Run starts the upgrader module and run the update according to the detected boot method
 func (u *Upgrader) Run(ctx context.Context) error {
 	method := u.boot.DetectBootMethod()
 	if method == BootMethodOther {
@@ -233,6 +234,22 @@ func (u *Upgrader) update() error {
 	if remote.Target == current.Target {
 		// nothing to do!
 		return nil
+	}
+
+	env := environment.MustGet()
+	config, err := environment.GetConfig()
+	if err != nil {
+		return errors.Wrap(err, "failed to get network config")
+	}
+
+	rolloutConfigs := config.RolloutUpgrade
+
+	if !rolloutConfigs.SafeToUpgrade {
+		if !slices.Contains(rolloutConfigs.TestFarms, uint32(env.FarmID)) {
+			// nothing to do! waiting for the flag `safe to upgrade to be enabled after A/B testing`
+			// node is not a part of A/B testing
+			return nil
+		}
 	}
 
 	log.Info().Str("version", filepath.Base(remote.Target)).Msg("updating system...")

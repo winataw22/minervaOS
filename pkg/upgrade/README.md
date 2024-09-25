@@ -27,14 +27,14 @@ Then run the upgrader `upgrader.Run(ctx)`
 
 ## How it works
 
-The upgrader module has two running modes depeding on the booting method.
+The upgrader module has two running modes depending on the booting method.
 
 ### Bootstrap Method
 
 Running the upgrader on a node run with `bootstrap` will periodically check the hub for latest tag,
 and if that tag differs from the current one, it updates the local packages to latest.
 
-If the update failed, the upgrader would attempts to install the packages again every `10 secounds` until all packages are successfully updated to prevent partial updates.
+If the update failed, the upgrader would attempts to install the packages again every `10 seconds` until all packages are successfully updated to prevent partial updates.
 
 The upgrader runs periodically every hour to check for new updates.
 

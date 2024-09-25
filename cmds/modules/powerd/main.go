@@ -37,6 +37,7 @@ var Module cli.Command = cli.Command{
 func action(cli *cli.Context) error {
 	var (
 		msgBrokerCon string = cli.String("broker")
+		powerdLabel  string = "powerd"
 	)
 
 	ctx, _ := utils.WithSignal(cli.Context)
@@ -51,16 +52,28 @@ func action(cli *cli.Context) error {
 		return errors.Wrap(err, "failed to connect to message broker server")
 	}
 
+	zui := stubs.NewZUIStub(cl)
+	// empty out zui errors for powerd
+	if zuiErr := zui.PushErrors(cli.Context, powerdLabel, []string{}); zuiErr != nil {
+		log.Info().Err(zuiErr).Send()
+	}
+
 	identity := stubs.NewIdentityManagerStub(cl)
 	register := stubs.NewRegistrarStub(cl)
 
 	nodeID, err := register.NodeID(ctx)
 	if err != nil {
+		if zuiErr := zui.PushErrors(cli.Context, powerdLabel, []string{err.Error()}); zuiErr != nil {
+			log.Info().Err(zuiErr).Send()
+		}
 		return errors.Wrap(err, "failed to get node id")
 	}
 
 	twinID, err := register.TwinID(ctx)
 	if err != nil {
+		if zuiErr := zui.PushErrors(cli.Context, powerdLabel, []string{err.Error()}); zuiErr != nil {
+			log.Info().Err(zuiErr).Send()
+		}
 		return errors.Wrap(err, "failed to get twin id")
 	}
 
