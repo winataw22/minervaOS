@@ -28,8 +28,7 @@ type Config struct {
 		Authorized []string `json:"authorized"`
 	} `json:"users"`
 	RolloutUpgrade struct {
-		TestFarms     []uint32 `json:"test_farms"`
-		SafeToUpgrade bool     `json:"safe_to_upgrade"`
+		TestFarms []uint32 `json:"test_farms"`
 	} `json:"rollout_upgrade"`
 }
 
