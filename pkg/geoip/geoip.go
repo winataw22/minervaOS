@@ -11,7 +11,7 @@ import (
 
 // Location holds the result of a geoip request
 type Location struct {
-	Longitute   float64 `json:"longitude"`
+	Longitude   float64 `json:"longitude"`
 	Latitude    float64 `json:"latitude"`
 	Continent   string  `json:"continent"`
 	Country     string  `json:"country_name"`
@@ -45,7 +45,7 @@ func Fetch() (Location, error) {
 
 func getLocation(geoIPService string) (Location, error) {
 	l := Location{
-		Longitute: 0.0,
+		Longitude: 0.0,
 		Latitude:  0.0,
 		Continent: "Unknown",
 		Country:   "Unknown",

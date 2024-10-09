@@ -138,7 +138,7 @@ func registerNode(
 	}
 
 	location := substrate.Location{
-		Longitude: fmt.Sprint(info.Location.Longitute),
+		Longitude: fmt.Sprint(info.Location.Longitude),
 		Latitude:  fmt.Sprint(info.Location.Latitude),
 		Country:   info.Location.Country,
 		City:      info.Location.City,
