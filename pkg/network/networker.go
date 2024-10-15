@@ -26,6 +26,7 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/iperf"
 	"github.com/threefoldtech/zos/pkg/network/mycelium"
 	"github.com/threefoldtech/zos/pkg/network/ndmz"
+	"github.com/threefoldtech/zos/pkg/network/options"
 	"github.com/threefoldtech/zos/pkg/network/public"
 	"github.com/threefoldtech/zos/pkg/network/tuntap"
 	"github.com/threefoldtech/zos/pkg/network/wireguard"
@@ -40,7 +41,6 @@ import (
 	"github.com/threefoldtech/zos/pkg/network/ifaceutil"
 
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/threefoldtech/zos/pkg/network/macvlan"
 	"github.com/threefoldtech/zos/pkg/network/nr"
 	"github.com/threefoldtech/zos/pkg/network/types"
 	"github.com/threefoldtech/zos/pkg/set"
@@ -156,28 +156,23 @@ func (n *networker) attachYgg(id string, netNs ns.NetNS) (net.IPNet, error) {
 		return net.IPNet{}, fmt.Errorf("failed to generate ygg subnet IP: %w", err)
 	}
 
-	ips := []*net.IPNet{
-		&ip,
-	}
-
 	gw, err := n.ygg.Gateway()
 	if err != nil {
 		return net.IPNet{}, fmt.Errorf("failed to get ygg gateway IP: %w", err)
 	}
 
-	routes := []*netlink.Route{
+	routes := []netlink.Route{
 		{
 			Dst: &net.IPNet{
 				IP:   net.ParseIP("200::"),
 				Mask: net.CIDRMask(7, 128),
 			},
 			Gw: gw.IP,
-			// LinkIndex:... this is set by macvlan.Install
 		},
 	}
 
-	if err := n.createMacVlan(ZDBYggIface, types.YggBridge, hw, ips, routes, netNs); err != nil {
-		return net.IPNet{}, errors.Wrap(err, "failed to setup zdb ygg interface")
+	if err := attachWithVeth(ZDBYggIface, types.YggBridge, netNs, &ip, routes); err != nil {
+		return net.IPNet{}, err
 	}
 
 	return ip, nil
@@ -199,7 +194,6 @@ func (n *networker) detachYgg(id string, netNs ns.NetNS) error {
 func (n *networker) attachMycelium(id string, netNs ns.NetNS) (net.IPNet, error) {
 	// new hardware address for mycelium interface
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("my:" + id))
-
 	myc, err := n.mycelium.InspectMycelium()
 	if err != nil {
 		return net.IPNet{}, err
@@ -210,62 +204,126 @@ func (n *networker) attachMycelium(id string, netNs ns.NetNS) (net.IPNet, error)
 	if err != nil {
 		return net.IPNet{}, fmt.Errorf("failed to generate mycelium IP: %w", err)
 	}
-
-	ips := []*net.IPNet{
-		&ip,
-	}
-
 	gw, err := myc.Gateway()
 	if err != nil {
 		return net.IPNet{}, fmt.Errorf("failed to get mycelium gateway IP: %w", err)
 	}
 
-	routes := []*netlink.Route{
+	routes := []netlink.Route{
 		{
 			Dst: &net.IPNet{
 				IP:   net.ParseIP("400::"),
 				Mask: net.CIDRMask(7, 128),
 			},
 			Gw: gw.IP,
-			// LinkIndex:... this is set by macvlan.Install
 		},
 	}
 
-	if err := n.createMacVlan(ZDBMyceliumIface, types.MyceliumBridge, hw, ips, routes, netNs); err != nil {
-		return net.IPNet{}, errors.Wrap(err, "failed to setup zdb mycelium interface")
+	if err := attachWithVeth(ZDBMyceliumIface, types.MyceliumBridge, netNs, &ip, routes); err != nil {
+		return net.IPNet{}, err
 	}
 
 	return ip, nil
 }
 
-// ensurePrepare ensurets that a unique namespace is created (based on id) with "prefix"
+func setLinkAddr(name string, ip *net.IPNet) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return fmt.Errorf("failed to set link address: %w", err)
+	}
+
+	addr := netlink.Addr{
+		IPNet: ip,
+	}
+	err = netlink.AddrAdd(link, &addr)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to add ip address to link: %w", err)
+	}
+
+	return netlink.LinkSetUp(link)
+}
+
+// attachWithVeth create an interface on the namespace (if not exist) and attach it to the given bridge
+// and setup the namespace with ips and routes
+//
+// - ifName: the name of the interface on the namespace
+// - bridge: the master bridge on the host
+// - netNs: the namespace to be wired to the bridge
+// - ip: ip for the link on the namespace
+// - routes: routes to add in the namespace
+func attachWithVeth(ifName, bridge string, netNs ns.NetNS, ip *net.IPNet, routes []netlink.Route) error {
+	if ifaceutil.Exists(ifName, netNs) {
+		return nil
+	}
+
+	if err := ifaceutil.MakeVethPair(ifName, bridge, 1500, netNs); err != nil {
+		return fmt.Errorf("failed to create ygg link: %w", err)
+	}
+
+	nsName := filepath.Base(netNs.Path())
+
+	// setup addresses for the link in the namespace
+	setupNs := func(_ ns.NetNS) error {
+		if ip != nil {
+			if err := setLinkAddr(ifName, ip); err != nil {
+				return fmt.Errorf("failed to set up address for interface %q: %w", ifName, err)
+			}
+		}
+
+		if err := ifaceutil.SetLoUp(); err != nil {
+			return fmt.Errorf("failed to set lo up for namespace '%s': %w", nsName, err)
+		}
+
+		if err := options.SetIPv6Forwarding(true); err != nil {
+			return fmt.Errorf("failed to enable ipv6 forwarding in namespace %q: %w", nsName, err)
+		}
+
+		for _, route := range routes {
+			if err := netlink.RouteAdd(&route); err != nil {
+				return fmt.Errorf("failed to add route %q: %w", nsName, err)
+			}
+		}
+
+		return nil
+	}
+
+	if err := netNs.Do(setupNs); err != nil {
+		return fmt.Errorf("failed to setup namespace %q: %w", nsName, err)
+	}
+
+	return nil
+}
+
+// ensurePrepare ensures that a unique namespace is created (based on id) with "prefix"
 // and make sure it's wired to the bridge on host namespace
 func (n *networker) ensurePrepare(id, prefix, bridge string) (string, error) {
 	hw := ifaceutil.HardwareAddrFromInputBytes([]byte("pub:" + id))
-
 	netNSName := prefix + strings.Replace(hw.String(), ":", "", -1)
-
 	netNs, err := createNetNS(netNSName)
 	if err != nil {
 		return "", err
 	}
 	defer netNs.Close()
 
-	if err := n.createMacVlan(PubIface, bridge, hw, nil, nil, netNs); err != nil {
-		return "", errors.Wrap(err, "failed to setup zdb public interface")
+	/*
+		target state will be something like this:
+		- br-pub (host) p-eth0 ---> (netNs) eth0
+		- br-my  (host) p-my0  ---> (netNs) my0
+		- br-ygg (host) p-ygg0 ---> (netNs) ygg0
+	*/
+
+	if err := attachWithVeth(PubIface, bridge, netNs, nil, nil); err != nil {
+		return "", err
 	}
 
 	if n.ygg != nil {
-		_, err = n.attachYgg(id, netNs)
-		if err != nil {
+		if _, err = n.attachYgg(id, netNs); err != nil {
 			return "", err
 		}
-
 	}
 
 	if n.mycelium != nil {
-		_, err = n.attachMycelium(id, netNs)
-		if err != nil {
+		if _, err = n.attachMycelium(id, netNs); err != nil {
 			return "", err
 		}
 	}
@@ -288,7 +346,6 @@ func (n *networker) destroy(ns string) error {
 	return namespace.Delete(nSpace)
 }
 
-// func (n *networker) NSPrepare(id string, )
 // EnsureZDBPrepare sends a macvlan interface into the
 // network namespace of a ZDB container
 func (n *networker) EnsureZDBPrepare(id string) (string, error) {
@@ -306,31 +363,31 @@ func (n *networker) ZDBDestroy(ns string) error {
 	// return n.destroy(ns)
 }
 
-func (n *networker) createMacVlan(iface string, master string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
-	var macVlan *netlink.Macvlan
-	err := netNs.Do(func(_ ns.NetNS) error {
-		var err error
-		macVlan, err = macvlan.GetByName(iface)
-		return err
-	})
+// func (n *networker) createMacVlan(iface string, master string, hw net.HardwareAddr, ips []*net.IPNet, routes []*netlink.Route, netNs ns.NetNS) error {
+// 	var macVlan *netlink.Macvlan
+// 	err := netNs.Do(func(_ ns.NetNS) error {
+// 		var err error
+// 		macVlan, err = macvlan.GetByName(iface)
+// 		return err
+// 	})
 
-	if _, ok := err.(netlink.LinkNotFoundError); ok {
-		macVlan, err = macvlan.Create(iface, master, netNs)
-		if err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
+// 	if _, ok := err.(netlink.LinkNotFoundError); ok {
+// 		macVlan, err = macvlan.Create(iface, master, netNs)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	} else if err != nil {
+// 		return err
+// 	}
 
-	log.Debug().Str("HW", hw.String()).Str("macvlan", macVlan.Name).Msg("setting hw address on link")
-	// we don't set any route or ip
-	if err := macvlan.Install(macVlan, hw, ips, routes, netNs); err != nil {
-		return err
-	}
+// 	log.Debug().Str("HW", hw.String()).Str("macvlan", macVlan.Name).Msg("setting hw address on link")
+// 	// we don't set any route or ip
+// 	if err := macvlan.Install(macVlan, hw, ips, routes, netNs); err != nil {
+// 		return err
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // SetupTap interface in the network resource. We only allow 1 tap interface to be
 // set up per NR currently

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/pkg/errors"
 
@@ -133,25 +134,43 @@ func RandomName(prefix string) (string, error) {
 	return fmt.Sprintf("%s%x", prefix, b), nil
 }
 
-// MakeVethPair creates a veth pair
-func MakeVethPair(name, master string, mtu int) (netlink.Link, error) {
-	masterLink, err := netlink.LinkByName(master)
-	if err != nil {
-		return nil, err
+// MakeVethPair attach the given interface to the given bridge with veth cable
+// in case of providing a namespace, the interface will be moved there
+//
+// - name: name of the veth interface
+// - master: name of the master bridge to attach the veth peer to
+// - mtu: mtu
+// - netNs: network namespace to move the veth interface into. (could be nil)
+func MakeVethPair(name, master string, mtu int, netNs ns.NetNS) error {
+	var err error
+
+	// 1. Create a Veth link
+	ifName := name
+	if netNs != nil {
+		// due to kernel bug we have to create with temp name or it might
+		// collide with the name on the host and error out
+		// temp name will be renamed after moving it to the namespace
+		ifName, err = ip.RandomVethName()
+		if err != nil {
+			return err
+		}
 	}
 
-	peer := fmt.Sprintf("%s-p", name)
+	peerName := fmt.Sprintf("p-%s", name)
+	if _, err = netlink.LinkByName(peerName); err == nil {
+		return fmt.Errorf("peer already exists %q", peerName)
+	}
+
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  name,
+			Name:  ifName,
 			Flags: net.FlagUp,
 			MTU:   mtu,
 		},
-		PeerName: peer,
+		PeerName: peerName,
 	}
-
-	if err = netlink.LinkAdd(veth); err != nil {
-		return nil, err
+	if err := netlink.LinkAdd(veth); err != nil {
+		return fmt.Errorf("failed to add the veth: %w", err)
 	}
 
 	defer func() {
@@ -160,23 +179,49 @@ func MakeVethPair(name, master string, mtu int) (netlink.Link, error) {
 		}
 	}()
 
-	peerLink, err := netlink.LinkByName(peer)
-	if err = netlink.LinkSetMaster(peerLink, masterLink); err != nil {
-		return nil, err
-	}
-
-	// make sure the lowerhalf is up, this automatically sets the upperhalf UP
-	if err = netlink.LinkSetUp(peerLink); err != nil {
-		return nil, errors.Wrap(err, "could not set veth peer up")
-	}
-
-	// Re-fetch the link to get its creation-time parameters, e.g. index and mac
-	veth2, err := netlink.LinkByName(name)
+	// 2. attach the link to the master
+	masterLink, err := netlink.LinkByName(master)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("master link: %s not found: %v", master, err)
 	}
 
-	return veth2, nil
+	peerLink, err := netlink.LinkByName(peerName)
+	if err != nil {
+		return fmt.Errorf("failed to get peer link %q: %v", peerName, err)
+	}
+
+	if err := netlink.LinkSetMaster(peerLink, masterLink); err != nil {
+		return fmt.Errorf("failed to set master for peer link %q: %w", peerName, err)
+	}
+
+	// 3. move to the namespace and rename
+	if netNs != nil {
+		if err = moveLinkToNamespace(veth, ifName, name, netNs); err != nil {
+			return err
+		}
+	}
+
+	// 4. make sure the lowerhalf is up, this automatically sets the upperhalf UP
+	if err := netlink.LinkSetUp(peerLink); err != nil {
+		return fmt.Errorf("failed to set veth peer up: %w", err)
+	}
+
+	return nil
+}
+
+// moveLinkToNamespace moves the veth link to the specified namespace and renames it
+func moveLinkToNamespace(veth netlink.Link, name, renameTo string, netNs ns.NetNS) error {
+	if err := netlink.LinkSetNsFd(veth, int(netNs.Fd())); err != nil {
+		return fmt.Errorf("failed to move link: %s to namespace:%s : %w", renameTo, netNs.Path(), err)
+	}
+
+	return netNs.Do(func(nn ns.NetNS) error {
+		if err := ip.RenameLink(name, renameTo); err != nil {
+			_ = netlink.LinkDel(veth)
+			return fmt.Errorf("failed to rename veth to %q: %v", renameTo, err)
+		}
+		return nil
+	})
 }
 
 // VethByName loads one end of a veth pair given its name
