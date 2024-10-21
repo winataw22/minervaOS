@@ -282,7 +282,7 @@ func (u *Upgrader) update() error {
 
 	remoteVer := remote.Target[strings.LastIndex(remote.Target, "/")+1:]
 
-	if remoteVer != chainVer.Version {
+	if env.RunningMode != environment.RunningDev && remoteVer != chainVer.Version {
 		// nothing to do! hub version is not the same as the chain
 		return nil
 	}
