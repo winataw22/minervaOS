@@ -88,6 +88,7 @@ func (s *MyceliumServer) Ensure(z *zinit.Client, ns string) error {
 		bin,
 		"--key-file", confPath,
 		"--tun-name", s.cfg.TunName,
+		"--silent",
 		"--peers",
 	}
 
