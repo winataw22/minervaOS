@@ -307,6 +307,21 @@ func (s *NetworkerStub) Metrics(ctx context.Context) (ret0 pkg.NetResourceMetric
 	return
 }
 
+func (s *NetworkerStub) MigrateZdbMacvlanToVeth(ctx context.Context) (ret0 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "MigrateZdbMacvlanToVeth", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret0 = result.CallError()
+	loader := zbus.Loader{}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
 func (s *NetworkerStub) Namespace(ctx context.Context, arg0 zos.NetID) (ret0 string) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "Namespace", args...)

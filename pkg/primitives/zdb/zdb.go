@@ -831,6 +831,11 @@ func (p *Manager) Initialize(ctx context.Context) error {
 		delete(poolNames, string(container))
 	}
 
+	log.Debug().Msg("running zdb network setup migration")
+	if err := network.MigrateZdbMacvlanToVeth(ctx); err != nil {
+		log.Error().Err(err).Send()
+	}
+
 	// do we still have allocated pools that does not have associated zdbs.
 	for _, device := range poolNames {
 		log.Debug().Str("device", device.Path).Msg("starting zdb")

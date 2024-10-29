@@ -96,6 +96,9 @@ type Networker interface {
 	// for zdb is rewind. ns param is the namespace return by the ZDBPrepare
 	ZDBDestroy(ns string) error
 
+	// MigrateZdbMacvlanToVeth migrate the zdb setup to use veth instead of macvlan
+	MigrateZdbMacvlanToVeth() error
+
 	// QSFSNamespace returns the namespace of the qsfs workload
 	QSFSNamespace(id string) string
 
