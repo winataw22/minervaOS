@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,7 +109,19 @@ func (w *Worker) updateZosVersion(network Network, manager client.Manager) error
 		return err
 	}
 
-	log.Debug().Msgf("getting substrate version %v for network %v", currentZosVersion, network)
+	type ChainVersion struct {
+		SafeToUpgrade bool   `json:"safe_to_upgrade"`
+		Version       string `json:"version"`
+	}
+
+	var chainVersion ChainVersion
+	err = json.Unmarshal([]byte(currentZosVersion), &chainVersion)
+	if err != nil {
+		log.Debug().Err(err).Msg("failed to unmarshal chain version")
+		chainVersion.Version = currentZosVersion
+	}
+
+	log.Debug().Msgf("getting substrate version %v for network %v", chainVersion.Version, network)
 
 	// now we need to find how dst is relative to src
 	path, err := filepath.Rel(w.dst, w.src)
@@ -116,12 +129,12 @@ func (w *Worker) updateZosVersion(network Network, manager client.Manager) error
 		return fmt.Errorf("failed to get dst relative path to src: %w", err)
 	}
 
-	zosCurrent := fmt.Sprintf("%v/.tag-%v", w.src, currentZosVersion)
+	zosCurrent := fmt.Sprintf("%v/.tag-%v", w.src, chainVersion.Version)
 	zosLatest := fmt.Sprintf("%v/%v", w.dst, network)
 	// the link is like zosCurrent but it has the path relative from the symlink
 	// point of view (so relative to the symlink, how to reach zosCurrent)
 	// hence the link is instead used in all calls to symlink
-	link := fmt.Sprintf("%v/.tag-%v", path, currentZosVersion)
+	link := fmt.Sprintf("%v/.tag-%v", path, chainVersion.Version)
 
 	// check if current exists
 	if _, err := os.Lstat(zosCurrent); err != nil {
