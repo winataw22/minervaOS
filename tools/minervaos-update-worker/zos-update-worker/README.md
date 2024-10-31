@@ -6,7 +6,7 @@ A worker to get the version set on the chain with the substrate-client with a sp
 
 - Get the binary
 
-> Download the latest from the [releases page](https://github.com/threefoldtech/zos-update-worker/releases)
+> Download the latest from the [releases page](https://github.com/threefoldtech/zos/releases)
 
 - Run the worker
 

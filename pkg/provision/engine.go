@@ -3,17 +3,22 @@ package provision
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/joncrlsn/dque"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zos/pkg"
+	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"github.com/threefoldtech/zos/pkg/stubs"
@@ -108,21 +113,23 @@ type NativeEngine struct {
 
 	queue *dque.DQue
 
-	//options
+	// options
 	// janitor Janitor
 	twins     Twins
 	admins    Twins
 	order     []gridtypes.WorkloadType
 	typeIndex map[gridtypes.WorkloadType]int
 	rerunAll  bool
-	//substrate specific attributes
+	// substrate specific attributes
 	nodeID           uint32
 	substrateGateway *stubs.SubstrateGatewayStub
 	callback         Callback
 }
 
-var _ Engine = (*NativeEngine)(nil)
-var _ pkg.Provision = (*NativeEngine)(nil)
+var (
+	_ Engine        = (*NativeEngine)(nil)
+	_ pkg.Provision = (*NativeEngine)(nil)
+)
 
 type withUserKeyGetter struct {
 	g Twins
@@ -199,14 +206,19 @@ func (n *nullKeyGetter) GetKey(id uint32) ([]byte, error) {
 	return nil, fmt.Errorf("null user key getter")
 }
 
-type engineKey struct{}
-type deploymentKey struct{}
-type deploymentValue struct {
-	twin       uint32
-	deployment uint64
-}
-type contractKey struct{}
-type rentKey struct{}
+type (
+	engineKey       struct{}
+	deploymentKey   struct{}
+	deploymentValue struct {
+		twin       uint32
+		deployment uint64
+	}
+)
+
+type (
+	contractKey struct{}
+	rentKey     struct{}
+)
 
 // GetEngine gets engine from context
 func GetEngine(ctx context.Context) Engine {
@@ -498,7 +510,7 @@ func (e *NativeEngine) Run(root context.Context) error {
 			ctx, err = e.validate(ctx, &job.Target, job.Op == opProvisionNoValidation)
 			if err != nil {
 				l.Error().Err(err).Msg("contact validation fails")
-				//job.Target.SetError(err)
+				// job.Target.SetError(err)
 				if err := e.storage.Error(job.Target.TwinID, job.Target.ContractID, err); err != nil {
 					l.Error().Err(err).Msg("failed to set deployment global error")
 				}
@@ -718,7 +730,7 @@ func (e *NativeEngine) installWorkload(ctx context.Context, wl *gridtypes.Worklo
 		// if it has been deleted,  error state, we do nothing.
 		// otherwise, we-reinstall it
 		if current.Result.State.IsAny(gridtypes.StateDeleted, gridtypes.StateError) {
-			//nothing to do!
+			// nothing to do!
 			return nil
 		}
 	}
@@ -797,7 +809,7 @@ func (e *NativeEngine) lockWorkload(ctx context.Context, wl *gridtypes.WorkloadW
 		return errors.Wrapf(err, "failed to get last transaction for '%s'", wl.ID.String())
 	} else {
 		if !current.Result.State.IsOkay() {
-			//nothing to do! it's either in error state or something else.
+			// nothing to do! it's either in error state or something else.
 			return nil
 		}
 	}
@@ -857,7 +869,6 @@ func (e *NativeEngine) uninstallDeployment(ctx context.Context, dl *gridtypes.De
 			Uint64("contract", dl.ContractID).
 			Msg("failed to delete deployment")
 	}
-
 }
 
 func getMountSize(wl *gridtypes.Workload) (gridtypes.Unit, error) {
@@ -985,11 +996,11 @@ func (e *NativeEngine) DecommissionCached(id string, reason string) error {
 
 	if wl.Result.State == gridtypes.StateDeleted ||
 		wl.Result.State == gridtypes.StateError {
-		//nothing to do!
+		// nothing to do!
 		return nil
 	}
 
-	//to bad we have to repeat this here
+	// to bad we have to repeat this here
 	ctx := context.WithValue(context.Background(), engineKey{}, e)
 	ctx = withDeployment(ctx, twin, dlID)
 
@@ -1012,6 +1023,20 @@ func (n *NativeEngine) CreateOrUpdate(twin uint32, deployment gridtypes.Deployme
 		return fmt.Errorf("twin id mismatch (deployment: %d, message: %d)", deployment.TwinID, twin)
 	}
 
+	// make sure the account used is verified
+	check := func() error {
+		if ok, err := isTwinVerified(twin); err != nil {
+			return err
+		} else if !ok {
+			return fmt.Errorf("user with twin id %d is not verified", twin)
+		}
+		return nil
+	}
+
+	if err := backoff.Retry(check, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 5)); err != nil {
+		return err
+	}
+
 	if err := deployment.Verify(n.twins); err != nil {
 		return err
 	}
@@ -1028,7 +1053,6 @@ func (n *NativeEngine) CreateOrUpdate(twin uint32, deployment gridtypes.Deployme
 	}
 
 	return action(ctx, deployment)
-
 }
 
 func (n *NativeEngine) Get(twin uint32, contractID uint64) (gridtypes.Deployment, error) {
@@ -1041,6 +1065,7 @@ func (n *NativeEngine) Get(twin uint32, contractID uint64) (gridtypes.Deployment
 
 	return deployment, nil
 }
+
 func (n *NativeEngine) List(twin uint32) ([]gridtypes.Deployment, error) {
 	deploymentIDs, err := n.storage.ByTwin(twin)
 	if err != nil {
@@ -1059,6 +1084,7 @@ func (n *NativeEngine) List(twin uint32) ([]gridtypes.Deployment, error) {
 	}
 	return deployments, nil
 }
+
 func (n *NativeEngine) Changes(twin uint32, contractID uint64) ([]gridtypes.Workload, error) {
 	changes, err := n.storage.Changes(twin, contractID)
 	if errors.Is(err, ErrDeploymentNotExists) {
@@ -1068,6 +1094,7 @@ func (n *NativeEngine) Changes(twin uint32, contractID uint64) ([]gridtypes.Work
 	}
 	return changes, nil
 }
+
 func (n *NativeEngine) ListPublicIPs() ([]string, error) {
 	// for efficiency this method should just find out configured public Ips.
 	// but currently the only way to do this is by scanning the nft rules
@@ -1110,6 +1137,7 @@ func (n *NativeEngine) ListPublicIPs() ([]string, error) {
 
 	return ips, nil
 }
+
 func (n *NativeEngine) ListPrivateIPs(twin uint32, network gridtypes.Name) ([]string, error) {
 	deployments, err := n.List(twin)
 	if err != nil {
@@ -1161,4 +1189,47 @@ func (e *NativeEngine) GetWorkloadStatus(id string) (gridtypes.ResultState, bool
 	}
 
 	return wl.Result.State, true, nil
+}
+
+// isTwinVerified make sure the account used is verified
+func isTwinVerified(twinID uint32) (verified bool, err error) {
+	const verifiedStatus = "VERIFIED"
+	env := environment.MustGet()
+
+	verificationServiceURL, err := url.JoinPath(env.KycURL, "/api/v1/status")
+	if err != nil {
+		return
+	}
+
+	request, err := http.NewRequest(http.MethodGet, verificationServiceURL, nil)
+	if err != nil {
+		return
+	}
+
+	q := request.URL.Query()
+	q.Set("twin_id", fmt.Sprint(twinID))
+	request.URL.RawQuery = q.Encode()
+
+	cl := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	response, err := cl.Do(request)
+	if err != nil {
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return verified, errors.New("failed to get twin verification status")
+	}
+
+	var result struct{ Result struct{ Status string } }
+
+	err = json.NewDecoder(response.Body).Decode(&result)
+	if err != nil {
+		return
+	}
+
+	return result.Result.Status == verifiedStatus, nil
 }

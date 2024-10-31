@@ -2,9 +2,11 @@
 
 The upgrade module is responsible to keep a zos node always up to date.
 
-It checks the hub for new releases of zos packages.
+It checks the hub for new releases of zos packages. Also check version and `safe_to_upgrade` flag from the chain.
 
-If a new release is available, it will then update the packages and restart the updated module with the new binaries if required.
+If `safe_to_upgrade` is set to `false` and a new release is available then it will only update the [configured farms](https://github.com/threefoldtech/zos-config/blob/main/config.schema.json#L49)
+
+If `safe_to_upgrade` is set to `true` and a new release is available, it will then update the packages and restart the updated module with the new binaries if required.
 
 ## Usage
 
