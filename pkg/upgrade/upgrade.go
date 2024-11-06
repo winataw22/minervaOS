@@ -231,7 +231,7 @@ func (u *Upgrader) Version() semver.Version {
 func (u *Upgrader) nextUpdate() time.Duration {
 	jitter := rand.Intn(checkJitter)
 	next := checkForUpdateEvery + (time.Duration(jitter) * time.Minute)
-	log.Info().Str("after", next.String()).Msg("checking for update after")
+	log.Info().Str("after", next.String()).Msg("checking for update")
 	return next
 }
 
@@ -295,7 +295,7 @@ func (u *Upgrader) update() error {
 		}
 	}
 
-	log.Info().Str("version", filepath.Base(remote.Target)).Msg("updating system...")
+	log.Info().Str("running version", u.Version().String()).Str("updating to version", filepath.Base(remote.Target)).Msg("updating system...")
 	if err := u.updateTo(remote, &current); err != nil {
 		return errors.Wrapf(err, "failed to update to new tag '%s'", remote.Target)
 	}
@@ -436,9 +436,11 @@ func newInMemoryCache() (*inMemoryCache, error) {
 func (c *inMemoryCache) flistCache() string {
 	return c.flist
 }
+
 func (c *inMemoryCache) fileCache() string {
 	return c.file
 }
+
 func (c *inMemoryCache) clean() {
 	os.RemoveAll(c.root)
 }

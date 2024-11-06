@@ -1,0 +1,43 @@
+name: Update Worker Release
+
+defaults:
+  run:
+    working-directory: tools/zos-update-worker
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  zos-update-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install GO
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Build zos update worker
+        run: |
+          make build
+
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.2.3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload Release Asset for zos update worker
+        id: upload-release-asset-worker
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: tools/zos-update-worker/bin/zos-update-worker
+          asset_name: zos-update-worker
+          asset_content_type: application/x-pie-executable

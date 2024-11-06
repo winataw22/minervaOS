@@ -119,8 +119,8 @@ func (w *Worker) updateZosVersion(network Network, manager client.Manager) error
 	err = json.Unmarshal([]byte(currentZosVersion), &chainVersion)
 	if err != nil {
 		log.Debug().Err(err).Msg("failed to unmarshal chain version")
-		chainVersion.Version = currentZosVersion
-		chainVersion.VersionLight = currentZosVersion
+		// shouldn't fail for env that still not updated version format
+		return nil
 	}
 
 	log.Debug().Msgf("getting substrate version %v for network %v", chainVersion.Version, network)
@@ -134,21 +134,23 @@ func (w *Worker) updateZosVersion(network Network, manager client.Manager) error
 	//zos
 	zosCurrent := fmt.Sprintf("%v/.tag-%v", w.src, chainVersion.Version)
 	zosLatest := fmt.Sprintf("%v/%v", w.dst, network)
+
 	// zos light
-	// to handle the environments that aren't updated yet (mainnet)
-	zosLightCurrent := fmt.Sprintf("%v/.tag-%v", w.src, chainVersion.VersionLight)
-	zosLightLatest := fmt.Sprintf("%v/%v-v4", w.dst, network)
+	if chainVersion.VersionLight != "" {
+		zosLightCurrent := fmt.Sprintf("%v/.tag-%v", w.src, chainVersion.VersionLight)
+		zosLightLatest := fmt.Sprintf("%v/%v-v4", w.dst, network)
+		zosLightLink := fmt.Sprintf("%v/.tag-%v", path, chainVersion.VersionLight)
+		if err = w.updateLink(zosLightCurrent, zosLightLatest, zosLightLink); err != nil {
+			return err
+		}
+	}
 	// the link is like zosCurrent but it has the path relative from the symlink
 	// point of view (so relative to the symlink, how to reach zosCurrent)
 	// hence the link is instead used in all calls to symlink
 	zosLink := fmt.Sprintf("%v/.tag-%v", path, chainVersion.Version)
-	zosLightLink := fmt.Sprintf("%v/.tag-%v", path, chainVersion.VersionLight)
 
-	// update links for both zos and zoslight
-	if err = w.updateLink(zosCurrent, zosLatest, zosLink); err != nil {
-		return err
-	}
-	return w.updateLink(zosLightCurrent, zosLightLatest, zosLightLink)
+	// update links zos
+	return w.updateLink(zosCurrent, zosLatest, zosLink)
 }
 
 func (w *Worker) updateLink(current string, latest string, link string) error {
