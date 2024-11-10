@@ -63,7 +63,7 @@ func (h *healthcheckTask) Run(ctx context.Context) (interface{}, error) {
 	log.Debug().Msg("starting health check task")
 	errs := make(map[string][]string)
 
-	cl := perf.GetZbusClient(ctx)
+	cl := perf.MustGetZbusClient(ctx)
 	zui := stubs.NewZUIStub(cl)
 
 	var wg sync.WaitGroup

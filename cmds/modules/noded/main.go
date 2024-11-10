@@ -167,7 +167,11 @@ func action(cli *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create a new perfMon")
 	}
-
+	zcl, err := zbus.NewRedisClient(msgBrokerCon)
+	if err != nil {
+		return errors.Wrap(err, "failed to create a zbus client to the msgBroker")
+	}
+	ctx = perf.WithZbusClient(ctx, zcl)
 	healthcheck.RunNTPCheck(ctx)
 	perfMon.AddTask(iperf.NewTask())
 	perfMon.AddTask(cpubench.NewTask())

@@ -78,7 +78,7 @@ func (p *publicIPValidationTask) Run(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace %s: %w", testNamespace, err)
 	}
-	cl := perf.GetZbusClient(ctx)
+	cl := perf.MustGetZbusClient(ctx)
 	substrateGateway := stubs.NewSubstrateGatewayStub(cl)
 	farmID := environment.MustGet().FarmID
 
@@ -191,7 +191,7 @@ func isLeastValidNode(ctx context.Context, farmID uint32, substrateGateway *stub
 	if err != nil {
 		return false, fmt.Errorf("failed to get farm %d nodes: %w", farmID, err)
 	}
-	cl := perf.GetZbusClient(ctx)
+	cl := perf.MustGetZbusClient(ctx)
 	registrar := stubs.NewRegistrarStub(cl)
 	var nodeID uint32
 	err = backoff.Retry(func() error {

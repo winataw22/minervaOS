@@ -16,6 +16,12 @@ A `tag link` is a link that exists in a repo to a tag in another repo. We then u
 
 For example a `development` tag link from tf-zos will point to a tag (say `61cc487`) under tf-autobuilder. What does that mean? it means the development env zos is using this build tag, and the flists installed (and used by the zos nodes) in development are installed from that build tag.
 
+Before createing a new release we need to make sure that the chain(substrate client) is up to date.
+```sh
+cd pkg
+go get 'github.com/threefoldtech/tfchain/clients/tfchain-client-go@<latest version>'
+```
+
 On creating a new release, the build tag will get that exact release version (say v3.20.0), instead of a commit short hash.
 
 For more details on how the system updates itself please check [upgrade documentation](../internals/identity/upgrade.md).
@@ -34,8 +40,6 @@ On creating a release it's exactly the same as above except the tag will be the 
 production -> ../tf-autobuilder/v3.4.5
 ```
 
-> NOTE: during the writing of this docs, not all networks are using this release pipeline and they might still using the old style. Hopefully this will phaseout as soon as possible to use the procedure described in this document.
-
 ## Creating the links
 
 Now, once a release is created the links from the tag links (qa, testing, production) are not auto-created by the build pipeline. Instead, these has to be created by other means when the operators decide it's right time to deploy a certain version to a certain network. Once decided the link then must be created. This brings us to the `zos-update-worker`
@@ -43,3 +47,14 @@ Now, once a release is created the links from the tag links (qa, testing, produc
 The update worker is a very simple process that watches changes to `tfchain` version as updated by the Council. and apply the correct link.
 
 Say the worker finds out that the zos version on production tfchain is set to `v3.4.5` then it will simply make sure the link from `production` is correctly pointing to the correct release tag. If not, will create that link.
+
+On updates using motions we need to set zos3 and zos4 version and if the new release is safe to upgrade to. For example:
+```json
+{"safe_to_upgrade": true, "version":"v3.12.5", "version_light": "v0.1.1"}
+```
+- safe_to_upgrade: if the flag is set this indicates that it is safe to update all nodes in the network to this release, if not then the nodes specified in zos-config are the only ones that is getting the upgrade.
+
+For example [here](https://github.com/threefoldtech/zos-config/blob/1a2d1339b219775ca4359535793f067630ed9062/qa.json#L68) if safe_to_upgrade is not set the only farms getting the new upgrade are the mentioned farms other farms in qa are not.
+
+- version: is zos3 version
+- version_light: is zos4(zos light) version

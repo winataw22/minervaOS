@@ -1,6 +1,8 @@
 package pkg
 
 import (
+	"time"
+
 	"github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 )
@@ -27,6 +29,7 @@ type SubstrateGateway interface {
 	SetNodePowerState(up bool) (hash types.Hash, err error)
 	UpdateNode(node substrate.Node) (uint32, error)
 	UpdateNodeUptimeV2(uptime uint64, timestampHint uint64) (hash types.Hash, err error)
+	GetTime() (time.Time, error)
 }
 
 type SubstrateError struct {

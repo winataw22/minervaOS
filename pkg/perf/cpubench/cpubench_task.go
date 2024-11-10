@@ -59,7 +59,7 @@ func (c *CPUBenchmarkTask) Run(ctx context.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse cpubench output: %w", err)
 	}
-	client := perf.GetZbusClient(ctx)
+	client := perf.MustGetZbusClient(ctx)
 	statistics := stubs.NewStatisticsStub(client)
 
 	workloads, err := statistics.Workloads(ctx)

@@ -78,7 +78,7 @@ func (pm *PerformanceMonitor) runTask(ctx context.Context, task Task) error {
 
 // Run adds the tasks to the cron queue and start the scheduler
 func (pm *PerformanceMonitor) Run(ctx context.Context) error {
-	ctx = withZbusClient(ctx, pm.zbusClient)
+	ctx = WithZbusClient(ctx, pm.zbusClient)
 	for _, task := range pm.tasks {
 		task := task
 		if _, err := pm.scheduler.CronWithSeconds(task.Cron()).Do(func() error {
@@ -104,15 +104,4 @@ func (pm *PerformanceMonitor) Run(ctx context.Context) error {
 
 	pm.scheduler.StartAsync()
 	return nil
-}
-
-type zbusClient struct{}
-
-func withZbusClient(ctx context.Context, client zbus.Client) context.Context {
-	return context.WithValue(ctx, zbusClient{}, client)
-}
-
-// GetZbusClient gets zbus client from the given context
-func GetZbusClient(ctx context.Context) zbus.Client {
-	return ctx.Value(zbusClient{}).(zbus.Client)
 }

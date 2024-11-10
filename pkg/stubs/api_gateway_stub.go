@@ -10,6 +10,7 @@ import (
 	tfchainclientgo "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
+	"time"
 )
 
 type SubstrateGatewayStub struct {
@@ -219,6 +220,23 @@ func (s *SubstrateGatewayStub) GetNodes(ctx context.Context, arg0 uint32) (ret0 
 func (s *SubstrateGatewayStub) GetPowerTarget(ctx context.Context, arg0 uint32) (ret0 tfchainclientgo.NodePower, ret1 error) {
 	args := []interface{}{arg0}
 	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetPowerTarget", args...)
+	if err != nil {
+		panic(err)
+	}
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
+}
+
+func (s *SubstrateGatewayStub) GetTime(ctx context.Context) (ret0 time.Time, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetTime", args...)
 	if err != nil {
 		panic(err)
 	}

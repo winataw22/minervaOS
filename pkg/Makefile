@@ -7,6 +7,7 @@ all: getdeps test
 
 getdeps:
 	@echo "Installing golangci-lint" && go get github.com/golangci/golangci-lint/cmd/golangci-lint && go install github.com/golangci/golangci-lint/cmd/golangci-lint
+	@echo "Installing zbusc" && go install github.com/threefoldtech/zbus/zbusc
 	go mod tidy
 
 lint:
