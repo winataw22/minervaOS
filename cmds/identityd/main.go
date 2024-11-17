@@ -68,6 +68,8 @@ func main() {
 		version.ShowAndExit(false)
 	}
 
+	client, err := zbus.NewRedisClient(broker)
+
 	if farm {
 		env := environment.MustGet()
 		fmt.Println(env.FarmID)
@@ -78,7 +80,6 @@ func main() {
 		os.Exit(0)
 	} else if id || address {
 		ctx := context.Background()
-		client, err := zbus.NewRedisClient(broker)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to connect to zbus")
 		}
@@ -107,7 +108,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create identity manager")
 	}
 
-	upgrader, err := upgrade.NewUpgrader(root, upgrade.NoZosUpgrade(debug))
+	upgrader, err := upgrade.NewUpgrader(root, upgrade.NoZosUpgrade(debug), upgrade.ZbusClient(client))
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize upgrader")
 	}

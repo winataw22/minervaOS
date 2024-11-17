@@ -6,11 +6,12 @@ package stubs
 
 import (
 	"context"
+	"time"
+
 	types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	tfchainclientgo "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	zbus "github.com/threefoldtech/zbus"
 	pkg "github.com/threefoldtech/zos/pkg"
-	"time"
 )
 
 type SubstrateGatewayStub struct {
@@ -28,6 +29,25 @@ func NewSubstrateGatewayStub(client zbus.Client) *SubstrateGatewayStub {
 			Version: "0.0.1",
 		},
 	}
+}
+
+func (s *SubstrateGatewayStub) GetZosVersion(ctx context.Context) (ret0 string, ret1 error) {
+	args := []interface{}{}
+	result, err := s.client.RequestContext(ctx, s.module, s.object, "GetZosVersion", args...)
+	if err != nil {
+		panic(err)
+	}
+
+	result.PanicOnError()
+	ret1 = result.CallError()
+	loader := zbus.Loader{
+		&ret0,
+	}
+
+	if err := result.Unmarshal(&loader); err != nil {
+		panic(err)
+	}
+	return
 }
 
 func (s *SubstrateGatewayStub) CreateNode(ctx context.Context, arg0 tfchainclientgo.Node) (ret0 uint32, ret1 error) {
