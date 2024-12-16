@@ -92,7 +92,7 @@ func TestMarkBooted(t *testing.T) {
 	})
 }
 
-// TestIsFirstBoo tests the isFirstBoot function against multiple scenarios.
+// TestIsFirstBoot tests the isFirstBoot function against multiple scenarios.
 // it tests both scenarios of the file being first booted or not
 func TestIsFirstBoot(t *testing.T) {
 	testFile := "test"

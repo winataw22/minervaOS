@@ -735,7 +735,7 @@ func (b *BoltStorage) Close() error {
 	return b.db.Close()
 }
 
-// CleanDeletes is a cleaner method intended to clean up old "deleted" contracts
+// CleanDeleted is a cleaner method intended to clean up old "deleted" contracts
 // that has no active workloads anymore. We used to always leave the entire history
 // of all deployments that ever lived on the system. But we changed that so once
 // a deployment is deleted, it's deleted forever. Hence this code is only needed

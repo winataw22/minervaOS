@@ -18,7 +18,7 @@ import (
 
 const module = "container"
 
-//Module is contd entry point
+// Module is contd entry point
 var Module cli.Command = cli.Command{
 	Name:  "contd",
 	Usage: "handles containers creations",
