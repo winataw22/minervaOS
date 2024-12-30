@@ -113,6 +113,7 @@ func action(cli *cli.Context) error {
 			router.Serve,
 			peer.WithKeyType(peer.KeyTypeEd25519),
 			peer.WithRelay(environment.MustGet().RelayURL...),
+			peer.WithInMemoryExpiration(6*60*60), // 6 hours
 		)
 		if err != nil {
 			return fmt.Errorf("failed to start a new rmb peer: %w", err)
