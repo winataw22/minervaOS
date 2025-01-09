@@ -40,6 +40,8 @@ type Counters struct {
 	System gridtypes.Capacity `json:"system"`
 	// Users statistics by zos
 	Users UsersCounters `json:"users"`
+	// OpenConnecions number of open connections in the node
+	OpenConnecions int `json:"open_connections"`
 }
 
 // UsersCounters the expected counters for deployments and workloads
