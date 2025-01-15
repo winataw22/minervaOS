@@ -55,7 +55,7 @@ The following procedure is what is needed to boot a new machine to `zos:v2`
 > - Create another mem disk of proper size, use it as a temporary cache for the downloads, then cleared up after the files are copied to the tmpfs of the rootfs
 
 ## Data Migration
-Since some daemons need to keep some sort of state on disk. Daemons **MUST** make sure they are always compatible with the older version of their data. It's totally up to the daemon to decide how it's gonna track the version number of the data schema, but we provided a small util library to work with [versioned](../modules/versioned) data.
+Since some daemons need to keep some sort of state on disk. Daemons **MUST** make sure they are always compatible with the older version of their data. It's totally up to the daemon to decide how it's gonna track the version number of the data schema, but we provided a small util library to work with [versioned](../pkg/versioned) data.
 
 > We are concerned with the version of the data `schema` not the version of the data object.
 

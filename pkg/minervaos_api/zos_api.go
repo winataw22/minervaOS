@@ -2,13 +2,20 @@ package zosapi
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/patrickmn/go-cache"
 	substrate "github.com/threefoldtech/tfchain/clients/tfchain-client-go"
 	"github.com/threefoldtech/zbus"
 	"github.com/threefoldtech/zos/pkg/capacity"
 	"github.com/threefoldtech/zos/pkg/diagnostics"
 	"github.com/threefoldtech/zos/pkg/environment"
 	"github.com/threefoldtech/zos/pkg/stubs"
+)
+
+const (
+	cacheDefaultExpiration = 24 * time.Hour
+	cacheDefaultCleanup    = 24 * time.Hour
 )
 
 type ZosAPI struct {
@@ -22,6 +29,7 @@ type ZosAPI struct {
 	performanceMonitorStub *stubs.PerformanceMonitorStub
 	diagnosticsManager     *diagnostics.DiagnosticsManager
 	farmerID               uint32
+	inMemCache             *cache.Cache
 }
 
 func NewZosAPI(manager substrate.Manager, client zbus.Client, msgBrokerCon string) (ZosAPI, error) {
@@ -56,5 +64,6 @@ func NewZosAPI(manager substrate.Manager, client zbus.Client, msgBrokerCon strin
 		return ZosAPI{}, err
 	}
 	api.farmerID = uint32(farmer.ID)
+	api.inMemCache = cache.New(cacheDefaultExpiration, cacheDefaultCleanup)
 	return api, nil
 }

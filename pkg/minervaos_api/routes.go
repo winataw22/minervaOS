@@ -48,4 +48,7 @@ func (g *ZosAPI) SetupRoutes(router *peer.Router) {
 	admin.WithHandler("interfaces", g.adminInterfacesHandler)
 	admin.WithHandler("set_public_nic", g.adminSetPublicNICHandler)
 	admin.WithHandler("get_public_nic", g.adminGetPublicNICHandler)
+
+	location := root.SubRoute("location")
+	location.WithHandler("get", g.locationGet)
 }
