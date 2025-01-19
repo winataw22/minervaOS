@@ -1,7 +1,7 @@
 ﻿# minervaOS – First Blockchain-Based OS  
 
 **Version:** v1.0.0  
-**Ticker:** $MINERVA  
+**Ticker:**  $MNRV
 
 ---
 
