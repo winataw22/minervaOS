@@ -39,6 +39,16 @@ minervaOS is the first fully blockchain-integrated operating system, designed to
 6. **Data Indexer**  
    Sync and aggregate blockchain data in real-time, enabling rapid analytics and token tracking.
 
+7. **Main APIs Capability**  
+   - Bullx API
+   - Gmgn API
+   - Photon API
+   - Bloom API
+   - Phanes API
+   - Kaito API
+   - Nansen API
+   - StalkChain API
+
 ---
 
 ## Installation  
