@@ -3,9 +3,9 @@ package geoip
 import (
 	"encoding/json"
 	"errors"
-	"net/http"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,9 +22,7 @@ type Location struct {
 var (
 	geoipURLs = []string{"https://geoip.grid.tf/", "https://02.geoip.grid.tf/", "https://03.geoip.grid.tf/"}
 
-	defaultHTTPClient = &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	defaultHTTPClient = retryablehttp.NewClient()
 )
 
 // Fetch retrieves the location of the system calling this function
@@ -51,6 +49,8 @@ func getLocation(geoIPService string) (Location, error) {
 		City:      "Unknown",
 	}
 
+	defaultHTTPClient.HTTPClient.Timeout = 10 * time.Second
+	defaultHTTPClient.RetryMax = 5
 	resp, err := defaultHTTPClient.Get(geoIPService)
 	if err != nil {
 		return l, err

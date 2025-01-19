@@ -62,6 +62,8 @@ require (
 	gotest.tools v2.2.0+incompatible
 )
 
+require github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.8.25 // indirect
@@ -94,6 +96,7 @@ require (
 	github.com/hanwen/go-fuse/v2 v2.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/jarcoal/httpmock v1.3.1

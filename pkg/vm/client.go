@@ -8,12 +8,13 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 )
 
 // Client to a cloud hypervisor instance
 type Client struct {
-	client http.Client
+	client *retryablehttp.Client
 }
 
 type VMData struct {
@@ -24,14 +25,15 @@ type VMData struct {
 
 // NewClient creates a new instance of client
 func NewClient(unix string) *Client {
-	client := Client{
-		client: http.Client{
-			Transport: &http.Transport{
-				Dial: func(network, _ string) (net.Conn, error) {
-					return net.Dial("unix", unix)
-				},
-			},
+	httpClient := retryablehttp.NewClient()
+	httpClient.RetryMax = 5
+	httpClient.HTTPClient.Transport = &http.Transport{
+		Dial: func(network, _ string) (net.Conn, error) {
+			return net.Dial("unix", unix)
 		},
+	}
+	client := Client{
+		client: httpClient,
 	}
 
 	return &client
@@ -43,7 +45,7 @@ func (c *Client) Shutdown(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	response, err := c.client.Do(request)
+	response, err := c.client.StandardClient().Do(request)
 	if err != nil {
 		return errors.Wrap(err, "error calling machine shutdown")
 	}
@@ -61,7 +63,7 @@ func (c *Client) Pause(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	response, err := c.client.Do(request)
+	response, err := c.client.StandardClient().Do(request)
 	if err != nil {
 		return errors.Wrap(err, "error calling machine pause")
 	}
@@ -79,7 +81,7 @@ func (c *Client) Resume(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	response, err := c.client.Do(request)
+	response, err := c.client.StandardClient().Do(request)
 	if err != nil {
 		return errors.Wrap(err, "error calling machine pause")
 	}
@@ -100,7 +102,7 @@ func (c *Client) Inspect(ctx context.Context) (VMData, error) {
 	}
 	request.Header.Add("content-type", "application/json")
 
-	response, err := c.client.Do(request)
+	response, err := c.client.StandardClient().Do(request)
 	if err != nil {
 		return VMData{}, errors.Wrap(err, "error calling machine info")
 	}

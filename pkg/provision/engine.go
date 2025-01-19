@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/joncrlsn/dque"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -91,6 +92,8 @@ const (
 	opPause
 	// opResume resumes a deployment
 	opResume
+	// servers default timeout
+	defaultHttpTimeout = 10 * time.Second
 )
 
 // engineJob is a persisted job instance that is
@@ -1210,11 +1213,11 @@ func isTwinVerified(twinID uint32) (verified bool, err error) {
 	q.Set("twin_id", fmt.Sprint(twinID))
 	request.URL.RawQuery = q.Encode()
 
-	cl := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+	cl := retryablehttp.NewClient()
+	cl.HTTPClient.Timeout = defaultHttpTimeout
+	cl.RetryMax = 5
 
-	response, err := cl.Do(request)
+	response, err := cl.StandardClient().Do(request)
 	if err != nil {
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 )
 
@@ -51,11 +52,11 @@ func GetConfig() (base Config, err error) {
 
 // GetConfig returns extend config for specific run mode
 func GetConfigForMode(mode RunMode) (Config, error) {
-	httpClient := &http.Client{
-		Timeout: defaultHttpTimeout,
-	}
+	httpClient := retryablehttp.NewClient()
+	httpClient.HTTPClient.Timeout = defaultHttpTimeout
+	httpClient.RetryMax = 5
 
-	return getConfig(mode, baseExtendedURL, httpClient)
+	return getConfig(mode, baseExtendedURL, httpClient.StandardClient())
 }
 
 func uniqueStr(slice []string) []string {

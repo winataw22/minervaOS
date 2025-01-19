@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 )
@@ -85,7 +86,7 @@ func (n *NodeClient) Deploy(dl *gridtypes.Deployment, update bool) error {
 		return errors.Wrap(err, "failed to sign request")
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := retryablehttp.DefaultClient.Do(request)
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func (n *NodeClient) Get(twin, deployment uint32) (dl gridtypes.Deployment, err 
 		return dl, errors.Wrap(err, "failed to sign request")
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := retryablehttp.DefaultClient.Do(request)
 	if err != nil {
 		return dl, err
 	}
@@ -135,7 +136,7 @@ func (n *NodeClient) Delete(twin, deployment uint32) (err error) {
 		return errors.Wrap(err, "failed to sign request")
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := retryablehttp.DefaultClient.Do(request)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func (n *NodeClient) Counters() (total gridtypes.Capacity, used gridtypes.Capaci
 		return total, used, errors.Wrap(err, "failed to build request")
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := retryablehttp.DefaultClient.Do(request)
 	if err != nil {
 		return total, used, err
 	}
