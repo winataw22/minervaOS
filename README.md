@@ -2,7 +2,8 @@
 
 **Version:** v1.0.0  
 **Ticker:**  $MNRV
-**CA** 2JxFhGLcuDieDMTnNdmjkTppFan6QnvbZMHtgyBkpump
+
+**CA:** 2JxFhGLcuDieDMTnNdmjkTppFan6QnvbZMHtgyBkpump
 
 ---
 
